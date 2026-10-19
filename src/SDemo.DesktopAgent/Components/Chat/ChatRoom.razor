@@ -1,0 +1,309 @@
+@using SDemo.DesktopAgent.Models
+@inject IJSRuntime Js
+@inject ISettingsService Settings
+@inject IAgentChatService Agent
+@inject FileWriteApprovalService Approvals
+@implements IDisposable
+
+@* 聊天室：空会话（欢迎语 + 输入框，垂直居中）与有记录会话（标题 / 消息区 / 输入框）共用本组件 *@
+<section class="chat @(IsEmpty ? "chat--empty" : null)">
+    @if (IsEmpty)
+    {
+        <div class="welcome">
+            <h1>你好，我是 SDemo DesktopAgent</h1>
+            <p>描述你的任务，我会在本地工作区里帮你完成。</p>
+        </div>
+    }
+    else
+    {
+        <header class="chat-header">
+            <h1 class="chat-title">@Session.Title</h1>
+        </header>
+
+        <div class="chat-scroll" @ref="_scrollElement">
+            <div class="chat-messages">
+                @foreach (var message in Session.Messages)
+                {
+                    var isUser = message.Role == ChatMessageRole.User;
+
+                    <article class="msg @(isUser ? "msg--user" : "msg--assistant")">
+                        <span class="msg-role">@(isUser ? "你" : "SDemo")</span>
+                        <div class="msg-body">@message.Content</div>
+                    </article>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="chat-composer-area">
+        <ChatComposer @bind-Text="_draft"
+                      IsGenerating="_isGenerating"
+                      EnabledSkills="_enabledSkills"
+                      OnToggleSkill="ToggleSkill"
+                      OnSend="HandleSend"
+                      OnStop="HandleStop">
+            <FooterContent>
+                @if (_modelOptions.Count > 0)
+                {
+                    <div class="model-picker">
+                        <select class="model-picker-select"
+                                title="选择模型"
+                                value="@_selectedKey"
+                                disabled="@_isGenerating"
+                                @onchange="HandleModelChanged">
+                            @foreach (var option in _modelOptions)
+                            {
+                                <option value="@option.Key">@option.Text</option>
+                            }
+                        </select>
+                    </div>
+                }
+                else
+                {
+                    <button type="button" class="model-picker-empty" @onclick="() => OnOpenModelSettings.InvokeAsync()">
+                        未配置模型 · 去设置
+                    </button>
+                }
+            </FooterContent>
+        </ChatComposer>
+    </div>
+
+    @* 文件写入确认：模型调用 write_file 时弹出 *@
+    @if (_pendingWrite is not null)
+    {
+        <div class="modal-backdrop">
+            <div class="modal" role="dialog" aria-modal="true">
+                <h2 class="modal-title">允许写入这个文件吗？</h2>
+                <p class="modal-sub">模型请求写入文件，确认后才会落盘。</p>
+                <code class="modal-path">@_pendingWrite.Path</code>
+                <pre class="modal-preview">@PreviewWrite(_pendingWrite.Content)</pre>
+                <div class="modal-actions">
+                    <button type="button" class="ghost-button" @onclick="() => ResolveWrite(false)">拒绝</button>
+                    <button type="button" class="primary-button" @onclick="() => ResolveWrite(true)">允许写入</button>
+                </div>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private sealed record ModelOption(string Key, string Text, ModelProvider Provider, string ModelId);
+
+    [Parameter, EditorRequired]
+    public ChatSession Session { get; set; } = default!;
+
+    /// <summary>发送：由外层把消息写入会话并落库。</summary>
+    [Parameter]
+    public EventCallback<string> OnSend { get; set; }
+
+    /// <summary>直接跳到设置的「模型设置」分区。</summary>
+    [Parameter]
+    public EventCallback OnOpenModelSettings { get; set; }
+
+    private string _draft = string.Empty;
+    private bool _isGenerating;
+    private string? _sessionId;
+    private ElementReference _scrollElement;
+
+    private List<ModelOption> _modelOptions = [];
+    private string? _selectedKey;
+    private CancellationTokenSource? _cts;
+    private FileWriteRequest? _pendingWrite;
+
+    /// <summary>输入框底部 chip 打开的工具（默认全关）。</summary>
+    private readonly HashSet<AgentSkill> _enabledSkills = [];
+
+    private bool IsEmpty => Session.Messages.Count == 0;
+
+    protected override void OnInitialized()
+    {
+        RefreshModelOptions();
+        Settings.Changed += OnSettingsChanged;
+        Approvals.Changed += OnApprovalChanged;
+    }
+
+    protected override void OnParametersSet()
+    {
+        // 切换到另一个聊天室时清空草稿、取消上一轮生成。
+        if (_sessionId != Session.Id)
+        {
+            _sessionId = Session.Id;
+            _draft = string.Empty;
+            _cts?.Cancel();
+            _isGenerating = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // 有消息后滚到底部（空态没有消息区，跳过）。
+        if (Session.Messages.Count > 0)
+        {
+            await Js.InvokeVoidAsync("sdChat.scrollToBottom", _scrollElement);
+        }
+    }
+
+    private void OnSettingsChanged(object? sender, EventArgs args) =>
+        _ = InvokeAsync(() =>
+        {
+            RefreshModelOptions();
+            StateHasChanged();
+        });
+
+    /// <summary>写入确认状态变化（可能来自后台线程）。</summary>
+    private void OnApprovalChanged() =>
+        _ = InvokeAsync(() =>
+        {
+            _pendingWrite = Approvals.Pending;
+            StateHasChanged();
+        });
+
+    private void ResolveWrite(bool approved) => Approvals.Resolve(approved);
+
+    private static string PreviewWrite(string content)
+    {
+        var normalized = content.Replace("\r\n", "\n");
+        return normalized.Length <= 1200 ? normalized : normalized[..1200] + "\n…（已截断）";
+    }
+
+    private void RefreshModelOptions()
+    {
+        var options = new List<ModelOption>();
+
+        foreach (var provider in Settings.Current.Providers)
+        {
+            foreach (var model in provider.Models)
+            {
+                options.Add(new ModelOption(
+                    $"{provider.Id}|{model.Id}",
+                    $"{provider.Name} · {model.Name}",
+                    provider,
+                    model.Id));
+            }
+        }
+
+        _modelOptions = options;
+
+        if (_selectedKey is not null && options.Any(option => option.Key == _selectedKey))
+        {
+            return;
+        }
+
+        // 优先恢复上次使用的 provider + model，其次用第一个可用模型。
+        var remembered = options.FirstOrDefault(option =>
+            string.Equals(option.Provider.Id, Settings.Current.LastProviderId, StringComparison.Ordinal) &&
+            string.Equals(option.ModelId, Settings.Current.LastModelId, StringComparison.Ordinal));
+
+        _selectedKey = remembered?.Key ?? options.FirstOrDefault()?.Key;
+    }
+
+    private void HandleModelChanged(ChangeEventArgs args)
+    {
+        _selectedKey = args.Value?.ToString();
+        RememberSelection();
+    }
+
+    /// <summary>点 chip 开关一个工具，下一次发送时生效。</summary>
+    private void ToggleSkill(AgentSkill skill)
+    {
+        if (!_enabledSkills.Remove(skill))
+        {
+            _enabledSkills.Add(skill);
+        }
+    }
+
+    /// <summary>把当前选择写进设置，下次启动直接选中。</summary>
+    private void RememberSelection()
+    {
+        var option = _modelOptions.FirstOrDefault(item => item.Key == _selectedKey);
+        if (option is null)
+        {
+            return;
+        }
+
+        if (string.Equals(Settings.Current.LastProviderId, option.Provider.Id, StringComparison.Ordinal) &&
+            string.Equals(Settings.Current.LastModelId, option.ModelId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Settings.Current.LastProviderId = option.Provider.Id;
+        Settings.Current.LastModelId = option.ModelId;
+        Settings.Save();
+    }
+
+    private async Task HandleSend()
+    {
+        if (string.IsNullOrWhiteSpace(_draft) || _isGenerating)
+        {
+            return;
+        }
+
+        var text = _draft.Trim();
+        await OnSend.InvokeAsync(text);
+        _draft = string.Empty;
+        RememberSelection();
+
+        var option = _modelOptions.FirstOrDefault(item => item.Key == _selectedKey);
+        if (option is null)
+        {
+            Session.Messages.Add(new ChatMessage(
+                ChatMessageRole.Assistant,
+                "还没有可用的模型。请到「设置 → 模型设置」添加模型提供商，并把模型加入目录。"));
+            return;
+        }
+
+        await GenerateAsync(option);
+    }
+
+    /// <summary>用 Agent Framework 流式生成回复，边生成边写入会话。</summary>
+    private async Task GenerateAsync(ModelOption option)
+    {
+        _isGenerating = true;
+        using var cts = new CancellationTokenSource();
+        _cts = cts;
+
+        var history = Session.Messages.ToList();
+        var reply = new ChatMessage(ChatMessageRole.Assistant, string.Empty);
+        Session.Messages.Add(reply);
+        StateHasChanged();
+
+        try
+        {
+            await foreach (var delta in Agent.StreamAsync(option.Provider, option.ModelId, history, _enabledSkills, cts.Token))
+            {
+                reply.Content += delta;
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 用户点了停止。
+        }
+        catch (Exception ex)
+        {
+            var prefix = string.IsNullOrWhiteSpace(reply.Content) ? string.Empty : "\n\n";
+            reply.Content += $"{prefix}调用失败：{ex.Message}";
+        }
+        finally
+        {
+            _isGenerating = false;
+            _cts = null;
+            StateHasChanged();
+        }
+    }
+
+    private void HandleStop() => _cts?.Cancel();
+
+    public void Dispose()
+    {
+        Settings.Changed -= OnSettingsChanged;
+        Approvals.Changed -= OnApprovalChanged;
+
+        // 组件销毁时若还有待确认的写入，按拒绝处理，避免工具线程一直挂着。
+        if (Approvals.Pending is not null)
+        {
+            Approvals.Resolve(false);
+        }
+    }
+}

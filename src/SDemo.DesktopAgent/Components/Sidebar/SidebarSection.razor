@@ -1,0 +1,41 @@
+@* 可收起/展开的分组列表 *@
+<div class="sidebar-section">
+    <button type="button"
+            class="section-toggle"
+            aria-expanded="@(_expanded ? "true" : "false")"
+            @onclick="Toggle">
+        <span class="chevron @(_expanded ? "is-open" : string.Empty)">▸</span>
+        <span class="section-title">@Title</span>
+        @if (Count > 0)
+        {
+            <span class="section-count">@Count</span>
+        }
+    </button>
+
+    @if (_expanded)
+    {
+        <div class="section-body">
+            @ChildContent
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public int Count { get; set; }
+
+    [Parameter]
+    public bool InitiallyExpanded { get; set; } = true;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private bool _expanded;
+
+    protected override void OnInitialized() => _expanded = InitiallyExpanded;
+
+    private void Toggle() => _expanded = !_expanded;
+}

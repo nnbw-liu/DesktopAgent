@@ -1,0 +1,112 @@
+<Window x:Class="SDemo.DesktopAgent.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:blazor="clr-namespace:Microsoft.AspNetCore.Components.WebView.Wpf;assembly=Microsoft.AspNetCore.Components.WebView.Wpf"
+        xmlns:components="clr-namespace:SDemo.DesktopAgent.Components"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="SDemo DesktopAgent"
+        Width="1240"
+        Height="800"
+        MinWidth="900"
+        MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        Background="{DynamicResource AppBackgroundBrush}"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+
+    <!-- 自绘标题栏：去掉系统边框，标题栏与 Blazor 界面共用同一套主题色 -->
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="40"
+                            ResizeBorderThickness="6"
+                            GlassFrameThickness="0"
+                            CornerRadius="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Border Background="{DynamicResource AppBackgroundBrush}"
+            BorderBrush="{DynamicResource WindowBorderBrush}"
+            BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="26" />
+            </Grid.RowDefinitions>
+
+            <!-- 标题栏 -->
+            <Grid Grid.Row="0" Background="{DynamicResource TitleBarBackgroundBrush}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Margin="16,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource TitleBarForegroundBrush}"
+                           Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" />
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,0,6,0"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button x:Name="MinimizeButton"
+                            Style="{StaticResource CaptionButtonStyle}"
+                            Content="&#xE921;"
+                            ToolTip="最小化"
+                            Click="OnMinimizeClick" />
+                    <Button x:Name="MaximizeButton"
+                            Style="{StaticResource CaptionButtonStyle}"
+                            Content="&#xE922;"
+                            ToolTip="最大化"
+                            Click="OnMaximizeClick" />
+                    <Button x:Name="CloseButton"
+                            Style="{StaticResource CloseCaptionButtonStyle}"
+                            Content="&#xE8BB;"
+                            ToolTip="关闭"
+                            Click="OnCloseClick" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Blazor Hybrid：界面由 Razor 组件渲染，根组件挂在 #app -->
+            <blazor:BlazorWebView x:Name="BlazorView"
+                                  Grid.Row="1"
+                                  HostPage="wwwroot/index.html">
+                <blazor:BlazorWebView.RootComponents>
+                    <blazor:RootComponent Selector="#app" ComponentType="{x:Type components:AppShell}" />
+                </blazor:BlazorWebView.RootComponents>
+            </blazor:BlazorWebView>
+
+            <!-- 底部状态栏：展示 Blazor Hybrid · WPF 的运行状态 -->
+            <Border Grid.Row="2"
+                    Background="{DynamicResource StatusBarBackgroundBrush}"
+                    BorderBrush="{DynamicResource ChromeBorderBrush}"
+                    BorderThickness="0,1,0,0">
+                <Grid Margin="14,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Width="6"
+                                 Height="6"
+                                 Margin="0,0,7,0"
+                                 VerticalAlignment="Center"
+                                 Fill="{DynamicResource StatusAccentBrush}" />
+                        <TextBlock FontSize="11"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource StatusBarForegroundBrush}"
+                                   Text="Blazor Hybrid · WPF" />
+                    </StackPanel>
+
+                    <TextBlock x:Name="RuntimeText"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="{DynamicResource StatusBarMutedBrush}" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

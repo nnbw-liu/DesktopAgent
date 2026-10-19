@@ -1,0 +1,167 @@
+@using SDemo.DesktopAgent.Models
+@inject IJSRuntime Js
+@implements IAsyncDisposable
+
+@* 多功能组合输入框：Header（为空不外显） / 多行输入 / Skills + 发送按钮 *@
+<div class="composer">
+    @if (HeaderContent is not null)
+    {
+        <div class="composer-header">
+            @HeaderContent
+        </div>
+    }
+
+    <textarea class="composer-text"
+              rows="1"
+              placeholder="@Placeholder"
+              value="@Text"
+              @oninput="HandleInput"></textarea>
+
+    <div class="composer-footer">
+        <div class="composer-skills">
+            <button type="button"
+                    class="skill-chip @(EnabledSkills.Contains(AgentSkill.Skills) ? "is-on" : null)"
+                    title="本地技能库：技能目录里的 Markdown 说明"
+                    @onclick="() => OnToggleSkill.InvokeAsync(AgentSkill.Skills)">
+                <span class="chip-icon">◈</span>技能
+            </button>
+            <button type="button"
+                    class="skill-chip @(EnabledSkills.Contains(AgentSkill.Search) ? "is-on" : null)"
+                    title="联网搜索（Bing）"
+                    @onclick="() => OnToggleSkill.InvokeAsync(AgentSkill.Search)">
+                <span class="chip-icon">⌕</span>搜索
+            </button>
+            <button type="button"
+                    class="skill-chip @(EnabledSkills.Contains(AgentSkill.Files) ? "is-on" : null)"
+                    title="工作区文件读写"
+                    @onclick="() => OnToggleSkill.InvokeAsync(AgentSkill.Files)">
+                <span class="chip-icon">▤</span>文件
+            </button>
+        </div>
+
+        <div class="composer-actions">
+            @FooterContent
+
+            <button type="button"
+                    class="composer-send @(IsGenerating ? "is-stop" : null)"
+                    title="@(IsGenerating ? "停止生成" : "发送")"
+                    disabled="@(!CanSubmit)"
+                    @onclick="HandlePrimaryAction">
+                @if (IsGenerating)
+                {
+                    <svg class="send-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="7" y="7" width="10" height="10" rx="2.5" fill="currentColor" />
+                    </svg>
+                }
+                else
+                {
+                    <svg class="send-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 19V6M12 6l-5.5 5.5M12 6l5.5 5.5"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round" />
+                    </svg>
+                }
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>输入框内容（支持 @bind-Text 双向绑定）。</summary>
+    [Parameter]
+    public string Text { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> TextChanged { get; set; }
+
+    /// <summary>生成中：同一个按钮切换为停止。</summary>
+    [Parameter]
+    public bool IsGenerating { get; set; }
+
+    [Parameter]
+    public EventCallback OnSend { get; set; }
+
+    [Parameter]
+    public EventCallback OnStop { get; set; }
+
+    /// <summary>顶部 Header 区域的内容；为 null 时整块不渲染、不占高度。</summary>
+    [Parameter]
+    public RenderFragment? HeaderContent { get; set; }
+
+    /// <summary>底部功能区里、发送按钮左侧的内容（例如模型选择器）。</summary>
+    [Parameter]
+    public RenderFragment? FooterContent { get; set; }
+
+    /// <summary>当前启用的工具（chip 高亮状态）。</summary>
+    [Parameter]
+    public IReadOnlySet<AgentSkill> EnabledSkills { get; set; } = new HashSet<AgentSkill>();
+
+    [Parameter]
+    public EventCallback<AgentSkill> OnToggleSkill { get; set; }
+
+    [Parameter]
+    public string Placeholder { get; set; } = "描述你的任务，Enter 发送，Shift + Enter 换行…";
+
+    private DotNetObjectReference<ChatComposer>? _selfReference;
+
+    private bool CanSubmit => IsGenerating || !string.IsNullOrWhiteSpace(Text);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        // 键盘约定由 JS 处理（Enter 发送 / Shift、Ctrl+Enter 换行），这里注册回调。
+        _selfReference = DotNetObjectReference.Create(this);
+        await Js.InvokeVoidAsync("sdComposer.attach", _selfReference);
+    }
+
+    /// <summary>Enter 键触发：与点击发送按钮走同一条路径。</summary>
+    [JSInvokable]
+    public Task HandleEnterAsync() => HandlePrimaryAction();
+
+    private async Task HandleInput(ChangeEventArgs args)
+    {
+        Text = args.Value?.ToString() ?? string.Empty;
+
+        if (TextChanged.HasDelegate)
+        {
+            await TextChanged.InvokeAsync(Text);
+        }
+    }
+
+    private async Task HandlePrimaryAction()
+    {
+        if (IsGenerating)
+        {
+            await OnStop.InvokeAsync();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Text))
+        {
+            return;
+        }
+
+        await OnSend.InvokeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("sdComposer.detach");
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView 已释放。
+        }
+
+        _selfReference?.Dispose();
+    }
+}

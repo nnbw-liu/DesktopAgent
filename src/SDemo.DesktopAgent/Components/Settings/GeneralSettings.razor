@@ -1,0 +1,94 @@
+@inject IThemeService ThemeService
+@inject ISettingsService Settings
+@inject IAppEnvironmentService Environment
+
+@* 通用设置：外观 / 语言 / 版本信息 *@
+<div class="settings-pane">
+    <section class="settings-section">
+        <h2 class="settings-section-title">外观</h2>
+        <p class="settings-section-hint">选择「跟随系统」时，应用会随 Windows 的「应用模式」自动切换。</p>
+
+        <div class="theme-options">
+            @foreach (var option in ThemeOptions)
+            {
+                <button type="button"
+                        class="theme-option @(ThemeService.Preference == option.Value ? "is-active" : null)"
+                        @onclick="() => ThemeService.SetPreference(option.Value)">
+                    <span class="theme-swatch theme-swatch--@option.Key"></span>
+                    <span class="theme-label">@option.Label</span>
+                    <span class="theme-desc">@option.Description</span>
+                </button>
+            }
+        </div>
+    </section>
+
+    <section class="settings-section">
+        <h2 class="settings-section-title">语言</h2>
+        <p class="settings-section-hint">界面文案目前只有简体中文；其他语言会随资源本地化一起接入。</p>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">界面语言</span>
+                <span class="settings-row-hint">语言资源放在 .resx 中，切换后重新渲染界面。</span>
+            </span>
+
+            <select class="field-input field-input--select" value="@_language" @onchange="HandleLanguageChanged">
+                <option value="zh-CN">简体中文</option>
+                <option value="en-US" disabled>English（即将支持）</option>
+            </select>
+        </div>
+    </section>
+
+    <section class="settings-section">
+        <h2 class="settings-section-title">版本信息</h2>
+        <p class="settings-section-hint">排查问题时把这几项一起发过来即可。</p>
+
+        <dl class="info-list">
+            <div class="info-row">
+                <dt>应用版本</dt>
+                <dd>@Environment.Version</dd>
+            </div>
+            <div class="info-row">
+                <dt>.NET 运行时</dt>
+                <dd>@Environment.RuntimeDescription</dd>
+            </div>
+            <div class="info-row">
+                <dt>操作系统</dt>
+                <dd>@Environment.OsDescription</dd>
+            </div>
+            <div class="info-row">
+                <dt>WebView2</dt>
+                <dd>@Environment.WebView2Version</dd>
+            </div>
+        </dl>
+    </section>
+</div>
+
+@code {
+    private string _language = "zh-CN";
+
+    private static readonly (ThemePreference Value, string Key, string Label, string Description)[] ThemeOptions =
+    [
+        (ThemePreference.System, "system", "跟随系统", "随 Windows 应用模式"),
+        (ThemePreference.Light, "light", "浅色", "始终使用浅色"),
+        (ThemePreference.Dark, "dark", "深色", "始终使用深色")
+    ];
+
+    protected override void OnInitialized() => _language = Settings.Current.Language;
+
+    private void HandleLanguageChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? "zh-CN";
+
+        // 目前只支持简体中文，其他语言先不落库。
+        if (!string.Equals(value, "zh-CN", StringComparison.Ordinal))
+        {
+            _language = Settings.Current.Language;
+            return;
+        }
+
+        _language = value;
+        Settings.Current.Language = value;
+        Settings.Save();
+    }
+}

@@ -1,0 +1,276 @@
+@using SDemo.DesktopAgent.Models
+@inject IModelCatalogService Catalog
+
+@* 添加模型提供商：ProviderId / 显示名称 / API 地址 / API Key / 模型目录 *@
+<div class="provider-editor">
+    <div class="editor-title">@(IsEditing ? "编辑模型提供商" : "添加模型提供商")</div>
+
+    <div class="editor-grid">
+        <label class="field">
+            <span class="field-label">ProviderId</span>
+            <input class="field-input"
+                   @ref="_idInput"
+                   @bind="_id"
+                   @bind:event="oninput"
+                   maxlength="40"
+                   placeholder="例如：openai" />
+        </label>
+
+        <label class="field">
+            <span class="field-label">显示名称</span>
+            <input class="field-input"
+                   @bind="_displayName"
+                   @bind:event="oninput"
+                   maxlength="60"
+                   placeholder="@DisplayNamePlaceholder" />
+        </label>
+
+        <label class="field field--wide">
+            <span class="field-label">API 地址</span>
+            <input class="field-input"
+                   @bind="_baseUrl"
+                   @bind:event="oninput"
+                   placeholder="https://api.openai.com/v1" />
+            <span class="field-hint">需包含 /v1（OpenAI SDK 只会在后面拼 /chat/completions）；只填域名时会自动补全。</span>
+        </label>
+
+        <label class="field field--wide">
+            <span class="field-label">API Key</span>
+            <span class="field-secret">
+                <input class="field-input"
+                       type="@(_showKey ? "text" : "password")"
+                       @bind="_apiKey"
+                       @bind:event="oninput"
+                       autocomplete="off"
+                       spellcheck="false"
+                       placeholder="sk-…（本地服务可留空）" />
+                <button type="button" class="field-secret-toggle" @onclick="() => _showKey = !_showKey">
+                    @(_showKey ? "隐藏" : "显示")
+                </button>
+            </span>
+        </label>
+    </div>
+
+    <div class="editor-models">
+        <div class="editor-models-head">
+            <span class="field-label">模型目录</span>
+            <button type="button" class="ghost-button" disabled="@_isFetching" @onclick="FetchModelsAsync">
+                @(_isFetching ? "获取中…" : "获取模型")
+            </button>
+        </div>
+
+        @if (_models.Count == 0)
+        {
+            <p class="model-empty">还没有模型：点「获取模型」从服务端读取，或在下方手动添加。</p>
+        }
+        else
+        {
+            <div class="model-chips">
+                @foreach (var model in _models)
+                {
+                    <span class="model-chip">
+                        @model
+                        <button type="button" class="chip-remove" title="移除" @onclick="() => RemoveModel(model)">✕</button>
+                    </span>
+                }
+            </div>
+        }
+
+        <div class="model-add">
+            <input class="field-input"
+                   @bind="_modelInput"
+                   @bind:event="oninput"
+                   placeholder="手动输入模型 ID，例如 gpt-4o-mini"
+                   @onkeydown="HandleModelKeyDown" />
+            <button type="button" class="ghost-button" @onclick="AddModel">添加</button>
+        </div>
+
+        @if (_error is not null)
+        {
+            <p class="form-error">@_error</p>
+        }
+    </div>
+
+    <div class="editor-footer">
+        <button type="button" class="ghost-button" @onclick="() => OnCancel.InvokeAsync()">取消</button>
+        <button type="button" class="primary-button" disabled="@(!CanSave)" @onclick="Save">保存</button>
+    </div>
+</div>
+
+@code {
+    /// <summary>已存在的 ProviderId，用于唯一性校验。</summary>
+    [Parameter]
+    public IReadOnlyCollection<string> ExistingIds { get; set; } = [];
+
+    /// <summary>传入表示编辑已有提供商；为空表示新增。</summary>
+    [Parameter]
+    public ModelProvider? Existing { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    [Parameter]
+    public EventCallback<ModelProvider> OnSaved { get; set; }
+
+    private string _id = string.Empty;
+    private string _displayName = string.Empty;
+    private string _baseUrl = "https://api.openai.com/v1";
+    private string _apiKey = string.Empty;
+    private string _modelInput = string.Empty;
+    private bool _showKey;
+    private bool _isFetching;
+    private string? _error;
+    private readonly List<string> _models = [];
+    private ElementReference _idInput;
+
+    private bool IsEditing => Existing is not null;
+
+    protected override void OnInitialized()
+    {
+        if (Existing is null)
+        {
+            return;
+        }
+
+        _id = Existing.Id;
+        _displayName = Existing.DisplayName;
+        _baseUrl = Existing.BaseUrl;
+        _apiKey = Existing.ApiKey;
+        _models.AddRange(Existing.Models.Select(model => model.Id));
+    }
+
+    /// <summary>显示名称为空时，水印跟随 ProviderId 的内容。</summary>
+    private string DisplayNamePlaceholder =>
+        string.IsNullOrWhiteSpace(_id) ? "显示名称" : _id.Trim();
+
+    private bool CanSave =>
+        !string.IsNullOrWhiteSpace(_id) && !string.IsNullOrWhiteSpace(_baseUrl) && !_isFetching;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _idInput.FocusAsync();
+        }
+    }
+
+    private async Task FetchModelsAsync()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_baseUrl))
+        {
+            _error = "请先填写 API 地址。";
+            return;
+        }
+
+        _isFetching = true;
+        try
+        {
+            var ids = await Catalog.GetModelsAsync(_baseUrl, _apiKey);
+            var added = 0;
+
+            foreach (var id in ids)
+            {
+                if (_models.Contains(id, StringComparer.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                _models.Add(id);
+                added++;
+            }
+
+            _models.Sort(StringComparer.OrdinalIgnoreCase);
+            _error = added == 0 ? "服务端返回的模型都已存在。" : null;
+        }
+        catch (ModelCatalogException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isFetching = false;
+        }
+    }
+
+    private void AddModel()
+    {
+        var value = _modelInput.Trim();
+
+        if (value.Length == 0)
+        {
+            return;
+        }
+
+        if (_models.Contains(value, StringComparer.OrdinalIgnoreCase))
+        {
+            _error = $"模型「{value}」已在目录中。";
+            return;
+        }
+
+        _models.Add(value);
+        _models.Sort(StringComparer.OrdinalIgnoreCase);
+        _modelInput = string.Empty;
+        _error = null;
+    }
+
+    private void RemoveModel(string model)
+    {
+        _models.Remove(model);
+        _error = null;
+    }
+
+    private void HandleModelKeyDown(KeyboardEventArgs args)
+    {
+        if (string.Equals(args.Key, "Enter", StringComparison.Ordinal))
+        {
+            AddModel();
+        }
+    }
+
+    private async Task Save()
+    {
+        var id = _id.Trim();
+        var baseUrl = _baseUrl.Trim();
+
+        if (id.Length == 0)
+        {
+            _error = "ProviderId 不能为空。";
+            return;
+        }
+
+        // 编辑时允许保持自己的 Id。
+        if (ExistingIds.Any(existing =>
+                !string.Equals(existing, Existing?.Id, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(existing, id, StringComparison.OrdinalIgnoreCase)))
+        {
+            _error = $"ProviderId「{id}」已被使用。";
+            return;
+        }
+
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            _error = "API 地址需要是 http/https 开头的完整地址。";
+            return;
+        }
+
+        // 只填域名时补成标准 OpenAI 路径：Endpoint 必须带 /v1 才能拼出 /v1/chat/completions。
+        if (uri.AbsolutePath.Trim('/').Length == 0)
+        {
+            baseUrl = baseUrl.TrimEnd('/') + "/v1";
+        }
+
+        var provider = new ModelProvider
+        {
+            Id = id,
+            DisplayName = _displayName.Trim(),
+            BaseUrl = baseUrl.TrimEnd('/'),
+            ApiKey = _apiKey.Trim(),
+            Models = _models.Select(m => new ModelEntry { Id = m }).ToList()
+        };
+
+        await OnSaved.InvokeAsync(provider);
+    }
+}

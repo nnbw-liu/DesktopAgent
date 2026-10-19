@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <!-- Windows 10 2004+：WebView2 组合渲染控件依赖 Windows SDK 投影（Microsoft.Windows.SDK.NET） -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>SDemo.DesktopAgent</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent</AssemblyName>
+    <OutputType>WinExe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <SatelliteResourceLanguages>en;zh-Hans</SatelliteResourceLanguages>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.110" />
+    <!-- Agent 运行时：Microsoft Agent Framework（OpenAI 兼容 provider） -->
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.25.0" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.25.0" />
+  </ItemGroup>
+
+</Project>

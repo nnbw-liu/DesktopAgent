@@ -1,0 +1,148 @@
+@using SDemo.DesktopAgent.Models
+@inject ISettingsService Settings
+@inject ISearchService Search
+
+@* 工具设置：联网搜索后端 + 文件写入确认 *@
+<div class="settings-pane">
+    <section class="settings-section">
+        <h2 class="settings-section-title">联网搜索</h2>
+        <p class="settings-section-hint">默认使用必应 RSS（免密钥）；也可以填自己的搜索接口地址与 Key。</p>
+
+        <div class="segmented">
+            <button type="button"
+                    class="segmented-item @(Settings.Current.Search.Backend == SearchBackend.Bing ? "is-active" : null)"
+                    @onclick="() => SetBackend(SearchBackend.Bing)">
+                必应 RSS
+            </button>
+            <button type="button"
+                    class="segmented-item @(Settings.Current.Search.Backend == SearchBackend.Custom ? "is-active" : null)"
+                    @onclick="() => SetBackend(SearchBackend.Custom)">
+                自定义 API
+            </button>
+        </div>
+
+        @if (Settings.Current.Search.Backend == SearchBackend.Custom)
+        {
+            <div class="field field--wide">
+                <span class="field-label">接口地址</span>
+                <input class="field-input"
+                       @bind="_endpoint"
+                       @bind:event="oninput"
+                       placeholder="https://open.feedcoopapi.com/search_api/global_search" />
+                <span class="field-hint">按 POST 提交 JSON（query / top_k），返回 JSON 即可。</span>
+            </div>
+
+            <div class="field field--wide">
+                <span class="field-label">API Key</span>
+                <span class="field-secret">
+                    <input class="field-input"
+                           type="@(_showKey ? "text" : "password")"
+                           @bind="_apiKey"
+                           @bind:event="oninput"
+                           autocomplete="off"
+                           placeholder="可留空" />
+                    <button type="button" class="field-secret-toggle" @onclick="() => _showKey = !_showKey">
+                        @(_showKey ? "隐藏" : "显示")
+                    </button>
+                </span>
+            </div>
+
+            <div class="editor-footer">
+                <button type="button" class="ghost-button" disabled="@_isTesting" @onclick="TestSearchAsync">
+                    @(_isTesting ? "测试中…" : "测试搜索")
+                </button>
+                <button type="button" class="primary-button" @onclick="SaveSearch">保存</button>
+            </div>
+        }
+        else
+        {
+            <div class="editor-footer">
+                <button type="button" class="ghost-button" disabled="@_isTesting" @onclick="TestSearchAsync">
+                    @(_isTesting ? "测试中…" : "测试搜索")
+                </button>
+            </div>
+        }
+
+        @if (_message is not null)
+        {
+            <p class="settings-message">@_message</p>
+        }
+
+        @if (_searchResult is not null)
+        {
+            <pre class="search-preview">@_searchResult</pre>
+        }
+    </section>
+
+    <section class="settings-section">
+        <h2 class="settings-section-title">文件写入</h2>
+        <p class="settings-section-hint">工作区里的文件由模型读写；写入前可以要求确认。</p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">写入前需要确认</span>
+                <span class="settings-row-hint">关闭后模型可以直接覆盖工作区文件。</span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@Settings.Current.ConfirmFileWrite"
+                   @onchange="ToggleConfirmWrite" />
+        </label>
+    </section>
+</div>
+
+@code {
+    private string _endpoint = string.Empty;
+    private string _apiKey = string.Empty;
+    private bool _showKey;
+    private bool _isTesting;
+    private string? _message;
+    private string? _searchResult;
+
+    protected override void OnInitialized()
+    {
+        _endpoint = Settings.Current.Search.Endpoint;
+        _apiKey = Settings.Current.Search.ApiKey;
+    }
+
+    private void SetBackend(SearchBackend backend)
+    {
+        Settings.Current.Search.Backend = backend;
+        Settings.Save();
+        _message = null;
+        _searchResult = null;
+    }
+
+    private void SaveSearch()
+    {
+        Settings.Current.Search.Endpoint = _endpoint.Trim();
+        Settings.Current.Search.ApiKey = _apiKey.Trim();
+        Settings.Save();
+        _message = "已保存。";
+    }
+
+    private async Task TestSearchAsync()
+    {
+        // 测试前先落库，确保测的是当前填写的配置。
+        SaveSearch();
+
+        _isTesting = true;
+        _searchResult = null;
+        _message = null;
+
+        try
+        {
+            _searchResult = await Search.SearchAsync("火山方舟");
+        }
+        finally
+        {
+            _isTesting = false;
+        }
+    }
+
+    private void ToggleConfirmWrite(ChangeEventArgs args)
+    {
+        Settings.Current.ConfirmFileWrite = args.Value is true;
+        Settings.Save();
+    }
+}

@@ -1,0 +1,140 @@
+@using SDemo.DesktopAgent.Models
+@inject ISettingsService Settings
+
+@* 模型设置：提供商列表（列表最后固定「添加模型提供商」） *@
+<div class="settings-pane settings-pane--models">
+    <div class="models-head">
+        <h2 class="settings-section-title">模型提供商</h2>
+        <p class="settings-section-hint">只支持标准 OpenAI API（GET /v1/models、POST /v1/chat/completions）。</p>
+    </div>
+
+    <div class="provider-scroll">
+        @if (Settings.Current.Providers.Count == 0)
+        {
+            <div class="provider-empty">
+                还没有模型提供商。<br />
+                添加后即可在聊天里选择模型。
+            </div>
+        }
+
+        @foreach (var provider in Settings.Current.Providers)
+        {
+            <article class="provider-card">
+                <div class="provider-card-main">
+                    <div class="provider-title-row">
+                        <span class="provider-name">@provider.Name</span>
+                        <span class="provider-id">@provider.Id</span>
+                    </div>
+                    <div class="provider-meta">@provider.BaseUrl</div>
+                    <div class="provider-models">
+                        @provider.Models.Count 个模型
+                        @if (provider.Models.Count > 0)
+                        {
+                            <span class="provider-model-preview">· @string.Join("、", provider.Models.Take(3).Select(m => m.Name))@(provider.Models.Count > 3 ? "…" : "")</span>
+                        }
+                    </div>
+                </div>
+
+                <div class="provider-actions">
+                    <button type="button"
+                            class="provider-edit"
+                            title="编辑这个提供商"
+                            @onclick="() => StartEdit(provider)">
+                        编辑
+                    </button>
+                    <button type="button"
+                            class="provider-remove @(_pendingRemoveId == provider.Id ? "is-armed" : null)"
+                            title="移除这个提供商"
+                            @onclick="() => RequestRemove(provider.Id)">
+                        @(_pendingRemoveId == provider.Id ? "确认移除" : "移除")
+                    </button>
+                </div>
+            </article>
+        }
+    </div>
+
+    <div class="provider-add-bar">
+        @if (_editing is not null)
+        {
+            <ProviderEditor Existing="_editing"
+                            ExistingIds="@ExistingIds"
+                            OnCancel="CancelEdit"
+                            OnSaved="SaveProvider" />
+        }
+        else if (_isAdding)
+        {
+            <ProviderEditor ExistingIds="@ExistingIds"
+                            OnCancel="CancelAdd"
+                            OnSaved="SaveProvider" />
+        }
+        else
+        {
+            <button type="button" class="provider-add" @onclick="StartAdd">
+                <span class="provider-add-icon">+</span>
+                <span>添加模型提供商</span>
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    private bool _isAdding;
+    private ModelProvider? _editing;
+    private string? _pendingRemoveId;
+
+    private IReadOnlyCollection<string> ExistingIds =>
+        Settings.Current.Providers.Select(p => p.Id).ToList();
+
+    private void StartAdd()
+    {
+        _pendingRemoveId = null;
+        _editing = null;
+        _isAdding = true;
+    }
+
+    private void StartEdit(ModelProvider provider)
+    {
+        _pendingRemoveId = null;
+        _isAdding = false;
+        _editing = provider;
+    }
+
+    private void CancelAdd() => _isAdding = false;
+
+    private void CancelEdit() => _editing = null;
+
+    private void SaveProvider(ModelProvider provider)
+    {
+        if (_editing is null)
+        {
+            Settings.Current.Providers.Add(provider);
+        }
+        else
+        {
+            // 编辑：就地更新原对象，保持列表顺序。
+            _editing.Id = provider.Id;
+            _editing.DisplayName = provider.DisplayName;
+            _editing.BaseUrl = provider.BaseUrl;
+            _editing.ApiKey = provider.ApiKey;
+            _editing.Models = provider.Models;
+        }
+
+        Settings.Save();
+        _isAdding = false;
+        _editing = null;
+    }
+
+    /// <summary>第一次点击只是确认态，再点一次才真的移除。</summary>
+    private void RequestRemove(string providerId)
+    {
+        if (_pendingRemoveId != providerId)
+        {
+            _pendingRemoveId = providerId;
+            return;
+        }
+
+        Settings.Current.Providers.RemoveAll(p => string.Equals(p.Id, providerId, StringComparison.OrdinalIgnoreCase));
+        Settings.Save();
+        _pendingRemoveId = null;
+    }
+}

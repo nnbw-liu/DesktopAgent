@@ -1,0 +1,95 @@
+@using SDemo.DesktopAgent.Models
+
+@* 左侧栏：Header（固定） / Content（滚动 + 可收起列表） / Footer（设置） *@
+<aside class="sidebar">
+    <header class="sidebar-header">
+        <div class="brand">
+            <span class="brand-mark">D</span>
+            <span class="brand-text">
+                <strong>SDemo</strong>
+                <em>DesktopAgent</em>
+            </span>
+        </div>
+
+        <button type="button" class="new-chat" title="新建聊天室" @onclick="() => OnNewChat.InvokeAsync()">
+            <span class="new-chat-icon">+</span>
+            <span>新建聊天室</span>
+        </button>
+    </header>
+
+    <div class="sidebar-content">
+        <SidebarSection Title="工作区" Count="@_workspaces.Count" InitiallyExpanded="true">
+            @foreach (var workspace in _workspaces)
+            {
+                <button type="button" class="sidebar-item">
+                    <span class="item-icon">@workspace.Glyph</span>
+                    <span class="item-text">
+                        <span class="item-title">@workspace.Name</span>
+                        <span class="item-meta">@workspace.Description</span>
+                    </span>
+                </button>
+            }
+        </SidebarSection>
+
+        <SidebarSection Title="历史聊天" Count="@Sessions.Count" InitiallyExpanded="true">
+            @foreach (var session in Sessions)
+            {
+                <button type="button"
+                        class="sidebar-item @(IsActive(session) ? "is-active" : null)"
+                        @onclick="() => OnOpenSession.InvokeAsync(session)">
+                    <span class="item-icon">◌</span>
+                    <span class="item-text">
+                        <span class="item-title">@session.Title</span>
+                        <span class="item-meta">@session.Meta</span>
+                    </span>
+                </button>
+            }
+        </SidebarSection>
+    </div>
+
+    <footer class="sidebar-footer">
+        <button type="button"
+                class="sidebar-item @(IsSettingsActive ? "is-active" : null)"
+                title="设置"
+                @onclick="() => OnOpenSettings.InvokeAsync()">
+            <span class="item-icon">⚙</span>
+            <span class="item-text">
+                <span class="item-title">设置</span>
+            </span>
+        </button>
+    </footer>
+</aside>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<ChatSession> Sessions { get; set; } = [];
+
+    [Parameter]
+    public string? ActiveSessionId { get; set; }
+
+    /// <summary>当前是否停留在设置页（用于高亮底部「设置」）。</summary>
+    [Parameter]
+    public bool IsSettingsActive { get; set; }
+
+    [Parameter]
+    public EventCallback OnNewChat { get; set; }
+
+    [Parameter]
+    public EventCallback<ChatSession> OnOpenSession { get; set; }
+
+    [Parameter]
+    public EventCallback OnOpenSettings { get; set; }
+
+    // 占位数据：后续接入工作区服务后替换。
+    private readonly List<Workspace> _workspaces =
+    [
+        new("默认工作区", "本地 · SDemo Agent", "▣"),
+        new("代码助手", "仓库问答与代码生成", "⌘"),
+        new("文档整理", "会议纪要与资料摘要", "▤")
+    ];
+
+    private bool IsActive(ChatSession session) =>
+        string.Equals(session.Id, ActiveSessionId, StringComparison.Ordinal);
+
+    private sealed record Workspace(string Name, string Description, string Glyph);
+}

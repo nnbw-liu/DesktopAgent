@@ -1,0 +1,190 @@
+@implements IDisposable
+@inject IThemeService ThemeService
+@inject IJSRuntime Js
+
+<div class="app-shell">
+    <Sidebar Sessions="_sessions"
+             ActiveSessionId="@(_view == MainView.Chat ? _activeSession?.Id : null)"
+             IsSettingsActive="@(_view == MainView.Settings)"
+             OnNewChat="StartNewChat"
+             OnOpenSession="OpenSession"
+             OnOpenSettings="OpenSettings" />
+
+    <main class="main-area">
+        @if (_view == MainView.Settings)
+        {
+            <SettingsView InitialSection="_settingsSection" />
+        }
+        else if (_activeSession is null)
+        {
+            <div class="landing">
+                <div class="empty-state">
+                    <span class="empty-mark">D</span>
+                    <h1>开始新的对话</h1>
+                    <p>在左侧「新建聊天室」，或从历史会话中选择一个继续。</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            <ChatRoom Session="_activeSession"
+                      OnSend="HandleSendMessage"
+                      OnOpenModelSettings="OpenModelSettings" />
+        }
+    </main>
+</div>
+
+@code {
+    private enum MainView
+    {
+        Chat,
+        Settings
+    }
+
+    private readonly List<ChatSession> _sessions = CreateSeedSessions();
+
+    // 启动后默认就是一个新建的空聊天室（尚不进入历史列表，等有内容再落库）。
+    private ChatSession? _activeSession = ChatSession.CreateEmpty();
+
+    private MainView _view = MainView.Chat;
+
+    private SettingsSection _settingsSection = SettingsSection.General;
+
+    /// <summary>新建聊天室：右侧切换到空的聊天室页面。</summary>
+    private void StartNewChat()
+    {
+        _view = MainView.Chat;
+        _activeSession = ChatSession.CreateEmpty();
+    }
+
+    /// <summary>打开历史会话。</summary>
+    private void OpenSession(ChatSession session)
+    {
+        _view = MainView.Chat;
+        _activeSession = session;
+    }
+
+    /// <summary>打开设置：右侧整页显示。</summary>
+    private void OpenSettings()
+    {
+        _settingsSection = SettingsSection.General;
+        _view = MainView.Settings;
+    }
+
+    /// <summary>直接打开设置里的「模型设置」分区。</summary>
+    private void OpenModelSettings()
+    {
+        _settingsSection = SettingsSection.Models;
+        _view = MainView.Settings;
+    }
+
+    /// <summary>
+    /// 发送一条用户消息：写入会话 → 首次有内容时补标题并落库到历史列表。
+    /// 聊天室随之从「空态居中」切到「有记录布局」。当前不调用模型，不产生回复。
+    /// </summary>
+    private void HandleSendMessage(string text)
+    {
+        if (_activeSession is null || string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        var session = _activeSession;
+        session.Messages.Add(new ChatMessage(ChatMessageRole.User, text));
+
+        if (session.Messages.Count == 1)
+        {
+            session.Title = BuildTitle(text);
+            session.Meta = DateTime.Now.ToString("HH:mm");
+        }
+
+        // 新建的聊天室要有内容才出现在左侧历史列表里。
+        if (!_sessions.Contains(session))
+        {
+            _sessions.Insert(0, session);
+        }
+    }
+
+    private static string BuildTitle(string text)
+    {
+        var firstLine = text
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault();
+
+        if (string.IsNullOrWhiteSpace(firstLine))
+        {
+            return "新聊天室";
+        }
+
+        return firstLine.Length <= 18 ? firstLine : string.Concat(firstLine.AsSpan(0, 18), "…");
+    }
+
+    private static List<ChatSession> CreateSeedSessions() =>
+    [
+        new ChatSession
+        {
+            Id = "seed-1",
+            Title = "桌面 Agent 架构设计",
+            Meta = "今天 10:24",
+            Messages =
+            [
+                new ChatMessage(ChatMessageRole.User, "帮我梳理一下桌面 Agent 的分层结构。"),
+                new ChatMessage(ChatMessageRole.Assistant,
+                    "建议分三层：宿主层（WPF 窗口、WebView2、托盘与全局快捷键）、UI 层（Blazor 组件）、服务层（会话管理、工具调用、模型访问）。宿主层只负责窗口生命周期与原生能力，UI 层通过 DI 直接调用服务层。")
+            ]
+        },
+        new ChatSession
+        {
+            Id = "seed-2",
+            Title = "Blazor Hybrid 主题适配",
+            Meta = "昨天 18:02",
+            Messages =
+            [
+                new ChatMessage(ChatMessageRole.User, "Blazor 界面怎么跟随系统深浅色？"),
+                new ChatMessage(ChatMessageRole.Assistant,
+                    "由 .NET 侧读取系统设置，切换 WPF 资源字典，同时通过 JS 互操作把 data-theme 写到 html 上，CSS 变量随之切换即可。")
+            ]
+        },
+        new ChatSession
+        {
+            Id = "seed-3",
+            Title = "WPF 与 Blazor 的通信方式",
+            Meta = "10 月 16 日",
+            Messages =
+            [
+                new ChatMessage(ChatMessageRole.User, "WPF 和 Blazor 之间怎么互相调用？"),
+                new ChatMessage(ChatMessageRole.Assistant,
+                    "共用同一个 IServiceProvider 是最直接的方式；需要反向通知时用服务事件 + InvokeAsync 切回渲染器线程。")
+            ]
+        }
+    ];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        // 首帧渲染后把 WPF 侧的主题同步给 WebView，避免两侧配色不一致。
+        await ApplyThemeAsync(ThemeService.Current);
+        ThemeService.ThemeChanged += OnThemeChanged;
+    }
+
+    private async void OnThemeChanged(object? sender, AppTheme theme)
+    {
+        try
+        {
+            await InvokeAsync(() => ApplyThemeAsync(theme));
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView 已释放，无需再同步。
+        }
+    }
+
+    private ValueTask ApplyThemeAsync(AppTheme theme) =>
+        Js.InvokeVoidAsync("sdTheme.apply", theme == AppTheme.Dark ? "dark" : "light");
+
+    public void Dispose() => ThemeService.ThemeChanged -= OnThemeChanged;
+}

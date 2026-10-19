@@ -1,0 +1,56 @@
+@* 设置页：右侧整页。顶部分区切换，下面是各自独立滚动的设置内容。 *@
+<section class="settings">
+    <header class="settings-header">
+        <h1>设置</h1>
+        <p>外观、语言与模型提供商配置都保存在本机，修改即时生效。</p>
+    </header>
+
+    <nav class="settings-tabs" role="tablist">
+        <button type="button"
+                role="tab"
+                aria-selected="@(_tab == SettingsSection.General)"
+                class="settings-tab @(_tab == SettingsSection.General ? "is-active" : null)"
+                @onclick="() => _tab = SettingsSection.General">
+            通用设置
+        </button>
+        <button type="button"
+                role="tab"
+                aria-selected="@(_tab == SettingsSection.Models)"
+                class="settings-tab @(_tab == SettingsSection.Models ? "is-active" : null)"
+                @onclick="() => _tab = SettingsSection.Models">
+            模型设置
+        </button>
+        <button type="button"
+                role="tab"
+                aria-selected="@(_tab == SettingsSection.Tools)"
+                class="settings-tab @(_tab == SettingsSection.Tools ? "is-active" : null)"
+                @onclick="() => _tab = SettingsSection.Tools">
+            工具设置
+        </button>
+    </nav>
+
+    <div class="settings-body">
+        @switch (_tab)
+        {
+            case SettingsSection.General:
+                <GeneralSettings />
+                break;
+            case SettingsSection.Models:
+                <ModelSettings />
+                break;
+            default:
+                <ToolsSettings />
+                break;
+        }
+    </div>
+</section>
+
+@code {
+    /// <summary>打开设置时默认显示的分区（例如从聊天页的「未配置模型」跳过来）。</summary>
+    [Parameter]
+    public SettingsSection InitialSection { get; set; } = SettingsSection.General;
+
+    private SettingsSection _tab = SettingsSection.General;
+
+    protected override void OnInitialized() => _tab = InitialSection;
+}
