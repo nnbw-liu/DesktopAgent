@@ -5,10 +5,11 @@
         xmlns:components="clr-namespace:SDemo.DesktopAgent.Components"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="SDemo DesktopAgent"
+        Icon="Assets/app.ico"
         Width="1240"
         Height="800"
-        MinWidth="900"
-        MinHeight="560"
+        MinWidth="1024"
+        MinHeight="680"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         Background="{DynamicResource AppBackgroundBrush}"
@@ -25,9 +26,11 @@
                             UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
 
-    <Border Background="{DynamicResource AppBackgroundBrush}"
+    <Border x:Name="RootBorder"
+            Background="{DynamicResource AppBackgroundBrush}"
             BorderBrush="{DynamicResource WindowBorderBrush}"
-            BorderThickness="1">
+            BorderThickness="1"
+            CornerRadius="8">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="40" />

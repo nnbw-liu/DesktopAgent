@@ -17,8 +17,14 @@ public partial class MainWindow : Window
     private const string ImmersiveColorSet = "ImmersiveColorSet";
     private const uint MonitorDefaultToNearest = 0x00000002;
 
+    // Windows 11 圆角：DWMWA_WINDOW_CORNER_PREFERENCE（33）
+    private const int DwmwaWindowCornerPreference = 33;
+    private const int DwmwcpDoNotRound = 1;
+    private const int DwmwcpRound = 2;
+
     private readonly IThemeService _themeService;
 
+    private IntPtr _hwnd;
     private WebView2CompositionControl? _webView;
 
     public MainWindow(IServiceProvider serviceProvider, IThemeService themeService)
@@ -36,7 +42,12 @@ public partial class MainWindow : Window
 
         RuntimeText.Text = $".NET {Environment.Version}";
 
-        StateChanged += (_, _) => UpdateChromeState();
+        StateChanged += (_, _) =>
+        {
+            UpdateChromeState();
+            ApplyWindowCorners();
+        };
+
         UpdateChromeState();
 
         _themeService.ThemeChanged += (_, theme) => UpdateWebViewBackground(theme);
@@ -48,8 +59,26 @@ public partial class MainWindow : Window
 
         if (PresentationSource.FromVisual(this) is HwndSource source)
         {
+            _hwnd = source.Handle;
             source.AddHook(WndProc);
+            ApplyWindowCorners();
         }
+    }
+
+    /// <summary>普通状态用 Windows 11 圆角，最大化时切成直角。</summary>
+    private void ApplyWindowCorners()
+    {
+        var isMaximized = WindowState == WindowState.Maximized;
+
+        RootBorder.CornerRadius = isMaximized ? new CornerRadius(0) : new CornerRadius(8);
+
+        if (_hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var preference = isMaximized ? DwmwcpDoNotRound : DwmwcpRound;
+        DwmSetWindowAttribute(_hwnd, DwmwaWindowCornerPreference, ref preference, sizeof(int));
     }
 
     private static IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -196,4 +225,7 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo monitorInfo);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 }

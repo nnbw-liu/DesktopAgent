@@ -19,9 +19,9 @@ Blazor Hybrid + WPF 桌面应用骨架（.NET 10 / WebView2）。
 │  · 品牌标识       │  · 启动即进入新建的空聊天室               │
 │  · 新建聊天室 ────┼─▶ 空聊天室：欢迎语 + 输入框，垂直居中      │
 ├───────────────────┤  · 有记录：聊天室名称 / 消息区 / 底部输入框│
-│ 侧栏 Content      │  · 设置：右侧整页（通用 / 模型 / 工具）   │
-│  · 工作区（可收起）│                                          │
-│  · 历史聊天（可收起，点击打开对应聊天室）                    │
+│ 侧栏 Content      │  · 有记录：聊天室名称 / 消息区 / 底部输入框│
+│  · 工作区（含其下  │  · 设置：右侧整页（通用 / 模型 / 工具）   │
+│    的聊天室）     │                                          │
 │   ↑ 该区域独立滚动 │                                          │
 ├───────────────────┤                                          │
 │ 侧栏 Footer       │                                          │
@@ -31,7 +31,7 @@ Blazor Hybrid + WPF 桌面应用骨架（.NET 10 / WebView2）。
 └──────────────────────────────────────────────────────────────┘
 ```
 
-侧栏固定 268px，`Header` 与 `Footer` 不滚动，只有中间的 `Content` 区域滚动；两个列表分组各自可收起 / 展开。
+侧栏固定 268px，`Header` 与 `Footer` 不滚动，只有中间的 `Content` 区域滚动；聊天室按工作区分组挂在各自的工作区下面。
 
 ## 目录结构
 
@@ -144,10 +144,18 @@ dotnet run --project src/SDemo.DesktopAgent
 ## 工作区与会话列表
 
 - **工作区**：持久化在设置的 `workspaces` 里（默认工作区 = `我的文档\SDemo DesktopAgent`）。侧栏工作区行 hover 出现「＋ 新建聊天室」和「⋯ 更多（重命名 / 删除）」；点击行本身会把它设为当前工作区。
+- **聊天室挂在所属工作区下面**（缩进一级），不再单独出现在「历史聊天」里；置顶的会话排在该工作区最前。
 - 重命名只改显示名，不动目录；删除工作区不会删磁盘文件；只剩一个工作区时不允许删除。
 - **工作区选择器**：只在「新建聊天室」（空会话）时出现在输入框上方，下拉列表底部是「＋ 选择工作区…」，点了会打开系统文件夹选择框，选中的目录会建成新工作区并选中。发送第一条消息后选择器随空态一起消失。
-- **会话列表**：hover 会话行出现「置顶 / 更多（重命名 / 删除）」。置顶后排序到最前并常驻显示操作按钮；重命名是行内输入（Enter 保存 / Esc 取消）；删除当前会话会回到新的空聊天室。
+- **会话行**：左侧是会话图标（SVG），置顶标记固定在右侧；「置顶 / 更多（重命名 / 删除）」只在鼠标移入时出现（选中状态不会常亮）。重命名是行内输入（Enter 保存 / Esc 取消）；删除当前会话会回到新的空聊天室。
 - 文件工具的根目录跟着当前聊天室所属工作区走（`WorkspaceContext`）。
+
+## 窗口外观
+
+- **图标**：`Assets/app.ico`（由脚本生成的 7 个尺寸 16–256，渐变圆角方块 + 白色 D），同时用于 exe（`ApplicationIcon`）和窗口（`Window.Icon`）。
+- **圆角**：Windows 11 下通过 `DWMWA_WINDOW_CORNER_PREFERENCE` 设成圆角（`DwmSetWindowAttribute`），内容 Border 同步 8px 圆角；最大化时切回直角。
+- **最小尺寸**：`MinWidth=1024`、`MinHeight=680`，窗口默认 1240×800。
+- 最大化尺寸仍由 `WM_GETMINMAXINFO` 钉到显示器工作区。
 
 ## 设置页
 
@@ -246,4 +254,5 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 - 模型 provider 的 BaseUrl 必须带 `/v1`（SDK 只拼 `/chat/completions`）；只填域名时表单会自动补全。
 - 火山方舟 **Agent Plan** 的 `/api/plan/v3` 不提供 `/models`（返回 404），模型只能手动添加；平台版 `/api/v3` 才有模型列表接口。
 - 设置里的 API Key 用 Windows DPAPI 加密，仅当前用户可解密；换用户/换机器需要重新填写。
+- **不要在 WebView2 的事件回调里同步弹模态对话框**（`ShowDialog`）：会跑嵌套消息循环并重入 WebView2，触发 `EmbeddedBrowserWebView.dll` 的原生断言（0x80000003）直接闪退。`FolderPickerService` 用 `Dispatcher.BeginInvoke` 把对话框推迟到下一轮消息循环再打开。
 - 自定义搜索接口按 `Authorization: Bearer <key>` + `{"query":…, "top_k":5}` 调用；如果服务端返回 HTTP 200 但 `ResponseMetadata.Error`（例如 `invalid_api_key`），UI 会原样显示错误，需要换成该服务自己的 Key。

@@ -1,4 +1,6 @@
 using System.IO;
+using System.Windows;
+using System.Windows.Threading;
 using Microsoft.Win32;
 
 namespace SDemo.DesktopAgent.Services;
@@ -7,25 +9,54 @@ namespace SDemo.DesktopAgent.Services;
 public interface IFolderPickerService
 {
     /// <summary>返回选中的目录；取消返回 null。</summary>
-    string? PickFolder(string title, string? initialDirectory = null);
+    Task<string?> PickFolderAsync(string title, string? initialDirectory = null);
 }
 
 /// <inheritdoc />
 public sealed class FolderPickerService : IFolderPickerService
 {
-    public string? PickFolder(string title, string? initialDirectory = null)
+    public Task<string?> PickFolderAsync(string title, string? initialDirectory = null)
     {
-        var dialog = new OpenFolderDialog
-        {
-            Title = title,
-            Multiselect = false
-        };
+        var completion = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dispatcher = Application.Current?.Dispatcher;
 
-        if (!string.IsNullOrWhiteSpace(initialDirectory) && Directory.Exists(initialDirectory))
+        if (dispatcher is null)
         {
-            dialog.InitialDirectory = initialDirectory;
+            completion.TrySetResult(null);
+            return completion.Task;
         }
 
-        return dialog.ShowDialog() == true ? dialog.FolderName : null;
+        // 关键：不要在 WebView2 的事件回调栈里直接 ShowDialog。
+        // 模态对话框会跑嵌套消息循环并重入 WebView2，触发 EmbeddedBrowserWebView 的原生断言（0x80000003）导致闪退；
+        // 这里把对话框推迟到消息循环的下一轮再打开。
+        dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            try
+            {
+                var dialog = new OpenFolderDialog
+                {
+                    Title = title,
+                    Multiselect = false
+                };
+
+                if (!string.IsNullOrWhiteSpace(initialDirectory) && Directory.Exists(initialDirectory))
+                {
+                    dialog.InitialDirectory = initialDirectory;
+                }
+
+                var owner = Application.Current?.MainWindow;
+                var accepted = owner is not null && owner.IsVisible
+                    ? dialog.ShowDialog(owner)
+                    : dialog.ShowDialog();
+
+                completion.TrySetResult(accepted == true ? dialog.FolderName : null);
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+        }));
+
+        return completion.Task;
     }
 }

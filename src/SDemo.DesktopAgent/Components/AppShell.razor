@@ -207,9 +207,19 @@
     }
 
     /// <summary>下拉框最底部的「选择工作区」：打开系统文件夹选择框。</summary>
-    private void PickWorkspace()
+    private async Task PickWorkspace()
     {
-        var path = FolderPicker.PickFolder("选择工作区文件夹", WorkspaceContext.RootPath);
+        string? path;
+        try
+        {
+            path = await FolderPicker.PickFolderAsync("选择工作区文件夹", WorkspaceContext.RootPath);
+        }
+        catch (Exception)
+        {
+            // 对话框异常（或被系统拒绝）不影响主流程。
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(path))
         {
             return;

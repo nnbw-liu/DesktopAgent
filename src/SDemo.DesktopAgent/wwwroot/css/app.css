@@ -1027,10 +1027,62 @@ a {
 }
 
 .item-row:hover .item-actions,
-.item-row:focus-within .item-actions,
-.item-row.is-pinned .item-actions,
-.item-row.is-active .item-actions {
+.item-row:focus-within .item-actions {
     opacity: 1;
+}
+
+/* 行内图标（SVG） */
+.icon {
+    display: block;
+    width: 15px;
+    height: 15px;
+}
+
+.icon--sm {
+    width: 12px;
+    height: 12px;
+}
+
+.item-icon {
+    background: transparent;
+    color: var(--muted);
+}
+
+.item-row.is-active .item-icon {
+    color: var(--accent);
+}
+
+.item-icon--sm {
+    flex: 0 0 16px;
+    width: 16px;
+    height: 16px;
+}
+
+/* 置顶标记固定在右侧 */
+.item-pin {
+    display: grid;
+    flex: 0 0 18px;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    color: var(--muted);
+}
+
+.session-row.is-pinned .item-pin {
+    color: var(--accent);
+}
+
+/* 聊天室挂在工作区下面，缩进一级 */
+.session-row.is-child .item-main {
+    gap: 8px;
+    padding-left: 24px;
+}
+
+.sidebar-group-label {
+    padding: 8px 10px 4px 14px;
+    color: var(--muted);
+    font-size: 10.5px;
+    letter-spacing: .04em;
 }
 
 .item-action {
