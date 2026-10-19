@@ -31,13 +31,6 @@ public sealed class SettingsService : ISettingsService
         {
             Save();
         }
-
-        // 第一次启动时给一个默认工作区。
-        if (Current.Workspaces.Count == 0)
-        {
-            Current.Workspaces.Add(Workspace.CreateDefault());
-            Save();
-        }
     }
 
     public AppSettings Current { get; private set; }

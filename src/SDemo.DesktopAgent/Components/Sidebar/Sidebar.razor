@@ -1,6 +1,6 @@
 @using SDemo.DesktopAgent.Models
 
-@* 左侧栏：Header（固定） / Content（工作区 + 其下的聊天室） / Footer（设置） *@
+@* 左侧栏：Header（固定） / Content（工作区 + 历史聊天） / Footer（设置） *@
 <aside class="sidebar">
     <header class="sidebar-header">
         <div class="brand">
@@ -22,8 +22,9 @@
             @foreach (var workspace in Workspaces)
             {
                 var workspaceMenu = "w:" + workspace.Id;
+                var collapsed = _collapsedWorkspaces.Contains(workspace.Id);
 
-                <div class="sidebar-item item-row workspace-row @(string.Equals(workspace.Id, ActiveWorkspaceId, StringComparison.Ordinal) ? "is-active" : null)"
+                <div class="sidebar-item item-row workspace-row"
                      @onmouseleave="() => CloseMenu(workspaceMenu)">
                     @if (_renamingKey == workspaceMenu)
                     {
@@ -38,7 +39,13 @@
                     }
                     else
                     {
-                        <button type="button" class="item-main" @onclick="() => OnSelectWorkspace.InvokeAsync(workspace)">
+                        <button type="button" class="item-main" @onclick="() => ToggleCollapse(workspace.Id)">
+                            <span class="tree-caret @(collapsed ? null : "is-open")">
+                                <svg class="icon icon--sm" viewBox="0 0 16 16" aria-hidden="true">
+                                    <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"
+                                          stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </span>
                             <span class="item-icon">
                                 <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
                                     <path d="M1.8 4.4a1.2 1.2 0 0 1 1.2-1.2h3l1.3 1.5h5.5a1.2 1.2 0 0 1 1.2 1.2v6.4a1.2 1.2 0 0 1-1.2 1.2H3a1.2 1.2 0 0 1-1.2-1.2z"
@@ -80,19 +87,30 @@
                     }
                 </div>
 
-                @foreach (var session in SessionsFor(workspace))
+                @if (!collapsed)
                 {
-                    @RenderSession(session)
+                    @foreach (var session in SessionsFor(workspace))
+                    {
+                        @RenderSession(session)
+                    }
                 }
             }
 
-            @if (LooseSessions.Count > 0)
+            <button type="button" class="sidebar-add" @onclick="() => OnAddWorkspace.InvokeAsync()">
+                <span class="sidebar-add-icon">+</span>
+                <span>添加工作区</span>
+            </button>
+        </SidebarSection>
+
+        <SidebarSection Title="历史聊天" Count="@LooseSessions.Count" InitiallyExpanded="true">
+            @foreach (var session in LooseSessions)
             {
-                <div class="sidebar-group-label">未分组</div>
-                @foreach (var session in LooseSessions)
-                {
-                    @RenderSession(session)
-                }
+                @RenderSession(session)
+            }
+
+            @if (LooseSessions.Count == 0)
+            {
+                <p class="sidebar-empty">顶部「新建聊天室」的会话会出现在这里。</p>
             }
         </SidebarSection>
     </div>
@@ -126,9 +144,6 @@
     [Parameter]
     public string? ActiveSessionId { get; set; }
 
-    [Parameter]
-    public string? ActiveWorkspaceId { get; set; }
-
     /// <summary>当前是否停留在设置页（用于高亮底部「设置」）。</summary>
     [Parameter]
     public bool IsSettingsActive { get; set; }
@@ -146,7 +161,7 @@
     public EventCallback<Workspace> OnNewChatInWorkspace { get; set; }
 
     [Parameter]
-    public EventCallback<Workspace> OnSelectWorkspace { get; set; }
+    public EventCallback OnAddWorkspace { get; set; }
 
     [Parameter]
     public EventCallback<ChatSession> OnTogglePin { get; set; }
@@ -166,9 +181,15 @@
     private string? _openMenu;
     private string? _renamingKey;
     private string _renameText = string.Empty;
+    private readonly HashSet<string> _collapsedWorkspaces = [];
 
+    /// <summary>不属于任何工作区的会话（历史聊天）。</summary>
     private IReadOnlyList<ChatSession> LooseSessions =>
-        Sessions.Where(session => Workspaces.All(workspace => workspace.Id != session.WorkspaceId)).ToList();
+        Sessions
+            .Where(session => string.IsNullOrEmpty(session.WorkspaceId) ||
+                              Workspaces.All(workspace => workspace.Id != session.WorkspaceId))
+            .OrderByDescending(session => session.IsPinned)
+            .ToList();
 
     private bool IsActive(ChatSession session) =>
         string.Equals(session.Id, ActiveSessionId, StringComparison.Ordinal);
@@ -178,6 +199,14 @@
         Sessions
             .Where(session => string.Equals(session.WorkspaceId, workspace.Id, StringComparison.Ordinal))
             .OrderByDescending(session => session.IsPinned);
+
+    private void ToggleCollapse(string workspaceId)
+    {
+        if (!_collapsedWorkspaces.Remove(workspaceId))
+        {
+            _collapsedWorkspaces.Add(workspaceId);
+        }
+    }
 
     private void ToggleMenu(string key) => _openMenu = _openMenu == key ? null : key;
 

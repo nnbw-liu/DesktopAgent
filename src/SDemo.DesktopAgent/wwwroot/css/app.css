@@ -1075,14 +1075,66 @@ a {
 /* 聊天室挂在工作区下面，缩进一级 */
 .session-row.is-child .item-main {
     gap: 8px;
-    padding-left: 24px;
+    padding-left: 38px;
 }
 
-.sidebar-group-label {
-    padding: 8px 10px 4px 14px;
+/* 工作区折叠箭头 */
+.tree-caret {
+    display: grid;
+    flex: 0 0 12px;
+    place-items: center;
+    width: 12px;
+    height: 12px;
     color: var(--muted);
-    font-size: 10.5px;
-    letter-spacing: .04em;
+}
+
+.tree-caret .icon {
+    transition: transform .12s ease;
+}
+
+.tree-caret.is-open .icon {
+    transform: rotate(90deg);
+}
+
+/* 「添加工作区」行 */
+.sidebar-add {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: calc(100% - 16px);
+    margin: 4px 8px 2px;
+    padding: 8px 10px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color .12s ease, color .12s ease, background .12s ease;
+}
+
+.sidebar-add:hover {
+    border-color: var(--accent-border);
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.sidebar-add-icon {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.sidebar-empty {
+    margin: 0;
+    padding: 4px 12px 10px 24px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.6;
 }
 
 .item-action {

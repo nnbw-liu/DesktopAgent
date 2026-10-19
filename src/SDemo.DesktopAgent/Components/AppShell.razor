@@ -10,13 +10,12 @@
     <Sidebar Workspaces="Workspaces"
              Sessions="SortedSessions"
              ActiveSessionId="@(_view == MainView.Chat ? _activeSession?.Id : null)"
-             ActiveWorkspaceId="_selectedWorkspaceId"
              IsSettingsActive="@(_view == MainView.Settings)"
              OnNewChat="StartNewChat"
              OnOpenSession="OpenSession"
              OnOpenSettings="OpenSettings"
              OnNewChatInWorkspace="NewChatInWorkspace"
-             OnSelectWorkspace="SelectWorkspace"
+             OnAddWorkspace="AddWorkspace"
              OnTogglePin="TogglePin"
              OnDeleteSession="DeleteSession"
              OnRenameSession="RenameSession"
@@ -66,9 +65,6 @@
 
     private SettingsSection _settingsSection = SettingsSection.General;
 
-    /// <summary>当前选中的工作区（新建聊天室时使用）。</summary>
-    private string? _selectedWorkspaceId;
-
     private IReadOnlyList<Workspace> Workspaces => Settings.Current.Workspaces;
 
     private IReadOnlyList<ChatSession> SortedSessions =>
@@ -76,53 +72,32 @@
 
     protected override void OnInitialized()
     {
-        _selectedWorkspaceId = Workspaces.FirstOrDefault()?.Id;
-        _sessions = CreateSeedSessions(_selectedWorkspaceId);
-        _activeSession = ChatSession.CreateEmpty(_selectedWorkspaceId);
+        _sessions = CreateSeedSessions();
+        _activeSession = ChatSession.CreateEmpty();
         UpdateWorkspaceRoot();
     }
 
-    /// <summary>新建聊天室：右侧切换到空的聊天室页面。</summary>
+    /// <summary>新建聊天室：默认不归属任何工作区，进「历史聊天」。</summary>
     private void StartNewChat()
     {
         _view = MainView.Chat;
-        _activeSession = ChatSession.CreateEmpty(_selectedWorkspaceId);
+        _activeSession = ChatSession.CreateEmpty();
         UpdateWorkspaceRoot();
     }
 
     /// <summary>在指定工作区里新建聊天室。</summary>
     private void NewChatInWorkspace(Workspace workspace)
     {
-        _selectedWorkspaceId = workspace.Id;
         _view = MainView.Chat;
         _activeSession = ChatSession.CreateEmpty(workspace.Id);
         UpdateWorkspaceRoot();
     }
 
-    /// <summary>选中工作区（影响后续新建聊天室）。</summary>
-    private void SelectWorkspace(Workspace workspace)
-    {
-        _selectedWorkspaceId = workspace.Id;
-
-        if (_activeSession is { IsEmpty: true })
-        {
-            _activeSession.WorkspaceId = workspace.Id;
-        }
-
-        UpdateWorkspaceRoot();
-    }
-
-    /// <summary>打开历史会话。</summary>
+    /// <summary>打开聊天室（历史聊天或工作区里的都可以）。</summary>
     private void OpenSession(ChatSession session)
     {
         _view = MainView.Chat;
         _activeSession = session;
-
-        if (!string.IsNullOrEmpty(session.WorkspaceId))
-        {
-            _selectedWorkspaceId = session.WorkspaceId;
-        }
-
         UpdateWorkspaceRoot();
     }
 
@@ -149,9 +124,21 @@
         if (ReferenceEquals(_activeSession, session))
         {
             _view = MainView.Chat;
-            _activeSession = ChatSession.CreateEmpty(session.WorkspaceId ?? _selectedWorkspaceId);
+            _activeSession = ChatSession.CreateEmpty(session.WorkspaceId);
             UpdateWorkspaceRoot();
         }
+    }
+
+    /// <summary>添加工作区：选一个本地文件夹。</summary>
+    private async Task AddWorkspace()
+    {
+        var workspace = await PickOrCreateWorkspaceAsync();
+        if (workspace is null)
+        {
+            return;
+        }
+
+        UpdateWorkspaceRoot();
     }
 
     private void RenameSession((ChatSession Session, string Title) args) =>
@@ -165,35 +152,24 @@
 
     private void DeleteWorkspace(Workspace workspace)
     {
-        if (Workspaces.Count <= 1)
-        {
-            return;
-        }
-
         Settings.Current.Workspaces.Remove(workspace);
         Settings.Save();
 
+        // 工作区被删后，它下面的会话回到「历史聊天」。
         foreach (var session in _sessions.Where(item => item.WorkspaceId == workspace.Id))
         {
-            session.WorkspaceId = _selectedWorkspaceId == workspace.Id
-                ? Workspaces.FirstOrDefault()?.Id
-                : session.WorkspaceId;
-        }
-
-        if (_selectedWorkspaceId == workspace.Id)
-        {
-            _selectedWorkspaceId = Workspaces.FirstOrDefault()?.Id;
+            session.WorkspaceId = null;
         }
 
         if (_activeSession?.WorkspaceId == workspace.Id)
         {
-            _activeSession.WorkspaceId = _selectedWorkspaceId;
+            _activeSession.WorkspaceId = null;
         }
 
         UpdateWorkspaceRoot();
     }
 
-    /// <summary>聊天室页顶上切换工作区。</summary>
+    /// <summary>聊天室里切换工作区（只影响当前会话的归属）。</summary>
     private void ChangeWorkspace(Workspace workspace)
     {
         if (_activeSession is null)
@@ -202,12 +178,23 @@
         }
 
         _activeSession.WorkspaceId = workspace.Id;
-        _selectedWorkspaceId = workspace.Id;
         UpdateWorkspaceRoot();
     }
 
-    /// <summary>下拉框最底部的「选择工作区」：打开系统文件夹选择框。</summary>
+    /// <summary>下拉框最底部的「选择工作区」：选文件夹 → 建工作区 → 归到当前会话。</summary>
     private async Task PickWorkspace()
+    {
+        var workspace = await PickOrCreateWorkspaceAsync();
+        if (workspace is null)
+        {
+            return;
+        }
+
+        ChangeWorkspace(workspace);
+    }
+
+    /// <summary>弹出文件夹选择框，并按路径复用 / 新建工作区。</summary>
+    private async Task<Workspace?> PickOrCreateWorkspaceAsync()
     {
         string? path;
         try
@@ -217,44 +204,41 @@
         catch (Exception)
         {
             // 对话框异常（或被系统拒绝）不影响主流程。
-            return;
+            return null;
         }
 
         if (string.IsNullOrWhiteSpace(path))
         {
-            return;
+            return null;
         }
 
         var existing = Workspaces.FirstOrDefault(workspace =>
             string.Equals(workspace.Path, path, StringComparison.OrdinalIgnoreCase));
 
-        if (existing is null)
+        if (existing is not null)
         {
-            var name = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            existing = new Workspace
-            {
-                Id = Guid.NewGuid().ToString("N"),
-                Name = string.IsNullOrWhiteSpace(name) ? path : name,
-                Path = path
-            };
-
-            Settings.Current.Workspaces.Add(existing);
-            Settings.Save();
+            return existing;
         }
 
-        ChangeWorkspace(existing);
+        var name = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        var created = new Workspace
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = string.IsNullOrWhiteSpace(name) ? path : name,
+            Path = path
+        };
+
+        Settings.Current.Workspaces.Add(created);
+        Settings.Save();
+        return created;
     }
 
     private void UpdateWorkspaceRoot()
     {
-        var workspace = Workspaces.FirstOrDefault(item => item.Id == _activeSession?.WorkspaceId)
-                        ?? Workspaces.FirstOrDefault(item => item.Id == _selectedWorkspaceId)
-                        ?? Workspaces.FirstOrDefault();
+        // 没有工作区的会话（历史聊天）用默认文档目录当文件工具的根。
+        var workspace = Workspaces.FirstOrDefault(item => item.Id == _activeSession?.WorkspaceId);
 
-        if (workspace is not null)
-        {
-            WorkspaceContext.RootPath = workspace.Path;
-        }
+        WorkspaceContext.RootPath = workspace?.Path ?? WorkspaceContext.DefaultRootPath;
     }
 
     /// <summary>
@@ -298,14 +282,13 @@
         return firstLine.Length <= 18 ? firstLine : string.Concat(firstLine.AsSpan(0, 18), "…");
     }
 
-    private static List<ChatSession> CreateSeedSessions(string? workspaceId) =>
+    private static List<ChatSession> CreateSeedSessions() =>
     [
         new ChatSession
         {
             Id = "seed-1",
             Title = "桌面 Agent 架构设计",
             Meta = "今天 10:24",
-            WorkspaceId = workspaceId,
             Messages =
             [
                 new ChatMessage(ChatMessageRole.User, "帮我梳理一下桌面 Agent 的分层结构。"),
@@ -318,7 +301,6 @@
             Id = "seed-2",
             Title = "Blazor Hybrid 主题适配",
             Meta = "昨天 18:02",
-            WorkspaceId = workspaceId,
             Messages =
             [
                 new ChatMessage(ChatMessageRole.User, "Blazor 界面怎么跟随系统深浅色？"),
@@ -331,7 +313,6 @@
             Id = "seed-3",
             Title = "WPF 与 Blazor 的通信方式",
             Meta = "10 月 16 日",
-            WorkspaceId = workspaceId,
             Messages =
             [
                 new ChatMessage(ChatMessageRole.User, "WPF 和 Blazor 之间怎么互相调用？"),
