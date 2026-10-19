@@ -1,0 +1,70 @@
+@using SDemo.DesktopAgent.Models
+
+@* 工作区下拉框：列表最底部是「选择工作区」按钮 *@
+<div class="workspace-picker">
+    <button type="button" class="workspace-trigger" @onclick="Toggle">
+        <span class="workspace-label">工作区</span>
+        <span class="workspace-name">@SelectedName</span>
+        <span class="workspace-caret @(_open ? "is-open" : null)">▾</span>
+    </button>
+
+    @if (_open)
+    {
+        <div class="workspace-backdrop" @onclick="Close"></div>
+
+        <div class="workspace-menu">
+            @foreach (var workspace in Workspaces)
+            {
+                <button type="button"
+                        class="workspace-option @(IsSelected(workspace) ? "is-active" : null)"
+                        @onclick="() => Select(workspace)">
+                    <span class="workspace-option-name">@workspace.Name</span>
+                    <span class="workspace-option-path">@workspace.Path</span>
+                </button>
+            }
+
+            <button type="button" class="workspace-option workspace-option--pick" @onclick="Pick">
+                <span class="workspace-option-name">＋ 选择工作区…</span>
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<Workspace> Workspaces { get; set; } = [];
+
+    [Parameter]
+    public string? SelectedId { get; set; }
+
+    [Parameter]
+    public EventCallback<Workspace> OnSelect { get; set; }
+
+    [Parameter]
+    public EventCallback OnPick { get; set; }
+
+    private bool _open;
+
+    private Workspace? Selected => Workspaces.FirstOrDefault(workspace => IsSelected(workspace));
+
+    private string SelectedName => Selected?.Name ?? "选择工作区";
+
+    private bool IsSelected(Workspace workspace) =>
+        string.Equals(workspace.Id, SelectedId, StringComparison.Ordinal);
+
+    private void Toggle() => _open = !_open;
+
+    private void Close() => _open = false;
+
+    private async Task Select(Workspace workspace)
+    {
+        _open = false;
+        await OnSelect.InvokeAsync(workspace);
+    }
+
+    private async Task Pick()
+    {
+        _open = false;
+        await OnPick.InvokeAsync();
+    }
+}

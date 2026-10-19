@@ -69,6 +69,8 @@ public partial class App : Application
         services.AddSingleton<IModelCatalogService, ModelCatalogService>();
         services.AddSingleton<ISearchService, SearchService>();
         services.AddSingleton<FileWriteApprovalService>();
+        services.AddSingleton<WorkspaceContext>();
+        services.AddSingleton<IFolderPickerService, FolderPickerService>();
         services.AddSingleton<AgentToolbox>();
         services.AddSingleton<IAgentChatService, AgentChatService>();
 

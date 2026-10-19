@@ -18,31 +18,101 @@
     </header>
 
     <div class="sidebar-content">
-        <SidebarSection Title="工作区" Count="@_workspaces.Count" InitiallyExpanded="true">
-            @foreach (var workspace in _workspaces)
+        <SidebarSection Title="工作区" Count="@Workspaces.Count" InitiallyExpanded="true">
+            @foreach (var workspace in Workspaces)
             {
-                <button type="button" class="sidebar-item">
-                    <span class="item-icon">@workspace.Glyph</span>
-                    <span class="item-text">
-                        <span class="item-title">@workspace.Name</span>
-                        <span class="item-meta">@workspace.Description</span>
-                    </span>
-                </button>
+                var menuKey = "w:" + workspace.Id;
+
+                <div class="sidebar-item item-row @(string.Equals(workspace.Id, ActiveWorkspaceId, StringComparison.Ordinal) ? "is-active" : null)"
+                     @onmouseleave="() => CloseMenu(menuKey)">
+                    @if (_renamingKey == menuKey)
+                    {
+                        <div class="item-editor">
+                            <input class="item-editor-input"
+                                   @bind="_renameText"
+                                   @bind:event="oninput"
+                                   @onkeydown="HandleRenameKeyDown" />
+                            <button type="button" class="item-action item-action--confirm" title="保存" @onclick="() => CommitRename()">✓</button>
+                            <button type="button" class="item-action" title="取消" @onclick="CancelRename">✕</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <button type="button" class="item-main" @onclick="() => OnSelectWorkspace.InvokeAsync(workspace)">
+                            <span class="item-icon">▣</span>
+                            <span class="item-text">
+                                <span class="item-title">@workspace.Name</span>
+                                <span class="item-meta">@workspace.Path</span>
+                            </span>
+                        </button>
+
+                        <span class="item-actions">
+                            <button type="button" class="item-action" title="在此工作区新建聊天室"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => OnNewChatInWorkspace.InvokeAsync(workspace)">＋</button>
+                            <button type="button" class="item-action" title="更多"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => ToggleMenu(menuKey)">⋯</button>
+                        </span>
+
+                        @if (_openMenu == menuKey)
+                        {
+                            <div class="item-menu">
+                                <button type="button" class="item-menu-entry" @onclick="() => StartRename(menuKey, workspace.Name)">重命名</button>
+                                <button type="button" class="item-menu-entry item-menu-entry--danger" @onclick="() => DeleteWorkspace(workspace)">删除</button>
+                            </div>
+                        }
+                    }
+                </div>
             }
         </SidebarSection>
 
         <SidebarSection Title="历史聊天" Count="@Sessions.Count" InitiallyExpanded="true">
             @foreach (var session in Sessions)
             {
-                <button type="button"
-                        class="sidebar-item @(IsActive(session) ? "is-active" : null)"
-                        @onclick="() => OnOpenSession.InvokeAsync(session)">
-                    <span class="item-icon">◌</span>
-                    <span class="item-text">
-                        <span class="item-title">@session.Title</span>
-                        <span class="item-meta">@session.Meta</span>
-                    </span>
-                </button>
+                var menuKey = "s:" + session.Id;
+
+                <div class="sidebar-item item-row @(IsActive(session) ? "is-active" : null) @(session.IsPinned ? "is-pinned" : null)"
+                     @onmouseleave="() => CloseMenu(menuKey)">
+                    @if (_renamingKey == menuKey)
+                    {
+                        <div class="item-editor">
+                            <input class="item-editor-input"
+                                   @bind="_renameText"
+                                   @bind:event="oninput"
+                                   @onkeydown="HandleRenameKeyDown" />
+                            <button type="button" class="item-action item-action--confirm" title="保存" @onclick="() => CommitRename()">✓</button>
+                            <button type="button" class="item-action" title="取消" @onclick="CancelRename">✕</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <button type="button" class="item-main" @onclick="() => OnOpenSession.InvokeAsync(session)">
+                            <span class="item-icon">@(session.IsPinned ? "⚑" : "◌")</span>
+                            <span class="item-text">
+                                <span class="item-title">@session.Title</span>
+                                <span class="item-meta">@session.Meta</span>
+                            </span>
+                        </button>
+
+                        <span class="item-actions">
+                            <button type="button" class="item-action" title="@(session.IsPinned ? "取消置顶" : "置顶")"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => OnTogglePin.InvokeAsync(session)">@(session.IsPinned ? "⚐" : "⚑")</button>
+                            <button type="button" class="item-action" title="更多"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => ToggleMenu(menuKey)">⋯</button>
+                        </span>
+
+                        @if (_openMenu == menuKey)
+                        {
+                            <div class="item-menu">
+                                <button type="button" class="item-menu-entry" @onclick="() => StartRename(menuKey, session.Title)">重命名</button>
+                                <button type="button" class="item-menu-entry item-menu-entry--danger" @onclick="() => DeleteSession(session)">删除</button>
+                            </div>
+                        }
+                    }
+                </div>
             }
         </SidebarSection>
     </div>
@@ -62,10 +132,16 @@
 
 @code {
     [Parameter]
+    public IReadOnlyList<Workspace> Workspaces { get; set; } = [];
+
+    [Parameter]
     public IReadOnlyList<ChatSession> Sessions { get; set; } = [];
 
     [Parameter]
     public string? ActiveSessionId { get; set; }
+
+    [Parameter]
+    public string? ActiveWorkspaceId { get; set; }
 
     /// <summary>当前是否停留在设置页（用于高亮底部「设置」）。</summary>
     [Parameter]
@@ -80,16 +156,109 @@
     [Parameter]
     public EventCallback OnOpenSettings { get; set; }
 
-    // 占位数据：后续接入工作区服务后替换。
-    private readonly List<Workspace> _workspaces =
-    [
-        new("默认工作区", "本地 · SDemo Agent", "▣"),
-        new("代码助手", "仓库问答与代码生成", "⌘"),
-        new("文档整理", "会议纪要与资料摘要", "▤")
-    ];
+    [Parameter]
+    public EventCallback<Workspace> OnNewChatInWorkspace { get; set; }
+
+    [Parameter]
+    public EventCallback<Workspace> OnSelectWorkspace { get; set; }
+
+    [Parameter]
+    public EventCallback<ChatSession> OnTogglePin { get; set; }
+
+    [Parameter]
+    public EventCallback<ChatSession> OnDeleteSession { get; set; }
+
+    [Parameter]
+    public EventCallback<(ChatSession Session, string Title)> OnRenameSession { get; set; }
+
+    [Parameter]
+    public EventCallback<Workspace> OnDeleteWorkspace { get; set; }
+
+    [Parameter]
+    public EventCallback<(Workspace Workspace, string Name)> OnRenameWorkspace { get; set; }
+
+    private string? _openMenu;
+    private string? _renamingKey;
+    private string _renameText = string.Empty;
 
     private bool IsActive(ChatSession session) =>
         string.Equals(session.Id, ActiveSessionId, StringComparison.Ordinal);
 
-    private sealed record Workspace(string Name, string Description, string Glyph);
+    private void ToggleMenu(string key) => _openMenu = _openMenu == key ? null : key;
+
+    private void CloseMenu(string key)
+    {
+        if (_openMenu == key)
+        {
+            _openMenu = null;
+        }
+    }
+
+    private void StartRename(string key, string currentName)
+    {
+        _openMenu = null;
+        _renamingKey = key;
+        _renameText = currentName;
+    }
+
+    private void CancelRename()
+    {
+        _renamingKey = null;
+        _renameText = string.Empty;
+    }
+
+    private async Task CommitRename()
+    {
+        var key = _renamingKey;
+        var text = _renameText.Trim();
+
+        if (key is null || text.Length == 0)
+        {
+            CancelRename();
+            return;
+        }
+
+        if (key.StartsWith("w:", StringComparison.Ordinal))
+        {
+            var workspace = Workspaces.FirstOrDefault(item => item.Id == key[2..]);
+            if (workspace is not null)
+            {
+                await OnRenameWorkspace.InvokeAsync((workspace, text));
+            }
+        }
+        else
+        {
+            var session = Sessions.FirstOrDefault(item => item.Id == key[2..]);
+            if (session is not null)
+            {
+                await OnRenameSession.InvokeAsync((session, text));
+            }
+        }
+
+        CancelRename();
+    }
+
+    private async Task DeleteSession(ChatSession session)
+    {
+        _openMenu = null;
+        await OnDeleteSession.InvokeAsync(session);
+    }
+
+    private async Task DeleteWorkspace(Workspace workspace)
+    {
+        _openMenu = null;
+        await OnDeleteWorkspace.InvokeAsync(workspace);
+    }
+
+    private async Task HandleRenameKeyDown(KeyboardEventArgs args)
+    {
+        if (string.Equals(args.Key, "Enter", StringComparison.Ordinal))
+        {
+            await CommitRename();
+        }
+        else if (string.Equals(args.Key, "Escape", StringComparison.Ordinal))
+        {
+            CancelRename();
+        }
+    }
 }

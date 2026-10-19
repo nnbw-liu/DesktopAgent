@@ -28,10 +28,38 @@
 
                     <article class="msg @(isUser ? "msg--user" : "msg--assistant")">
                         <span class="msg-role">@(isUser ? "你" : "SDemo")</span>
+
+                        @if (!string.IsNullOrWhiteSpace(message.Reasoning))
+                        {
+                            <div class="msg-reasoning">
+                                <button type="button"
+                                        class="reasoning-toggle"
+                                        @onclick="() => ToggleReasoning(message.Id)">
+                                    <span class="reasoning-caret @(IsReasoningOpen(message.Id) ? "is-open" : null)">▸</span>
+                                    <span>思考过程 · @message.Reasoning.Length 字</span>
+                                </button>
+
+                                @if (IsReasoningOpen(message.Id))
+                                {
+                                    <pre class="reasoning-body">@message.Reasoning</pre>
+                                }
+                            </div>
+                        }
+
                         <div class="msg-body">@message.Content</div>
                     </article>
                 }
             </div>
+        </div>
+    }
+
+    @if (IsEmpty)
+    {
+        <div class="workspace-bar">
+            <WorkspacePicker Workspaces="Workspaces"
+                             SelectedId="@Session.WorkspaceId"
+                             OnSelect="SelectWorkspace"
+                             OnPick="() => OnPickWorkspace.InvokeAsync()" />
         </div>
     }
 
@@ -100,6 +128,18 @@
     [Parameter]
     public EventCallback OnOpenModelSettings { get; set; }
 
+    /// <summary>当前聊天室可选的工作区。</summary>
+    [Parameter]
+    public IReadOnlyList<Workspace> Workspaces { get; set; } = [];
+
+    /// <summary>切换当前聊天室的工作区。</summary>
+    [Parameter]
+    public EventCallback<Workspace> OnWorkspaceChanged { get; set; }
+
+    /// <summary>下拉框最底部的「选择工作区」（打开系统文件夹选择框）。</summary>
+    [Parameter]
+    public EventCallback OnPickWorkspace { get; set; }
+
     private string _draft = string.Empty;
     private bool _isGenerating;
     private string? _sessionId;
@@ -112,6 +152,9 @@
 
     /// <summary>输入框底部 chip 打开的工具（默认全关）。</summary>
     private readonly HashSet<AgentSkill> _enabledSkills = [];
+
+    /// <summary>展开了思维链的消息 Id。</summary>
+    private readonly HashSet<string> _openReasoning = [];
 
     private bool IsEmpty => Session.Messages.Count == 0;
 
@@ -159,6 +202,18 @@
         });
 
     private void ResolveWrite(bool approved) => Approvals.Resolve(approved);
+
+    private bool IsReasoningOpen(string messageId) => _openReasoning.Contains(messageId);
+
+    private void ToggleReasoning(string messageId)
+    {
+        if (!_openReasoning.Remove(messageId))
+        {
+            _openReasoning.Add(messageId);
+        }
+    }
+
+    private Task SelectWorkspace(Workspace workspace) => OnWorkspaceChanged.InvokeAsync(workspace);
 
     private static string PreviewWrite(string content)
     {
@@ -266,13 +321,23 @@
         var history = Session.Messages.ToList();
         var reply = new ChatMessage(ChatMessageRole.Assistant, string.Empty);
         Session.Messages.Add(reply);
+        _openReasoning.Add(reply.Id);
         StateHasChanged();
 
         try
         {
             await foreach (var delta in Agent.StreamAsync(option.Provider, option.ModelId, history, _enabledSkills, cts.Token))
             {
-                reply.Content += delta;
+                if (delta.Text.Length > 0)
+                {
+                    reply.Content += delta.Text;
+                }
+
+                if (delta.Reasoning.Length > 0)
+                {
+                    reply.Reasoning += delta.Reasoning;
+                }
+
                 StateHasChanged();
             }
         }

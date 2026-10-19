@@ -986,6 +986,308 @@ a {
     background-color: var(--muted);
 }
 
+/* ---------- 侧栏列表：hover 操作 / 菜单 / 重命名 ---------- */
+
+.item-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 4px 0 0;
+}
+
+.item-row.is-active {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.item-main {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.item-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 1px;
+    opacity: 0;
+    transition: opacity .12s ease;
+}
+
+.item-row:hover .item-actions,
+.item-row:focus-within .item-actions,
+.item-row.is-pinned .item-actions,
+.item-row.is-active .item-actions {
+    opacity: 1;
+}
+
+.item-action {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.item-action:hover {
+    background: var(--bg);
+    color: var(--text);
+}
+
+.item-action--confirm {
+    color: var(--accent);
+}
+
+.item-menu {
+    position: absolute;
+    top: calc(100% - 2px);
+    right: 4px;
+    z-index: 30;
+    min-width: 120px;
+    padding: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: 9px;
+    background: var(--surface);
+    box-shadow: var(--composer-shadow);
+}
+
+.item-menu-entry {
+    display: block;
+    width: 100%;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.item-menu-entry:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.item-menu-entry--danger:hover {
+    background: #c42b1c;
+    color: #fff;
+}
+
+.item-editor {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    padding: 4px 6px;
+}
+
+.item-editor-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 5px 8px;
+    border: 1px solid var(--accent-border);
+    border-radius: 7px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12.5px;
+    outline: none;
+}
+
+/* ---------- 聊天室顶部工作区下拉 ---------- */
+
+.workspace-bar {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: center;
+    padding: 0 0 12px;
+}
+
+.workspace-picker {
+    position: relative;
+    display: inline-flex;
+}
+
+.workspace-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: border-color .12s ease, color .12s ease;
+}
+
+.workspace-trigger:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+
+.workspace-label {
+    color: var(--muted);
+}
+
+.workspace-name {
+    max-width: 240px;
+    overflow: hidden;
+    color: var(--text);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.workspace-caret {
+    color: var(--muted);
+    font-size: 9px;
+    transition: transform .12s ease;
+}
+
+.workspace-caret.is-open {
+    transform: rotate(180deg);
+}
+
+.workspace-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+}
+
+.workspace-menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    min-width: 260px;
+    max-height: 300px;
+    padding: 4px;
+    overflow-y: auto;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: var(--composer-shadow);
+}
+
+.workspace-option {
+    display: block;
+    width: 100%;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.workspace-option:hover {
+    background: var(--surface-hover);
+}
+
+.workspace-option.is-active {
+    background: var(--accent-soft);
+}
+
+.workspace-option-name {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.workspace-option-path {
+    display: block;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 10.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.workspace-option--pick {
+    margin-top: 4px;
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 7px 7px;
+    color: var(--text-dim);
+}
+
+/* ---------- 思维链 ---------- */
+
+.msg-reasoning {
+    max-width: 100%;
+}
+
+.reasoning-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    transition: color .12s ease, border-color .12s ease;
+}
+
+.reasoning-toggle:hover {
+    border-color: var(--muted);
+    color: var(--text-dim);
+}
+
+.reasoning-caret {
+    display: inline-block;
+    font-size: 9px;
+    transition: transform .12s ease;
+}
+
+.reasoning-caret.is-open {
+    transform: rotate(90deg);
+}
+
+.reasoning-body {
+    max-height: 260px;
+    margin: 8px 0 0;
+    padding: 8px 12px;
+    overflow-y: auto;
+    border-left: 2px solid var(--border-strong);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 /* ---------- 设置页 ---------- */
 
 .settings {

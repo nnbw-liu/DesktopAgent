@@ -25,4 +25,7 @@ public sealed class AppSettings
 
     /// <summary>模型写文件前是否需要用户确认（默认需要）。</summary>
     public bool ConfirmFileWrite { get; set; } = true;
+
+    /// <summary>工作区列表。</summary>
+    public List<Workspace> Workspaces { get; set; } = [];
 }

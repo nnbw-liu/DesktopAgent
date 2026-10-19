@@ -1,5 +1,6 @@
 using System.ClientModel;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using OpenAI;
@@ -11,14 +12,17 @@ using ChatRoleModel = SDemo.DesktopAgent.Models.ChatMessageRole;
 
 namespace SDemo.DesktopAgent.Services;
 
+/// <summary>流式增量：正文与思维链分开返回。</summary>
+public readonly record struct AgentDelta(string Text, string Reasoning);
+
 /// <summary>
 /// 通过 Microsoft Agent Framework 调用模型。只支持标准 OpenAI API，
 /// provider 的 BaseUrl 直接作为 OpenAI 客户端的 Endpoint。
 /// </summary>
 public interface IAgentChatService
 {
-    /// <summary>流式生成回复；每个元素是增量文本。</summary>
-    IAsyncEnumerable<string> StreamAsync(
+    /// <summary>流式生成回复；正文与思维链分别放在 <see cref="AgentDelta"/> 里。</summary>
+    IAsyncEnumerable<AgentDelta> StreamAsync(
         ModelProvider provider,
         string modelId,
         IReadOnlyList<ChatMessageModel> history,
@@ -40,7 +44,7 @@ public sealed class AgentChatService : IAgentChatService
 
     public AgentChatService(AgentToolbox toolbox) => _toolbox = toolbox;
 
-    public async IAsyncEnumerable<string> StreamAsync(
+    public async IAsyncEnumerable<AgentDelta> StreamAsync(
         ModelProvider provider,
         string modelId,
         IReadOnlyList<ChatMessageModel> history,
@@ -59,9 +63,25 @@ public sealed class AgentChatService : IAgentChatService
 
         await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken: cancellationToken))
         {
-            if (!string.IsNullOrEmpty(update.Text))
+            var text = new StringBuilder();
+            var reasoning = new StringBuilder();
+
+            foreach (var content in update.Contents)
             {
-                yield return update.Text;
+                switch (content)
+                {
+                    case TextReasoningContent { Text: { Length: > 0 } chain }:
+                        reasoning.Append(chain);
+                        break;
+                    case TextContent { Text: { Length: > 0 } chunk } when content is not TextReasoningContent:
+                        text.Append(chunk);
+                        break;
+                }
+            }
+
+            if (text.Length > 0 || reasoning.Length > 0)
+            {
+                yield return new AgentDelta(text.ToString(), reasoning.ToString());
             }
         }
     }

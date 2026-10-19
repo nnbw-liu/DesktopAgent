@@ -28,19 +28,18 @@ public sealed class AgentToolbox
     private readonly ISearchService _search;
     private readonly ISettingsService _settings;
     private readonly FileWriteApprovalService _approvals;
+    private readonly WorkspaceContext _workspace;
 
     public AgentToolbox(
         ISearchService search,
         ISettingsService settings,
-        FileWriteApprovalService approvals)
+        FileWriteApprovalService approvals,
+        WorkspaceContext workspace)
     {
         _search = search;
         _settings = settings;
         _approvals = approvals;
-
-        WorkspaceRoot = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "SDemo DesktopAgent");
+        _workspace = workspace;
 
         SkillsRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -49,7 +48,8 @@ public sealed class AgentToolbox
             "skills");
     }
 
-    public string WorkspaceRoot { get; }
+    /// <summary>文件工具的根目录 = 当前聊天室所属工作区。</summary>
+    public string WorkspaceRoot => _workspace.RootPath;
 
     public string SkillsRoot { get; }
 
