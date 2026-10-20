@@ -133,13 +133,23 @@ public sealed class PluginRegistry
         return new Snapshot(plugins, bySurface, byKey);
     }
 
-    /// <summary>气泡界面没有「侧栏 / 输入框」开关，只受插件级启用控制。</summary>
-    private static bool IsSurfaceAllowed(PluginSurface surface, PluginEntryPreferences? entry) => surface switch
+    /// <summary>
+    /// 某个界面是否可用。气泡只受插件级启用控制之外的 <c>inMessage</c> 开关；
+    /// <b>侧栏依赖输入框</b>：侧栏入口只是「新建一个预选该插件的会话」，输入框入口关掉后
+    /// 进去也看不到插件，留着只会让人找不到插件，所以一并隐藏。
+    /// </summary>
+    private static bool IsSurfaceAllowed(PluginSurface surface, PluginEntryPreferences? entry)
     {
-        PluginSurface.Sidebar => entry?.InSidebar ?? true,
-        PluginSurface.Composer => entry?.InComposer ?? true,
-        _ => true
-    };
+        var inComposer = entry?.InComposer ?? true;
+
+        return surface switch
+        {
+            PluginSurface.Sidebar => inComposer && (entry?.InSidebar ?? true),
+            PluginSurface.Composer => inComposer,
+            PluginSurface.Message => entry?.InMessage ?? true,
+            _ => true
+        };
+    }
 
     private sealed record Snapshot(
         IReadOnlyList<PluginDescriptor> Plugins,

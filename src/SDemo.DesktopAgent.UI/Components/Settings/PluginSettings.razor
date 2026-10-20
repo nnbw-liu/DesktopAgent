@@ -160,16 +160,6 @@
                             <span>启用</span>
                         </label>
 
-                        <label class="plugin-control @(HasSidebar(plugin) ? null : "is-disabled")"
-                               title="@(HasSidebar(plugin) ? "在侧栏显示入口" : "这个插件没有侧栏入口")">
-                            <input type="checkbox"
-                                   class="switch switch--sm"
-                                   checked="@InSidebar(plugin)"
-                                   disabled="@(!HasSidebar(plugin))"
-                                   @onchange="args => SetInSidebar(plugin, args)" />
-                            <span>侧栏</span>
-                        </label>
-
                         <label class="plugin-control @(HasComposer(plugin) ? null : "is-disabled")"
                                title="@(HasComposer(plugin) ? "在输入框显示 chip" : "这个插件没有输入框入口")">
                             <input type="checkbox"
@@ -178,6 +168,26 @@
                                    disabled="@(!HasComposer(plugin))"
                                    @onchange="args => SetInComposer(plugin, args)" />
                             <span>输入框</span>
+                        </label>
+
+                        <label class="plugin-control @(CanUseSidebar(plugin) ? null : "is-disabled")"
+                               title="@SidebarHint(plugin)">
+                            <input type="checkbox"
+                                   class="switch switch--sm"
+                                   checked="@IsSidebarOn(plugin)"
+                                   disabled="@(!CanUseSidebar(plugin))"
+                                   @onchange="args => SetInSidebar(plugin, args)" />
+                            <span>侧栏</span>
+                        </label>
+
+                        <label class="plugin-control @(HasMessage(plugin) ? null : "is-disabled")"
+                               title="@(HasMessage(plugin) ? "在助手消息底部显示插件按钮" : "这个插件没有气泡入口")">
+                            <input type="checkbox"
+                                   class="switch switch--sm"
+                                   checked="@InMessage(plugin)"
+                                   disabled="@(!HasMessage(plugin))"
+                                   @onchange="args => SetInMessage(plugin, args)" />
+                            <span>气泡</span>
                         </label>
 
                         <label class="plugin-control plugin-control--order" title="数字小的排前面；清空表示用插件清单里的顺序">
@@ -314,6 +324,12 @@
         Settings.Save();
     }
 
+    private void SetInMessage(PluginDescriptor plugin, ChangeEventArgs args)
+    {
+        Prefs.GetOrAddEntry(plugin.Id).InMessage = args.Value is true;
+        Settings.Save();
+    }
+
     private void SetOrder(PluginDescriptor plugin, ChangeEventArgs args)
     {
         var text = args.Value?.ToString();
@@ -337,6 +353,35 @@
 
     private bool InComposer(PluginDescriptor plugin) => Prefs.FindEntry(plugin.Id)?.InComposer ?? true;
 
+    private bool InMessage(PluginDescriptor plugin) => Prefs.FindEntry(plugin.Id)?.InMessage ?? true;
+
+    /// <summary>侧栏能不能用：插件本身要有侧栏入口，而且输入框入口得开着（侧栏会进入预选插件的会话）。</summary>
+    private bool CanUseSidebar(PluginDescriptor plugin) =>
+        HasSidebar(plugin) && HasComposer(plugin) && InComposer(plugin);
+
+    /// <summary>生效值：输入框入口关闭时侧栏跟着灰掉；存储值不动，重新打开输入框会恢复。</summary>
+    private bool IsSidebarOn(PluginDescriptor plugin) => InComposer(plugin) && InSidebar(plugin);
+
+    private string SidebarHint(PluginDescriptor plugin)
+    {
+        if (!HasComposer(plugin))
+        {
+            return "这个插件没有输入框入口，侧栏入口不可用";
+        }
+
+        if (!InComposer(plugin))
+        {
+            return "输入框入口关闭时侧栏也不可用（侧栏会进入预选插件的会话）";
+        }
+
+        if (!HasSidebar(plugin))
+        {
+            return "这个插件没有侧栏入口";
+        }
+
+        return "在侧栏显示入口";
+    }
+
     private int OrderOf(PluginDescriptor plugin) => Prefs.FindEntry(plugin.Id)?.Order ?? plugin.Order;
 
     private static bool HasSidebar(PluginDescriptor plugin) =>
@@ -344,6 +389,9 @@
 
     private static bool HasComposer(PluginDescriptor plugin) =>
         plugin.Mounts.Any(mount => mount.IsUsable && mount.Surface == PluginSurface.Composer);
+
+    private static bool HasMessage(PluginDescriptor plugin) =>
+        plugin.Mounts.Any(mount => mount.IsUsable && mount.Surface == PluginSurface.Message);
 
     private static string SurfaceSummary(PluginDescriptor plugin)
     {

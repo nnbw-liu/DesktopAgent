@@ -67,11 +67,14 @@ public sealed class PluginEntryPreferences
     /// <summary>启用开关（null = 启用）。</summary>
     public bool? Enabled { get; set; }
 
-    /// <summary>侧栏入口开关（null = 用 manifest 的 show）。</summary>
+    /// <summary>侧栏入口开关（null = 用 manifest 的 show）。注意：输入框入口关闭时侧栏会跟着不可用。</summary>
     public bool? InSidebar { get; set; }
 
     /// <summary>输入框入口开关（null = 用 manifest 的 show）。</summary>
     public bool? InComposer { get; set; }
+
+    /// <summary>气泡（消息底部按钮）开关（null = 用 manifest 的 show）。</summary>
+    public bool? InMessage { get; set; }
 
     /// <summary>排序覆盖（null = 用 manifest 的 order）。</summary>
     public int? Order { get; set; }

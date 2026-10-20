@@ -78,7 +78,7 @@ public sealed class PluginRegistryTests
     }
 
     [Fact]
-    public void 关掉输入框开关_气泡仍然可用()
+    public void 关掉输入框开关_侧栏跟着不可用_气泡仍可用()
     {
         using var temp = new TempPlugins();
         temp.WriteLocal("demo", ThreeSurfaces, ("skills/main.md", Fixtures.Skill));
@@ -89,7 +89,44 @@ public sealed class PluginRegistryTests
         settings.Save();
 
         Assert.Empty(registry.Mounts(PluginSurface.Composer));
+
+        // 侧栏入口只是「新建一个预选该插件的会话」，输入框入口关了以后进去也看不到插件，所以一起隐藏。
+        Assert.Empty(registry.Mounts(PluginSurface.Sidebar));
+        Assert.Null(registry.FindMount("demo/sidebar"));
+
+        Assert.Single(registry.Mounts(PluginSurface.Message));
+    }
+
+    [Fact]
+    public void 关掉气泡开关_只影响气泡()
+    {
+        using var temp = new TempPlugins();
+        temp.WriteLocal("demo", ThreeSurfaces, ("skills/main.md", Fixtures.Skill));
+        var settings = new StubSettingsService();
+        var registry = new PluginRegistry(temp.CreateCatalog(), settings);
+
+        settings.Current.Plugins.GetOrAddEntry("demo").InMessage = false;
+        settings.Save();
+
+        Assert.Empty(registry.Mounts(PluginSurface.Message));
+        Assert.Null(registry.FindMount("demo/bubble"));
         Assert.Single(registry.Mounts(PluginSurface.Sidebar));
+        Assert.Single(registry.Mounts(PluginSurface.Composer));
+    }
+
+    [Fact]
+    public void 侧栏开关不影响输入框与气泡()
+    {
+        using var temp = new TempPlugins();
+        temp.WriteLocal("demo", ThreeSurfaces, ("skills/main.md", Fixtures.Skill));
+        var settings = new StubSettingsService();
+        var registry = new PluginRegistry(temp.CreateCatalog(), settings);
+
+        settings.Current.Plugins.GetOrAddEntry("demo").InSidebar = false;
+        settings.Save();
+
+        Assert.Empty(registry.Mounts(PluginSurface.Sidebar));
+        Assert.Single(registry.Mounts(PluginSurface.Composer));
         Assert.Single(registry.Mounts(PluginSurface.Message));
     }
 

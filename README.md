@@ -365,7 +365,7 @@ version: 1.0
 | M1 输入框 | ✅ | 选中插件后发送走插件 Run：chip + 内联参数、会话记忆、助手消息带「翻译 · SDemo」归属 |
 | M2 侧栏 | ✅ | 「新建聊天室」下方的插件入口区，点入口新建预选该插件的空会话（`OriginMountId = ActiveMountId`） |
 | M3 气泡 | ✅ | 助手消息底部的插件按钮 → 派生卡片（复制 / 重试 / 删除）；会话图标跟随 `LastPluginId`，普通推理后复位；派生内容不进上下文 |
-| M4 设置 | ✅ | 「设置 → 插件」：总开关、输入框/侧栏上限、参数记忆、默认呈现、每个插件的启用/入口/顺序、打开目录、重新扫描；改动即时生效 |
+| M4 设置 | ✅ | 「设置 → 插件」：总开关、输入框/侧栏上限、参数记忆、默认呈现、每个插件的启用/输入框/侧栏/气泡/顺序、打开目录、重新扫描；改动即时生效。侧栏依赖输入框（关掉输入框后侧栏入口一并隐藏） |
 | M5 内置翻译 | ✅ | `plugins/translate/`（三条入口都可用） |
 | M6 双语对照 | ⬜ | 目前 `segments` 输出按纯文本处理 |
 
@@ -375,8 +375,8 @@ version: 1.0
 - `Core/Plugins/PluginManifest.cs`：清单 DTO 与反序列化选项（允许 `//` 注释、尾逗号、大小写不敏感、UTF-8 BOM），未知字段按 JSON 路径记警告。
 - `Core/Plugins/PluginValidator.cs`：id 格式与唯一性、skill 路径越界（`Path.GetFullPath` + 前缀比较，必须 `.md`）、占位符必须有参数定义、参数 `kind` / `options`、`minHostVersion`、`plugin.json` 512 KB 与 skill 256 KB 上限、图标只收 SVG `path` 数据。
 - `Core/Plugins/PluginModels.cs`：`PluginDescriptor` / `Capability` / `Mount` / `Parameter` 描述符，入口组合键 `<pluginId>/<mountId>`。
-- `Core/Plugins/PluginRegistry.cs`：把目录结果与用户设置合并成「有效视图」——总开关、插件启用、侧栏 / 输入框开关、顺序、显示上限；设置或重新扫描后立即刷新，UI 只从这里取入口。
-- `Core/Models/PluginPreferences.cs`：`settings.json` 的 `plugins` 节点（含每个插件的 `enabled` / `inSidebar` / `inComposer` / `order` 与隐私确认列表）。旧设置文件没有该节点时用默认值，不写迁移。
+- `Core/Plugins/PluginRegistry.cs`：把目录结果与用户设置合并成「有效视图」——总开关、插件启用、输入框 / 侧栏 / 气泡开关、顺序、显示上限；设置或重新扫描后立即刷新，UI 只从这里取入口。**侧栏依赖输入框**：关掉输入框入口后侧栏入口也隐藏（侧栏本来就只是进入预选插件的会话）。
+- `Core/Models/PluginPreferences.cs`：`settings.json` 的 `plugins` 节点（含每个插件的 `enabled` / `inComposer` / `inSidebar` / `inMessage` / `order` 与隐私确认列表）。旧设置文件没有该节点时用默认值，不写迁移。
 - `Core/Plugins/PluginParameterResolver.cs`：会话记忆 → `default` → `defaultFrom`（`system-language` / `system-locale`）→ `fallback` → 第一个 option；无效记忆值不会把会话卡死。
 - `Core/Plugins/PluginPromptComposer.cs`：skill 去 frontmatter、替换 `{{key}}` / `{{key.label}}`；用户输入单独成条并包进 `<待处理文本>`，`<` 全角转义。
 - `Core/Plugins/PluginRunner.cs`：单轮、无历史（除非能力打开 `allowHistory`）、无工具；超 60,000 字符直接报错而不是发出去。

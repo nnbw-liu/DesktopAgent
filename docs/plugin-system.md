@@ -640,12 +640,16 @@ public sealed record OutputSegment(string Source, string Target);
   "rememberParameterValues": true,
   "defaultOutputMode": "bilingual",
   "entries": [
-    { "id": "translate", "enabled": true, "inSidebar": true, "inComposer": true, "order": 10 }
+    { "id": "translate", "enabled": true, "inSidebar": true, "inComposer": true, "inMessage": true, "order": 10 }
   ]
 }
 ```
 
 `entries` 只在用户改过设置时写入；插件默认值来自 manifest 的 `show` / `order`。插件被删除后条目保留（下次装回来仍然生效），但不在界面上展示。
+
+> 入口开关的依赖关系：**侧栏依赖输入框**。侧栏入口只是「新建一个预选该插件的会话」，
+> 输入框入口关闭后进去也看不到插件，所以 `inComposer = false` 时 `inSidebar` 一律视为关闭
+> （设置页把侧栏那一项灰掉并给原因）。`inMessage` 是气泡按钮的独立开关，与输入框无关。
 
 ---
 

@@ -54,6 +54,7 @@ public sealed class PluginPreferencesTests : IDisposable
         var entry = first.Current.Plugins.GetOrAddEntry("translate");
         entry.InSidebar = true;
         entry.InComposer = false;
+        entry.InMessage = true;
         entry.Order = 10;
         first.Current.Plugins.PrivacyAcknowledged.Add("translate");
         first.Save();
@@ -64,6 +65,7 @@ public sealed class PluginPreferencesTests : IDisposable
         Assert.Equal("translate", back.Id);
         Assert.True(back.InSidebar);
         Assert.False(back.InComposer);
+        Assert.True(back.InMessage);
         Assert.Equal(10, back.Order);
         Assert.Null(back.Enabled);   // 没动过的开关保持 null（继续用 manifest 默认）
         Assert.Contains("translate", reloaded.Current.Plugins.PrivacyAcknowledged);
