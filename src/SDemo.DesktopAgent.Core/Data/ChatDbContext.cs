@@ -45,6 +45,7 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         message.Property(record => record.OutputTokens);
         message.Property(record => record.ToolCallsJson);
         message.Property(record => record.PluginJson);
+        message.Property(record => record.DerivedJson);
         message.HasIndex(record => record.SessionId);
     }
 }
@@ -112,4 +113,7 @@ public sealed class MessageRecord
 
     /// <summary>本轮插件归属信息（PluginMessageInfo）的 JSON。</summary>
     public string? PluginJson { get; set; }
+
+    /// <summary>派生卡片（DerivedArtifact[]）的 JSON。</summary>
+    public string? DerivedJson { get; set; }
 }

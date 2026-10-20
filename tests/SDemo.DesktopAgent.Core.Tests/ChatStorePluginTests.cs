@@ -61,6 +61,44 @@ public sealed class ChatStorePluginTests : IDisposable
     }
 
     [Fact]
+    public async Task 派生卡片落库后能读回_运行中的收尾成失败()
+    {
+        var store = new ChatStore(_root);
+        var session = new ChatSession
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = "派生卡片",
+            UpdatedAt = DateTime.Now
+        };
+
+        var values = new Dictionary<string, string>(StringComparer.Ordinal) { ["target"] = "ja" };
+        var reply = new ChatMessage(ChatMessageRole.Assistant, "原文");
+        reply.Derived.Add(new DerivedArtifact(
+            "a1", "translate", "bubble", "translate", values, null, "译文",
+            DerivedState.Done, null, "mock-model", 1200, 30, 8, DateTime.Now));
+        reply.Derived.Add(new DerivedArtifact(
+            "a2", "translate", "bubble", "translate", values, null, string.Empty,
+            DerivedState.Running, null, "mock-model", 0, 0, 0, DateTime.Now));
+
+        session.Messages.Add(reply);
+        await store.SaveSessionAsync(session);
+
+        var loaded = Assert.Single(await store.LoadAllAsync([]));
+        var derived = Assert.Single(loaded.Messages).Derived;
+
+        Assert.Equal(2, derived.Count);
+        Assert.Equal("译文", derived[0].Text);
+        Assert.Equal(DerivedState.Done, derived[0].State);
+        Assert.Equal(1200, derived[0].DurationMs);
+        Assert.Equal(30, derived[0].InputTokens);
+        Assert.Equal("ja", derived[0].Values["target"]);
+
+        // 上次没跑完的卡片加载时收尾成失败，避免界面上永远转圈。
+        Assert.Equal(DerivedState.Failed, derived[1].State);
+        Assert.Contains("未完成", derived[1].Error);
+    }
+
+    [Fact]
     public async Task 老库缺列时自动补齐_读写都不抛异常()
     {
         var databasePath = Path.Combine(_root, "history.db");
@@ -93,6 +131,7 @@ public sealed class ChatStorePluginTests : IDisposable
         Assert.Contains("LastPluginId", sessionColumns);
         Assert.Contains("PluginMemoryJson", sessionColumns);
         Assert.Contains("PluginJson", ReadColumns(connection, "messages"));
+        Assert.Contains("DerivedJson", ReadColumns(connection, "messages"));
     }
 
     private static void CreateLegacyDatabase(string path)

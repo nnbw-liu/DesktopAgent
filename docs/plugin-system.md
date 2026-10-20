@@ -1,6 +1,6 @@
 # 插件系统设计（v1）
 
-> 状态：M0（加载器）+ M1（输入框）+ M2（侧栏）已实现，M5 的内置翻译插件已就位；M3 / M4 / M6 待实现
+> 状态：M0（加载器）+ M1（输入框）+ M2（侧栏）+ M3（气泡）+ M5（内置翻译插件）已实现；M4 / M6 待实现
 > 适用工程：`SDemo.DesktopAgent`（WPF 宿主 + MAUI 宿主，共用 Core / UI）
 > 首个插件：翻译（`translate`）
 > 相关代码：`src/SDemo.DesktopAgent.Core`、`src/SDemo.DesktopAgent.UI`、`src/SDemo.DesktopAgent.Core/Data/ChatDbContext.cs`
@@ -1154,13 +1154,13 @@ M0 ──┬──▶ M1 ──┬──▶ M2
 
 **任务**
 
-- [ ] `PluginIcon.razor`：`paths` 白名单渲染 + `text` 兜底
-- [ ] `PluginActionButton` + 展开面板：OK / Cancel / Esc / 点外部
-- [ ] `DerivedCard.razor`：先做 `text` 模式（对照在 M6）
-- [ ] `PluginRunner.RunArtifactAsync` + 写 `ChatMessage.Derived`
-- [ ] `messages.DerivedJson` 列 + 映射
-- [ ] `LastPluginId` 写（Run 开始）/ 清（普通推理开始）+ 侧栏图标
-- [ ] 单飞约束：同一会话同一时间只允许一个 Run
+- [x] `PluginIcon.razor`：`paths` 白名单渲染 + `text` 兜底
+- [x] `PluginActionButton` + 展开面板：OK / Cancel / Esc / 点外部
+- [x] `DerivedCard.razor`：先做 `text` 模式（对照在 M6）
+- [x] `PluginRunner.RunArtifactAsync` + 写 `ChatMessage.Derived`
+- [x] `messages.DerivedJson` 列 + 映射
+- [x] `LastPluginId` 写（Run 开始）/ 清（普通推理开始）+ 侧栏图标
+- [x] 单飞约束：同一会话同一时间只允许一个 Run
 - [ ] 上限：每条消息最多 5 张卡片，单张文本 ≤ 32,000 字符
 
 **关键实现点**
@@ -1249,6 +1249,9 @@ src/SDemo.DesktopAgent.Core/Plugins/
   PluginRunner.cs            Run 编排、分段、取消、产物写入
   PluginPromptComposer.cs    skill 渲染、定界包裹、格式契约追加
   SegmentedOutputParser.cs   <s>/<t> 解析与降级
+
+src/SDemo.DesktopAgent.Core/Services/
+  AgentMessageMapper.cs      请求上下文组装（只读正文与附件，派生卡片不参与）
 
 tests/SDemo.DesktopAgent.Core.Tests/
   PluginCatalogTests.cs      扫描 / 校验 / 去重 / 降级 / 体积上限

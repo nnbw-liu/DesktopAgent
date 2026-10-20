@@ -364,7 +364,7 @@ version: 1.0
 | M0 骨架 | ✅ | 扫描、解析、校验、排序、去重；「设置 → 插件」只读列表能看到可用 / 不可用及原因（文件 + 行号 / JSON 路径） |
 | M1 输入框 | ✅ | 选中插件后发送走插件 Run：chip + 内联参数、会话记忆、助手消息带「翻译 · SDemo」归属 |
 | M2 侧栏 | ✅ | 「新建聊天室」下方的插件入口区，点入口新建预选该插件的空会话（`OriginMountId = ActiveMountId`） |
-| M3 气泡 | ⬜ | 对既有回答做加工，产物是派生卡片 |
+| M3 气泡 | ✅ | 助手消息底部的插件按钮 → 派生卡片（复制 / 重试 / 删除）；会话图标跟随 `LastPluginId`，普通推理后复位；派生内容不进上下文 |
 | M4 设置 | ⬜ | 启用开关、显示上限、打开插件目录；目前设置页只是只读列表 |
 | M5 内置翻译 | ✅ | `plugins/translate/`（三条入口只有输入框能跑，另外两条等 M2 / M3） |
 | M6 双语对照 | ⬜ | 目前 `segments` 输出按纯文本处理 |
@@ -382,12 +382,15 @@ version: 1.0
 - `Core/Services/ChatStore.cs`：`sessions` 四个插件列 + `messages.PluginJson`；`UpgradeSchemaAsync` 现在**两张表各扫一遍**，老库升级不报 `no such column`。
 - `UI/Components/Chat/ChatComposer.razor` + `PluginParameterControl.razor`：全局 / 插件模式切换、chip 带 `✕`、最多内联 2 个参数（`select` / `text` / `number` / `toggle`；多选未实现）。
 - `UI/Components/Sidebar/PluginRail.razor`：侧栏入口区（图标 + 名称，最多 6 个 + 「更多插件」），点击走 `AppShell.StartNewChat(mount)`，与「新建聊天室」同一条路径。
-- `UI/Components/Plugins/PluginIcon.razor`：按清单里的 SVG `path` 数据渲染图标，没有 path 时退回首字。
+- `UI/Components/Sidebar/Sidebar.razor`：会话图标跟随 `LastPluginId`（插件被删除时回默认图标）。
+- `UI/Components/Plugins/`：`PluginIcon`（只渲染 SVG `path`）、`PluginActionButton`（无参数点击即跑 / 有参数展开面板，OK / Cancel / Esc / 点外部）、`PluginActionBar`（最多内联 2 个，其余进「⋯」）、`DerivedCard`（流式文本、复制 / 重试 / 删除）。
+- `Core/Services/AgentMessageMapper.cs`：请求上下文只由消息正文与附件组成——**派生卡片永远不进去**，并有一条单测钉住这个约定。
+- `Core/Services/ChatStore.cs`：`messages.DerivedJson` 持久化；加载时把上次没跑完的 `Running` 卡片收尾成 `Failed`，避免界面永远转圈。
 - `UI/Components/Settings/PluginSettings.razor`：M0 的只读列表（M4 会换成正式管理页）。
 
-使用方式：重启应用后，侧栏「新建聊天室」下方出现「翻译」入口，点一下就是预选翻译的空会话；输入框底部也有「翻译」chip，点它进入插件模式，选目标语言后发送即可。切到别的会话再回来，插件与语言仍然保留（会话级记忆）。「无参数插件点一下就执行」要等 M3 的气泡按钮。
+使用方式：侧栏「新建聊天室」下方有「翻译」入口，点一下就是预选翻译的空会话；输入框底部的「翻译」chip 选中后发送走插件 Run；任意助手消息底部（时间右侧）的插件图标点一下，无参数直接跑、有参数弹出语言面板，产物是挂在原消息下的卡片，重启仍在、也不会进入下一轮上下文。
 
-**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（78 个用例：清单解析、路径穿越、占位符、去重、超体积、`minHostVersion`、参数校验、DI 注册、参数解析顺序、提示词组装、老库补列、Run 请求组装、侧栏入口过滤、内置 translate 清单）。
+**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（83 个用例：清单解析、路径穿越、占位符、去重、超体积、`minHostVersion`、参数校验、DI 注册、参数解析顺序、提示词组装、老库补列、Run 请求组装、气泡模式不带历史、派生卡片不进入上下文、侧栏入口过滤、内置 translate 清单）。
 
 ## 主题实现
 

@@ -85,6 +85,34 @@ public sealed class PluginRunnerTests
     }
 
     [Fact]
+    public async Task 气泡模式永远不带历史()
+    {
+        var chat = new StubChatService();
+        var runner = new PluginRunner(chat, new PluginPromptComposer());
+        var descriptor = BuildDescriptor(allowHistory: true);
+        var history = new List<ChatMessage>
+        {
+            new(ChatMessageRole.User, "历史问题"),
+            new(ChatMessageRole.Assistant, "历史回答")
+        };
+
+        await foreach (var _ in runner.RunArtifactAsync(new PluginRunRequest(
+                           descriptor,
+                           descriptor.Mounts[0],
+                           new Dictionary<string, string>(StringComparer.Ordinal) { ["target"] = "ja" },
+                           "待加工的原文",
+                           Provider(),
+                           "test-model",
+                           new AgentRunMetrics(),
+                           history)))
+        {
+        }
+
+        var message = Assert.Single(chat.Plan!.Messages);
+        Assert.Contains("待加工的原文", message.Content);
+    }
+
+    [Fact]
     public async Task 超长输入直接报错而不是发出去()
     {
         var chat = new StubChatService();

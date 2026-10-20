@@ -17,10 +17,16 @@ public sealed record PluginRunRequest(
     AgentRunMetrics Metrics,
     IReadOnlyList<ChatMessageModel>? History = null);
 
-/// <summary>插件运行器：v1 只有「输入框选中插件后发送」这一条路径（气泡派生结果在 M3）。</summary>
+/// <summary>插件运行器：输入框的「发送」与气泡的「派生卡片」两条路径。</summary>
 public interface IPluginRunner
 {
+    /// <summary>输入框模式：按能力的 <c>allowHistory</c> 决定是否带历史。</summary>
     IAsyncEnumerable<AgentDelta> RunComposerAsync(
+        PluginRunRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>气泡模式：只加工这条消息本身，<b>永远不带历史</b>。</summary>
+    IAsyncEnumerable<AgentDelta> RunArtifactAsync(
         PluginRunRequest request,
         CancellationToken cancellationToken = default);
 }
@@ -49,8 +55,19 @@ public sealed class PluginRunner : IPluginRunner
         _composer = composer;
     }
 
-    public async IAsyncEnumerable<AgentDelta> RunComposerAsync(
+    public IAsyncEnumerable<AgentDelta> RunComposerAsync(
         PluginRunRequest request,
+        CancellationToken cancellationToken = default) =>
+        RunCoreAsync(request, useHistory: true, cancellationToken);
+
+    public IAsyncEnumerable<AgentDelta> RunArtifactAsync(
+        PluginRunRequest request,
+        CancellationToken cancellationToken = default) =>
+        RunCoreAsync(request, useHistory: false, cancellationToken);
+
+    private async IAsyncEnumerable<AgentDelta> RunCoreAsync(
+        PluginRunRequest request,
+        bool useHistory,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var capability = request.Mount.Capability
@@ -65,7 +82,7 @@ public sealed class PluginRunner : IPluginRunner
         var instructions = _composer.BuildSystemPrompt(capability, request.Values);
 
         var messages = new List<ChatMessageModel>();
-        if (capability.AllowHistory && request.History is { Count: > 0 })
+        if (useHistory && capability.AllowHistory && request.History is { Count: > 0 })
         {
             messages.AddRange(TakeHistory(request.History));
         }

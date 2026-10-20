@@ -40,5 +40,11 @@ public sealed class ChatMessage(ChatMessageRole role, string content)
     /// <summary>本轮由哪个插件生成；普通对话为 null。持久化到 PluginJson。</summary>
     public PluginMessageInfo? Plugin { get; set; }
 
+    /// <summary>
+    /// 挂在这条消息下的派生卡片（插件对它的加工结果）。
+    /// 持久化到 DerivedJson，但<b>不进入后续请求上下文</b>。
+    /// </summary>
+    public List<DerivedArtifact> Derived { get; init; } = [];
+
     public int TotalTokens => InputTokens + OutputTokens;
 }
