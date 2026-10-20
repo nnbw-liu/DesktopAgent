@@ -1,13 +1,34 @@
+@using System.IO
+@using Microsoft.AspNetCore.Components.Forms
 @using SDemo.DesktopAgent.Models
 @inject IJSRuntime Js
+@inject AttachmentStore AttachmentStore
 @implements IAsyncDisposable
 
-@* 多功能组合输入框：Header（为空不外显） / 多行输入 / Skills + 发送按钮 *@
+@* 组合输入框：Header（工作区 / 附件） / 文本输入 / 上传 + 技能 + 搜索 + 模型 + 发送 *@
 <div class="composer">
-    @if (HeaderContent is not null)
+    @if (HeaderContent is not null || _attachments.Count > 0)
     {
         <div class="composer-header">
             @HeaderContent
+
+            @if (_attachments.Count > 0)
+            {
+                <div class="composer-attachments">
+                    @foreach (var attachment in _attachments)
+                    {
+                        <span class="attachment-chip" title="@attachment.FilePath">
+                            <svg class="attachment-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                <path d="M9.9 4.2 5.3 8.8a1.6 1.6 0 0 0 2.3 2.3l4.9-4.9a2.6 2.6 0 0 0-3.7-3.7L3.7 7.6a4 4 0 0 0 5.7 5.7l4-4"
+                                      fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                            <span class="attachment-name">@attachment.FileName</span>
+                            <span class="attachment-size">@AttachmentStore.FormatSize(attachment.Size)</span>
+                            <button type="button" class="attachment-remove" title="移除附件" @onclick="() => RemoveAttachment(attachment)">✕</button>
+                        </span>
+                    }
+                </div>
+            }
         </div>
     }
 
@@ -18,28 +39,95 @@
               @oninput="HandleInput"></textarea>
 
     <div class="composer-footer">
-        <div class="composer-skills">
-            <button type="button"
-                    class="skill-chip @(EnabledSkills.Contains(AgentSkill.Skills) ? "is-on" : null)"
-                    title="本地技能库：技能目录里的 Markdown 说明"
-                    @onclick="() => OnToggleSkill.InvokeAsync(AgentSkill.Skills)">
-                <span class="chip-icon">◈</span>技能
-            </button>
-            <button type="button"
-                    class="skill-chip @(EnabledSkills.Contains(AgentSkill.Search) ? "is-on" : null)"
-                    title="联网搜索（Bing）"
-                    @onclick="() => OnToggleSkill.InvokeAsync(AgentSkill.Search)">
-                <span class="chip-icon">⌕</span>搜索
-            </button>
-            <button type="button"
-                    class="skill-chip @(EnabledSkills.Contains(AgentSkill.Files) ? "is-on" : null)"
-                    title="工作区文件读写"
-                    @onclick="() => OnToggleSkill.InvokeAsync(AgentSkill.Files)">
-                <span class="chip-icon">▤</span>文件
-            </button>
+        <div class="composer-tools">
+            <label class="composer-plus @(IsGenerating ? "is-disabled" : null)" title="上传文件（可多选）">
+                <InputFile OnChange="HandleFilesSelected" multiple class="composer-file-input" />
+                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 3.2v9.6M3.2 8h9.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+            </label>
+
+            @if (!string.IsNullOrEmpty(SelectedSkill))
+            {
+                <span class="skill-chip is-on" title="@SelectedSkill">
+                    <span class="skill-chip-label">@SelectedSkill</span>
+                    <button type="button" class="chip-close" title="取消技能" @onclick="ClearSkill">✕</button>
+                </span>
+            }
+            else if (Skills.Count > 0)
+            {
+                <div class="skill-list">
+                    @foreach (var skill in VisibleSkills)
+                    {
+                        <button type="button"
+                                class="skill-chip"
+                                title="@skill.Description"
+                                @onclick="() => ToggleSkill(skill.Name)">
+                            <span class="skill-chip-label">@skill.Name</span>
+                        </button>
+                    }
+
+                    @if (HasMore)
+                    {
+                        <div class="skill-more">
+                            <button type="button"
+                                    class="skill-chip skill-chip--more @(_moreOpen ? "is-open" : null)"
+                                    title="更多技能"
+                                    aria-expanded="@(_moreOpen ? "true" : "false")"
+                                    @onclick="ToggleMore">
+                                更多 <span class="skill-more-caret">▾</span>
+                            </button>
+
+                            @if (_moreOpen)
+                            {
+                                <div class="skill-backdrop" @onclick="CloseMenus"></div>
+                                <div class="skill-menu">
+                                    @foreach (var skill in Skills)
+                                    {
+                                        <button type="button"
+                                                class="skill-menu-entry @(IsSelected(skill.Name) ? "is-active" : null)"
+                                                title="@skill.Description"
+                                                @onclick="() => SelectSkill(skill.Name)">
+                                            <span class="skill-menu-name">@skill.Name</span>
+                                            <span class="skill-menu-desc">@skill.Description</span>
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (_uploadError is not null)
+            {
+                <span class="composer-error">@_uploadError</span>
+            }
         </div>
 
         <div class="composer-actions">
+            <button type="button"
+                    class="composer-tool @(EnabledTools.Contains(AgentSkill.Search) ? "is-on" : null)"
+                    title="联网搜索"
+                    aria-pressed="@(EnabledTools.Contains(AgentSkill.Search) ? "true" : "false")"
+                    @onclick="() => OnToggleTool.InvokeAsync(AgentSkill.Search)">
+                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.35" />
+                    <path d="M10.2 10.2 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+            </button>
+
+            <button type="button"
+                    class="composer-tool @(EnabledTools.Contains(AgentSkill.Files) ? "is-on" : null)"
+                    title="文件读写"
+                    aria-pressed="@(EnabledTools.Contains(AgentSkill.Files) ? "true" : "false")"
+                    @onclick="() => OnToggleTool.InvokeAsync(AgentSkill.Files)">
+                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M1.8 4.4a1.2 1.2 0 0 1 1.2-1.2h3l1.3 1.5h5.5a1.2 1.2 0 0 1 1.2 1.2v6.4a1.2 1.2 0 0 1-1.2 1.2H3a1.2 1.2 0 0 1-1.2-1.2z"
+                          fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+                </svg>
+            </button>
+
             @FooterContent
 
             <button type="button"
@@ -70,6 +158,9 @@
 </div>
 
 @code {
+    private const int VisibleSkillCount = 3;
+    private const int MaxFilesPerUpload = 10;
+
     /// <summary>输入框内容（支持 @bind-Text 双向绑定）。</summary>
     [Parameter]
     public string Text { get; set; } = string.Empty;
@@ -81,8 +172,9 @@
     [Parameter]
     public bool IsGenerating { get; set; }
 
+    /// <summary>提交：文本 + 本次附件，由外层写入会话并落库。</summary>
     [Parameter]
-    public EventCallback OnSend { get; set; }
+    public EventCallback<ComposerSubmission> OnSend { get; set; }
 
     [Parameter]
     public EventCallback OnStop { get; set; }
@@ -95,19 +187,55 @@
     [Parameter]
     public RenderFragment? FooterContent { get; set; }
 
-    /// <summary>当前启用的工具（chip 高亮状态）。</summary>
+    /// <summary>常用技能列表（来自本地技能库）。</summary>
     [Parameter]
-    public IReadOnlySet<AgentSkill> EnabledSkills { get; set; } = new HashSet<AgentSkill>();
+    public IReadOnlyList<SkillInfo> Skills { get; set; } = [];
+
+    /// <summary>当前选中的技能名；为空表示不套用技能。</summary>
+    [Parameter]
+    public string? SelectedSkill { get; set; }
 
     [Parameter]
-    public EventCallback<AgentSkill> OnToggleSkill { get; set; }
+    public EventCallback<string?> OnSelectSkill { get; set; }
+
+    /// <summary>当前启用的模型工具（多选：搜索 / 文件可以同时开）。</summary>
+    [Parameter]
+    public IReadOnlySet<AgentSkill> EnabledTools { get; set; } = new HashSet<AgentSkill>();
+
+    [Parameter]
+    public EventCallback<AgentSkill> OnToggleTool { get; set; }
+
+    /// <summary>附件按会话存放，切换会话时清空未发送的附件。</summary>
+    [Parameter]
+    public string SessionId { get; set; } = string.Empty;
 
     [Parameter]
     public string Placeholder { get; set; } = "描述你的任务，Enter 发送，Shift + Enter 换行…";
 
+    private readonly List<ChatAttachment> _attachments = [];
+    private string _sessionId = string.Empty;
+    private bool _moreOpen;
+    private string? _uploadError;
     private DotNetObjectReference<ChatComposer>? _selfReference;
 
-    private bool CanSubmit => IsGenerating || !string.IsNullOrWhiteSpace(Text);
+    private IEnumerable<SkillInfo> VisibleSkills => Skills.Take(VisibleSkillCount);
+
+    private bool HasMore => Skills.Count > VisibleSkillCount;
+
+    private bool CanSubmit => IsGenerating || !string.IsNullOrWhiteSpace(Text) || _attachments.Count > 0;
+
+    protected override void OnParametersSet()
+    {
+        if (_sessionId == SessionId)
+        {
+            return;
+        }
+
+        _sessionId = SessionId;
+        ClearAttachments();
+        _moreOpen = false;
+        _uploadError = null;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -135,6 +263,85 @@
         }
     }
 
+    private async Task HandleFilesSelected(InputFileChangeEventArgs args)
+    {
+        if (IsGenerating)
+        {
+            return;
+        }
+
+        _uploadError = null;
+
+        IReadOnlyList<IBrowserFile> files;
+        try
+        {
+            files = args.GetMultipleFiles(MaxFilesPerUpload);
+        }
+        catch (InvalidOperationException)
+        {
+            _uploadError = $"一次最多上传 {MaxFilesPerUpload} 个文件";
+            return;
+        }
+
+        foreach (var file in files)
+        {
+            try
+            {
+                _attachments.Add(await AttachmentStore.SaveAsync(file, SessionId));
+            }
+            catch (IOException)
+            {
+                _uploadError = $"「{file.Name}」超过 25 MB，未上传";
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+            {
+                _uploadError = $"「{file.Name}」上传失败：{ex.Message}";
+            }
+        }
+    }
+
+    private void RemoveAttachment(ChatAttachment attachment)
+    {
+        _attachments.Remove(attachment);
+        AttachmentStore.Delete(attachment);
+    }
+
+    private async Task ToggleSkill(string name)
+    {
+        var next = string.Equals(SelectedSkill, name, StringComparison.Ordinal) ? null : name;
+        _moreOpen = false;
+        await OnSelectSkill.InvokeAsync(next);
+    }
+
+    private async Task SelectSkill(string name)
+    {
+        _moreOpen = false;
+        await OnSelectSkill.InvokeAsync(name);
+    }
+
+    private async Task ClearSkill()
+    {
+        _moreOpen = false;
+        await OnSelectSkill.InvokeAsync(null);
+    }
+
+    private void ToggleMore() => _moreOpen = !_moreOpen;
+
+    private void CloseMenus() => _moreOpen = false;
+
+    private void ClearAttachments()
+    {
+        foreach (var attachment in _attachments)
+        {
+            AttachmentStore.Delete(attachment);
+        }
+
+        _attachments.Clear();
+    }
+
+    private bool IsSelected(string name) =>
+        string.Equals(SelectedSkill, name, StringComparison.Ordinal);
+
     private async Task HandlePrimaryAction()
     {
         if (IsGenerating)
@@ -143,12 +350,18 @@
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(Text))
+        if (string.IsNullOrWhiteSpace(Text) && _attachments.Count == 0)
         {
             return;
         }
 
-        await OnSend.InvokeAsync();
+        // 先清空附件再提交：生成期间切换会话 / 销毁组件时，不会把已发送的文件删掉。
+        var submission = new ComposerSubmission(Text.Trim(), _attachments.ToList());
+        _attachments.Clear();
+        _moreOpen = false;
+        StateHasChanged();
+
+        await OnSend.InvokeAsync(submission);
     }
 
     public async ValueTask DisposeAsync()
@@ -162,6 +375,8 @@
             // WebView 已释放。
         }
 
+        // 还没发出去的附件没有消息引用，直接删掉。
+        ClearAttachments();
         _selfReference?.Dispose();
     }
 }

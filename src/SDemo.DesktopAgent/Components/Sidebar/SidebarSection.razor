@@ -1,16 +1,25 @@
 @* 可收起/展开的分组列表 *@
 <div class="sidebar-section">
-    <button type="button"
-            class="section-toggle"
-            aria-expanded="@(_expanded ? "true" : "false")"
-            @onclick="Toggle">
-        <span class="chevron @(_expanded ? "is-open" : string.Empty)">▸</span>
-        <span class="section-title">@Title</span>
-        @if (Count > 0)
+    <div class="section-head">
+        <button type="button"
+                class="section-toggle"
+                aria-expanded="@(_expanded ? "true" : "false")"
+                @onclick="Toggle">
+            <span class="chevron @(_expanded ? "is-open" : string.Empty)">▸</span>
+            <span class="section-title">@Title</span>
+            @if (Count > 0)
+            {
+                <span class="section-count">@Count</span>
+            }
+        </button>
+
+        @if (HeaderAction is not null)
         {
-            <span class="section-count">@Count</span>
+            <span class="section-action">
+                @HeaderAction
+            </span>
         }
-    </button>
+    </div>
 
     @if (_expanded)
     {
@@ -29,6 +38,10 @@
 
     [Parameter]
     public bool InitiallyExpanded { get; set; } = true;
+
+    /// <summary>标题右侧的附加操作（例如「添加工作区」）。</summary>
+    [Parameter]
+    public RenderFragment? HeaderAction { get; set; }
 
     [Parameter]
     public RenderFragment? ChildContent { get; set; }

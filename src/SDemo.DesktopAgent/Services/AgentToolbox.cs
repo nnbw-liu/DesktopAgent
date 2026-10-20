@@ -1,19 +1,17 @@
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.AI;
 
 namespace SDemo.DesktopAgent.Services;
 
-/// <summary>输入框底部的三个技能开关。</summary>
+/// <summary>输入框底部的工具开关。</summary>
 public enum AgentSkill
 {
-    /// <summary>本地技能库：读取 skills 目录里的 Markdown 技能。</summary>
-    Skills,
-
     /// <summary>联网搜索。</summary>
     Search,
 
-    /// <summary>工作区文件读写。</summary>
+    /// <summary>工作区文件读写（写文件仍需确认）。</summary>
     Files
 }
 
@@ -40,68 +38,72 @@ public sealed class AgentToolbox
         _settings = settings;
         _approvals = approvals;
         _workspace = workspace;
-
-        SkillsRoot = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "SDemo",
-            "DesktopAgent",
-            "skills");
     }
 
     /// <summary>文件工具的根目录 = 当前聊天室所属工作区。</summary>
     public string WorkspaceRoot => _workspace.RootPath;
 
-    public string SkillsRoot { get; }
-
-    public IList<AITool> Create(IReadOnlySet<AgentSkill> enabled)
+    public IList<AITool> Create(IReadOnlySet<AgentSkill> enabled, AgentRunMetrics? metrics = null)
     {
         var tools = new List<AITool>();
 
         if (enabled.Contains(AgentSkill.Files))
         {
-            tools.Add(AIFunctionFactory.Create(
+            tools.Add(Track(AIFunctionFactory.Create(
                 ListFiles,
                 name: "list_files",
-                description: $"列出工作区（{WorkspaceRoot}）内的文件，path 为相对路径，默认当前目录。"));
+                description: $"列出工作区（{WorkspaceRoot}）内的文件，path 为相对路径，默认当前目录。"), metrics));
 
-            tools.Add(AIFunctionFactory.Create(
+            tools.Add(Track(AIFunctionFactory.Create(
                 ReadFile,
                 name: "read_file",
-                description: "读取工作区内的文本文件内容，path 为相对路径。"));
+                description: "读取工作区内的文本文件内容，path 为相对路径。"), metrics));
 
-            tools.Add(AIFunctionFactory.Create(
+            tools.Add(Track(AIFunctionFactory.Create(
                 WriteFile,
                 name: "write_file",
-                description: "把文本写入工作区内的文件（会覆盖同名文件），path 为相对路径，content 为完整内容。"));
+                description: "把文本写入工作区内的文件（会覆盖同名文件），path 为相对路径，content 为完整内容。"), metrics));
 
-            tools.Add(AIFunctionFactory.Create(
+            tools.Add(Track(AIFunctionFactory.Create(
                 WorkspaceInfo,
                 name: "workspace_info",
-                description: "获取工作区根目录路径，用于向用户说明文件保存位置。"));
+                description: "获取工作区根目录路径，用于向用户说明文件保存位置。"), metrics));
         }
 
         if (enabled.Contains(AgentSkill.Search))
         {
-            tools.Add(AIFunctionFactory.Create(
+            tools.Add(Track(AIFunctionFactory.Create(
                 WebSearch,
                 name: "web_search",
-                description: "联网搜索，返回若干条标题、链接和摘要。"));
-        }
-
-        if (enabled.Contains(AgentSkill.Skills))
-        {
-            tools.Add(AIFunctionFactory.Create(
-                ListSkills,
-                name: "list_skills",
-                description: "列出本地技能库中可用的技能名称与说明。"));
-
-            tools.Add(AIFunctionFactory.Create(
-                ReadSkill,
-                name: "read_skill",
-                description: "读取某个技能的完整说明（Markdown），按其中的步骤执行任务。"));
+                description: "联网搜索，返回若干条标题、链接和摘要。"), metrics));
         }
 
         return tools;
+    }
+
+    /// <summary>包一层计数，记录每个工具实际被调用了多少次（不管框架是否把 tool_calls 透出来）。</summary>
+    private static AITool Track(AITool tool, AgentRunMetrics? metrics) =>
+        metrics is null || tool is not AIFunction function
+            ? tool
+            : new TrackingAIFunction(function, metrics);
+
+    private sealed class TrackingAIFunction(AIFunction inner, AgentRunMetrics metrics) : AIFunction
+    {
+        public override string Name => inner.Name;
+
+        public override string Description => inner.Description;
+
+        public override JsonElement JsonSchema => inner.JsonSchema;
+
+        public override IReadOnlyDictionary<string, object?> AdditionalProperties => inner.AdditionalProperties;
+
+        protected override ValueTask<object?> InvokeCoreAsync(
+            AIFunctionArguments arguments,
+            CancellationToken cancellationToken)
+        {
+            metrics.RecordToolCall(inner.Name);
+            return inner.InvokeAsync(arguments, cancellationToken);
+        }
     }
 
     private string WorkspaceInfo() => $"工作区根目录：{WorkspaceRoot}";
@@ -176,47 +178,6 @@ public sealed class AgentToolbox
 
     private Task<string> WebSearch(string query, CancellationToken cancellationToken) =>
         _search.SearchAsync(query, cancellationToken);
-
-    private string ListSkills()
-    {
-        if (!Directory.Exists(SkillsRoot))
-        {
-            return $"技能库为空。把 Markdown 技能文件放到：{SkillsRoot}";
-        }
-
-        var files = Directory.EnumerateFiles(SkillsRoot, "*.md").OrderBy(name => name).ToList();
-        if (files.Count == 0)
-        {
-            return $"技能库为空。把 Markdown 技能文件放到：{SkillsRoot}";
-        }
-
-        var builder = new StringBuilder();
-
-        foreach (var file in files)
-        {
-            var name = Path.GetFileNameWithoutExtension(file);
-            var description = File.ReadLines(file)
-                .Select(line => line.Trim())
-                .FirstOrDefault(line => line.Length > 0 && !line.StartsWith('#')) ?? string.Empty;
-
-            builder.AppendLine($"- {name}：{Trim(description, 120)}");
-        }
-
-        return builder.ToString().TrimEnd();
-    }
-
-    private string ReadSkill(string skillName)
-    {
-        var name = Path.GetFileNameWithoutExtension(skillName.Trim());
-        var file = Path.Combine(SkillsRoot, name + ".md");
-
-        if (!File.Exists(file))
-        {
-            return $"技能不存在：{skillName}";
-        }
-
-        return Trim(File.ReadAllText(file), 32 * 1024);
-    }
 
     /// <summary>把相对路径限制在工作区内，防止 ../ 越界。</summary>
     private string ResolveWorkspacePath(string relative)

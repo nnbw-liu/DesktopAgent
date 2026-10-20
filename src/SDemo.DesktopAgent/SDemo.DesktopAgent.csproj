@@ -5,6 +5,8 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <UseWPF>true</UseWPF>
+    <!-- 托盘图标用 WinForms 的 NotifyIcon（两端同时开启时共享 Microsoft.WindowsDesktop.App） -->
+    <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>SDemo.DesktopAgent</RootNamespace>
     <AssemblyName>SDemo.DesktopAgent</AssemblyName>
     <OutputType>WinExe</OutputType>
@@ -14,10 +16,18 @@
     <SatelliteResourceLanguages>en;zh-Hans</SatelliteResourceLanguages>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <!-- 只借用 WinForms 的 NotifyIcon，DPI 仍由 WPF 和 app.manifest 管理 -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <!-- UseWindowsForms 会注入这两个全局 using，WPF 侧 Application / MessageBox 会冲突，去掉 -->
+  <ItemGroup>
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,6 +35,10 @@
     <!-- Agent 运行时：Microsoft Agent Framework（OpenAI 兼容 provider） -->
     <PackageReference Include="Microsoft.Agents.AI" Version="1.25.0" />
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.25.0" />
+    <!-- Markdown 渲染：CommonMark + GFM 表格 / 任务列表 / 自动链接等扩展 -->
+    <PackageReference Include="Markdig" Version="1.4.0" />
+    <!-- 会话持久化：一个工作区一个 SQLite 文件，历史聊天一个文件 -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
   </ItemGroup>
 
 </Project>

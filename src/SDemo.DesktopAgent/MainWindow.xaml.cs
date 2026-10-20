@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -26,6 +27,12 @@ public partial class MainWindow : Window
 
     private IntPtr _hwnd;
     private WebView2CompositionControl? _webView;
+
+    /// <summary>托盘「退出」时置为 true，窗口才会真正关闭。</summary>
+    public bool ExitRequested { get; set; }
+
+    /// <summary>点击关闭按钮把窗口收进托盘时触发（用于第一次的托盘提示）。</summary>
+    public event EventHandler? HiddenToTray;
 
     public MainWindow(IServiceProvider serviceProvider, IThemeService themeService)
     {
@@ -135,6 +142,22 @@ public partial class MainWindow : Window
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
     private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>
+    /// 关闭按钮不退出程序，只是收进托盘；真正退出走托盘菜单的「退出」（会先置 ExitRequested）。
+    /// </summary>
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (!ExitRequested)
+        {
+            e.Cancel = true;
+            Hide();
+            HiddenToTray?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        base.OnClosing(e);
+    }
 
     private void UpdateChromeState()
     {

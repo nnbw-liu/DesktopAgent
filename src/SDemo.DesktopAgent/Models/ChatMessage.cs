@@ -10,7 +10,7 @@ public enum ChatMessageRole
 /// <summary>一条聊天消息。助手消息在流式生成过程中会不断追加文本与思维链。</summary>
 public sealed class ChatMessage(ChatMessageRole role, string content)
 {
-    public string Id { get; } = Guid.NewGuid().ToString("N");
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
 
     public ChatMessageRole Role { get; } = role;
 
@@ -18,4 +18,24 @@ public sealed class ChatMessage(ChatMessageRole role, string content)
 
     /// <summary>思维链（reasoning_content），为空表示模型没有返回。</summary>
     public string Reasoning { get; set; } = string.Empty;
+
+    /// <summary>随这条消息一起发送的附件。</summary>
+    public List<ChatAttachment> Attachments { get; init; } = [];
+
+    /// <summary>消息创建时间（界面显示 HH:mm）。</summary>
+    public DateTime CreatedAt { get; init; } = DateTime.Now;
+
+    /// <summary>助手消息的生成耗时（毫秒）；用户消息为 0。</summary>
+    public long DurationMs { get; set; }
+
+    /// <summary>本次请求的输入 token（助手消息）。</summary>
+    public int InputTokens { get; set; }
+
+    /// <summary>本次请求的输出 token（助手消息）。</summary>
+    public int OutputTokens { get; set; }
+
+    /// <summary>本次生成里各工具的调用次数，例如 web_search → 2。</summary>
+    public Dictionary<string, int> ToolCalls { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public int TotalTokens => InputTokens + OutputTokens;
 }

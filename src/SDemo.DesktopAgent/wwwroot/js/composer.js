@@ -3,8 +3,12 @@
 //   Shift+Enter  → 换行（浏览器默认行为）
 //   Ctrl+Enter   → 换行（浏览器默认不插入，这里手动插入并同步给 Blazor）
 // 用 document 捕获阶段监听，元素重新渲染后依然有效。
+// 另外接管文件拖放：把 drop 的文件写进 Blazor 的 file input，触发 change。
 window.sdComposer = {
     _handler: null,
+    _dragOver: null,
+    _dragLeave: null,
+    _drop: null,
 
     attach: function (dotNetRef) {
         this.detach();
@@ -38,12 +42,28 @@ window.sdComposer = {
         }.bind(this);
 
         document.addEventListener('keydown', this._handler, true);
+        this._attachDrop();
     },
 
     detach: function () {
         if (this._handler) {
             document.removeEventListener('keydown', this._handler, true);
             this._handler = null;
+        }
+
+        if (this._dragOver) {
+            document.removeEventListener('dragover', this._dragOver, true);
+            this._dragOver = null;
+        }
+
+        if (this._dragLeave) {
+            document.removeEventListener('dragleave', this._dragLeave, true);
+            this._dragLeave = null;
+        }
+
+        if (this._drop) {
+            document.removeEventListener('drop', this._drop, true);
+            this._drop = null;
         }
     },
 
@@ -54,5 +74,67 @@ window.sdComposer = {
 
         element.setRangeText('\n', start, end, 'end');
         element.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+
+    _hasFiles: function (event) {
+        var types = event.dataTransfer && event.dataTransfer.types;
+        return !!types && Array.prototype.indexOf.call(types, 'Files') >= 0;
+    },
+
+    _attachDrop: function () {
+        this._dragOver = function (event) {
+            if (!this._hasFiles(event)) {
+                return;
+            }
+
+            var composer = event.target && event.target.closest ? event.target.closest('.composer') : null;
+            if (!composer) {
+                return;
+            }
+
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+            composer.classList.add('is-dragging');
+        }.bind(this);
+
+        this._dragLeave = function (event) {
+            var composer = event.target && event.target.closest ? event.target.closest('.composer') : null;
+            if (composer && !composer.contains(event.relatedTarget)) {
+                composer.classList.remove('is-dragging');
+            }
+        }.bind(this);
+
+        this._drop = function (event) {
+            if (!this._hasFiles(event)) {
+                return;
+            }
+
+            // 不让 WebView 直接打开被拖入的文件。
+            event.preventDefault();
+
+            var composer = event.target && event.target.closest ? event.target.closest('.composer') : null;
+            if (!composer) {
+                return;
+            }
+
+            composer.classList.remove('is-dragging');
+
+            var input = composer.querySelector('input[type="file"]');
+            if (!input || !event.dataTransfer.files.length) {
+                return;
+            }
+
+            var transfer = new DataTransfer();
+            for (var i = 0; i < event.dataTransfer.files.length; i++) {
+                transfer.items.add(event.dataTransfer.files[i]);
+            }
+
+            input.files = transfer.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }.bind(this);
+
+        document.addEventListener('dragover', this._dragOver, true);
+        document.addEventListener('dragleave', this._dragLeave, true);
+        document.addEventListener('drop', this._drop, true);
     }
 };

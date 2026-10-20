@@ -5,11 +5,14 @@
 @inject ISettingsService Settings
 @inject WorkspaceContext WorkspaceContext
 @inject IFolderPickerService FolderPicker
+@inject ChatStore ChatStore
 
 <div class="app-shell">
     <Sidebar Workspaces="Workspaces"
              Sessions="SortedSessions"
              ActiveSessionId="@(_view == MainView.Chat ? _activeSession?.Id : null)"
+             ActiveWorkspaceId="@(_view == MainView.Chat ? _activeSession?.WorkspaceId : null)"
+             ActiveSessionIsEmpty="@(_view == MainView.Chat && _activeSession is { Messages.Count: 0 })"
              IsSettingsActive="@(_view == MainView.Settings)"
              OnNewChat="StartNewChat"
              OnOpenSession="OpenSession"
@@ -42,6 +45,9 @@
             <ChatRoom Session="_activeSession"
                       Workspaces="Workspaces"
                       OnSend="HandleSendMessage"
+                      OnSessionChanged="PersistSession"
+                      OnBranch="BranchSession"
+                      OnGeneratingChanged="SetGenerating"
                       OnOpenModelSettings="OpenModelSettings"
                       OnWorkspaceChanged="ChangeWorkspace"
                       OnPickWorkspace="PickWorkspace" />
@@ -58,7 +64,7 @@
 
     private List<ChatSession> _sessions = [];
 
-    // 启动后默认就是一个新建的空聊天室（尚不进入历史列表，等有内容再落库）。
+    // 启动后默认就是一个新建的空聊天室（尚不进入历史列表，等有内容才加入）。
     private ChatSession? _activeSession;
 
     private MainView _view = MainView.Chat;
@@ -68,11 +74,15 @@
     private IReadOnlyList<Workspace> Workspaces => Settings.Current.Workspaces;
 
     private IReadOnlyList<ChatSession> SortedSessions =>
-        _sessions.OrderByDescending(session => session.IsPinned).ToList();
+        _sessions
+            .OrderByDescending(session => session.IsPinned)
+            .ThenByDescending(session => session.UpdatedAt)
+            .ToList();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        _sessions = CreateSeedSessions();
+        // 启动时从各个 SQLite 库恢复历史会话（工作区 DB + 历史聊天 DB）。
+        _sessions = (await ChatStore.LoadAllAsync(Workspaces)).ToList();
         _activeSession = ChatSession.CreateEmpty();
         UpdateWorkspaceRoot();
     }
@@ -115,11 +125,16 @@
         _view = MainView.Settings;
     }
 
-    private void TogglePin(ChatSession session) => session.IsPinned = !session.IsPinned;
+    private async Task TogglePin(ChatSession session)
+    {
+        session.IsPinned = !session.IsPinned;
+        await ChatStore.SaveSessionAsync(session);
+    }
 
-    private void DeleteSession(ChatSession session)
+    private async Task DeleteSession(ChatSession session)
     {
         _sessions.Remove(session);
+        await ChatStore.DeleteSessionAsync(session);
 
         if (ReferenceEquals(_activeSession, session))
         {
@@ -141,8 +156,11 @@
         UpdateWorkspaceRoot();
     }
 
-    private void RenameSession((ChatSession Session, string Title) args) =>
+    private async Task RenameSession((ChatSession Session, string Title) args)
+    {
         args.Session.Title = args.Title;
+        await ChatStore.SaveSessionAsync(args.Session);
+    }
 
     private void RenameWorkspace((Workspace Workspace, string Name) args)
     {
@@ -150,15 +168,23 @@
         Settings.Save();
     }
 
-    private void DeleteWorkspace(Workspace workspace)
+    private async Task DeleteWorkspace(Workspace workspace)
     {
+        var affected = _sessions
+            .Where(session => session.WorkspaceId == workspace.Id)
+            .ToList();
+
+        // 先把该工作区 DB 里的会话搬到历史聊天 DB，再删工作区记录和 DB 文件。
+        await ChatStore.DeleteWorkspaceStoreAsync(workspace.Id);
+
         Settings.Current.Workspaces.Remove(workspace);
         Settings.Save();
 
-        // 工作区被删后，它下面的会话回到「历史聊天」。
-        foreach (var session in _sessions.Where(item => item.WorkspaceId == workspace.Id))
+        // 内存里的会话跟着回到历史聊天（同时把尚未落库的最新内容补写进历史库）。
+        foreach (var session in affected)
         {
             session.WorkspaceId = null;
+            await ChatStore.SaveSessionAsync(session);
         }
 
         if (_activeSession?.WorkspaceId == workspace.Id)
@@ -169,15 +195,23 @@
         UpdateWorkspaceRoot();
     }
 
-    /// <summary>聊天室里切换工作区（只影响当前会话的归属）。</summary>
-    private void ChangeWorkspace(Workspace workspace)
+    /// <summary>聊天室里切换工作区：空会话只改归属，已有内容的会话要把行搬到目标库。</summary>
+    private async Task ChangeWorkspace(Workspace workspace)
     {
         if (_activeSession is null)
         {
             return;
         }
 
-        _activeSession.WorkspaceId = workspace.Id;
+        if (_activeSession.Messages.Count == 0)
+        {
+            _activeSession.WorkspaceId = workspace.Id;
+        }
+        else
+        {
+            await ChatStore.MoveSessionAsync(_activeSession, workspace.Id);
+        }
+
         UpdateWorkspaceRoot();
     }
 
@@ -190,7 +224,7 @@
             return;
         }
 
-        ChangeWorkspace(workspace);
+        await ChangeWorkspace(workspace);
     }
 
     /// <summary>弹出文件夹选择框，并按路径复用 / 新建工作区。</summary>
@@ -242,22 +276,26 @@
     }
 
     /// <summary>
-    /// 发送一条用户消息：写入会话 → 首次有内容时补标题并落库到历史列表。
+    /// 发送一条用户消息：写入会话（含附件）→ 首次有内容时补标题并落到对应的 SQLite 库。
     /// 聊天室随之从「空态居中」切到「有记录布局」。
     /// </summary>
-    private void HandleSendMessage(string text)
+    private async Task HandleSendMessage(ComposerSubmission submission)
     {
-        if (_activeSession is null || string.IsNullOrWhiteSpace(text))
+        if (_activeSession is null || (string.IsNullOrWhiteSpace(submission.Text) && submission.Attachments.Count == 0))
         {
             return;
         }
 
         var session = _activeSession;
-        session.Messages.Add(new ChatMessage(ChatMessageRole.User, text));
+        session.Messages.Add(new ChatMessage(ChatMessageRole.User, submission.Text)
+        {
+            Attachments = submission.Attachments.ToList()
+        });
+        session.UpdatedAt = DateTime.Now;
 
         if (session.Messages.Count == 1)
         {
-            session.Title = BuildTitle(text);
+            session.Title = BuildTitle(submission.Text, submission.Attachments);
             session.Meta = DateTime.Now.ToString("HH:mm");
         }
 
@@ -266,9 +304,70 @@
         {
             _sessions.Insert(0, session);
         }
+
+        await ChatStore.SaveSessionAsync(session);
     }
 
-    private static string BuildTitle(string text)
+    /// <summary>助手消息生成结束（或失败 / 停止）后由 ChatRoom 回调，把最新内容写回数据库。</summary>
+    private async Task PersistSession(ChatSession session)
+    {
+        session.UpdatedAt = DateTime.Now;
+        await ChatStore.SaveSessionAsync(session);
+    }
+
+    /// <summary>生成开始 / 结束时更新会话状态，左侧列表据此显示“推理中”。</summary>
+    private void SetGenerating((ChatSession Session, bool IsGenerating) args) =>
+        args.Session.IsGenerating = args.IsGenerating;
+
+    /// <summary>从某条助手消息创建分支：复制到这条消息为止的上下文，打开新会话。</summary>
+    private async Task BranchSession(ChatMessage message)
+    {
+        if (_activeSession is null)
+        {
+            return;
+        }
+
+        var source = _activeSession;
+        var index = source.Messages.IndexOf(message);
+        if (index < 0)
+        {
+            return;
+        }
+
+        var branch = new ChatSession
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = $"{Truncate(source.Title)} · 分支",
+            Meta = "刚刚",
+            WorkspaceId = source.WorkspaceId,
+            UpdatedAt = DateTime.Now,
+            Messages = source.Messages
+                .Take(index + 1)
+                .Select(CloneMessage)
+                .ToList()
+        };
+
+        _sessions.Insert(0, branch);
+        await ChatStore.SaveSessionAsync(branch);
+
+        _view = MainView.Chat;
+        _activeSession = branch;
+        UpdateWorkspaceRoot();
+    }
+
+    private static ChatMessage CloneMessage(ChatMessage message) => new(message.Role, message.Content)
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        Reasoning = message.Reasoning,
+        Attachments = [.. message.Attachments],
+        CreatedAt = message.CreatedAt,
+        DurationMs = message.DurationMs,
+        InputTokens = message.InputTokens,
+        OutputTokens = message.OutputTokens,
+        ToolCalls = new Dictionary<string, int>(message.ToolCalls, StringComparer.OrdinalIgnoreCase)
+    };
+
+    private static string BuildTitle(string text, IReadOnlyList<ChatAttachment> attachments)
     {
         var firstLine = text
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -276,51 +375,20 @@
 
         if (string.IsNullOrWhiteSpace(firstLine))
         {
-            return "新聊天室";
+            if (attachments.Count == 0)
+            {
+                return "新聊天室";
+            }
+
+            // 只发了附件的会话：用第一个文件名当标题。
+            return Truncate(attachments[0].FileName);
         }
 
-        return firstLine.Length <= 18 ? firstLine : string.Concat(firstLine.AsSpan(0, 18), "…");
+        return Truncate(firstLine);
     }
 
-    private static List<ChatSession> CreateSeedSessions() =>
-    [
-        new ChatSession
-        {
-            Id = "seed-1",
-            Title = "桌面 Agent 架构设计",
-            Meta = "今天 10:24",
-            Messages =
-            [
-                new ChatMessage(ChatMessageRole.User, "帮我梳理一下桌面 Agent 的分层结构。"),
-                new ChatMessage(ChatMessageRole.Assistant,
-                    "建议分三层：宿主层（WPF 窗口、WebView2、托盘与全局快捷键）、UI 层（Blazor 组件）、服务层（会话管理、工具调用、模型访问）。宿主层只负责窗口生命周期与原生能力，UI 层通过 DI 直接调用服务层。")
-            ]
-        },
-        new ChatSession
-        {
-            Id = "seed-2",
-            Title = "Blazor Hybrid 主题适配",
-            Meta = "昨天 18:02",
-            Messages =
-            [
-                new ChatMessage(ChatMessageRole.User, "Blazor 界面怎么跟随系统深浅色？"),
-                new ChatMessage(ChatMessageRole.Assistant,
-                    "由 .NET 侧读取系统设置，切换 WPF 资源字典，同时通过 JS 互操作把 data-theme 写到 html 上，CSS 变量随之切换即可。")
-            ]
-        },
-        new ChatSession
-        {
-            Id = "seed-3",
-            Title = "WPF 与 Blazor 的通信方式",
-            Meta = "10 月 16 日",
-            Messages =
-            [
-                new ChatMessage(ChatMessageRole.User, "WPF 和 Blazor 之间怎么互相调用？"),
-                new ChatMessage(ChatMessageRole.Assistant,
-                    "共用同一个 IServiceProvider 是最直接的方式；需要反向通知时用服务事件 + InvokeAsync 切回渲染器线程。")
-            ]
-        }
-    ];
+    private static string Truncate(string value) =>
+        value.Length <= 18 ? value : string.Concat(value.AsSpan(0, 18), "…");
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

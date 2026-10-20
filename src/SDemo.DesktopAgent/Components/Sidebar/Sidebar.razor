@@ -19,99 +19,110 @@
 
     <div class="sidebar-content">
         <SidebarSection Title="工作区" Count="@Workspaces.Count" InitiallyExpanded="true">
-            @foreach (var workspace in Workspaces)
-            {
-                var workspaceMenu = "w:" + workspace.Id;
-                var collapsed = _collapsedWorkspaces.Contains(workspace.Id);
+            <HeaderAction>
+                <button type="button"
+                        class="item-action section-add"
+                        title="添加工作区"
+                        aria-label="添加工作区"
+                        @onclick="() => OnAddWorkspace.InvokeAsync()">
+                    <svg class="icon icon--sm" viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M8 3.2v9.6M3.2 8h9.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                </button>
+            </HeaderAction>
 
-                <div class="sidebar-item item-row workspace-row"
-                     @onmouseleave="() => CloseMenu(workspaceMenu)">
-                    @if (_renamingKey == workspaceMenu)
-                    {
-                        <div class="item-editor">
-                            <input class="item-editor-input"
-                                   @bind="_renameText"
-                                   @bind:event="oninput"
-                                   @onkeydown="HandleRenameKeyDown" />
-                            <button type="button" class="item-action item-action--confirm" title="保存" @onclick="() => CommitRename()">✓</button>
-                            <button type="button" class="item-action" title="取消" @onclick="CancelRename">✕</button>
-                        </div>
-                    }
-                    else
-                    {
-                        <button type="button" class="item-main" @onclick="() => ToggleCollapse(workspace.Id)">
-                            <span class="tree-caret @(collapsed ? null : "is-open")">
-                                <svg class="icon icon--sm" viewBox="0 0 16 16" aria-hidden="true">
-                                    <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"
-                                          stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </span>
-                            <span class="item-icon">
-                                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-                                    <path d="M1.8 4.4a1.2 1.2 0 0 1 1.2-1.2h3l1.3 1.5h5.5a1.2 1.2 0 0 1 1.2 1.2v6.4a1.2 1.2 0 0 1-1.2 1.2H3a1.2 1.2 0 0 1-1.2-1.2z"
-                                          fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" />
-                                </svg>
-                            </span>
-                            <span class="item-text">
-                                <span class="item-title">@workspace.Name</span>
-                                <span class="item-meta">@workspace.Path</span>
-                            </span>
-                        </button>
+            <ChildContent>
+                @foreach (var workspace in Workspaces)
+                {
+                    var workspaceMenu = "w:" + workspace.Id;
+                    var collapsed = _collapsedWorkspaces.Contains(workspace.Id);
 
-                        <span class="item-actions">
-                            <button type="button" class="item-action" title="在此工作区新建聊天室"
-                                    @onclick:stopPropagation="true"
-                                    @onclick="() => OnNewChatInWorkspace.InvokeAsync(workspace)">
-                                <svg class="icon icon--sm" viewBox="0 0 16 16" aria-hidden="true">
-                                    <path d="M8 3.2v9.6M3.2 8h9.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                                </svg>
-                            </button>
-                            <button type="button" class="item-action" title="更多"
-                                    @onclick:stopPropagation="true"
-                                    @onclick="() => ToggleMenu(workspaceMenu)">
-                                <svg class="icon icon--sm" viewBox="0 0 16 16" aria-hidden="true">
-                                    <circle cx="3.4" cy="8" r="1.2" fill="currentColor" />
-                                    <circle cx="8" cy="8" r="1.2" fill="currentColor" />
-                                    <circle cx="12.6" cy="8" r="1.2" fill="currentColor" />
-                                </svg>
-                            </button>
-                        </span>
-
-                        @if (_openMenu == workspaceMenu)
+                    <div class="sidebar-item item-row workspace-row"
+                         @onmouseleave="() => CloseMenu(workspaceMenu)">
+                        @if (_renamingKey == workspaceMenu)
                         {
-                            <div class="item-menu">
-                                <button type="button" class="item-menu-entry" @onclick="() => StartRename(workspaceMenu, workspace.Name)">重命名</button>
-                                <button type="button" class="item-menu-entry item-menu-entry--danger" @onclick="() => DeleteWorkspace(workspace)">删除</button>
+                            <div class="item-editor">
+                                <input class="item-editor-input"
+                                       @bind="_renameText"
+                                       @bind:event="oninput"
+                                       @onkeydown="HandleRenameKeyDown" />
+                                <button type="button" class="item-action item-action--confirm" title="保存" @onclick="() => CommitRename()">✓</button>
+                                <button type="button" class="item-action" title="取消" @onclick="CancelRename">✕</button>
                             </div>
                         }
-                    }
-                </div>
+                        else
+                        {
+                            <button type="button" class="item-main" @onclick="() => HandleWorkspaceClick(workspace)">
+                                <span class="tree-caret @(collapsed ? null : "is-open")">
+                                    <svg class="icon icon--sm" viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"
+                                              stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </span>
+                                <span class="item-icon">
+                                    <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M1.8 4.4a1.2 1.2 0 0 1 1.2-1.2h3l1.3 1.5h5.5a1.2 1.2 0 0 1 1.2 1.2v6.4a1.2 1.2 0 0 1-1.2 1.2H3a1.2 1.2 0 0 1-1.2-1.2z"
+                                              fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" />
+                                    </svg>
+                                </span>
+                                <span class="item-text">
+                                    <span class="item-title">@workspace.Name</span>
+                                    <span class="item-meta">@workspace.Path</span>
+                                </span>
+                            </button>
 
-                @if (!collapsed)
-                {
-                    @foreach (var session in SessionsFor(workspace))
+                            <span class="item-actions">
+                                <button type="button" class="item-action" title="在此工作区新建聊天室"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="() => OnNewChatInWorkspace.InvokeAsync(workspace)">
+                                    <svg class="icon icon--sm" viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M8 3.2v9.6M3.2 8h9.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                                    </svg>
+                                </button>
+                                <button type="button" class="item-action" title="更多"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="() => ToggleMenu(workspaceMenu)">
+                                    <svg class="icon icon--sm" viewBox="0 0 16 16" aria-hidden="true">
+                                        <circle cx="3.4" cy="8" r="1.2" fill="currentColor" />
+                                        <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+                                        <circle cx="12.6" cy="8" r="1.2" fill="currentColor" />
+                                    </svg>
+                                </button>
+                            </span>
+
+                            @if (_openMenu == workspaceMenu)
+                            {
+                                <div class="item-menu">
+                                    <button type="button" class="item-menu-entry" @onclick="() => StartRename(workspaceMenu, workspace.Name)">重命名</button>
+                                    <button type="button" class="item-menu-entry item-menu-entry--danger" @onclick="() => DeleteWorkspace(workspace)">删除</button>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    @if (!collapsed)
                     {
-                        @RenderSession(session)
+                        @foreach (var session in SessionsFor(workspace))
+                        {
+                            @RenderSession(session)
+                        }
                     }
-                }
             }
-
-            <button type="button" class="sidebar-add" @onclick="() => OnAddWorkspace.InvokeAsync()">
-                <span class="sidebar-add-icon">+</span>
-                <span>添加工作区</span>
-            </button>
+            </ChildContent>
         </SidebarSection>
 
         <SidebarSection Title="历史聊天" Count="@LooseSessions.Count" InitiallyExpanded="true">
-            @foreach (var session in LooseSessions)
-            {
-                @RenderSession(session)
-            }
+            <ChildContent>
+                @foreach (var session in LooseSessions)
+                {
+                    @RenderSession(session)
+                }
 
-            @if (LooseSessions.Count == 0)
-            {
-                <p class="sidebar-empty">顶部「新建聊天室」的会话会出现在这里。</p>
-            }
+                @if (LooseSessions.Count == 0)
+                {
+                    <p class="sidebar-empty">新建聊天室并发出第一条消息后，会话会出现在这里。</p>
+                }
+            </ChildContent>
         </SidebarSection>
     </div>
 
@@ -147,6 +158,14 @@
     /// <summary>当前是否停留在设置页（用于高亮底部「设置」）。</summary>
     [Parameter]
     public bool IsSettingsActive { get; set; }
+
+    /// <summary>当前会话所属的工作区（空会话点击空工作区时避免重置草稿）。</summary>
+    [Parameter]
+    public string? ActiveWorkspaceId { get; set; }
+
+    /// <summary>当前会话是否还是空的（尚未发过消息）。</summary>
+    [Parameter]
+    public bool ActiveSessionIsEmpty { get; set; }
 
     [Parameter]
     public EventCallback OnNewChat { get; set; }
@@ -206,6 +225,28 @@
         {
             _collapsedWorkspaces.Add(workspaceId);
         }
+    }
+
+    /// <summary>
+    /// 点工作区：没有会话时直接进去开一个新聊天室（工作区为空 = 默认入口）；
+    /// 已经有会话时只做折叠 / 展开。
+    /// </summary>
+    private async Task HandleWorkspaceClick(Workspace workspace)
+    {
+        if (SessionsFor(workspace).Any())
+        {
+            ToggleCollapse(workspace.Id);
+            return;
+        }
+
+        // 已经停在这个工作区的新聊天室里，就别再建一个把草稿清掉。
+        if (ActiveSessionIsEmpty &&
+            string.Equals(ActiveWorkspaceId, workspace.Id, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await OnNewChatInWorkspace.InvokeAsync(workspace);
     }
 
     private void ToggleMenu(string key) => _openMenu = _openMenu == key ? null : key;
@@ -287,7 +328,7 @@
     }
 }
 
-@* 聊天室行：图标在左，置顶标记在右，操作只在 hover 时出现 *@
+@* 聊天室行：图标在左；操作默认隐藏，hover 时出现，已置顶的按钮常亮 *@
 @{
     RenderFragment RenderSession(ChatSession session) => __builder =>
     {
@@ -317,27 +358,35 @@
                     </span>
                     <span class="item-text">
                         <span class="item-title">@session.Title</span>
-                        <span class="item-meta">@session.Meta</span>
+                        <span class="item-meta">
+                            @if (session.IsGenerating)
+                            {
+                                <span class="session-thinking" title="正在推理中…">
+                                    <span class="session-thinking-dot"></span>推理中…
+                                </span>
+                            }
+                            else
+                            {
+                                @session.Meta
+                            }
+                        </span>
                     </span>
                 </button>
 
-                @if (session.IsPinned)
-                {
-                    <span class="item-pin" title="已置顶">
-                        <svg class="icon icon--sm" viewBox="0 0 16 16" aria-hidden="true">
-                            <path d="M8 1.8a2.6 2.6 0 0 1 2.6 2.6c0 .9-.45 1.65-1.05 2.2l1.25 1.4H5.2l1.25-1.4A2.9 2.9 0 0 1 5.4 4.4 2.6 2.6 0 0 1 8 1.8z" fill="currentColor" />
-                            <path d="M8 8.4v5.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-                        </svg>
-                    </span>
-                }
-
                 <span class="item-actions">
-                    <button type="button" class="item-action" title="@(session.IsPinned ? "取消置顶" : "置顶")"
+                    <button type="button"
+                            class="item-action item-action--pin @(session.IsPinned ? "is-on" : null)"
+                            title="@(session.IsPinned ? "取消置顶" : "置顶")"
+                            aria-pressed="@(session.IsPinned ? "true" : "false")"
                             @onclick:stopPropagation="true"
                             @onclick="() => OnTogglePin.InvokeAsync(session)">
-                        <svg class="icon icon--sm" viewBox="0 0 16 16" aria-hidden="true">
-                            <path d="M8 1.8a2.6 2.6 0 0 1 2.6 2.6c0 .9-.45 1.65-1.05 2.2l1.25 1.4H5.2l1.25-1.4A2.9 2.9 0 0 1 5.4 4.4 2.6 2.6 0 0 1 8 1.8z" fill="currentColor" />
-                            <path d="M8 8.4v5.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                        @* 斜着的图钉：整体旋转 45°，针尖朝左下 *@
+                        <svg class="icon icon--sm pin-glyph" viewBox="0 0 16 16" aria-hidden="true">
+                            <g transform="rotate(45 8 8)">
+                                <path d="M5.1 2.4h5.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                                <path d="M6.1 3.4h3.8l-1.15 3.9H7.25z" fill="currentColor" />
+                                <path d="M8 7.3v5.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                            </g>
                         </svg>
                     </button>
                     <button type="button" class="item-action" title="更多"

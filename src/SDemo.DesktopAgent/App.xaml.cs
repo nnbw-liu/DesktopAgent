@@ -13,6 +13,8 @@ public partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
     private IThemeService? _themeService;
+    private MainWindow? _mainWindow;
+    private TrayIconService? _tray;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -39,14 +41,42 @@ public partial class App : Application
         _themeService.ThemeChanged += (_, theme) => ThemeResources.Apply(theme);
 
         var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
+        _mainWindow = mainWindow;
         MainWindow = mainWindow;
+
+        // 先建托盘再显示窗口：关闭按钮收进托盘时图标已经在。
+        _tray = new TrayIconService(mainWindow);
+
         mainWindow.Show();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _tray?.Dispose();
         _serviceProvider?.Dispose();
         base.OnExit(e);
+    }
+
+    /// <summary>托盘菜单的「退出」：允许主窗口关闭并结束消息循环。</summary>
+    internal void RequestExit()
+    {
+        if (_mainWindow is not null)
+        {
+            _mainWindow.ExitRequested = true;
+        }
+
+        Shutdown();
+    }
+
+    /// <summary>注销 / 关机时不拦截窗口关闭。</summary>
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        if (_mainWindow is not null)
+        {
+            _mainWindow.ExitRequested = true;
+        }
+
+        base.OnSessionEnding(e);
     }
 
     /// <summary>系统主题变化（WM_SETTINGCHANGE / ImmersiveColorSet）后重新探测。</summary>
@@ -71,6 +101,9 @@ public partial class App : Application
         services.AddSingleton<FileWriteApprovalService>();
         services.AddSingleton<WorkspaceContext>();
         services.AddSingleton<IFolderPickerService, FolderPickerService>();
+        services.AddSingleton<ChatStore>();
+        services.AddSingleton<SkillCatalog>();
+        services.AddSingleton<AttachmentStore>();
         services.AddSingleton<AgentToolbox>();
         services.AddSingleton<IAgentChatService, AgentChatService>();
 

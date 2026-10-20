@@ -61,19 +61,28 @@ DesktopAgent/
       │     ├─ ToolsSettings.razor           # 联网搜索后端、文件写入确认
       │     └─ SettingsSection.cs            # 设置分区枚举
       ├─ Models/
-      │  ├─ ChatMessage.cs                   # 消息模型（角色 + 内容）
+      │  ├─ ChatMessage.cs                   # 消息模型（角色 + 内容 + 附件）
+      │  ├─ ChatAttachment.cs                # 附件模型（名称 / 路径 / 大小）
+      │  ├─ ComposerSubmission.cs            # 输入框提交（文本 + 附件）
       │  ├─ ChatSession.cs                   # 会话模型（标题、时间、消息列表）
       │  ├─ AppSettings.cs                   # 设置根对象（主题 / 语言 / 提供商）
       │  └─ ModelProvider.cs                 # 模型提供商与模型目录
+      ├─ Data/
+      │  └─ ChatDbContext.cs                 # SQLite + EF Core：sessions / messages
       ├─ Services/
       │  ├─ IAppEnvironmentService.cs        # 应用 / 运行环境信息（含 WebView2 版本）
       │  ├─ AppEnvironmentService.cs
       │  ├─ ISettingsService.cs              # 设置读写（%APPDATA%\SDemo\DesktopAgent\settings.json）
       │  ├─ SettingsService.cs
+      │  ├─ ChatStore.cs                     # 会话落库：按工作区 / 历史聊天分 SQLite 文件
+      │  ├─ SkillCatalog.cs                  # 技能库：读取 skills\*.md（含 frontmatter）
+      │  ├─ AttachmentStore.cs               # 上传附件落盘到 AppData\uploads
       │  ├─ IThemeService.cs                 # 主题来源 + 外观偏好（System / Light / Dark）
       │  ├─ ThemeService.cs
       │  ├─ ModelCatalogService.cs           # GET {baseUrl}/models 读取模型目录
-      │  └─ AgentChatService.cs              # Agent Framework 流式调用（OpenAI 兼容）
+      │  ├─ AgentChatService.cs              # Agent Framework 流式调用（OpenAI 兼容）
+      │  ├─ MarkdownRenderer.cs              # Markdig：模型 Markdown → 安全 HTML
+      │  └─ TrayIconService.cs               # 系统托盘（NotifyIcon：显示 / 退出）
       ├─ Theme/
       │  └─ ThemeResources.cs                # 运行时替换 WPF 主题资源字典
       ├─ Themes/
@@ -82,7 +91,7 @@ DesktopAgent/
       │  └─ Chrome.xaml                      # 标题栏按钮等与主题无关的样式
       └─ wwwroot/
          ├─ index.html                       # BlazorWebView 宿主页面
-         ├─ css/app.css                      # 界面样式（含深/浅色变量）
+         ├─ css/app.css                      # 界面样式（含深/浅色变量、Markdown 样式）
          └─ js/
             ├─ theme.js                      # 供 .NET 调用：切换 data-theme
             ├─ chat.js                       # 消息区滚到底部
@@ -116,11 +125,21 @@ dotnet run --project src/SDemo.DesktopAgent
 | 空聊天室 | 欢迎语 + 输入框整体垂直居中（输入框水平居中、最大宽 760px） |
 | 有记录 | 顶部聊天室名称（左对齐）→ 中间消息区（独立滚动）→ 底部输入框 |
 
+助手消息按 **Markdown** 渲染（`MarkdownRenderer`，基于 [Markdig](https://github.com/xoofx/markdig) 1.4.0）：标题、段落、粗斜体、列表、GFM 表格、任务列表、行内代码 / 代码块、引用、删除线、裸链接等；用户消息仍按纯文本显示（保留换行）。模型输出里的原始 HTML 会被转义，链接只保留 `http(s)` / `mailto`；点击链接由 BlazorWebView 的默认 `UrlLoading` 策略（外部地址 `OpenExternally`）交给系统默认浏览器，不会把 Blazor 界面导航走。表格外面套了可横向滚动的容器，长表格不会撑破消息区。
+
 `ChatComposer` 是组合输入框，自下而上分三块：
 
-1. **Header**：`HeaderContent` 参数；未传内容时整块不渲染、不占高度（后续可放附件、上下文标签）。
+1. **Header**：`HeaderContent` 参数放工作区（空聊天室）；上传的附件由 `ChatComposer` 追加在它下面，没有内容时整块不渲染、不占高度。
 2. **输入区**：`<textarea>` 多行输入，`field-sizing: content` 自动增高（上限 200px 后内部滚动）。
-3. **底部功能区**：左侧 Skills 占位按钮（技能 / 搜索 / 文件），右侧的模型选择器紧贴发送按钮左边；`IsGenerating` 为 true 时发送按钮切换为停止图标（`.is-stop`）。模型选择会记到设置里（`lastProviderId` / `lastModelId`），下次启动自动选中。
+3. **底部功能区**：左侧是「＋ 上传文件」和常用技能（最多直接显示 3 个，超出的进「更多」）；右侧依次是**搜索**、**文件**两个可同时点亮的图标按钮、模型选择器、发送按钮。`IsGenerating` 为 true 时发送按钮切换为停止图标（`.is-stop`）。模型选择会记到设置里（`lastProviderId` / `lastModelId`），下次启动自动选中。
+
+上传的附件会复制到 `%APPDATA%\SDemo\DesktopAgent\uploads\{sessionId}\`，显示在输入框 Header 里（新建聊天室时在工作区选择器下面）；发送后附件随消息持久化，消息气泡里也会显示。文本类附件（`.md` / `.txt` / `.json` / 常见代码后缀）会内联进模型上下文（单个最多 16K 字符、总量 48K），二进制附件只把名称 / 大小 / 路径告诉模型。也可以把文件直接**拖进输入框**：JS 把 drop 的文件写进 Blazor 的 file input，再走同一套上传逻辑。
+
+消息底部会显示元信息（`msg-meta`）：
+
+- 用户消息：时间 + 复制按钮。
+- 助手消息：时间、token 总量（同时显示输入 token，hover 显示输入 / 输出明细）、工具调用总次数（hover 显示每个工具的次数）、耗时、复制按钮、**分支按钮**（从这条消息复制上下文，生成一个新的聊天室）。
+- token / 工具统计来自 `AgentRunMetrics`：token 从流式返回的 `UsageContent` 累加，工具次数由 `AgentToolbox` 在每次工具调用时计数。服务端没有返回 usage 时只显示耗时。
 
 输入为空时发送按钮禁用。键盘约定由 `js/composer.js` 处理（`document` 捕获阶段监听，元素重渲染后依然有效）：
 
@@ -137,10 +156,27 @@ dotnet run --project src/SDemo.DesktopAgent
 1. 用户消息写入 `ChatSession.Messages`，界面立刻从「空态居中」切到「有记录布局」。
 2. 首条消息用于生成会话标题（首行前 18 字）与时间；会话在发送前不会出现在列表里，发送后按归属落到「历史聊天」或对应工作区下（置顶的排最前）。
 3. 清空输入框，消息区滚到底部。
-4. 若已配置模型（输入框 Header 里的模型选择器），调用 Agent Framework 流式生成，助手消息边生成边追加；生成中发送按钮变为停止，点击可中断（保留已生成的部分）。
+4. 若已配置模型（输入框底部功能区里的模型选择器），调用 Agent Framework 流式生成，助手消息边生成边追加；生成中发送按钮变为停止，点击可中断（保留已生成的部分）。
 5. **思维链**：模型返回 `reasoning_content` 时（如 DeepSeek 系列），MAF 会把它拆成 `TextReasoningContent`；应用把正文与思维链分开接收，消息上方显示「思考过程 · N 字」，默认展开、可折叠。普通模型没有该字段则不显示。
 
-会话目前只存在内存中（重启后历史会话会回到种子数据，重命名 / 置顶 / 删除也会重置）。
+会话持久化到 SQLite（按工作区分库，见「数据存储」），重启后保留；新建的空聊天室在首次发送消息前不落库。
+
+## 数据存储
+
+设置与会话分开存：
+
+| 数据 | 位置 | 说明 |
+| --- | --- | --- |
+| 设置（主题 / 提供商 / 工作区列表 / 搜索 / 写入确认） | `%APPDATA%\SDemo\DesktopAgent\settings.json` | `System.Text.Json`；API Key 用 DPAPI 加密 |
+| 历史聊天（不归属工作区） | `%APPDATA%\SDemo\DesktopAgent\chats\history.db` | SQLite + EF Core |
+| 每个工作区的聊天 | `%APPDATA%\SDemo\DesktopAgent\chats\workspaces\{workspaceId}.db` | 一个工作区一个库 |
+
+- 两个表：`sessions`（Id / Title / Meta / WorkspaceId / IsPinned / UpdatedAt）和 `messages`（Id / SessionId / Order / Role / Content / Reasoning / AttachmentsJson / CreatedAt / DurationMs / InputTokens / OutputTokens / ToolCallsJson）；删除会话级联删除消息。附件文件本身在 `%APPDATA%\SDemo\DesktopAgent\uploads\{sessionId}\`，数据库只存路径与元信息。
+- 新建聊天室在发出第一条消息前不落库；首条消息写入时在对应库创建会话。
+- 用户消息立即写库；助手消息在流式结束（正常结束 / 停止 / 出错）后写一次，避免每个增量都落盘。
+- 置顶、重命名、删除会话都会立即写库；删除工作区时先把该库中的会话搬到 `history.db`（`WorkspaceId` 置空），再删除工作区 DB 文件。
+- 写操作通过 `ChatStore` 串行执行；建表用 `Database.EnsureCreated()`，并在打开旧库时自动补 `AttachmentsJson` 列（新增列以外的表结构变更仍需手动迁移）。
+- 启动时 `AppShell` 从历史库 + 所有工作区库加载会话；某个库损坏 / 被占用时跳过它，不影响其他库。
 
 ## 工作区与会话列表
 
@@ -148,15 +184,16 @@ dotnet run --project src/SDemo.DesktopAgent
 
 **工作区**：显式创建（没有默认工作区），每个工作区对应一个本地目录，持久化在设置的 `workspaces` 里。
 
-- 「＋ 添加工作区」按钮在最下方，点了打开系统文件夹选择框；同路径会复用已有工作区。
-- 工作区行 hover 出现「＋ 新建聊天室」和「⋯ 更多（重命名 / 删除）」；点击行本身折叠 / 展开它下面的聊天室。
+- 工作区分组标题右侧的 **＋**（`SidebarSection.HeaderAction`）添加工作区，点了打开系统文件夹选择框；同路径会复用已有工作区。
+- 点击工作区行：**该工作区还没有任何会话时，直接进入属于它的新建聊天室**（空工作区就是默认入口）；有会话时只是折叠 / 展开它下面的聊天室。
+- 工作区行 hover 出现「＋ 新建聊天室」和「⋯ 更多（重命名 / 删除）」；「＋」无论有没有会话都会新开一个聊天室。
 - 重命名只改显示名，不动目录；删除工作区不会删磁盘文件，它下面的会话回到「历史聊天」。
 - 在工作区里新建的聊天室，发送第一条消息后挂在该工作区下面（缩进一级，置顶的排最前）。
 
 **历史聊天**：顶部「新建聊天室」创建的会话不归属任何工作区，都进这里；工作区里新建的会话不会出现在这里。
 
-- **工作区选择器**：空会话时在输入框上方，下拉底部是「＋ 选择工作区…」，选中即把当前会话归到该工作区（也可以选已有工作区）。发送第一条消息后选择器随空态一起消失。
-- **会话行**：左侧是会话图标（SVG），置顶标记固定在右侧；「置顶 / 更多（重命名 / 删除）」只在鼠标移入时出现（选中状态不会常亮）。重命名是行内输入（Enter 保存 / Esc 取消）；删除当前会话会回到新的空聊天室。
+- **工作区选择器**：空会话时在输入框的 Header 里（左上角，与输入文字左对齐）；下拉列表在下方展开，底部是「＋ 选择工作区…」，选中即把当前会话归到该工作区（也可以选已有工作区）。发送第一条消息后 Header 随空态一起收起。
+- **会话行**：左侧是会话图标（SVG）；右侧的置顶按钮在鼠标移入时出现，已置顶的会话按钮常亮（再点一次取消置顶），「更多（重命名 / 删除）」同样只在移入时出现。重命名是行内输入（Enter 保存 / Esc 取消）；删除当前会话会回到新的空聊天室。会话正在生成回复时，标题下方的时间会换成带脉冲圆点的「推理中…」。
 - 文件工具的根目录：工作区里的会话用工作区目录，历史聊天用 `我的文档\SDemo DesktopAgent`（`WorkspaceContext`）。
 
 ## 窗口外观
@@ -165,6 +202,14 @@ dotnet run --project src/SDemo.DesktopAgent
 - **圆角**：Windows 11 下通过 `DWMWA_WINDOW_CORNER_PREFERENCE` 设成圆角（`DwmSetWindowAttribute`），内容 Border 同步 8px 圆角；最大化时切回直角。
 - **最小尺寸**：`MinWidth=1024`、`MinHeight=680`，窗口默认 1240×800。
 - 最大化尺寸仍由 `WM_GETMINMAXINFO` 钉到显示器工作区。
+
+## 系统托盘
+
+- 启动后托盘常驻一个图标，和 exe / 窗口共用 `Assets/app.ico`。
+- 标题栏关闭按钮（以及 Alt+F4）**不会退出程序**，而是把窗口收进托盘继续运行；第一次收起时会弹一条托盘提示。要真正退出，用托盘右键菜单的「退出」。
+- 托盘图标的左键单击 / 双击恢复窗口；右键菜单：显示主窗口 / 退出。
+- 注销、关机走 `App.OnSessionEnding`，不会被“关闭即隐藏”的逻辑拦住。
+- 实现：WinForms `NotifyIcon`（`TrayIconService`）。项目同时开启 `UseWPF` 与 `UseWindowsForms`（共享 `Microsoft.WindowsDesktop.App`），并在 csproj 里用 `<Using Remove="System.Windows.Forms" />`、`<Using Remove="System.Drawing" />` 去掉 WinForms 注入的全局 using，避免和 WPF 的 `Application` / `MessageBox` 冲突。
 
 ## 设置页
 
@@ -219,13 +264,45 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 
 ## 技能与工具
 
-输入框底部三个 chip 是工具开关（默认全关，开启后高亮），下一次发送生效：
+输入框底部现在是「上传文件 + 常用技能」和右侧的「工具 + 模型 + 发送」：
 
-| Chip | 工具 | 实现 |
+- **＋ 上传文件**：多选，附件显示在 Header（新聊天室在工作区选择器下面），发送后随消息落库。
+- **常用技能**：直接读取技能库，最多同时显示 3 个，超出的放进「更多」菜单；点击后**只显示选中的那一个 chip**（带 `✕` 取消），其余技能隐藏，下一次发送把该技能全文注入系统提示词。
+- **模型工具（多选）**：右侧是「联网搜索」「文件读写」两个图标按钮，并排显示，各自独立开关、**可以同时启用**；点亮即启用，再点取消。启用了哪些，本次请求就只下发哪些工具；都不点亮 = 不下发任何工具。
+
+| 工具 | 下发的工具 | 实现 |
 | --- | --- | --- |
-| 技能 | `list_skills` / `read_skill` | 读取 `%APPDATA%\SDemo\DesktopAgent\skills\*.md`，模型先看技能说明再按步骤执行 |
-| 搜索 | `web_search` | 默认 Bing RSS；可在「设置 → 工具设置」换成自定义搜索 API（地址 + Key） |
-| 文件 | `list_files` / `read_file` / `write_file` / `workspace_info` | 工作区 `%USERPROFILE%\Documents\SDemo DesktopAgent`，路径被限制在工作区内，防止 `../` 越界 |
+| 联网搜索 | `web_search` | 默认 Bing RSS；可在「设置 → 工具设置」换成自定义搜索 API（地址 + Key） |
+| 文件读写 | `list_files` / `read_file` / `write_file` / `workspace_info` | 当前会话所属工作区；历史聊天用 `%USERPROFILE%\Documents\SDemo Desktop Agent`。路径被限制在根目录内，防止 `../` 越界；写文件仍会先弹确认框 |
+
+### 技能格式
+
+技能就是一个 Markdown 文件，**文件名就是技能名**。推荐使用标准的 YAML frontmatter，输入框的技能列表会优先取其中的 `description` 作为悬浮说明：
+
+```markdown
+---
+name: 总结
+description: 一句话说明这个技能做什么、什么时候用。
+version: 1.0
+---
+
+# 总结
+
+## 何时使用
+## 输入
+## 工作步骤
+## 输出格式（严格）
+## 约束
+## 示例
+```
+
+`description` 建议一句话写清“做什么 + 何时使用”。技能**不再通过 `list_skills` / `read_skill` 工具调用**：点选后由 `AgentChatService` 把技能全文拼进系统提示词，输出格式更稳定。
+
+内置了三个技能（`%APPDATA%\SDemo\DesktopAgent\skills\`）：
+
+- `总结.md`：一句话结论 → 关键要点 → 决策与依据 → 待办 → 风险与未决问题。
+- `代码解释.md`：一句话概括 → 逐段说明 → 输入输出 → 边界与风险。
+- `会议纪要.md`：会议结论 → 决策清单 → 待办 → 风险与待确认。
 
 - 工具通过 `AsAIAgent(tools: …)` 挂到 agent 上；`ChatClientAgent` 默认会自动执行工具调用并继续生成，不需要手写循环。
 - 已用本地 mock 验证：开工具后请求体带 `tools` 数组；模型返回 `tool_calls` 后应用执行函数，并把 `role: tool` 的结果回传，再产出最终回复。
@@ -243,7 +320,7 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 
 ## 开发约定
 
-**侧栏列表**：工作区来自设置的 `workspaces`（`Workspace` 模型），会话来自 `AppShell` 的 `_sessions`（种子数据见 `CreateSeedSessions()`，目前只在内存里）；`Sidebar` 只负责展示与回调（新建 / 打开 / 重命名 / 删除 / 置顶 / 添加工作区），不直接改数据。
+**侧栏列表**：工作区来自设置的 `workspaces`（`Workspace` 模型），会话由 `AppShell` 在启动时通过 `ChatStore` 从 SQLite 加载（工作区库 + 历史库）；`Sidebar` 只负责展示与回调（新建 / 打开 / 重命名 / 删除 / 置顶 / 添加工作区），不直接改数据。工作区行点击时“有没有会话”的判断在 `Sidebar.HandleWorkspaceClick`，真正的新建仍由 `AppShell.NewChatInWorkspace` 完成。
 
 **设置**：新增设置项时加到 `AppSettings`，界面改动后调用 `ISettingsService.Save()`；需要跨组件即时生效的用 `SettingsService.Changed` 事件（聊天页的模型下拉就是这么刷新的）。
 
@@ -256,6 +333,10 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 
 ## 已知注意事项
 
+- 会话库用 `Database.EnsureCreated()` 建表，并在打开旧库时自动补 `AttachmentsJson` 列；**其它表结构变更仍没有迁移**，需要手动处理或删库重建。
+- 上传附件目前只把文本内容内联给模型；图片 / PDF 等二进制文件只会给模型文件名、大小和路径，模型看不到内容。单个附件上限 25 MB、一次最多 10 个。
+- 关闭窗口默认把应用收进托盘，而不是退出；要恢复“关闭即退出”，把 `MainWindow.OnClosing` 里的隐藏逻辑去掉即可。
+- Markdown 代码块目前只有等宽字体和底色，**没有语法高亮**（Markdig 不内置；需要的话可以再接 highlight.js 或 ColorCode）。
 - `TargetFramework` 带 `10.0.19041.0`：WebView2 组合渲染控件需要 Windows SDK 投影（`Microsoft.Windows.SDK.NET`），改成纯 `net10.0-windows` 会在启动时抛 `FileNotFoundException`。
 - WebView2 用户数据目录指向 `%LOCALAPPDATA%\SDemo\DesktopAgent\WebView2`，避免安装目录只读时启动失败。
 - 窗口为无边框自绘标题栏，最大化尺寸由 `WM_GETMINMAXINFO` 钉到显示器工作区，避免内容被裁切；代价是最大化按钮不出现 Windows 11 的贴靠布局浮层（Snap Layouts）。

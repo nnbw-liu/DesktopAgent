@@ -1,8 +1,11 @@
+@using System.Diagnostics
 @using SDemo.DesktopAgent.Models
+@using Microsoft.AspNetCore.Components
 @inject IJSRuntime Js
 @inject ISettingsService Settings
 @inject IAgentChatService Agent
 @inject FileWriteApprovalService Approvals
+@inject SkillCatalog SkillCatalog
 @implements IDisposable
 
 @* 聊天室：空会话（欢迎语 + 输入框，垂直居中）与有记录会话（标题 / 消息区 / 输入框）共用本组件 *@
@@ -46,30 +49,127 @@
                             </div>
                         }
 
-                        <div class="msg-body">@message.Content</div>
+                        @if (!string.IsNullOrWhiteSpace(message.Content))
+                        {
+                            <div class="msg-body @(isUser ? null : "msg-body--markdown")">
+                                @if (isUser)
+                                {
+                                    @message.Content
+                                }
+                                else
+                                {
+                                    @((MarkupString)MarkdownRenderer.ToHtml(message.Content))
+                                }
+                            </div>
+                        }
+
+                        @if (message.Attachments.Count > 0)
+                        {
+                            <div class="msg-attachments">
+                                @foreach (var attachment in message.Attachments)
+                                {
+                                    <span class="attachment-chip attachment-chip--static" title="@attachment.FilePath">
+                                        <svg class="attachment-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                            <path d="M9.9 4.2 5.3 8.8a1.6 1.6 0 0 0 2.3 2.3l4.9-4.9a2.6 2.6 0 0 0-3.7-3.7L3.7 7.6a4 4 0 0 0 5.7 5.7l4-4"
+                                                  fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                        <span class="attachment-name">@attachment.FileName</span>
+                                        <span class="attachment-size">@AttachmentStore.FormatSize(attachment.Size)</span>
+                                    </span>
+                                }
+                            </div>
+                        }
+
+                        <div class="msg-meta">
+                            <span class="msg-time">@message.CreatedAt.ToString("HH:mm")</span>
+
+                            @if (!isUser)
+                            {
+                                @if (message.TotalTokens > 0)
+                                {
+                                    <span class="msg-stat" title="输入 @message.InputTokens.ToString("N0") / 输出 @message.OutputTokens.ToString("N0")">
+                                        @message.TotalTokens.ToString("N0") tokens（输入 @message.InputTokens.ToString("N0")）
+                                    </span>
+                                }
+
+                                @if (message.ToolCalls.Count > 0)
+                                {
+                                    <span class="msg-stat" title="@ToolTip(message)">工具 @message.ToolCalls.Values.Sum() 次</span>
+                                }
+
+                                @if (message.DurationMs > 0)
+                                {
+                                    <span class="msg-stat">耗时 @FormatDuration(message.DurationMs)</span>
+                                }
+                            }
+
+                            <button type="button"
+                                    class="msg-action"
+                                    title="@(_copiedMessageId == message.Id ? "已复制" : "复制")"
+                                    @onclick="() => CopyMessage(message)"
+                                    @onclick:stopPropagation="true">
+                                @if (_copiedMessageId == message.Id)
+                                {
+                                    <svg class="msg-action-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M3.2 8.4 6.3 11.4 12.8 4.6" fill="none" stroke="currentColor"
+                                              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <svg class="msg-action-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                        <rect x="5.6" y="5.6" width="7.8" height="7.8" rx="1.5" fill="none"
+                                              stroke="currentColor" stroke-width="1.2" />
+                                        <path d="M10.4 5.6V4.1A1.5 1.5 0 0 0 8.9 2.6H4.1A1.5 1.5 0 0 0 2.6 4.1v4.8a1.5 1.5 0 0 0 1.5 1.5h1.5"
+                                              fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                                    </svg>
+                                }
+                            </button>
+
+                            @if (!isUser)
+                            {
+                                <button type="button"
+                                        class="msg-action"
+                                        title="从此消息创建分支"
+                                        @onclick="() => OnBranch.InvokeAsync(message)"
+                                        @onclick:stopPropagation="true">
+                                    <svg class="msg-action-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                        <circle cx="4.4" cy="3.4" r="1.5" fill="none" stroke="currentColor" stroke-width="1.2" />
+                                        <circle cx="4.4" cy="12.6" r="1.5" fill="none" stroke="currentColor" stroke-width="1.2" />
+                                        <circle cx="11.6" cy="6.4" r="1.5" fill="none" stroke="currentColor" stroke-width="1.2" />
+                                        <path d="M4.4 4.9v6.2M11.6 7.9c0 2.6-1.9 4.2-4.4 4.4"
+                                              fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                                    </svg>
+                                </button>
+                            }
+                        </div>
                     </article>
                 }
             </div>
         </div>
     }
 
-    @if (IsEmpty)
-    {
-        <div class="workspace-bar">
-            <WorkspacePicker Workspaces="Workspaces"
-                             SelectedId="@Session.WorkspaceId"
-                             OnSelect="SelectWorkspace"
-                             OnPick="() => OnPickWorkspace.InvokeAsync()" />
-        </div>
-    }
-
     <div class="chat-composer-area">
         <ChatComposer @bind-Text="_draft"
+                      SessionId="@Session.Id"
                       IsGenerating="_isGenerating"
-                      EnabledSkills="_enabledSkills"
-                      OnToggleSkill="ToggleSkill"
+                      Skills="_skills"
+                      SelectedSkill="@_selectedSkill"
+                      OnSelectSkill="SelectSkill"
+                      EnabledTools="_enabledTools"
+                      OnToggleTool="ToggleTool"
                       OnSend="HandleSend"
                       OnStop="HandleStop">
+            <HeaderContent>
+                @* 新聊天室（空会话）才需要归属工作区：放在 Header 里，贴左对齐输入文字 *@
+                @if (IsEmpty)
+                {
+                    <WorkspacePicker Workspaces="Workspaces"
+                                     SelectedId="@Session.WorkspaceId"
+                                     OnSelect="SelectWorkspace"
+                                     OnPick="() => OnPickWorkspace.InvokeAsync()" />
+                }
+            </HeaderContent>
             <FooterContent>
                 @if (_modelOptions.Count > 0)
                 {
@@ -122,7 +222,19 @@
 
     /// <summary>发送：由外层把消息写入会话并落库。</summary>
     [Parameter]
-    public EventCallback<string> OnSend { get; set; }
+    public EventCallback<ComposerSubmission> OnSend { get; set; }
+
+    /// <summary>会话内容变化（助手消息生成结束 / 失败 / 停止）后回调，由外层持久化。</summary>
+    [Parameter]
+    public EventCallback<ChatSession> OnSessionChanged { get; set; }
+
+    /// <summary>助手消息上的「分支」：由外层复制会话并打开。</summary>
+    [Parameter]
+    public EventCallback<ChatMessage> OnBranch { get; set; }
+
+    /// <summary>开始 / 结束生成时通知外层（左侧列表据此显示“推理中”）。</summary>
+    [Parameter]
+    public EventCallback<(ChatSession Session, bool IsGenerating)> OnGeneratingChanged { get; set; }
 
     /// <summary>直接跳到设置的「模型设置」分区。</summary>
     [Parameter]
@@ -150,8 +262,19 @@
     private CancellationTokenSource? _cts;
     private FileWriteRequest? _pendingWrite;
 
-    /// <summary>输入框底部 chip 打开的工具（默认全关）。</summary>
-    private readonly HashSet<AgentSkill> _enabledSkills = [];
+    /// <summary>常用技能（本地技能库）。</summary>
+    private IReadOnlyList<SkillInfo> _skills = [];
+
+    /// <summary>当前选中的技能名（为空表示不套用技能）。</summary>
+    private string? _selectedSkill;
+
+    /// <summary>当前启用的模型工具（多选，可同时开搜索与文件）。</summary>
+    private readonly HashSet<AgentSkill> _enabledTools = [];
+
+    /// <summary>刚刚复制过的消息 Id（用于短暂显示对勾）。</summary>
+    private string? _copiedMessageId;
+
+    private bool _disposed;
 
     /// <summary>展开了思维链的消息 Id。</summary>
     private readonly HashSet<string> _openReasoning = [];
@@ -160,6 +283,7 @@
 
     protected override void OnInitialized()
     {
+        _skills = SkillCatalog.List();
         RefreshModelOptions();
         Settings.Changed += OnSettingsChanged;
         Approvals.Changed += OnApprovalChanged;
@@ -167,11 +291,14 @@
 
     protected override void OnParametersSet()
     {
-        // 切换到另一个聊天室时清空草稿、取消上一轮生成。
+        // 切换到另一个聊天室时清空草稿、取消上一轮生成，技能 / 工具也回到默认。
         if (_sessionId != Session.Id)
         {
             _sessionId = Session.Id;
             _draft = string.Empty;
+            _selectedSkill = null;
+            _enabledTools.Clear();
+            _copiedMessageId = null;
             _cts?.Cancel();
             _isGenerating = false;
         }
@@ -258,14 +385,73 @@
         RememberSelection();
     }
 
-    /// <summary>点 chip 开关一个工具，下一次发送时生效。</summary>
-    private void ToggleSkill(AgentSkill skill)
+    /// <summary>选择技能：再次点击同一个则取消。</summary>
+    private void SelectSkill(string? name) => _selectedSkill = name;
+
+    /// <summary>开关一个模型工具；搜索与文件可以同时启用。</summary>
+    private void ToggleTool(AgentSkill tool)
     {
-        if (!_enabledSkills.Remove(skill))
+        if (!_enabledTools.Remove(tool))
         {
-            _enabledSkills.Add(skill);
+            _enabledTools.Add(tool);
         }
     }
+
+    /// <summary>复制消息纯文本到剪贴板，短暂显示对勾。</summary>
+    private async Task CopyMessage(ChatMessage message)
+    {
+        if (string.IsNullOrEmpty(message.Content))
+        {
+            return;
+        }
+
+        try
+        {
+            await Js.InvokeVoidAsync("sdChat.copyText", message.Content);
+        }
+        catch (JSException)
+        {
+            // 剪贴板不可用时仍然给出复制成功的视觉反馈没有意义，直接返回。
+            return;
+        }
+
+        _copiedMessageId = message.Id;
+        StateHasChanged();
+
+        await Task.Delay(1500);
+
+        if (_disposed || _copiedMessageId != message.Id)
+        {
+            return;
+        }
+
+        _copiedMessageId = null;
+        StateHasChanged();
+    }
+
+    /// <summary>工具调用明细（hover 时显示）。</summary>
+    private static string ToolTip(ChatMessage message)
+    {
+        var lines = new List<string>
+        {
+            $"共调用 {message.ToolCalls.Values.Sum()} 次"
+        };
+
+        lines.AddRange(message.ToolCalls
+            .OrderByDescending(pair => pair.Value)
+            .ThenBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(pair => $"{pair.Key} × {pair.Value}"));
+
+        return string.Join('\n', lines);
+    }
+
+    private static string FormatDuration(long milliseconds) =>
+        milliseconds < 1000 ? $"{milliseconds} ms" : $"{milliseconds / 1000.0:0.0} s";
+
+    private Task SetGeneratingAsync(bool isGenerating) =>
+        OnGeneratingChanged.HasDelegate
+            ? OnGeneratingChanged.InvokeAsync((Session, isGenerating))
+            : Task.CompletedTask;
 
     /// <summary>把当前选择写进设置，下次启动直接选中。</summary>
     private void RememberSelection()
@@ -287,15 +473,19 @@
         Settings.Save();
     }
 
-    private async Task HandleSend()
+    private async Task HandleSend(ComposerSubmission submission)
     {
-        if (string.IsNullOrWhiteSpace(_draft) || _isGenerating)
+        if (_isGenerating)
         {
             return;
         }
 
-        var text = _draft.Trim();
-        await OnSend.InvokeAsync(text);
+        if (string.IsNullOrWhiteSpace(submission.Text) && submission.Attachments.Count == 0)
+        {
+            return;
+        }
+
+        await OnSend.InvokeAsync(submission);
         _draft = string.Empty;
         RememberSelection();
 
@@ -305,6 +495,7 @@
             Session.Messages.Add(new ChatMessage(
                 ChatMessageRole.Assistant,
                 "还没有可用的模型。请到「设置 → 模型设置」添加模型提供商，并把模型加入目录。"));
+            await NotifySessionChangedAsync();
             return;
         }
 
@@ -315,18 +506,36 @@
     private async Task GenerateAsync(ModelOption option)
     {
         _isGenerating = true;
+        await SetGeneratingAsync(true);
+
         using var cts = new CancellationTokenSource();
         _cts = cts;
 
         var history = Session.Messages.ToList();
-        var reply = new ChatMessage(ChatMessageRole.Assistant, string.Empty);
+        var reply = new ChatMessage(ChatMessageRole.Assistant, string.Empty)
+        {
+            CreatedAt = DateTime.Now
+        };
+
         Session.Messages.Add(reply);
         _openReasoning.Add(reply.Id);
         StateHasChanged();
 
+        // 工具是多选的：把所有勾选的工具一起传给模型。
+        var enabledSkills = new HashSet<AgentSkill>(_enabledTools);
+        var metrics = new AgentRunMetrics();
+        var startedAt = Stopwatch.GetTimestamp();
+
         try
         {
-            await foreach (var delta in Agent.StreamAsync(option.Provider, option.ModelId, history, _enabledSkills, cts.Token))
+            await foreach (var delta in Agent.StreamAsync(
+                               option.Provider,
+                               option.ModelId,
+                               history,
+                               enabledSkills,
+                               _selectedSkill,
+                               metrics,
+                               cts.Token))
             {
                 if (delta.Text.Length > 0)
                 {
@@ -352,16 +561,32 @@
         }
         finally
         {
+            reply.DurationMs = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+            reply.InputTokens = metrics.InputTokens;
+            reply.OutputTokens = metrics.OutputTokens;
+
+            foreach (var pair in metrics.ToolCalls)
+            {
+                reply.ToolCalls[pair.Key] = pair.Value;
+            }
+
             _isGenerating = false;
             _cts = null;
+            await SetGeneratingAsync(false);
             StateHasChanged();
+            await NotifySessionChangedAsync();
         }
     }
+
+    /// <summary>通知外层把最新会话写回 SQLite（取消 / 出错时也保存已生成的部分）。</summary>
+    private Task NotifySessionChangedAsync() =>
+        OnSessionChanged.HasDelegate ? OnSessionChanged.InvokeAsync(Session) : Task.CompletedTask;
 
     private void HandleStop() => _cts?.Cancel();
 
     public void Dispose()
     {
+        _disposed = true;
         Settings.Changed -= OnSettingsChanged;
         Approvals.Changed -= OnApprovalChanged;
 
