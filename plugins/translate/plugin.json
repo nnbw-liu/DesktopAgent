@@ -1,0 +1,45 @@
+{
+  "id": "translate",
+  "name": "翻译",
+  "version": "1.0.0",
+  "description": "把文本翻译成指定语言，支持双语对照。",
+  "icon": {
+    "paths": [
+      "M3.5 5h6M6.5 3.2v1.8M9.5 5c0 3.6-2.2 6-5 7.4M5.8 8.2c1 2.1 2.7 3.7 4.7 4.6",
+      "M12.6 9.4 15.8 16.6M15.8 16.6h-6.4"
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "translate",
+      "name": "翻译",
+      "skill": "skills/translate.md",
+      "allowGlobalSkills": false,
+      "allowHistory": false,
+      "privacy": { "sendsText": true },
+      "output": { "format": "segments" },
+      "parameters": [
+        {
+          "key": "target",
+          "label": "目标语言",
+          "kind": "select",
+          "defaultFrom": "system-language",
+          "fallback": "en",
+          "options": [
+            { "value": "zh-Hans", "label": "简体中文" },
+            { "value": "zh-Hant", "label": "繁體中文" },
+            { "value": "ja", "label": "日本語" },
+            { "value": "fr", "label": "Français" },
+            { "value": "en", "label": "English" },
+            { "value": "ko", "label": "한국어" }
+          ]
+        }
+      ]
+    }
+  ],
+  "mounts": [
+    { "id": "sidebar", "surface": "sidebar", "capability": "translate", "order": 10 },
+    { "id": "composer", "surface": "composer", "capability": "translate", "order": 10 },
+    { "id": "bubble", "surface": "message", "capability": "translate", "input": "message", "order": 10 }
+  ]
+}

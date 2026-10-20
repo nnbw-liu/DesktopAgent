@@ -21,6 +21,10 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         session.Property(record => record.Title).IsRequired();
         session.Property(record => record.Meta);
         session.Property(record => record.WorkspaceId);
+        session.Property(record => record.OriginMountId);
+        session.Property(record => record.ActiveMountId);
+        session.Property(record => record.LastPluginId);
+        session.Property(record => record.PluginMemoryJson);
         session.HasIndex(record => record.UpdatedAt);
         session.HasMany(record => record.Messages)
             .WithOne()
@@ -40,6 +44,7 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         message.Property(record => record.InputTokens);
         message.Property(record => record.OutputTokens);
         message.Property(record => record.ToolCallsJson);
+        message.Property(record => record.PluginJson);
         message.HasIndex(record => record.SessionId);
     }
 }
@@ -58,6 +63,18 @@ public sealed class SessionRecord
     public bool IsPinned { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>会话从哪个插件入口创建（<c>&lt;pluginId&gt;/&lt;mountId&gt;</c>）。</summary>
+    public string? OriginMountId { get; set; }
+
+    /// <summary>输入框当前选中的插件入口。</summary>
+    public string? ActiveMountId { get; set; }
+
+    /// <summary>最后一次实际运行的插件 id。</summary>
+    public string? LastPluginId { get; set; }
+
+    /// <summary>会话级插件记忆的 JSON，例如 {"translate/composer/target":"ja"}。</summary>
+    public string? PluginMemoryJson { get; set; }
 
     public List<MessageRecord> Messages { get; set; } = [];
 }
@@ -92,4 +109,7 @@ public sealed class MessageRecord
 
     /// <summary>工具调用次数的 JSON，例如 {"web_search":2}。</summary>
     public string? ToolCallsJson { get; set; }
+
+    /// <summary>本轮插件归属信息（PluginMessageInfo）的 JSON。</summary>
+    public string? PluginJson { get; set; }
 }

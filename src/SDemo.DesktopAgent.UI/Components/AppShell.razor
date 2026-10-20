@@ -368,7 +368,8 @@
         DurationMs = message.DurationMs,
         InputTokens = message.InputTokens,
         OutputTokens = message.OutputTokens,
-        ToolCalls = new Dictionary<string, int>(message.ToolCalls, StringComparer.OrdinalIgnoreCase)
+        ToolCalls = new Dictionary<string, int>(message.ToolCalls, StringComparer.OrdinalIgnoreCase),
+        Plugin = message.Plugin
     };
 
     private static string BuildTitle(string text, IReadOnlyList<ChatAttachment> attachments)

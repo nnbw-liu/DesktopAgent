@@ -2674,6 +2674,99 @@ a {
     color: var(--muted);
 }
 
+/* ---------- 输入框里的插件 chip 与内联参数 ---------- */
+
+.plugin-chip-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+
+    width: 16px;
+    height: 16px;
+
+    border-radius: 5px;
+    background: var(--accent-soft);
+
+    font-size: 10px;
+    line-height: 1;
+    color: var(--accent-text);
+}
+
+.plugin-chip .skill-chip-label {
+    max-width: 88px;
+}
+
+.plugin-param {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+
+    padding: 2px 8px;
+
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+
+    font-size: 11.5px;
+    color: var(--text-dim);
+}
+
+.plugin-param.is-disabled {
+    opacity: .6;
+}
+
+.plugin-param-label {
+    white-space: nowrap;
+    color: var(--muted);
+}
+
+.plugin-param-select {
+    width: auto;
+    min-width: 0;
+    height: 24px;
+    padding: 0 20px 0 4px;
+
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+
+    font-size: 11.5px;
+    color: var(--text);
+}
+
+.plugin-param-select:focus {
+    outline: none;
+    color: var(--accent-text);
+}
+
+.plugin-param-input {
+    width: 104px;
+    height: 24px;
+    padding: 0 6px;
+
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+
+    font-size: 11.5px;
+    color: var(--text);
+}
+
+.plugin-param-toggle {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--accent-solid);
+}
+
+.plugin-param-more,
+.plugin-param-unsupported {
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--muted);
+}
+
 /* ---------- 移动端 / 窄屏 ---------- */
 
 /* 刘海屏与系统栏：MAUI 的 Android/iOS 宿主是 edge-to-edge，内边距交给 env()；

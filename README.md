@@ -346,7 +346,7 @@ version: 1.0
 - **写文件会先弹确认框**（路径 + 内容预览，可拒绝）；确认逻辑走 `FileWriteApprovalService`，工具线程 await 用户选择，停止生成/关闭页面按拒绝处理。
 - 写文件是唯一有副作用的工具，工作区路径固定，不接受绝对路径与 `..` 越界。
 
-## 插件（M0 骨架）
+## 插件
 
 插件是**零代码**的声明式能力包：一个目录 + `plugin.json` + 若干 `.md` 技能文件，不需要编译、不需要重装应用。完整设计见 [docs/plugin-system.md](docs/plugin-system.md)。
 
@@ -357,7 +357,17 @@ version: 1.0
 | 本地 | `%APPDATA%\SDemo\DesktopAgent\plugins\<目录>\` | 用户自制；同 `id` 时覆盖内置插件 |
 | 内置 | `<exe 目录>\plugins\<目录>\` | 随应用发布，仓库里是根目录的 `plugins/`，构建时复制 |
 
-当前进度：**M0 只做加载器与只读预览**——扫描、解析、校验、排序、去重，「设置 → 插件」能看到每个插件可用 / 不可用及具体原因（文件 + 行号 / JSON 路径）。把插件挂到输入框（M1）、侧栏（M2）、气泡（M3）以及启用开关（M4）都还没做。
+当前进度：**M0（加载器）+ M1（输入框）+ M5（内置翻译插件）已完成**。
+
+| 阶段 | 状态 | 说明 |
+| --- | --- | --- |
+| M0 骨架 | ✅ | 扫描、解析、校验、排序、去重；「设置 → 插件」只读列表能看到可用 / 不可用及原因（文件 + 行号 / JSON 路径） |
+| M1 输入框 | ✅ | 选中插件后发送走插件 Run：chip + 内联参数、会话记忆、助手消息带「翻译 · SDemo」归属 |
+| M2 侧栏 | ⬜ | 侧栏入口区、点入口新建预选插件的会话 |
+| M3 气泡 | ⬜ | 对既有回答做加工，产物是派生卡片 |
+| M4 设置 | ⬜ | 启用开关、显示上限、打开插件目录；目前设置页只是只读列表 |
+| M5 内置翻译 | ✅ | `plugins/translate/`（三条入口只有输入框能跑，另外两条等 M2 / M3） |
+| M6 双语对照 | ⬜ | 目前 `segments` 输出按纯文本处理 |
 
 已实现的接缝：
 
@@ -365,13 +375,17 @@ version: 1.0
 - `Core/Plugins/PluginManifest.cs`：清单 DTO 与反序列化选项（允许 `//` 注释、尾逗号、大小写不敏感、UTF-8 BOM），未知字段按 JSON 路径记警告。
 - `Core/Plugins/PluginValidator.cs`：id 格式与唯一性、skill 路径越界（`Path.GetFullPath` + 前缀比较，必须 `.md`）、占位符必须有参数定义、参数 `kind` / `options`、`minHostVersion`、`plugin.json` 512 KB 与 skill 256 KB 上限、图标只收 SVG `path` 数据。
 - `Core/Plugins/PluginModels.cs`：`PluginDescriptor` / `Capability` / `Mount` / `Parameter` 描述符，入口组合键 `<pluginId>/<mountId>`。
-- `Core/Plugins/PluginHostVersion.cs`：宿主版本与 `minHostVersion` 比较。
-- `IAppPaths.PluginsRoot`：WPF / MAUI 的插件目录（Android 落在 `AppDataDirectory/plugins`）。
+- `Core/Plugins/PluginParameterResolver.cs`：会话记忆 → `default` → `defaultFrom`（`system-language` / `system-locale`）→ `fallback` → 第一个 option；无效记忆值不会把会话卡死。
+- `Core/Plugins/PluginPromptComposer.cs`：skill 去 frontmatter、替换 `{{key}}` / `{{key.label}}`；用户输入单独成条并包进 `<待处理文本>`，`<` 全角转义。
+- `Core/Plugins/PluginRunner.cs`：单轮、无历史（除非能力打开 `allowHistory`）、无工具；超 60,000 字符直接报错而不是发出去。
+- `Core/Services/AgentChatService.cs`：抽出 `RunAsync(AgentRunPlan)`，普通对话与插件 Run 共用同一条请求组装。
+- `Core/Services/ChatStore.cs`：`sessions` 四个插件列 + `messages.PluginJson`；`UpgradeSchemaAsync` 现在**两张表各扫一遍**，老库升级不报 `no such column`。
+- `UI/Components/Chat/ChatComposer.razor` + `PluginParameterControl.razor`：全局 / 插件模式切换、chip 带 `✕`、最多内联 2 个参数（`select` / `text` / `number` / `toggle`；多选未实现）。
 - `UI/Components/Settings/PluginSettings.razor`：M0 的只读列表（M4 会换成正式管理页）。
 
-试一下：在 `%APPDATA%\SDemo\DesktopAgent\plugins\demo\` 放 `plugin.json` 和 `skills/main.md`，打开「设置 → 插件」即可看到；故意写错字段名或 skill 路径，条目会显示具体原因。
+使用方式：重启应用后，输入框底部出现「翻译」chip；点它进入插件模式，选目标语言后发送即可。切到别的会话再回来，插件与语言仍然保留（会话级记忆）。「无参数插件点一下就执行」要等 M3 的气泡按钮。
 
-**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（43 个用例：合法最小清单、缺 skill、路径穿越、未定义占位符、重复 id、超体积、无效 JSON、未知字段、minHostVersion、参数校验、DI 注册）。
+**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（77 个用例：清单解析、路径穿越、占位符、去重、超体积、`minHostVersion`、参数校验、DI 注册、参数解析顺序、提示词组装、老库补列、Run 请求组装、内置 translate 清单）。
 
 ## 主题实现
 
