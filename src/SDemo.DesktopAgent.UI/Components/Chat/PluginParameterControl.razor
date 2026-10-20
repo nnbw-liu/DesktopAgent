@@ -1,0 +1,81 @@
+@using SDemo.DesktopAgent.Plugins
+
+@* 单个插件参数的控件。M1 先实现 select / text / number / toggle；multiselect 留到后续版本。 *@
+@if (Parameter is not null)
+{
+    <label class="plugin-param @(Disabled ? "is-disabled" : null)" title="@Parameter.Label">
+        <span class="plugin-param-label">@Parameter.Label</span>
+
+        @switch (Parameter.Kind)
+        {
+            case PluginParameterKind.Select:
+                <select class="field-input field-input--select plugin-param-select"
+                        value="@Value"
+                        disabled="@Disabled"
+                        @onchange="HandleChanged">
+                    @foreach (var option in Parameter.Options)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
+                </select>
+                break;
+
+            case PluginParameterKind.Toggle:
+                <input type="checkbox"
+                       class="plugin-param-toggle"
+                       checked="@(string.Equals(Value, "true", StringComparison.OrdinalIgnoreCase))"
+                       disabled="@Disabled"
+                       @onchange="HandleChanged" />
+                break;
+
+            case PluginParameterKind.Number:
+                <input type="number"
+                       class="field-input plugin-param-input"
+                       value="@Value"
+                       placeholder="@Parameter.Placeholder"
+                       disabled="@Disabled"
+                       @onchange="HandleChanged" />
+                break;
+
+            case PluginParameterKind.Multiselect:
+                <span class="plugin-param-unsupported" title="多选参数尚未实现">多选暂不支持</span>
+                break;
+
+            default:
+                <input type="text"
+                       class="field-input plugin-param-input"
+                       value="@Value"
+                       placeholder="@Parameter.Placeholder"
+                       maxlength="@Parameter.MaxLength"
+                       disabled="@Disabled"
+                       @onchange="HandleChanged" />
+                break;
+        }
+    </label>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public PluginParameter Parameter { get; set; } = default!;
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    private async Task HandleChanged(ChangeEventArgs args)
+    {
+        var value = args.Value switch
+        {
+            null => string.Empty,
+            bool flag => flag ? "true" : "false",
+            var other => other.ToString() ?? string.Empty
+        };
+
+        await ValueChanged.InvokeAsync(value);
+    }
+}

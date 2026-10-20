@@ -6,6 +6,9 @@
 @inject IAgentChatService Agent
 @inject FileWriteApprovalService Approvals
 @inject SkillCatalog SkillCatalog
+@inject PluginCatalog PluginCatalog
+@inject PluginParameterResolver ParameterResolver
+@inject IPluginRunner PluginRunner
 @implements IDisposable
 
 @* 聊天室：空会话（欢迎语 + 输入框，垂直居中）与有记录会话（标题 / 消息区 / 输入框）共用本组件 *@
@@ -30,7 +33,7 @@
                     var isUser = message.Role == ChatMessageRole.User;
 
                     <article class="msg @(isUser ? "msg--user" : "msg--assistant")">
-                        <span class="msg-role">@(isUser ? "你" : "SDemo")</span>
+                        <span class="msg-role">@RoleLabel(message)</span>
 
                         @if (!string.IsNullOrWhiteSpace(message.Reasoning))
                         {
@@ -158,6 +161,12 @@
                       OnSelectSkill="SelectSkill"
                       EnabledTools="_enabledTools"
                       OnToggleTool="ToggleTool"
+                      PluginMounts="_composerMounts"
+                      ActivePlugin="_activePlugin"
+                      ActiveMount="_activeMount"
+                      ParameterValues="_parameterValues"
+                      OnSelectMount="SelectMount"
+                      OnParameterChanged="ChangeParameter"
                       OnSend="HandleSend"
                       OnStop="HandleStop">
             <HeaderContent>
@@ -271,6 +280,19 @@
     /// <summary>当前启用的模型工具（多选，可同时开搜索与文件）。</summary>
     private readonly HashSet<AgentSkill> _enabledTools = [];
 
+    /// <summary>输入框可用的插件入口（composer 界面、可用且 show）。</summary>
+    private IReadOnlyList<PluginMount> _composerMounts = [];
+
+    /// <summary>当前选中的插件入口组合键（<c>&lt;pluginId&gt;/&lt;mountId&gt;</c>）。</summary>
+    private string? _activeMountKey;
+
+    private PluginDescriptor? _activePlugin;
+
+    private PluginMount? _activeMount;
+
+    /// <summary>本轮参数值（按会话记忆解析；用户改了就写回会话记忆）。</summary>
+    private Dictionary<string, string> _parameterValues = new(StringComparer.Ordinal);
+
     /// <summary>刚刚复制过的消息 Id（用于短暂显示对勾）。</summary>
     private string? _copiedMessageId;
 
@@ -284,14 +306,16 @@
     protected override void OnInitialized()
     {
         _skills = SkillCatalog.List();
+        RefreshPluginMounts();
         RefreshModelOptions();
         Settings.Changed += OnSettingsChanged;
         Approvals.Changed += OnApprovalChanged;
+        PluginCatalog.Changed += OnCatalogChanged;
     }
 
     protected override void OnParametersSet()
     {
-        // 切换到另一个聊天室时清空草稿、取消上一轮生成，技能 / 工具也回到默认。
+        // 切换到另一个聊天室时清空草稿、取消上一轮生成；插件状态按会话恢复（不能一律清空）。
         if (_sessionId != Session.Id)
         {
             _sessionId = Session.Id;
@@ -301,6 +325,7 @@
             _copiedMessageId = null;
             _cts?.Cancel();
             _isGenerating = false;
+            ApplyActiveMount(Session.ActiveMountId);
         }
     }
 
@@ -397,6 +422,94 @@
         }
     }
 
+    /// <summary>刷新输入框可用的插件入口（启动、重新扫描后调用）。</summary>
+    private void RefreshPluginMounts() =>
+        _composerMounts = PluginCatalog.Result
+            .UsableMounts(PluginSurface.Composer)
+            .Where(mount => mount.Show)
+            .ToList();
+
+    /// <summary>
+    /// 按组合键恢复插件选择。插件已被删除 / 禁用时退回全局模式，
+    /// 但 <see cref="ChatSession.ActiveMountId"/> 原样保留——重装插件后仍能恢复。
+    /// </summary>
+    private void ApplyActiveMount(string? mountKey)
+    {
+        _activeMountKey = mountKey;
+
+        var mount = string.IsNullOrWhiteSpace(mountKey)
+            ? null
+            : PluginCatalog.Result.FindMount(mountKey);
+
+        if (mount?.Capability is not { } capability)
+        {
+            _activeMount = null;
+            _activePlugin = null;
+            _parameterValues = new Dictionary<string, string>(StringComparer.Ordinal);
+            return;
+        }
+
+        _activeMount = mount;
+        _activePlugin = PluginCatalog.Result.Find(mount.PluginId);
+        _parameterValues = new Dictionary<string, string>(
+            ParameterResolver.Resolve(capability, mount.PluginId, mount.Id, Session.PluginMemory),
+            StringComparer.Ordinal);
+    }
+
+    /// <summary>选中 / 取消插件入口（生成中禁止切换，避免半途换 prompt）。</summary>
+    private async Task SelectMount(string? mountKey)
+    {
+        if (_isGenerating)
+        {
+            return;
+        }
+
+        Session.ActiveMountId = mountKey;
+        ApplyActiveMount(mountKey);
+        StateHasChanged();
+        await PersistSelectionAsync();
+    }
+
+    /// <summary>参数变化：写回内存值 + 会话记忆（重开聊天室仍记得上次选的语言）。</summary>
+    private async Task ChangeParameter((string Key, string Value) change)
+    {
+        if (_activeMount is null)
+        {
+            return;
+        }
+
+        _parameterValues[change.Key] = change.Value;
+        Session.PluginMemory[
+            PluginParameterResolver.MemoryKey(_activeMount.PluginId, _activeMount.Id, change.Key)] = change.Value;
+
+        StateHasChanged();
+        await PersistSelectionAsync();
+    }
+
+    /// <summary>空会话还没落库：选择先留在内存，等首条消息保存时一起写。</summary>
+    private Task PersistSelectionAsync() =>
+        Session.Messages.Count > 0 ? NotifySessionChangedAsync() : Task.CompletedTask;
+
+    private void OnCatalogChanged(object? sender, EventArgs e) =>
+        _ = InvokeAsync(() =>
+        {
+            RefreshPluginMounts();
+            ApplyActiveMount(_activeMountKey);
+            StateHasChanged();
+        });
+
+    /// <summary>助手消息的角色名：插件生成显示「翻译 · SDemo」，普通回答仍是 SDemo。</summary>
+    private string RoleLabel(ChatMessage message)
+    {
+        if (message.Plugin is not { } info)
+        {
+            return message.Role == ChatMessageRole.User ? "你" : "SDemo";
+        }
+
+        var name = PluginCatalog.Result.Find(info.PluginId)?.Name;
+        return string.IsNullOrWhiteSpace(name) ? $"{info.PluginId} · SDemo" : $"{name} · SDemo";
+    }
+
     /// <summary>复制消息纯文本到剪贴板，短暂显示对勾。</summary>
     private async Task CopyMessage(ChatMessage message)
     {
@@ -485,6 +598,18 @@
             return;
         }
 
+        var mount = _activeMount;
+
+        // 插件只吃文本：只带了附件时明确提示，不产生空的 Run。
+        if (mount is not null && string.IsNullOrWhiteSpace(submission.Text))
+        {
+            Session.Messages.Add(new ChatMessage(
+                ChatMessageRole.Assistant,
+                "插件模式需要输入文本；附件不会传给插件。"));
+            await NotifySessionChangedAsync();
+            return;
+        }
+
         await OnSend.InvokeAsync(submission);
         _draft = string.Empty;
         RememberSelection();
@@ -499,7 +624,15 @@
             return;
         }
 
-        await GenerateAsync(option);
+        // 插件模式下发送 = 插件 Run，不是普通对话。
+        if (mount is not null)
+        {
+            await GenerateWithPluginAsync(option, mount, submission.Text);
+        }
+        else
+        {
+            await GenerateAsync(option);
+        }
     }
 
     /// <summary>用 Agent Framework 流式生成回复，边生成边写入会话。</summary>
@@ -517,6 +650,9 @@
             CreatedAt = DateTime.Now
         };
 
+        // 普通推理开始：清空 LastPluginId，侧栏图标回到默认。
+        Session.LastPluginId = null;
+
         Session.Messages.Add(reply);
         _openReasoning.Add(reply.Id);
         StateHasChanged();
@@ -528,14 +664,98 @@
 
         try
         {
-            await foreach (var delta in Agent.StreamAsync(
-                               option.Provider,
-                               option.ModelId,
-                               history,
-                               enabledSkills,
-                               _selectedSkill,
-                               metrics,
-                               cts.Token))
+            await ConsumeAsync(
+                reply,
+                Agent.StreamAsync(
+                    option.Provider,
+                    option.ModelId,
+                    history,
+                    enabledSkills,
+                    _selectedSkill,
+                    metrics,
+                    cts.Token));
+        }
+        finally
+        {
+            ApplyMetrics(reply, metrics, startedAt);
+            _isGenerating = false;
+            _cts = null;
+            await SetGeneratingAsync(false);
+            StateHasChanged();
+            await NotifySessionChangedAsync();
+        }
+    }
+
+    /// <summary>插件 Run：单轮、默认无历史、无全局技能；产物是一条带 Plugin 归属的普通助手消息。</summary>
+    private async Task GenerateWithPluginAsync(ModelOption option, PluginMount mount, string text)
+    {
+        if (mount.Capability is not { } capability)
+        {
+            return;
+        }
+
+        var plugin = _activePlugin ?? PluginCatalog.Result.Find(mount.PluginId);
+        if (plugin is null || !plugin.IsUsable)
+        {
+            Session.Messages.Add(new ChatMessage(
+                ChatMessageRole.Assistant,
+                "这个插件当前不可用（可能被删除、禁用，或能力加载失败），请重新扫描或换一个插件。"));
+            await NotifySessionChangedAsync();
+            return;
+        }
+
+        _isGenerating = true;
+        await SetGeneratingAsync(true);
+
+        using var cts = new CancellationTokenSource();
+        _cts = cts;
+
+        var values = new Dictionary<string, string>(_parameterValues, StringComparer.Ordinal);
+        var metrics = new AgentRunMetrics();
+        var startedAt = Stopwatch.GetTimestamp();
+
+        var reply = new ChatMessage(ChatMessageRole.Assistant, string.Empty)
+        {
+            CreatedAt = DateTime.Now,
+            // 参数快照随消息落库：重开还能看到当时用的是什么语言。
+            Plugin = new PluginMessageInfo(plugin.Id, mount.Id, capability.Id, values, null)
+        };
+
+        Session.Messages.Add(reply);
+        Session.LastPluginId = plugin.Id;
+        _openReasoning.Add(reply.Id);
+        StateHasChanged();
+
+        try
+        {
+            var request = new PluginRunRequest(
+                plugin,
+                mount,
+                values,
+                text,
+                option.Provider,
+                option.ModelId,
+                metrics);
+
+            await ConsumeAsync(reply, PluginRunner.RunComposerAsync(request, cts.Token));
+        }
+        finally
+        {
+            ApplyMetrics(reply, metrics, startedAt);
+            _isGenerating = false;
+            _cts = null;
+            await SetGeneratingAsync(false);
+            StateHasChanged();
+            await NotifySessionChangedAsync();
+        }
+    }
+
+    /// <summary>把流式增量写进消息；取消保留已生成部分，出错追加可读提示。</summary>
+    private async Task ConsumeAsync(ChatMessage reply, IAsyncEnumerable<AgentDelta> stream)
+    {
+        try
+        {
+            await foreach (var delta in stream)
             {
                 if (delta.Text.Length > 0)
                 {
@@ -559,22 +779,17 @@
             var prefix = string.IsNullOrWhiteSpace(reply.Content) ? string.Empty : "\n\n";
             reply.Content += $"{prefix}调用失败：{ex.Message}";
         }
-        finally
+    }
+
+    private static void ApplyMetrics(ChatMessage reply, AgentRunMetrics metrics, long startedAt)
+    {
+        reply.DurationMs = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+        reply.InputTokens = metrics.InputTokens;
+        reply.OutputTokens = metrics.OutputTokens;
+
+        foreach (var pair in metrics.ToolCalls)
         {
-            reply.DurationMs = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
-            reply.InputTokens = metrics.InputTokens;
-            reply.OutputTokens = metrics.OutputTokens;
-
-            foreach (var pair in metrics.ToolCalls)
-            {
-                reply.ToolCalls[pair.Key] = pair.Value;
-            }
-
-            _isGenerating = false;
-            _cts = null;
-            await SetGeneratingAsync(false);
-            StateHasChanged();
-            await NotifySessionChangedAsync();
+            reply.ToolCalls[pair.Key] = pair.Value;
         }
     }
 
@@ -589,6 +804,7 @@
         _disposed = true;
         Settings.Changed -= OnSettingsChanged;
         Approvals.Changed -= OnApprovalChanged;
+        PluginCatalog.Changed -= OnCatalogChanged;
 
         // 组件销毁时若还有待确认的写入，按拒绝处理，避免工具线程一直挂着。
         if (Approvals.Pending is not null)

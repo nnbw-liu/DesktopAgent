@@ -17,6 +17,18 @@ namespace SDemo.DesktopAgent.Services;
 public readonly record struct AgentDelta(string Text, string Reasoning);
 
 /// <summary>
+/// 一次生成所需的全部输入：instructions / messages / tools / metrics。
+/// 普通对话与插件 Run 都走 <see cref="IAgentChatService.RunAsync"/>，避免两套请求组装逻辑漂移。
+/// </summary>
+public sealed record AgentRunPlan(
+    ModelProvider Provider,
+    string ModelId,
+    string Instructions,
+    IReadOnlyList<ChatMessageModel> Messages,
+    IReadOnlySet<AgentSkill> Tools,
+    AgentRunMetrics? Metrics = null);
+
+/// <summary>
 /// 通过 Microsoft Agent Framework 调用模型。只支持标准 OpenAI API，
 /// provider 的 BaseUrl 直接作为 OpenAI 客户端的 Endpoint。
 /// </summary>
@@ -30,6 +42,11 @@ public interface IAgentChatService
         IReadOnlySet<AgentSkill> skills,
         string? skillName = null,
         AgentRunMetrics? metrics = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>按现成的 plan 执行（插件 Run 用这个；普通对话由 <see cref="StreamAsync"/> 组装后调用）。</summary>
+    IAsyncEnumerable<AgentDelta> RunAsync(
+        AgentRunPlan plan,
         CancellationToken cancellationToken = default);
 }
 
@@ -73,10 +90,28 @@ public sealed class AgentChatService : IAgentChatService
         AgentRunMetrics? metrics = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var tools = _toolbox.Create(skills, metrics);
-        var agent = CreateAgent(provider, modelId, tools, BuildInstructions(skillName));
+        var plan = new AgentRunPlan(
+            provider,
+            modelId,
+            BuildInstructions(skillName),
+            history,
+            skills,
+            metrics);
 
-        var messages = history
+        await foreach (var delta in RunAsync(plan, cancellationToken))
+        {
+            yield return delta;
+        }
+    }
+
+    public async IAsyncEnumerable<AgentDelta> RunAsync(
+        AgentRunPlan plan,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var tools = _toolbox.Create(plan.Tools, plan.Metrics);
+        var agent = CreateAgent(plan.Provider, plan.ModelId, tools, plan.Instructions);
+
+        var messages = plan.Messages
             .Where(message => !string.IsNullOrWhiteSpace(message.Content) || message.Attachments.Count > 0)
             .Select(message => new AIChatMessage(
                 message.Role == ChatRoleModel.User ? ChatRole.User : ChatRole.Assistant,
@@ -93,7 +128,7 @@ public sealed class AgentChatService : IAgentChatService
                 switch (content)
                 {
                     case UsageContent { Details: { } usage }:
-                        metrics?.AddUsage(usage);
+                        plan.Metrics?.AddUsage(usage);
                         break;
                     case TextReasoningContent { Text: { Length: > 0 } chain }:
                         reasoning.Append(chain);

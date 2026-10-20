@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
@@ -232,6 +233,12 @@ public sealed class ChatStore
         record.WorkspaceId = session.WorkspaceId;
         record.IsPinned = session.IsPinned;
         record.UpdatedAt = session.UpdatedAt;
+        record.OriginMountId = session.OriginMountId;
+        record.ActiveMountId = session.ActiveMountId;
+        record.LastPluginId = session.LastPluginId;
+        record.PluginMemoryJson = session.PluginMemory.Count == 0
+            ? null
+            : JsonSerializer.Serialize(session.PluginMemory, JsonOptions);
 
         var existing = record.Messages.ToDictionary(message => message.Id, StringComparer.Ordinal);
         var keep = new HashSet<string>(StringComparer.Ordinal);
@@ -264,6 +271,9 @@ public sealed class ChatStore
             messageRecord.ToolCallsJson = message.ToolCalls.Count == 0
                 ? null
                 : JsonSerializer.Serialize(message.ToolCalls, JsonOptions);
+            messageRecord.PluginJson = message.Plugin is null
+                ? null
+                : JsonSerializer.Serialize(message.Plugin, JsonOptions);
             keep.Add(message.Id);
         }
 
@@ -323,9 +333,31 @@ public sealed class ChatStore
     }
 
     /// <summary>
-    /// 轻量迁移：早期版本创建的消息表没有 AttachmentsJson 列，这里自动补上，
-    /// 避免升级后旧库直接报 “no such column”。（表结构大改仍建议改用 EF 迁移。）
+    /// 轻量迁移：老库缺列时自动补上，避免升级后直接报 “no such column”。
+    /// 两张表各自维护列清单——新增列时只加在这里，不要再写「只扫 messages」的旧逻辑。
+    /// （表结构大改仍建议改用 EF 迁移。）
     /// </summary>
+    private static readonly (string Table, (string Name, string Definition)[] Columns)[] RequiredColumns =
+    [
+        ("sessions",
+        [
+            ("OriginMountId", "TEXT NULL"),
+            ("ActiveMountId", "TEXT NULL"),
+            ("LastPluginId", "TEXT NULL"),
+            ("PluginMemoryJson", "TEXT NULL")
+        ]),
+        ("messages",
+        [
+            ("AttachmentsJson", "TEXT NULL"),
+            ("CreatedAt", "TEXT NULL"),
+            ("DurationMs", "INTEGER NOT NULL DEFAULT 0"),
+            ("InputTokens", "INTEGER NOT NULL DEFAULT 0"),
+            ("OutputTokens", "INTEGER NOT NULL DEFAULT 0"),
+            ("ToolCallsJson", "TEXT NULL"),
+            ("PluginJson", "TEXT NULL")
+        ])
+    ];
+
     private static async Task UpgradeSchemaAsync(ChatDbContext db, CancellationToken cancellationToken)
     {
         var connection = db.Database.GetDbConnection();
@@ -333,59 +365,69 @@ public sealed class ChatStore
 
         try
         {
-            var columns = new List<string>();
-
-            await using (var command = connection.CreateCommand())
+            foreach (var (table, columns) in RequiredColumns)
             {
-                command.CommandText = "SELECT name FROM pragma_table_info('messages')";
-
-                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-                while (await reader.ReadAsync(cancellationToken))
-                {
-                    columns.Add(reader.GetString(0));
-                }
-            }
-
-            // 表还不存在（空库 / 损坏库）时不在这里硬改，交给后续操作报明确错误。
-            if (columns.Count == 0)
-            {
-                return;
-            }
-
-            var requiredColumns = new (string Name, string Definition)[]
-            {
-                ("AttachmentsJson", "TEXT NULL"),
-                ("CreatedAt", "TEXT NULL"),
-                ("DurationMs", "INTEGER NOT NULL DEFAULT 0"),
-                ("InputTokens", "INTEGER NOT NULL DEFAULT 0"),
-                ("OutputTokens", "INTEGER NOT NULL DEFAULT 0"),
-                ("ToolCallsJson", "TEXT NULL")
-            };
-
-            foreach (var column in requiredColumns)
-            {
-                if (columns.Contains(column.Name, StringComparer.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    await using var alter = connection.CreateCommand();
-                    alter.CommandText = $"ALTER TABLE messages ADD COLUMN {column.Name} {column.Definition}";
-                    await alter.ExecuteNonQueryAsync(cancellationToken);
-                    columns.Add(column.Name);
-                }
-                catch (SqliteException ex) when (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
-                {
-                    // 另一个进程刚好也补过这一列，忽略。
-                }
+                await EnsureColumnsAsync(connection, table, columns, cancellationToken);
             }
         }
         finally
         {
             await db.Database.CloseConnectionAsync();
         }
+    }
+
+    private static async Task EnsureColumnsAsync(
+        DbConnection connection,
+        string table,
+        IReadOnlyList<(string Name, string Definition)> requiredColumns,
+        CancellationToken cancellationToken)
+    {
+        var existing = await ReadColumnsAsync(connection, table, cancellationToken);
+
+        // 表还不存在（空库 / 损坏库）时不在这里硬改，交给后续操作报明确错误。
+        if (existing.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var column in requiredColumns)
+        {
+            if (existing.Contains(column.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            try
+            {
+                await using var alter = connection.CreateCommand();
+                alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column.Name} {column.Definition}";
+                await alter.ExecuteNonQueryAsync(cancellationToken);
+                existing.Add(column.Name);
+            }
+            catch (SqliteException ex) when (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
+            {
+                // 另一个进程刚好也补过这一列，忽略。
+            }
+        }
+    }
+
+    private static async Task<List<string>> ReadColumnsAsync(
+        DbConnection connection,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        var columns = new List<string>();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT name FROM pragma_table_info('{table}')";
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            columns.Add(reader.GetString(0));
+        }
+
+        return columns;
     }
 
     private static List<ChatAttachment> DeserializeAttachments(string? json)
@@ -423,6 +465,44 @@ public sealed class ChatStore
         }
     }
 
+    private static Dictionary<string, string> DeserializePluginMemory(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+
+        try
+        {
+            var memory = JsonSerializer.Deserialize<Dictionary<string, string>>(json, JsonOptions);
+            return memory is null
+                ? new Dictionary<string, string>(StringComparer.Ordinal)
+                : new Dictionary<string, string>(memory, StringComparer.Ordinal);
+        }
+        catch (JsonException)
+        {
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+    }
+
+    private static PluginMessageInfo? DeserializePlugin(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<PluginMessageInfo>(json, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            // 历史数据的插件归属读不出来时降级成普通消息，不影响会话打开。
+            return null;
+        }
+    }
+
     private static ChatSession ToSession(SessionRecord record, string? workspaceId) => new()
     {
         Id = record.Id,
@@ -431,6 +511,10 @@ public sealed class ChatStore
         WorkspaceId = workspaceId ?? record.WorkspaceId,
         IsPinned = record.IsPinned,
         UpdatedAt = record.UpdatedAt,
+        OriginMountId = record.OriginMountId,
+        ActiveMountId = record.ActiveMountId,
+        LastPluginId = record.LastPluginId,
+        PluginMemory = DeserializePluginMemory(record.PluginMemoryJson),
         Messages = record.Messages
             .OrderBy(message => message.Order)
             .Select(message => new ChatMessage(message.Role, message.Content)
@@ -442,7 +526,8 @@ public sealed class ChatStore
                 DurationMs = message.DurationMs,
                 InputTokens = message.InputTokens,
                 OutputTokens = message.OutputTokens,
-                ToolCalls = DeserializeToolCalls(message.ToolCallsJson)
+                ToolCalls = DeserializeToolCalls(message.ToolCallsJson),
+                Plugin = DeserializePlugin(message.PluginJson)
             })
             .ToList()
     };

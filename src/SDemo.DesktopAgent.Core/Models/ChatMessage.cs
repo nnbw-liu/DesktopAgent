@@ -37,5 +37,8 @@ public sealed class ChatMessage(ChatMessageRole role, string content)
     /// <summary>本次生成里各工具的调用次数，例如 web_search → 2。</summary>
     public Dictionary<string, int> ToolCalls { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>本轮由哪个插件生成；普通对话为 null。持久化到 PluginJson。</summary>
+    public PluginMessageInfo? Plugin { get; set; }
+
     public int TotalTokens => InputTokens + OutputTokens;
 }

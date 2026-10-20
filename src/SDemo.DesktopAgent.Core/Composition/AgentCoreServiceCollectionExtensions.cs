@@ -21,6 +21,9 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<ChatStore>();
         services.AddSingleton<SkillCatalog>();
         services.AddSingleton<PluginCatalog>();
+        services.AddSingleton<PluginPromptComposer>();
+        services.AddSingleton<PluginParameterResolver>();
+        services.AddSingleton<IPluginRunner, PluginRunner>();
         services.AddSingleton<AgentToolbox>();
         services.AddSingleton<IAgentChatService, AgentChatService>();
 
