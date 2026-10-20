@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <!-- Razor 类库：WPF 与 MAUI 两个宿主共用同一套组件与 wwwroot 资源。
+         静态资源通过 _content/SDemo.DesktopAgent.UI/... 访问。 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SDemo.DesktopAgent</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent.UI</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 用 Package 而不是 FrameworkReference：MAUI 的 Android / iOS 目标没有 ASP.NET Core 共享框架，
+         只有走 NuGet 的组件程序集才能在两个宿主上都还原成功。 -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SDemo.DesktopAgent.Core\SDemo.DesktopAgent.Core.csproj" />
+  </ItemGroup>
+
+</Project>

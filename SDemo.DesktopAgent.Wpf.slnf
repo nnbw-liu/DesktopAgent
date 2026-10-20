@@ -1,0 +1,10 @@
+{
+  "solution": {
+    "path": "SDemo.DesktopAgent.sln",
+    "projects": [
+      "src\\SDemo.DesktopAgent.Core\\SDemo.DesktopAgent.Core.csproj",
+      "src\\SDemo.DesktopAgent.UI\\SDemo.DesktopAgent.UI.csproj",
+      "src\\SDemo.DesktopAgent\\SDemo.DesktopAgent.csproj"
+    ]
+  }
+}

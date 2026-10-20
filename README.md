@@ -1,13 +1,19 @@
 # SDemo.DesktopAgent
 
-Blazor Hybrid + WPF 桌面应用骨架（.NET 10 / WebView2）。
+Blazor Hybrid 多宿主应用：**一套 Razor 组件 + 一套业务服务**，同时挂在 **WPF** 与 **.NET MAUI**（Windows / Android）两个外壳里。
 
-- 命名空间 / 程序集：`SDemo.DesktopAgent`
-- 目标框架：`net10.0-windows10.0.19041.0`（Windows 10 2004 及以上）
-- 界面：Razor 组件渲染在 `BlazorWebView` 中，窗口外壳（标题栏、状态栏）由 WPF 绘制
-- 主题：跟随 Windows「应用模式」（浅色 / 深色），也可在设置里固定浅色 / 深色；WPF 与 Blazor 同步切换
+| 工程 | 目标框架 | 作用 |
+| --- | --- | --- |
+| `SDemo.DesktopAgent.Core` | `net10.0` | 模型、服务、平台接口；不含任何 UI / 平台 API |
+| `SDemo.DesktopAgent.UI` | `net10.0`（Razor 类库） | 所有 `.razor` 组件 + `wwwroot`（css / js） |
+| `SDemo.DesktopAgent` | `net10.0-windows10.0.19041.0` | WPF 宿主：自绘标题栏、托盘、DPAPI、注册表主题 |
+| `SDemo.DesktopAgent.Maui` | `net10.0-windows10.0.19041.0`（默认）/ `net10.0-android`（`EnableAndroidTarget=true` 时） | MAUI 宿主：Windows 与 Android 共用同一套界面 |
+
+- 命名空间统一为 `SDemo.DesktopAgent.*`，两个宿主引用同一批组件，`@inject`、组件名、CSS 类都不需要分叉
+- 平台差异收敛到 5 个接口：`IAppPaths`、`ISecureStore`、`ISystemThemeProvider`、`IFolderPickerService`、`IAppEnvironmentService`
+- 主题：跟随系统（WPF 读注册表 / MAUI 读 `RequestedTheme`），也可固定浅色 / 深色；WPF 侧同步替换资源字典
 - 模型接入：Microsoft Agent Framework（`Microsoft.Agents.AI` 1.25.0），OpenAI 兼容协议，流式输出
-- 依赖注入：WPF 与 Blazor 共享同一个 `IServiceProvider`
+- 依赖注入：Core 提供 `AddDesktopAgentCore()`，各宿主再补齐平台实现；Blazor 组件与外壳共享同一个容器
 
 ## 布局
 
@@ -39,82 +45,110 @@ Blazor Hybrid + WPF 桌面应用骨架（.NET 10 / WebView2）。
 ```
 DesktopAgent/
 ├─ SDemo.DesktopAgent.sln
+├─ SDemo.DesktopAgent.Wpf.slnf          # 只含桌面端三个工程，没装 MAUI workload 也能构建
 └─ src/
-   └─ SDemo.DesktopAgent/
-      ├─ App.xaml / App.xaml.cs              # 入口：DI 容器、主题初始化、WebView2 运行时检查
-      ├─ MainWindow.xaml / .xaml.cs          # 自绘标题栏 + BlazorWebView + 状态栏
-      ├─ app.manifest                        # DPI 感知、支持的操作系统
-      ├─ _Imports.razor                      # Razor 全局 using
-      ├─ Components/
-      │  ├─ AppShell.razor                   # 根组件：布局、视图切换（聊天 / 设置）、主题同步
-      │  ├─ Sidebar/
-      │  │  ├─ Sidebar.razor                 # 侧栏三段式结构 + 新建 / 打开会话 / 设置回调
-      │  │  └─ SidebarSection.razor          # 可收起 / 展开的分组列表
-      │  ├─ Chat/
-      │  │  ├─ ChatRoom.razor                # 聊天室：空态与有记录共用 + 流式生成
-      │  │  └─ ChatComposer.razor            # 组合输入框：Header / 多行输入 / Skills + 发送
-      │  └─ Settings/
-      │     ├─ SettingsView.razor            # 设置页骨架：通用 / 模型 / 工具
-      │     ├─ GeneralSettings.razor         # 外观、语言、版本信息
-      │     ├─ ModelSettings.razor           # 提供商列表 + 底部固定的「添加模型提供商」
-      │     ├─ ProviderEditor.razor          # 添加/编辑表单：Id / 名称 / 地址 / Key / 模型目录
-      │     ├─ ToolsSettings.razor           # 联网搜索后端、文件写入确认
-      │     └─ SettingsSection.cs            # 设置分区枚举
-      ├─ Models/
-      │  ├─ ChatMessage.cs                   # 消息模型（角色 + 内容 + 附件）
-      │  ├─ ChatAttachment.cs                # 附件模型（名称 / 路径 / 大小）
-      │  ├─ ComposerSubmission.cs            # 输入框提交（文本 + 附件）
-      │  ├─ ChatSession.cs                   # 会话模型（标题、时间、消息列表）
-      │  ├─ AppSettings.cs                   # 设置根对象（主题 / 语言 / 提供商）
-      │  └─ ModelProvider.cs                 # 模型提供商与模型目录
-      ├─ Data/
-      │  └─ ChatDbContext.cs                 # SQLite + EF Core：sessions / messages
-      ├─ Services/
-      │  ├─ IAppEnvironmentService.cs        # 应用 / 运行环境信息（含 WebView2 版本）
-      │  ├─ AppEnvironmentService.cs
-      │  ├─ ISettingsService.cs              # 设置读写（%APPDATA%\SDemo\DesktopAgent\settings.json）
-      │  ├─ SettingsService.cs
-      │  ├─ ChatStore.cs                     # 会话落库：按工作区 / 历史聊天分 SQLite 文件
-      │  ├─ SkillCatalog.cs                  # 技能库：读取 skills\*.md（含 frontmatter）
-      │  ├─ AttachmentStore.cs               # 上传附件落盘到 AppData\uploads
-      │  ├─ IThemeService.cs                 # 主题来源 + 外观偏好（System / Light / Dark）
-      │  ├─ ThemeService.cs
-      │  ├─ ModelCatalogService.cs           # GET {baseUrl}/models 读取模型目录
-      │  ├─ AgentChatService.cs              # Agent Framework 流式调用（OpenAI 兼容）
-      │  ├─ MarkdownRenderer.cs              # Markdig：模型 Markdown → 安全 HTML
-      │  └─ TrayIconService.cs               # 系统托盘（NotifyIcon：显示 / 退出）
-      ├─ Theme/
-      │  └─ ThemeResources.cs                # 运行时替换 WPF 主题资源字典
-      ├─ Themes/
-      │  ├─ Dark.xaml                        # 深色 WPF 画笔
-      │  ├─ Light.xaml                       # 浅色 WPF 画笔
-      │  └─ Chrome.xaml                      # 标题栏按钮等与主题无关的样式
-      └─ wwwroot/
-         ├─ index.html                       # BlazorWebView 宿主页面
-         ├─ css/app.css                      # 界面样式（含深/浅色变量、Markdown 样式）
-         └─ js/
-            ├─ theme.js                      # 供 .NET 调用：切换 data-theme
-            ├─ chat.js                       # 消息区滚到底部
-            └─ composer.js                   # 输入框键盘约定（Enter 发送 / Shift、Ctrl+Enter 换行）
+   ├─ SDemo.DesktopAgent.Core/                   # 平台无关：模型 + 服务 + 接口
+   │  ├─ Models/                                 # 会话 / 消息 / 附件 / 设置 / 工作区
+   │  ├─ Data/ChatDbContext.cs                   # SQLite + EF Core：sessions / messages
+   │  ├─ Abstractions/                           # IAppPaths / ISecureStore / ISystemThemeProvider / IFolderPickerService
+   │  ├─ Services/                               # ChatStore、SettingsService、SkillCatalog、AgentChatService…
+   │  │  └─ ByteSize.cs                          # 文件大小文案（Core 与 UI 共用）
+   │  └─ Composition/AgentCoreServiceCollectionExtensions.cs   # AddDesktopAgentCore()
+   ├─ SDemo.DesktopAgent.UI/                     # Razor 类库：两个宿主共用的界面
+   │  ├─ _Imports.razor
+   │  ├─ Components/                             # AppShell / Sidebar / Chat / Settings
+   │  ├─ Services/AttachmentStore.cs             # IBrowserFile → 落盘（依赖 Blazor 类型，放这里）
+   │  └─ wwwroot/                                # css/app.css、js/*.js（经 _content/ 访问）
+   ├─ SDemo.DesktopAgent/                        # WPF 宿主
+   │  ├─ App.xaml / App.xaml.cs                  # DI 组装、WebView2 检查、主题初始化
+   │  ├─ MainWindow.xaml / .xaml.cs              # 自绘标题栏 + BlazorWebView + 状态栏
+   │  ├─ Services/WindowsAppPaths.cs             # %APPDATA%\SDemo\DesktopAgent
+   │  ├─ Services/DpapiSecureStore.cs            # DPAPI 加密 API Key
+   │  ├─ Services/RegistrySystemThemeProvider.cs # 读「应用模式」注册表
+   │  ├─ Services/FolderPickerService.cs         # OpenFolderDialog（延迟到下一轮消息循环）
+   │  ├─ Services/WebView2EnvironmentService.cs  # 运行环境信息 + WebView2 版本
+   │  ├─ Services/TrayIconService.cs             # 托盘：显示 / 退出
+   │  ├─ Theme/ + Themes/                        # WPF 主题资源字典
+   │  └─ wwwroot/index.html                      # 引用 _content/SDemo.DesktopAgent.UI/…
+   └─ SDemo.DesktopAgent.Maui/                   # MAUI 宿主（Windows / Android）
+      ├─ MauiProgram.cs                          # AddMauiBlazorWebView + 平台实现
+      ├─ App.xaml / MainPage.xaml                # BlazorWebView 挂同一个 AppShell
+      ├─ Services/MauiAppPaths.cs                # Windows 与 WPF 共用目录；Android 用 AppDataDirectory
+      ├─ Services/MauiSecureStore.cs             # Windows: DPAPI；Android: AES-GCM
+      ├─ Services/MauiFolderPickerService.cs     # Windows: FolderPicker；Android: 返回 null
+      ├─ Services/MauiSystemThemeProvider.cs     # RequestedTheme → 浅色 / 深色
+      ├─ Platforms/Android|Windows/              # MainActivity / MauiWinUIApplication
+      ├─ Resources/                              # 图标、启动图
+      └─ wwwroot/index.html
 ```
 
 ## 运行
+
+WPF 宿主（主入口，免安装 exe 形态）：
 
 ```powershell
 dotnet run --project src/SDemo.DesktopAgent
 ```
 
-或用 Visual Studio 打开 `SDemo.DesktopAgent.sln`，把 `SDemo.DesktopAgent` 设为启动项目后 F5。
+MAUI 宿主（默认**只构建 Windows**，`TargetFrameworks` 里只有 `net10.0-windows10.0.19041.0`）：
 
-> 需要机器上已安装 **Microsoft Edge WebView2 Runtime**（Win10/11 通常已预装）。
-> 未安装时应用会弹提示并退出，下载地址：https://developer.microsoft.com/microsoft-edge/webview2/
+```powershell
+dotnet run --project src/SDemo.DesktopAgent.Maui        # 需要 maui-windows workload
+dotnet build src/SDemo.DesktopAgent.Maui -f net10.0-windows10.0.19041.0
+```
 
-调试时如果不方便改系统主题，可以用环境变量强制预览：
+Android 目标是**按需打开**的（`EnableAndroidTarget`，默认关闭）。没有 JDK 17 + Android SDK 时不要打开，
+否则 restore 会因为 android workload / SDK 缺失直接失败，连 Windows 也一起调试不了：
+
+```powershell
+# 需要 Android 时：先装好 JDK 17 + Android SDK，再显式打开目标
+dotnet build src/SDemo.DesktopAgent.Maui -p:EnableAndroidTarget=true -f net10.0-android
+```
+
+只构建桌面端（没有 MAUI workload 时用这个）：
+
+```powershell
+dotnet build SDemo.DesktopAgent.Wpf.slnf
+```
+
+或者用 Visual Studio 打开 `SDemo.DesktopAgent.sln`，把 `SDemo.DesktopAgent`（WPF）或 `SDemo.DesktopAgent.Maui` 设为启动项目后 F5。
+MAUI 宿主的调试目标选 **Windows Machine**（`Properties/launchSettings.json` 里只提供这一个 profile）；
+工具栏里的 Android 设备 / 模拟器项只有在 `EnableAndroidTarget=true` 后才会出现。
+
+> **为什么默认不把 net10.0-android 放进 `TargetFrameworks`**：NuGet restore 会对列表里**每一个** TFM 做 workload 校验，
+> 只要列表里有 android，即使 F5 的目标是 Windows，还原阶段也会因为缺 android workload / Android SDK 报错
+> （典型提示：`NETSDK1147: 要构建此项目，必须安装以下工作负载: android`，或 `XA5300: Android SDK 未找到`），
+> 整个启动直接失败。只在真正要出 Android 包时再打开这个开关。
+
+> 需要机器上已安装 **Microsoft Edge WebView2 Runtime**（Win10/11 通常已预装；两个宿主共用）。
+> 未安装时 WPF 端会弹提示并退出，下载地址：https://developer.microsoft.com/microsoft-edge/webview2/
+
+调试时如果不方便改系统主题，可以用环境变量强制预览（WPF 宿主）：
 
 ```powershell
 $env:SDEMO_FORCED_THEME = 'light'   # 或 dark；仅 Debug 构建生效
 dotnet run --project src/SDemo.DesktopAgent
 ```
+
+两个宿主同时运行时，用 `SDEMO_DATA_ROOT` 隔离数据，避免抢同一个 SQLite：
+
+```powershell
+$env:SDEMO_DATA_ROOT = "$env:TEMP\sdemo-sandbox"      # 设置 / 会话 / 上传都落到这里
+$env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
+```
+
+## 多宿主
+
+- **界面**：`SDemo.DesktopAgent.UI` 里的组件和 `wwwroot` 由两个宿主共同引用；`index.html` 各自保留一份，
+  通过 `_content/SDemo.DesktopAgent.UI/...` 访问共享的 css / js。
+- **服务**：`AddDesktopAgentCore()` 注册所有平台无关服务，宿主只补 5 个平台实现（见上表）。
+- **数据（Windows）**：MAUI 宿主的 `MauiAppPaths` 刻意指向 `%APPDATA%\SDemo\DesktopAgent`，和 WPF 端共用
+  `settings.json`、会话库与附件；API Key 两边都用 DPAPI，密文可以互相解开。
+  ⚠️ 两个进程**同时**写同一个 SQLite 仍可能锁库，正式使用建议只开一个，或用 `SDEMO_DATA_ROOT` 分开。
+- **Android**：数据落在应用私有目录；`IFolderPickerService` 返回 `null`（系统没有「选文件夹」UI），
+  工作区退化为 `AppDataDirectory/workspace`；API Key 用 AES-GCM + 应用私有密钥文件。
+- **窗口外壳**：WPF 的自绘标题栏 / 托盘 / `WM_GETMINMAXINFO` 只属于 WPF 宿主；MAUI 宿主用平台默认窗口，
+  移动端没有标题栏。Blazor 组件里**不要**假设存在标题栏或托盘。
 
 ## 聊天室与输入框
 
@@ -170,6 +204,9 @@ dotnet run --project src/SDemo.DesktopAgent
 | 设置（主题 / 提供商 / 工作区列表 / 搜索 / 写入确认） | `%APPDATA%\SDemo\DesktopAgent\settings.json` | `System.Text.Json`；API Key 用 DPAPI 加密 |
 | 历史聊天（不归属工作区） | `%APPDATA%\SDemo\DesktopAgent\chats\history.db` | SQLite + EF Core |
 | 每个工作区的聊天 | `%APPDATA%\SDemo\DesktopAgent\chats\workspaces\{workspaceId}.db` | 一个工作区一个库 |
+
+> 上表是 Windows 宿主的位置（WPF 与 MAUI-Windows 共用）。Android 宿主把根目录换成
+> `FileSystem.AppDataDirectory`，API Key 改用 AES-GCM（应用私有密钥文件），其余结构一致。
 
 - 两个表：`sessions`（Id / Title / Meta / WorkspaceId / IsPinned / UpdatedAt）和 `messages`（Id / SessionId / Order / Role / Content / Reasoning / AttachmentsJson / CreatedAt / DurationMs / InputTokens / OutputTokens / ToolCallsJson）；删除会话级联删除消息。附件文件本身在 `%APPDATA%\SDemo\DesktopAgent\uploads\{sessionId}\`，数据库只存路径与元信息。
 - 新建聊天室在发出第一条消息前不落库；首条消息写入时在对应库创建会话。
@@ -324,12 +361,12 @@ version: 1.0
 
 **设置**：新增设置项时加到 `AppSettings`，界面改动后调用 `ISettingsService.Save()`；需要跨组件即时生效的用 `SettingsService.Changed` 事件（聊天页的模型下拉就是这么刷新的）。
 
-**新增服务**：`Services/` 下定义接口与实现，在 `App.xaml.cs` 的 `CreateServiceProvider()` 中注册；Razor 组件用 `@inject` 取用，WPF 侧通过构造函数注入。
+**新增服务**：平台无关的放 `SDemo.DesktopAgent.Core/Services`，在 `AgentCoreServiceCollectionExtensions.AddDesktopAgentCore()` 里注册；带平台 API 的先在 `Core/Abstractions` 定义接口，再在 WPF / MAUI 两个宿主各写一份实现并注册。Razor 组件用 `@inject` 取用，外壳通过构造函数注入。
 
-**WPF ↔ Blazor 互操作**：
+**宿主 ↔ Blazor 互操作**：
 - Blazor → .NET：直接注入服务调用（主题同步就是例子）。
 - .NET → Blazor：共享服务 + 事件，组件里用 `InvokeAsync` 切回渲染器线程。
-- JS 互操作：脚本放 `wwwroot/js/`，用 `IJSRuntime` 调用。
+- JS 互操作：脚本放 `SDemo.DesktopAgent.UI/wwwroot/js/`，用 `IJSRuntime` 调用；`index.html` 里必须用 `_content/SDemo.DesktopAgent.UI/...` 引用。
 
 ## 已知注意事项
 
@@ -346,3 +383,21 @@ version: 1.0
 - 设置里的 API Key 用 Windows DPAPI 加密，仅当前用户可解密；换用户/换机器需要重新填写。
 - **不要在 WebView2 的事件回调里同步弹模态对话框**（`ShowDialog`）：会跑嵌套消息循环并重入 WebView2，触发 `EmbeddedBrowserWebView.dll` 的原生断言（0x80000003）直接闪退。`FolderPickerService` 用 `Dispatcher.BeginInvoke` 把对话框推迟到下一轮消息循环再打开。
 - 自定义搜索接口按 `Authorization: Bearer <key>` + `{"query":…, "top_k":5}` 调用；如果服务端返回 HTTP 200 但 `ResponseMetadata.Error`（例如 `invalid_api_key`），UI 会原样显示错误，需要换成该服务自己的 Key。
+- **MAUI 宿主需要 workload**：只调 Windows 时装 `dotnet workload install maui-windows` 即可；要出 Android 包再加 `maui-android`
+  （并把 `EnableAndroidTarget` 打开）。别直接装 `maui`——它会顺带拉 iOS / MacCatalyst 的运行时包（几个 GB，Windows 上还用不到）。Android 目标还需要 JDK 17 与 Android SDK：
+
+  ```powershell
+  # 首次准备 Android SDK / JDK（之后构建要加 -p:EnableAndroidTarget=true）
+  dotnet build src/SDemo.DesktopAgent.Maui -p:EnableAndroidTarget=true -f net10.0-android `
+    -t:InstallAndroidDependencies `
+    -p:AndroidSdkDirectory="$env:LOCALAPPDATA\Android\Sdk" `
+    -p:JavaSdkDirectory="$env:LOCALAPPDATA\Android\jdk" `
+    -p:AcceptAndroidSDKLicenses=true
+  ```
+
+- **VS 里的 MAUI 启动目标**：`Properties/launchSettings.json` 只暴露 `Windows Machine`，F5 不会再让你误选 Android 模拟器；
+  如果 VS 的工具栏仍然显示 Android 目标，说明工程里 `TargetFrameworks` 又带上了 `net10.0-android`（检查 `EnableAndroidTarget` 是否被 env/命令行打开）。
+
+- **两端共用数据时注意锁库**：WPF 与 MAUI-Windows 指向同一个 `%APPDATA%\SDemo\DesktopAgent`，两个进程同时写同一个会话库会 `database is locked`；并行调试用 `SDEMO_DATA_ROOT` 隔离。
+- **Android 的能力降级**：没有托盘、没有「选文件夹」对话框（`IFolderPickerService` 返回 `null`，工作区固定为应用私有目录）、没有自绘标题栏；窄屏（≤760px）下侧栏改为顶部的可滚动面板（`app.css` 末尾）。
+- MAUI 的 `BlazorWebView` 在 Windows 上同样用 WebView2，所以 `_content/` 静态资源、CSS、JS 与 WPF 端完全一致；Android 换成系统 WebView，`env(safe-area-inset-*)` 依赖 `viewport-fit=cover`（`Maui/wwwroot/index.html` 已设置）。

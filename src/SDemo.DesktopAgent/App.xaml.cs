@@ -84,6 +84,7 @@ public partial class App : Application
 
     /// <summary>
     /// 组装应用级 DI 容器。WPF 与 Blazor 组件共享同一个容器实例。
+    /// 平台无关的服务来自 Core，这里只补 WPF 侧实现。
     /// </summary>
     private static ServiceProvider CreateServiceProvider()
     {
@@ -92,20 +93,16 @@ public partial class App : Application
         // Blazor Hybrid 必需：注册 BlazorWebView 相关服务。
         services.AddWpfBlazorWebView();
 
-        // 应用服务注册区。
-        services.AddSingleton<IAppEnvironmentService, AppEnvironmentService>();
-        services.AddSingleton<ISettingsService, SettingsService>();
-        services.AddSingleton<IThemeService, ThemeService>();
-        services.AddSingleton<IModelCatalogService, ModelCatalogService>();
-        services.AddSingleton<ISearchService, SearchService>();
-        services.AddSingleton<FileWriteApprovalService>();
-        services.AddSingleton<WorkspaceContext>();
+        // 平台实现（WPF / Windows）。
+        services.AddSingleton<IAppPaths, WindowsAppPaths>();
+        services.AddSingleton<ISecureStore, DpapiSecureStore>();
+        services.AddSingleton<ISystemThemeProvider, RegistrySystemThemeProvider>();
+        services.AddSingleton<IAppEnvironmentService, WebView2EnvironmentService>();
         services.AddSingleton<IFolderPickerService, FolderPickerService>();
-        services.AddSingleton<ChatStore>();
-        services.AddSingleton<SkillCatalog>();
         services.AddSingleton<AttachmentStore>();
-        services.AddSingleton<AgentToolbox>();
-        services.AddSingleton<IAgentChatService, AgentChatService>();
+
+        // 平台无关：设置、主题、模型、会话、技能、Agent。
+        services.AddDesktopAgentCore();
 
         // WPF 窗口。
         services.AddSingleton<MainWindow>();

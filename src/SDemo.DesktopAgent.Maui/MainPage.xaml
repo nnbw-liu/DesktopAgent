@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:components="clr-namespace:SDemo.DesktopAgent.Components;assembly=SDemo.DesktopAgent.UI"
+             x:Class="SDemo.DesktopAgent.Maui.MainPage"
+             BackgroundColor="{AppThemeBinding Light=#F6F7F9, Dark=#0B0D12}">
+
+    <!-- 和 WPF 端挂的是同一个共享根组件 AppShell -->
+    <BlazorWebView HostPage="wwwroot/index.html">
+        <BlazorWebView.RootComponents>
+            <RootComponent Selector="#app" ComponentType="{x:Type components:AppShell}" />
+        </BlazorWebView.RootComponents>
+    </BlazorWebView>
+</ContentPage>

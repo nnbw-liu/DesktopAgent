@@ -32,13 +32,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.110" />
-    <!-- Agent 运行时：Microsoft Agent Framework（OpenAI 兼容 provider） -->
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.25.0" />
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.25.0" />
-    <!-- Markdown 渲染：CommonMark + GFM 表格 / 任务列表 / 自动链接等扩展 -->
-    <PackageReference Include="Markdig" Version="1.4.0" />
-    <!-- 会话持久化：一个工作区一个 SQLite 文件，历史聊天一个文件 -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 界面与服务都来自共享工程，本工程只保留 WPF 宿主（窗口、托盘、主题资源、平台实现） -->
+    <ProjectReference Include="..\SDemo.DesktopAgent.Core\SDemo.DesktopAgent.Core.csproj" />
+    <ProjectReference Include="..\SDemo.DesktopAgent.UI\SDemo.DesktopAgent.UI.csproj" />
   </ItemGroup>
 
 </Project>
