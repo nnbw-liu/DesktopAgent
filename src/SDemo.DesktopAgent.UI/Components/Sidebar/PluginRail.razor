@@ -1,0 +1,89 @@
+@using SDemo.DesktopAgent.Plugins
+@using SDemo.DesktopAgent.Components.Sidebar
+
+@* 侧栏插件入口区：条目 = 图标 + 名称；数量超过上限时收进「更多插件」。
+   无插件时整块不渲染（不留空区域）。 *@
+@if (Entries.Count > 0)
+{
+    <div class="plugin-rail" role="group" aria-label="插件入口">
+        @foreach (var entry in VisibleEntries)
+        {
+            <button type="button"
+                    class="sidebar-item plugin-rail-item"
+                    title="用「@entry.Plugin.Name」新建聊天室"
+                    @onclick="() => StartChat(entry)">
+                <span class="item-icon plugin-rail-icon">
+                    <PluginIcon Plugin="entry.Plugin" />
+                </span>
+                <span class="item-text">
+                    <span class="item-title">@entry.Plugin.Name</span>
+                </span>
+            </button>
+        }
+
+        @if (HasMore)
+        {
+            <div class="item-row plugin-rail-more">
+                <button type="button"
+                        class="item-main"
+                        title="更多插件"
+                        aria-expanded="@(_moreOpen ? "true" : "false")"
+                        @onclick="ToggleMore">
+                    <span class="item-icon plugin-rail-icon">
+                        <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+                            <circle cx="3.4" cy="8" r="1.2" fill="currentColor" />
+                            <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+                            <circle cx="12.6" cy="8" r="1.2" fill="currentColor" />
+                        </svg>
+                    </span>
+                    <span class="item-text">
+                        <span class="item-title">更多插件</span>
+                    </span>
+                </button>
+
+                @if (_moreOpen)
+                {
+                    <div class="item-menu">
+                        @foreach (var entry in HiddenEntries)
+                        {
+                            <button type="button"
+                                    class="item-menu-entry"
+                                    title="用「@entry.Plugin.Name」新建聊天室"
+                                    @onclick="() => StartChat(entry)">
+                                @entry.Plugin.Name
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>侧栏最多直接显示 6 个插件入口（M4 会改成设置项）。</summary>
+    private const int MaxInRail = 6;
+
+    [Parameter]
+    public IReadOnlyList<PluginRailEntry> Entries { get; set; } = [];
+
+    /// <summary>点条目：新建一个预选该插件的空会话（由 AppShell 走 StartNewChat）。</summary>
+    [Parameter]
+    public EventCallback<PluginRailEntry> OnStartPluginChat { get; set; }
+
+    private bool _moreOpen;
+
+    private IEnumerable<PluginRailEntry> VisibleEntries => Entries.Take(MaxInRail);
+
+    private IEnumerable<PluginRailEntry> HiddenEntries => Entries.Skip(MaxInRail);
+
+    private bool HasMore => Entries.Count > MaxInRail;
+
+    private void ToggleMore() => _moreOpen = !_moreOpen;
+
+    private async Task StartChat(PluginRailEntry entry)
+    {
+        _moreOpen = false;
+        await OnStartPluginChat.InvokeAsync(entry);
+    }
+}

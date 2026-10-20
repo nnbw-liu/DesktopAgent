@@ -531,6 +531,34 @@ public sealed class PluginCatalogTests
     }
 
     [Fact]
+    public void 侧栏入口按surface筛出_能力坏掉就一起不可用()
+    {
+        using var temp = new TempPlugins();
+        var manifest = """
+            {
+              "id": "demo",
+              "name": "演示",
+              "capabilities": [ { "id": "main", "name": "演示", "skill": "skills/main.md" } ],
+              "mounts": [
+                { "id": "sidebar", "surface": "sidebar", "capability": "main" },
+                { "id": "composer", "surface": "composer", "capability": "main" },
+                { "id": "bubble", "surface": "message", "capability": "main" }
+              ]
+            }
+            """;
+        temp.WriteLocal("demo", manifest, ("skills/main.md", Fixtures.Skill));
+
+        var ok = temp.Scan();
+        Assert.Single(ok.UsableMounts(PluginSurface.Sidebar));
+        Assert.Equal("demo/sidebar", ok.UsableMounts(PluginSurface.Sidebar)[0].Key);
+
+        // skill 坏掉后，同一个入口也跟着失效（侧栏不会留一个点了没反应的按钮）。
+        using var broken = new TempPlugins();
+        broken.WriteLocal("demo", manifest.Replace("skills/main.md", "skills/missing.md"));
+        Assert.Empty(broken.Scan().UsableMounts(PluginSurface.Sidebar));
+    }
+
+    [Fact]
     public void 内置与本地按来源排序()
     {
         using var temp = new TempPlugins();

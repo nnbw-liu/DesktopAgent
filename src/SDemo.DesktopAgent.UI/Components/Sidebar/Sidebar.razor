@@ -17,6 +17,9 @@
         </button>
     </header>
 
+    @* 插件入口区：「新建聊天室」下方、工作区之上；无插件时整块不渲染 *@
+    <PluginRail Entries="PluginEntries" OnStartPluginChat="OnStartPluginChat" />
+
     <div class="sidebar-content">
         <SidebarSection Title="工作区" Count="@Workspaces.Count" InitiallyExpanded="true">
             <HeaderAction>
@@ -166,6 +169,14 @@
     /// <summary>当前会话是否还是空的（尚未发过消息）。</summary>
     [Parameter]
     public bool ActiveSessionIsEmpty { get; set; }
+
+    /// <summary>侧栏插件入口（AppShell 已按目录结果过滤成可用入口）。</summary>
+    [Parameter]
+    public IReadOnlyList<PluginRailEntry> PluginEntries { get; set; } = [];
+
+    /// <summary>点插件入口：新建一个预选该插件的空会话。</summary>
+    [Parameter]
+    public EventCallback<PluginRailEntry> OnStartPluginChat { get; set; }
 
     [Parameter]
     public EventCallback OnNewChat { get; set; }
