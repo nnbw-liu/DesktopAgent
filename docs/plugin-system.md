@@ -710,6 +710,7 @@ public sealed record OutputSegment(string Source, string Target);
 ## 14. 如何制作一个插件
 
 > 目标：不写一行 C#，10 分钟内做出一个可用插件。
+> **面向作者的完整手册（含报错对照表与模板）见 [plugin-authoring.md](plugin-authoring.md)**；本节保留设计视角的最短路径。
 
 ### 14.1 准备
 

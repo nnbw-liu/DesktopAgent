@@ -348,7 +348,7 @@ version: 1.0
 
 ## 插件
 
-插件是**零代码**的声明式能力包：一个目录 + `plugin.json` + 若干 `.md` 技能文件，不需要编译、不需要重装应用。完整设计见 [docs/plugin-system.md](docs/plugin-system.md)。
+插件是**零代码**的声明式能力包：一个目录 + `plugin.json` + 若干 `.md` 技能文件，不需要编译、不需要重装应用。完整设计见 [docs/plugin-system.md](docs/plugin-system.md)；**自己写插件请看 [插件开发手册](docs/plugin-authoring.md)**（清单字段、参数、入口、双语对照、报错对照表、可复制模板）。
 
 目录：
 
