@@ -47,56 +47,127 @@
                 </svg>
             </label>
 
-            @if (!string.IsNullOrEmpty(SelectedSkill))
+            @if (ActiveMount is not null)
             {
-                <span class="skill-chip is-on" title="@SelectedSkill">
-                    <span class="skill-chip-label">@SelectedSkill</span>
-                    <button type="button" class="chip-close" title="取消技能" @onclick="ClearSkill">✕</button>
+                @* 插件模式：只留一个 chip + 内联参数，全局技能区整块隐藏 *@
+                <span class="skill-chip is-on plugin-chip" title="@ActivePlugin?.Description">
+                    <span class="plugin-chip-icon">@(ActivePlugin?.Initial ?? "◆")</span>
+                    <span class="skill-chip-label">@(ActivePlugin?.Name ?? ActiveMount.Capability?.Name ?? ActiveMount.Id)</span>
+                    <button type="button" class="chip-close" title="取消插件" disabled="@IsGenerating" @onclick="ClearMount">✕</button>
                 </span>
+
+                @foreach (var parameter in VisibleParameters)
+                {
+                    <PluginParameterControl Parameter="parameter"
+                                            Value="@GetParameterValue(parameter)"
+                                            Disabled="@IsGenerating"
+                                            ValueChanged="value => OnParameterChanged.InvokeAsync((parameter.Key, value))" />
+                }
+
+                @if (HiddenParameterCount > 0)
+                {
+                    <span class="plugin-param-more" title="其余参数使用默认值">还有 @HiddenParameterCount 项参数</span>
+                }
             }
-            else if (Skills.Count > 0)
+            else
             {
-                <div class="skill-list">
-                    @foreach (var skill in VisibleSkills)
-                    {
-                        <button type="button"
-                                class="skill-chip"
-                                title="@skill.Description"
-                                @onclick="() => ToggleSkill(skill.Name)">
-                            <span class="skill-chip-label">@skill.Name</span>
-                        </button>
-                    }
-
-                    @if (HasMore)
-                    {
-                        <div class="skill-more">
+                @if (PluginMounts.Count > 0)
+                {
+                    <div class="skill-list">
+                        @foreach (var mount in VisibleMounts)
+                        {
                             <button type="button"
-                                    class="skill-chip skill-chip--more @(_moreOpen ? "is-open" : null)"
-                                    title="更多技能"
-                                    aria-expanded="@(_moreOpen ? "true" : "false")"
-                                    @onclick="ToggleMore">
-                                更多 <span class="skill-more-caret">▾</span>
+                                    class="skill-chip plugin-chip"
+                                    title="@mount.Capability?.Name"
+                                    disabled="@IsGenerating"
+                                    @onclick="() => SelectMount(mount.Key)">
+                                <span class="skill-chip-label">@(mount.Capability?.Name ?? mount.Id)</span>
                             </button>
+                        }
 
-                            @if (_moreOpen)
-                            {
-                                <div class="skill-backdrop" @onclick="CloseMenus"></div>
-                                <div class="skill-menu">
-                                    @foreach (var skill in Skills)
-                                    {
-                                        <button type="button"
-                                                class="skill-menu-entry @(IsSelected(skill.Name) ? "is-active" : null)"
-                                                title="@skill.Description"
-                                                @onclick="() => SelectSkill(skill.Name)">
-                                            <span class="skill-menu-name">@skill.Name</span>
-                                            <span class="skill-menu-desc">@skill.Description</span>
-                                        </button>
-                                    }
-                                </div>
-                            }
-                        </div>
-                    }
-                </div>
+                        @if (HasMoreMounts)
+                        {
+                            <div class="skill-more">
+                                <button type="button"
+                                        class="skill-chip skill-chip--more @(_pluginMoreOpen ? "is-open" : null)"
+                                        title="更多插件"
+                                        aria-expanded="@(_pluginMoreOpen ? "true" : "false")"
+                                        @onclick="TogglePluginMore">
+                                    更多 <span class="skill-more-caret">▾</span>
+                                </button>
+
+                                @if (_pluginMoreOpen)
+                                {
+                                    <div class="skill-backdrop" @onclick="CloseMenus"></div>
+                                    <div class="skill-menu">
+                                        @foreach (var mount in HiddenMounts)
+                                        {
+                                            <button type="button"
+                                                    class="skill-menu-entry"
+                                                    title="@mount.Capability?.Name"
+                                                    @onclick="() => SelectMount(mount.Key)">
+                                                <span class="skill-menu-name">@(mount.Capability?.Name ?? mount.Id)</span>
+                                                <span class="skill-menu-desc">@(mount.Capability?.SkillDescription ?? mount.PluginId)</span>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(SelectedSkill))
+                {
+                    <span class="skill-chip is-on" title="@SelectedSkill">
+                        <span class="skill-chip-label">@SelectedSkill</span>
+                        <button type="button" class="chip-close" title="取消技能" @onclick="ClearSkill">✕</button>
+                    </span>
+                }
+                else if (Skills.Count > 0)
+                {
+                    <div class="skill-list">
+                        @foreach (var skill in VisibleSkills)
+                        {
+                            <button type="button"
+                                    class="skill-chip"
+                                    title="@skill.Description"
+                                    @onclick="() => ToggleSkill(skill.Name)">
+                                <span class="skill-chip-label">@skill.Name</span>
+                            </button>
+                        }
+
+                        @if (HasMore)
+                        {
+                            <div class="skill-more">
+                                <button type="button"
+                                        class="skill-chip skill-chip--more @(_moreOpen ? "is-open" : null)"
+                                        title="更多技能"
+                                        aria-expanded="@(_moreOpen ? "true" : "false")"
+                                        @onclick="ToggleMore">
+                                    更多 <span class="skill-more-caret">▾</span>
+                                </button>
+
+                                @if (_moreOpen)
+                                {
+                                    <div class="skill-backdrop" @onclick="CloseMenus"></div>
+                                    <div class="skill-menu">
+                                        @foreach (var skill in Skills)
+                                        {
+                                            <button type="button"
+                                                    class="skill-menu-entry @(IsSelected(skill.Name) ? "is-active" : null)"
+                                                    title="@skill.Description"
+                                                    @onclick="() => SelectSkill(skill.Name)">
+                                                <span class="skill-menu-name">@skill.Name</span>
+                                                <span class="skill-menu-desc">@skill.Description</span>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
             }
 
             @if (_uploadError is not null)
@@ -159,6 +230,8 @@
 
 @code {
     private const int VisibleSkillCount = 3;
+    private const int VisiblePluginCount = 3;
+    private const int MaxInlineParameters = 2;
     private const int MaxFilesPerUpload = 10;
 
     /// <summary>输入框内容（支持 @bind-Text 双向绑定）。</summary>
@@ -205,6 +278,31 @@
     [Parameter]
     public EventCallback<AgentSkill> OnToggleTool { get; set; }
 
+    /// <summary>输入框里可用的插件入口（ChatRoom 已按可用性过滤）。</summary>
+    [Parameter]
+    public IReadOnlyList<PluginMount> PluginMounts { get; set; } = [];
+
+    /// <summary>当前选中的插件；为 null 表示全局模式（技能 + 插件入口都显示）。</summary>
+    [Parameter]
+    public PluginDescriptor? ActivePlugin { get; set; }
+
+    /// <summary>当前选中的插件入口（与 <see cref="ActivePlugin"/> 一起由 ChatRoom 解析并传入）。</summary>
+    [Parameter]
+    public PluginMount? ActiveMount { get; set; }
+
+    /// <summary>当前参数值（按会话记忆解析后的结果）。</summary>
+    [Parameter]
+    public IReadOnlyDictionary<string, string> ParameterValues { get; set; } =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>选中 / 取消插件入口；参数为 null 表示回到全局模式。</summary>
+    [Parameter]
+    public EventCallback<string?> OnSelectMount { get; set; }
+
+    /// <summary>参数变化：(key, value)。</summary>
+    [Parameter]
+    public EventCallback<(string Key, string Value)> OnParameterChanged { get; set; }
+
     /// <summary>附件按会话存放，切换会话时清空未发送的附件。</summary>
     [Parameter]
     public string SessionId { get; set; } = string.Empty;
@@ -215,12 +313,49 @@
     private readonly List<ChatAttachment> _attachments = [];
     private string _sessionId = string.Empty;
     private bool _moreOpen;
+    private bool _pluginMoreOpen;
     private string? _uploadError;
     private DotNetObjectReference<ChatComposer>? _selfReference;
 
     private IEnumerable<SkillInfo> VisibleSkills => Skills.Take(VisibleSkillCount);
 
     private bool HasMore => Skills.Count > VisibleSkillCount;
+
+    /// <summary>最多内联 3 个插件入口，其余进「更多」。</summary>
+    private IEnumerable<PluginMount> VisibleMounts => PluginMounts.Take(VisiblePluginCount);
+
+    private IEnumerable<PluginMount> HiddenMounts => PluginMounts.Skip(VisiblePluginCount);
+
+    private bool HasMoreMounts => PluginMounts.Count > VisiblePluginCount;
+
+    /// <summary>参数 ≤ 2 个时全部内联，其余用默认值（面板留到 M4 / 气泡的那个浮层）。</summary>
+    private IEnumerable<PluginParameter> VisibleParameters =>
+        ActiveMount?.Capability?.Parameters.Take(MaxInlineParameters) ?? [];
+
+    private int HiddenParameterCount =>
+        Math.Max(0, (ActiveMount?.Capability?.Parameters.Count ?? 0) - MaxInlineParameters);
+
+    private string GetParameterValue(PluginParameter parameter) =>
+        ParameterValues.TryGetValue(parameter.Key, out var value) ? value : parameter.Default ?? string.Empty;
+
+    private async Task SelectMount(string mountKey)
+    {
+        _pluginMoreOpen = false;
+        _moreOpen = false;
+        await OnSelectMount.InvokeAsync(mountKey);
+    }
+
+    private async Task ClearMount()
+    {
+        _pluginMoreOpen = false;
+        await OnSelectMount.InvokeAsync(null);
+    }
+
+    private void TogglePluginMore()
+    {
+        _pluginMoreOpen = !_pluginMoreOpen;
+        _moreOpen = false;
+    }
 
     private bool CanSubmit => IsGenerating || !string.IsNullOrWhiteSpace(Text) || _attachments.Count > 0;
 
@@ -234,6 +369,7 @@
         _sessionId = SessionId;
         ClearAttachments();
         _moreOpen = false;
+        _pluginMoreOpen = false;
         _uploadError = null;
     }
 

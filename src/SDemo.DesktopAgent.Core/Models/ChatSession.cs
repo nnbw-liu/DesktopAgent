@@ -25,6 +25,21 @@ public sealed class ChatSession
     /// <summary>是否正在生成回复（运行期状态，不落库；左侧列表用于显示“推理中”）。</summary>
     public bool IsGenerating { get; set; }
 
+    /// <summary>这个会话是从哪个插件入口创建的（<c>&lt;pluginId&gt;/&lt;mountId&gt;</c>）；为空表示普通会话。</summary>
+    public string? OriginMountId { get; set; }
+
+    /// <summary>输入框当前选中的插件入口；随会话持久，决定这一轮走插件还是普通对话。</summary>
+    public string? ActiveMountId { get; set; }
+
+    /// <summary>最后一次<b>实际运行</b>的插件 id；普通推理开始时清空。侧栏会话图标用它。</summary>
+    public string? LastPluginId { get; set; }
+
+    /// <summary>
+    /// 会话级插件记忆：键为 <c>&lt;pluginId&gt;/&lt;mountId&gt;/&lt;key&gt;</c>，值为参数值；
+    /// <c>ui.</c> 前缀保留给宿主（例如 <c>ui.mode</c>）。
+    /// </summary>
+    public Dictionary<string, string> PluginMemory { get; init; } = new(StringComparer.Ordinal);
+
     public List<ChatMessage> Messages { get; init; } = [];
 
     public bool IsEmpty => Messages.Count == 0;
