@@ -18,7 +18,7 @@
     </header>
 
     @* 插件入口区：「新建聊天室」下方、工作区之上；无插件时整块不渲染 *@
-    <PluginRail Entries="PluginEntries" OnStartPluginChat="OnStartPluginChat" />
+    <PluginRail Entries="PluginEntries" MaxItems="MaxPluginEntries" OnStartPluginChat="OnStartPluginChat" />
 
     <div class="sidebar-content">
         <SidebarSection Title="工作区" Count="@Workspaces.Count" InitiallyExpanded="true">
@@ -173,6 +173,10 @@
     /// <summary>侧栏插件入口（AppShell 已按目录结果过滤成可用入口）。</summary>
     [Parameter]
     public IReadOnlyList<PluginRailEntry> PluginEntries { get; set; } = [];
+
+    /// <summary>侧栏最多直接显示几个插件入口（来自设置）。</summary>
+    [Parameter]
+    public int MaxPluginEntries { get; set; } = 6;
 
     /// <summary>已加载的插件，用来画会话图标（跟随 LastPluginId）。</summary>
     [Parameter]

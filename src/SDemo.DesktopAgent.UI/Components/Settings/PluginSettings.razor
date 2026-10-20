@@ -1,13 +1,82 @@
+@using System.Diagnostics
+@using System.IO
+@using SDemo.DesktopAgent.Models
+@using SDemo.DesktopAgent.Plugins
 @inject PluginCatalog Catalog
+@inject PluginRegistry Registry
+@inject ISettingsService Settings
 
-@* 插件设置（M0 骨架）：只读列表。启用开关 / 排序 / 打开目录等正式交互留给 M4。 *@
+@* 插件设置：全局开关 / 显示上限 / 参数记忆 / 默认呈现，以及每个插件的启用、入口与顺序。 *@
 <div class="settings-pane">
     <section class="settings-section">
         <h2 class="settings-section-title">插件</h2>
         <p class="settings-section-hint">
             插件是「plugin.json + skill 文件」组成的声明式能力包，把文件夹放进插件目录就能生效，不需要编译。
-            这里目前是 M0 的只读骨架：只展示扫描结果与加载错误，启用开关 / 排序 / 参数默认值会在 M4 提供。
+            开关、上限与顺序改完立即生效，不需要重启。
         </p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">启用插件</span>
+                <span class="settings-row-hint">关掉后侧栏、输入框、气泡都不显示插件；已打开的会话会回到普通对话。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@Prefs.Enabled" @onchange="ToggleGlobal" />
+        </label>
+
+        <div class="plugin-limits">
+            <label class="plugin-limit">
+                <span class="plugin-limit-label">输入框最多显示</span>
+                <input type="number"
+                       class="field-input plugin-limit-input"
+                       min="1"
+                       max="20"
+                       value="@Prefs.MaxInComposer"
+                       @onchange="args => SaveLimit(args, composer: true)" />
+                <span class="plugin-limit-unit">个</span>
+            </label>
+
+            <label class="plugin-limit">
+                <span class="plugin-limit-label">侧栏最多显示</span>
+                <input type="number"
+                       class="field-input plugin-limit-input"
+                       min="1"
+                       max="20"
+                       value="@Prefs.MaxInSidebar"
+                       @onchange="args => SaveLimit(args, composer: false)" />
+                <span class="plugin-limit-unit">个</span>
+            </label>
+        </div>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">记住每个会话上次选中的参数</span>
+                <span class="settings-row-hint">关掉后，每次都用插件清单里的默认值（例如系统语言）。</span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@Prefs.RememberParameterValues"
+                   @onchange="ToggleRemember" />
+        </label>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">新会话译文默认呈现</span>
+                <span class="settings-row-hint">双语对照等 M6 的 segments 支持接入后生效，目前结果按纯文本展示。</span>
+            </span>
+
+            <div class="segmented plugin-mode-segmented">
+                <button type="button"
+                        class="segmented-item @(Prefs.DefaultOutputMode == PluginOutputMode.Bilingual ? "is-active" : null)"
+                        @onclick="() => SetOutputMode(PluginOutputMode.Bilingual)">
+                    对照
+                </button>
+                <button type="button"
+                        class="segmented-item @(Prefs.DefaultOutputMode == PluginOutputMode.Translation ? "is-active" : null)"
+                        @onclick="() => SetOutputMode(PluginOutputMode.Translation)">
+                    纯译文
+                </button>
+            </div>
+        </div>
 
         <div class="plugin-roots">
             <div class="plugin-root">
@@ -22,8 +91,18 @@
 
         <div class="plugin-toolbar">
             <span class="settings-message">@_status</span>
-            <button type="button" class="ghost-button" @onclick="Rescan">重新扫描</button>
+            <span class="plugin-toolbar-actions">
+                @if (OperatingSystem.IsWindows())
+                {
+                    <button type="button" class="ghost-button" @onclick="OpenDirectory">打开插件目录</button>
+                }
+                <button type="button" class="ghost-button" @onclick="Rescan">重新扫描</button>
+            </span>
         </div>
+
+        <p class="settings-message">
+            本地插件的内容会进入系统提示词，只安装你信任的插件。
+        </p>
     </section>
 
     @if (_result.IsEmpty)
@@ -57,6 +136,10 @@
                         {
                             <span class="plugin-badge plugin-badge--warn">@stateText</span>
                         }
+                        @if (!IsPluginEnabled(plugin))
+                        {
+                            <span class="plugin-badge plugin-badge--warn">已停用</span>
+                        }
                     </div>
 
                     @if (!string.IsNullOrWhiteSpace(plugin.Description))
@@ -67,6 +150,46 @@
                     <p class="plugin-meta">
                         入口：@SurfaceSummary(plugin) · @plugin.Capabilities.Count 个能力 · 目录 @plugin.DirectoryName
                     </p>
+
+                    <div class="plugin-controls">
+                        <label class="plugin-control" title="停用后所有入口都不显示">
+                            <input type="checkbox"
+                                   class="switch switch--sm"
+                                   checked="@IsPluginEnabled(plugin)"
+                                   @onchange="args => SetPluginEnabled(plugin, args)" />
+                            <span>启用</span>
+                        </label>
+
+                        <label class="plugin-control @(HasSidebar(plugin) ? null : "is-disabled")"
+                               title="@(HasSidebar(plugin) ? "在侧栏显示入口" : "这个插件没有侧栏入口")">
+                            <input type="checkbox"
+                                   class="switch switch--sm"
+                                   checked="@InSidebar(plugin)"
+                                   disabled="@(!HasSidebar(plugin))"
+                                   @onchange="args => SetInSidebar(plugin, args)" />
+                            <span>侧栏</span>
+                        </label>
+
+                        <label class="plugin-control @(HasComposer(plugin) ? null : "is-disabled")"
+                               title="@(HasComposer(plugin) ? "在输入框显示 chip" : "这个插件没有输入框入口")">
+                            <input type="checkbox"
+                                   class="switch switch--sm"
+                                   checked="@InComposer(plugin)"
+                                   disabled="@(!HasComposer(plugin))"
+                                   @onchange="args => SetInComposer(plugin, args)" />
+                            <span>输入框</span>
+                        </label>
+
+                        <label class="plugin-control plugin-control--order" title="数字小的排前面；清空表示用插件清单里的顺序">
+                            <span>顺序</span>
+                            <input type="number"
+                                   class="field-input plugin-order-input"
+                                   min="0"
+                                   max="999"
+                                   value="@OrderOf(plugin)"
+                                   @onchange="args => SetOrder(plugin, args)" />
+                        </label>
+                    </div>
 
                     @if (plugin.DisabledReason is { } reason)
                     {
@@ -110,6 +233,8 @@
     private PluginLoadResult _result = PluginLoadResult.Empty;
     private string _status = string.Empty;
 
+    private PluginPreferences Prefs => Settings.Current.Plugins;
+
     protected override void OnInitialized() => Show(Catalog.Result, "扫描于");
 
     private void Rescan() => Show(Catalog.Scan(), "重新扫描于");
@@ -119,6 +244,106 @@
         _result = result;
         _status = $"{verb} {result.ScannedAt:HH:mm:ss} · 可用 {result.Usable.Count} 个，加载失败 {result.Failures.Count} 个";
     }
+
+    private void OpenDirectory()
+    {
+        try
+        {
+            Directory.CreateDirectory(Catalog.LocalRoot);
+            Process.Start(new ProcessStartInfo(Catalog.LocalRoot) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            _status = $"打开目录失败：{ex.Message}";
+        }
+    }
+
+    private void ToggleGlobal(ChangeEventArgs args)
+    {
+        Prefs.Enabled = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleRemember(ChangeEventArgs args)
+    {
+        Prefs.RememberParameterValues = args.Value is true;
+        Settings.Save();
+    }
+
+    private void SetOutputMode(PluginOutputMode mode)
+    {
+        Prefs.DefaultOutputMode = mode;
+        Settings.Save();
+    }
+
+    private void SaveLimit(ChangeEventArgs args, bool composer)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var value))
+        {
+            return;
+        }
+
+        value = PluginPreferences.ClampLimit(value);
+        if (composer)
+        {
+            Prefs.MaxInComposer = value;
+        }
+        else
+        {
+            Prefs.MaxInSidebar = value;
+        }
+
+        Settings.Save();
+    }
+
+    private void SetPluginEnabled(PluginDescriptor plugin, ChangeEventArgs args)
+    {
+        Prefs.GetOrAddEntry(plugin.Id).Enabled = args.Value is true;
+        Settings.Save();
+    }
+
+    private void SetInSidebar(PluginDescriptor plugin, ChangeEventArgs args)
+    {
+        Prefs.GetOrAddEntry(plugin.Id).InSidebar = args.Value is true;
+        Settings.Save();
+    }
+
+    private void SetInComposer(PluginDescriptor plugin, ChangeEventArgs args)
+    {
+        Prefs.GetOrAddEntry(plugin.Id).InComposer = args.Value is true;
+        Settings.Save();
+    }
+
+    private void SetOrder(PluginDescriptor plugin, ChangeEventArgs args)
+    {
+        var text = args.Value?.ToString();
+        var entry = Prefs.GetOrAddEntry(plugin.Id);
+
+        if (string.IsNullOrWhiteSpace(text) || !int.TryParse(text, out var order))
+        {
+            entry.Order = null;
+        }
+        else
+        {
+            entry.Order = Math.Clamp(order, 0, 999);
+        }
+
+        Settings.Save();
+    }
+
+    private bool IsPluginEnabled(PluginDescriptor plugin) => Prefs.FindEntry(plugin.Id)?.Enabled ?? true;
+
+    private bool InSidebar(PluginDescriptor plugin) => Prefs.FindEntry(plugin.Id)?.InSidebar ?? true;
+
+    private bool InComposer(PluginDescriptor plugin) => Prefs.FindEntry(plugin.Id)?.InComposer ?? true;
+
+    private int OrderOf(PluginDescriptor plugin) => Prefs.FindEntry(plugin.Id)?.Order ?? plugin.Order;
+
+    private static bool HasSidebar(PluginDescriptor plugin) =>
+        plugin.Mounts.Any(mount => mount.IsUsable && mount.Surface == PluginSurface.Sidebar);
+
+    private static bool HasComposer(PluginDescriptor plugin) =>
+        plugin.Mounts.Any(mount => mount.IsUsable && mount.Surface == PluginSurface.Composer);
 
     private static string SurfaceSummary(PluginDescriptor plugin)
     {

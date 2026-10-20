@@ -61,8 +61,9 @@
 }
 
 @code {
-    /// <summary>侧栏最多直接显示 6 个插件入口（M4 会改成设置项）。</summary>
-    private const int MaxInRail = 6;
+    /// <summary>侧栏最多直接显示几个插件入口（来自设置 plugins.maxInSidebar）。</summary>
+    [Parameter]
+    public int MaxItems { get; set; } = 6;
 
     [Parameter]
     public IReadOnlyList<PluginRailEntry> Entries { get; set; } = [];
@@ -73,11 +74,13 @@
 
     private bool _moreOpen;
 
-    private IEnumerable<PluginRailEntry> VisibleEntries => Entries.Take(MaxInRail);
+    private int EffectiveMax => Math.Max(1, MaxItems);
 
-    private IEnumerable<PluginRailEntry> HiddenEntries => Entries.Skip(MaxInRail);
+    private IEnumerable<PluginRailEntry> VisibleEntries => Entries.Take(EffectiveMax);
 
-    private bool HasMore => Entries.Count > MaxInRail;
+    private IEnumerable<PluginRailEntry> HiddenEntries => Entries.Skip(EffectiveMax);
+
+    private bool HasMore => Entries.Count > EffectiveMax;
 
     private void ToggleMore() => _moreOpen = !_moreOpen;
 

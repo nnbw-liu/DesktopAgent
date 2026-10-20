@@ -1,7 +1,62 @@
 using System.IO;
+using SDemo.DesktopAgent.Models;
 using SDemo.DesktopAgent.Plugins;
+using SDemo.DesktopAgent.Services;
 
 namespace SDemo.DesktopAgent.Core.Tests;
+
+/// <summary>测试用的 IAppPaths：所有目录都落在临时目录下。</summary>
+internal sealed class StubAppPaths : IAppPaths
+{
+    public StubAppPaths(string dataRoot)
+    {
+        DataRoot = dataRoot;
+        SettingsFile = Path.Combine(dataRoot, "settings.json");
+        ChatsRoot = Path.Combine(dataRoot, "chats");
+        UploadsRoot = Path.Combine(dataRoot, "uploads");
+        SkillsRoot = Path.Combine(dataRoot, "skills");
+        PluginsRoot = Path.Combine(dataRoot, "plugins");
+        DefaultWorkspaceRoot = Path.Combine(dataRoot, "workspace");
+    }
+
+    public string DataRoot { get; }
+
+    public string SettingsFile { get; }
+
+    public string ChatsRoot { get; }
+
+    public string UploadsRoot { get; }
+
+    public string SkillsRoot { get; }
+
+    public string PluginsRoot { get; }
+
+    public string DefaultWorkspaceRoot { get; }
+}
+
+/// <summary>不做真正加密的 ISecureStore（SettingsService 会用到）。</summary>
+internal sealed class StubSecureStore : ISecureStore
+{
+    public string Protect(string? plaintext) => plaintext ?? string.Empty;
+
+    public string Unprotect(string? cipherText) => cipherText ?? string.Empty;
+}
+
+/// <summary>内存版设置服务；Save() 会触发 Changed（PluginRegistry 靠它刷新）。</summary>
+internal sealed class StubSettingsService : ISettingsService
+{
+    public AppSettings Current { get; } = new();
+
+    public event EventHandler? Changed;
+
+    public int SaveCount { get; private set; }
+
+    public void Save()
+    {
+        SaveCount++;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+}
 
 /// <summary>
 /// 临时插件目录：每个测试一份，互不影响；内置目录与本地目录分开建。

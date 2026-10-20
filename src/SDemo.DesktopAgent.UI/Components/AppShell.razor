@@ -7,6 +7,7 @@
 @inject IFolderPickerService FolderPicker
 @inject ChatStore ChatStore
 @inject PluginCatalog PluginCatalog
+@inject PluginRegistry PluginRegistry
 
 <div class="app-shell">
     <Sidebar Workspaces="Workspaces"
@@ -16,7 +17,8 @@
              ActiveSessionIsEmpty="@(_view == MainView.Chat && _activeSession is { Messages.Count: 0 })"
              IsSettingsActive="@(_view == MainView.Settings)"
              PluginEntries="_pluginRailEntries"
-             Plugins="PluginCatalog.Result.Usable"
+             MaxPluginEntries="@PluginRegistry.MaxFor(PluginSurface.Sidebar)"
+             Plugins="PluginRegistry.Plugins"
              OnNewChat="StartNewChat"
              OnStartPluginChat="StartPluginChat"
              OnOpenSession="OpenSession"
@@ -91,7 +93,8 @@
         // 启动时扫一次插件目录（结果缓存，设置页打开时直接用；重新扫描走 Catalog.Scan()）。
         PluginCatalog.EnsureLoaded();
         RefreshPluginRailEntries();
-        PluginCatalog.Changed += OnPluginCatalogChanged;
+        // 目录重新扫描 / 设置改动都会经过 Registry 通知到界面。
+        PluginRegistry.Changed += OnPluginRegistryChanged;
 
         // 启动时从各个 SQLite 库恢复历史会话（工作区 DB + 历史聊天 DB）。
         _sessions = (await ChatStore.LoadAllAsync(Workspaces)).ToList();
@@ -99,17 +102,15 @@
         UpdateWorkspaceRoot();
     }
 
-    /// <summary>刷新侧栏插件入口：只取侧栏界面上可用且 show 的入口。</summary>
+    /// <summary>刷新侧栏插件入口：只取侧栏界面上可用且被用户打开的入口。</summary>
     private void RefreshPluginRailEntries() =>
-        _pluginRailEntries = PluginCatalog.Result
-            .UsableMounts(PluginSurface.Sidebar)
-            .Where(mount => mount.Show)
-            .Select(mount => (Mount: mount, Plugin: PluginCatalog.Result.Find(mount.PluginId)))
+        _pluginRailEntries = PluginRegistry.Mounts(PluginSurface.Sidebar)
+            .Select(mount => (Mount: mount, Plugin: PluginRegistry.Find(mount.PluginId)))
             .Where(item => item.Plugin is not null)
             .Select(item => new PluginRailEntry(item.Plugin!, item.Mount))
             .ToList();
 
-    private void OnPluginCatalogChanged(object? sender, EventArgs e) =>
+    private void OnPluginRegistryChanged(object? sender, EventArgs e) =>
         _ = InvokeAsync(() =>
         {
             RefreshPluginRailEntries();
@@ -468,6 +469,6 @@
     public void Dispose()
     {
         ThemeService.ThemeChanged -= OnThemeChanged;
-        PluginCatalog.Changed -= OnPluginCatalogChanged;
+        PluginRegistry.Changed -= OnPluginRegistryChanged;
     }
 }
