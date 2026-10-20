@@ -2816,6 +2816,300 @@ a {
     color: var(--text);
 }
 
+/* ---------- 气泡插件按钮与派生卡片 ---------- */
+
+.plugin-action-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.plugin-action {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.plugin-action-button .plugin-icon-svg {
+    width: 13px;
+    height: 13px;
+}
+
+.plugin-action-button .plugin-icon-text {
+    font-size: 9px;
+}
+
+.plugin-action-button.is-running {
+    opacity: 1;
+    color: var(--accent-text);
+}
+
+.plugin-action-spinner {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+
+    width: 7px;
+    height: 7px;
+
+    border: 1.5px solid var(--accent);
+    border-color: var(--accent) transparent transparent transparent;
+    border-radius: 50%;
+
+    animation: plugin-spin .8s linear infinite;
+}
+
+@keyframes plugin-spin {
+    to { transform: rotate(360deg); }
+}
+
+.plugin-action-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+}
+
+.plugin-action-panel {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 8px);
+    z-index: 41;
+
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+
+    min-width: 240px;
+    max-width: min(420px, calc(100vw - 60px));
+    padding: 8px 10px;
+
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: var(--composer-shadow);
+    outline: none;
+}
+
+.plugin-action-panel-actions {
+    display: inline-flex;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.plugin-mini-button {
+    padding: 3px 8px;
+
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: transparent;
+
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.plugin-mini-button:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.plugin-mini-button.is-primary {
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+}
+
+.plugin-action-more {
+    position: relative;
+    display: inline-flex;
+}
+
+.plugin-action-menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 6px);
+    z-index: 41;
+
+    min-width: 130px;
+    padding: 4px;
+
+    border: 1px solid var(--border-strong);
+    border-radius: 9px;
+    background: var(--surface);
+    box-shadow: var(--composer-shadow);
+}
+
+.plugin-action-menu-entry {
+    display: block;
+    width: 100%;
+    padding: 6px 10px;
+
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.plugin-action-menu-entry:hover:not(:disabled) {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.plugin-action-menu-entry:disabled {
+    opacity: .45;
+    cursor: default;
+}
+
+/* 派生卡片：挂在原消息下，不新增对话轮 */
+.derived-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.derived-card {
+    max-width: 680px;
+    padding: 10px 12px;
+
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent-border);
+    border-radius: 10px;
+    background: var(--surface);
+}
+
+.derived-card.is-running {
+    border-left-color: var(--accent);
+}
+
+.derived-card.is-failed {
+    border-left-color: #c24b4b;
+}
+
+.derived-card.is-canceled {
+    border-left-color: var(--border-strong);
+}
+
+.derived-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.derived-badge {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.derived-state,
+.derived-meta {
+    font-size: 10.5px;
+    color: var(--muted);
+}
+
+.derived-card.is-failed .derived-state {
+    color: #e07b7b;
+}
+
+.derived-actions {
+    display: inline-flex;
+    gap: 2px;
+    margin-left: auto;
+}
+
+.derived-action {
+    padding: 2px 6px;
+
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+
+    color: var(--muted);
+    font: inherit;
+    font-size: 10.5px;
+    cursor: pointer;
+}
+
+.derived-action:hover:not(:disabled) {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.derived-action:disabled {
+    opacity: .45;
+    cursor: default;
+}
+
+.derived-action--danger:hover:not(:disabled) {
+    background: #c42b1c;
+    color: #fff;
+}
+
+.derived-body {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.derived-pending {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 0;
+
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.derived-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: derived-pulse 1s ease-in-out infinite;
+}
+
+@keyframes derived-pulse {
+    0%, 100% { opacity: .3; }
+    50% { opacity: 1; }
+}
+
+.derived-error {
+    margin: 6px 0 0;
+    font-size: 11.5px;
+    color: #e07b7b;
+}
+
+[data-theme="light"] .derived-error {
+    color: #b83232;
+}
+
+@media (max-width: 760px) {
+    /* 窄屏：参数面板改成贴底整行展开，控件纵向排列 */
+    .plugin-action-panel {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: 92px;
+        max-width: none;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .plugin-action-panel-actions {
+        justify-content: flex-end;
+    }
+}
+
 /* ---------- 移动端 / 窄屏 ---------- */
 
 /* 刘海屏与系统栏：MAUI 的 Android/iOS 宿主是 edge-to-edge，内边距交给 env()；

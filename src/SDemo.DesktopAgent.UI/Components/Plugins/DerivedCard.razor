@@ -1,0 +1,128 @@
+@using SDemo.DesktopAgent.Models
+
+@* 派生卡片：挂在原消息下的加工结果。M3 只有纯文本模式（双语对照在 M6）。 *@
+<article class="derived-card @StateClass" data-artifact="@Artifact.Id">
+    <header class="derived-head">
+        <span class="derived-badge">@PluginName</span>
+
+        @if (StateText is { } stateText)
+        {
+            <span class="derived-state">@stateText</span>
+        }
+
+        @if (Artifact.State == DerivedState.Done)
+        {
+            @if (Artifact.DurationMs > 0)
+            {
+                <span class="derived-meta">@FormatDuration(Artifact.DurationMs)</span>
+            }
+
+            @if (Artifact.TotalTokens > 0)
+            {
+                <span class="derived-meta">@Artifact.TotalTokens.ToString("N0") tokens</span>
+            }
+        }
+
+        <span class="derived-actions">
+            <button type="button"
+                    class="derived-action"
+                    disabled="@(Artifact.IsRunning || string.IsNullOrEmpty(Artifact.Text))"
+                    @onclick="CopyAsync">
+                @(_copied ? "已复制" : "复制")
+            </button>
+
+            <button type="button"
+                    class="derived-action"
+                    disabled="@Artifact.IsRunning"
+                    @onclick="() => OnRetry.InvokeAsync()">
+                重试
+            </button>
+
+            <button type="button"
+                    class="derived-action derived-action--danger"
+                    disabled="@Artifact.IsRunning"
+                    @onclick="() => OnDelete.InvokeAsync()">
+                删除
+            </button>
+        </span>
+    </header>
+
+    @if (Artifact.IsRunning && Artifact.Text.Length == 0)
+    {
+        <p class="derived-pending">
+            <span class="derived-dot" aria-hidden="true"></span>处理中…
+        </p>
+    }
+    else if (Artifact.Text.Length > 0)
+    {
+        <div class="derived-body msg-body--markdown">@((MarkupString)MarkdownRenderer.ToHtml(Artifact.Text))</div>
+    }
+
+    @if (Artifact.Error is { Length: > 0 } error)
+    {
+        <p class="derived-error">@error</p>
+    }
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public DerivedArtifact Artifact { get; set; } = default!;
+
+    /// <summary>插件显示名（插件已被删除时由父组件传入 id）。</summary>
+    [Parameter]
+    public string PluginName { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback OnRetry { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    [Inject]
+    private IJSRuntime Js { get; set; } = default!;
+
+    private bool _copied;
+
+    private string StateClass => Artifact.State switch
+    {
+        DerivedState.Running => "is-running",
+        DerivedState.Failed => "is-failed",
+        DerivedState.Canceled => "is-canceled",
+        _ => null
+    } ?? string.Empty;
+
+    private string? StateText => Artifact.State switch
+    {
+        DerivedState.Running => "运行中",
+        DerivedState.Canceled => "已取消",
+        DerivedState.Failed => "失败",
+        _ => null
+    };
+
+    private static string FormatDuration(long milliseconds) =>
+        milliseconds < 1000 ? $"{milliseconds} ms" : $"{milliseconds / 1000.0:0.0} s";
+
+    private async Task CopyAsync()
+    {
+        if (string.IsNullOrEmpty(Artifact.Text))
+        {
+            return;
+        }
+
+        try
+        {
+            await Js.InvokeVoidAsync("sdChat.copyText", Artifact.Text);
+        }
+        catch (JSException)
+        {
+            return;
+        }
+
+        _copied = true;
+        StateHasChanged();
+        await Task.Delay(1500);
+
+        _copied = false;
+        StateHasChanged();
+    }
+}

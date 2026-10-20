@@ -174,6 +174,10 @@
     [Parameter]
     public IReadOnlyList<PluginRailEntry> PluginEntries { get; set; } = [];
 
+    /// <summary>已加载的插件，用来画会话图标（跟随 LastPluginId）。</summary>
+    [Parameter]
+    public IReadOnlyList<PluginDescriptor> Plugins { get; set; } = [];
+
     /// <summary>点插件入口：新建一个预选该插件的空会话。</summary>
     [Parameter]
     public EventCallback<PluginRailEntry> OnStartPluginChat { get; set; }
@@ -223,6 +227,12 @@
 
     private bool IsActive(ChatSession session) =>
         string.Equals(session.Id, ActiveSessionId, StringComparison.Ordinal);
+
+    /// <summary>会话最后一次 Run 用的插件（插件被删 / 停用时返回 null，回默认图标）。</summary>
+    private PluginDescriptor? PluginFor(ChatSession session) =>
+        string.IsNullOrEmpty(session.LastPluginId)
+            ? null
+            : Plugins.FirstOrDefault(plugin => string.Equals(plugin.Id, session.LastPluginId, StringComparison.Ordinal));
 
     /// <summary>某个工作区下的聊天室：置顶的排前面。</summary>
     private IEnumerable<ChatSession> SessionsFor(Workspace workspace) =>
@@ -362,10 +372,18 @@
             {
                 <button type="button" class="item-main" @onclick="() => OnOpenSession.InvokeAsync(session)">
                     <span class="item-icon item-icon--sm">
-                        <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-                            <path d="M3 3.2h10a1.4 1.4 0 0 1 1.4 1.4v5.2A1.4 1.4 0 0 1 13 11.2H7.6L4.4 13.6v-2.4H3a1.4 1.4 0 0 1-1.4-1.4V4.6A1.4 1.4 0 0 1 3 3.2z"
-                                  fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" />
-                        </svg>
+                        @if (PluginFor(session) is { } pluginIcon)
+                        {
+                            @* 最后一次 Run 来自插件：会话图标跟随它；插件没了就回默认图标 *@
+                            <PluginIcon Plugin="pluginIcon" />
+                        }
+                        else
+                        {
+                            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+                                <path d="M3 3.2h10a1.4 1.4 0 0 1 1.4 1.4v5.2A1.4 1.4 0 0 1 13 11.2H7.6L4.4 13.6v-2.4H3a1.4 1.4 0 0 1-1.4-1.4V4.6A1.4 1.4 0 0 1 3 3.2z"
+                                      fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" />
+                            </svg>
+                        }
                     </span>
                     <span class="item-text">
                         <span class="item-title">@session.Title</span>

@@ -274,6 +274,9 @@ public sealed class ChatStore
             messageRecord.PluginJson = message.Plugin is null
                 ? null
                 : JsonSerializer.Serialize(message.Plugin, JsonOptions);
+            messageRecord.DerivedJson = message.Derived.Count == 0
+                ? null
+                : JsonSerializer.Serialize(message.Derived, JsonOptions);
             keep.Add(message.Id);
         }
 
@@ -354,7 +357,8 @@ public sealed class ChatStore
             ("InputTokens", "INTEGER NOT NULL DEFAULT 0"),
             ("OutputTokens", "INTEGER NOT NULL DEFAULT 0"),
             ("ToolCallsJson", "TEXT NULL"),
-            ("PluginJson", "TEXT NULL")
+            ("PluginJson", "TEXT NULL"),
+            ("DerivedJson", "TEXT NULL")
         ])
     ];
 
@@ -503,6 +507,38 @@ public sealed class ChatStore
         }
     }
 
+    private static List<DerivedArtifact> DeserializeDerived(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            var artifacts = JsonSerializer.Deserialize<List<DerivedArtifact>>(json, JsonOptions);
+            if (artifacts is null)
+            {
+                return [];
+            }
+
+            // 上次运行没结束（应用被关掉 / 崩溃）的卡片：加载时收尾成失败，避免永远转圈。
+            return artifacts
+                .Select(artifact => artifact.State == DerivedState.Running
+                    ? artifact with
+                    {
+                        State = DerivedState.Failed,
+                        Error = artifact.Error ?? "上次运行未完成"
+                    }
+                    : artifact)
+                .ToList();
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
     private static ChatSession ToSession(SessionRecord record, string? workspaceId) => new()
     {
         Id = record.Id,
@@ -527,7 +563,8 @@ public sealed class ChatStore
                 InputTokens = message.InputTokens,
                 OutputTokens = message.OutputTokens,
                 ToolCalls = DeserializeToolCalls(message.ToolCallsJson),
-                Plugin = DeserializePlugin(message.PluginJson)
+                Plugin = DeserializePlugin(message.PluginJson),
+                Derived = DeserializeDerived(message.DerivedJson)
             })
             .ToList()
     };

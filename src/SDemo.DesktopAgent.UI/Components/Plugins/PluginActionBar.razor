@@ -1,0 +1,87 @@
+@using SDemo.DesktopAgent.Components.Plugins
+
+@* 助手消息底部的插件按钮组：内联最多 2 个，其余进「⋯」菜单。 *@
+@if (Entries.Count > 0)
+{
+    <span class="plugin-action-bar">
+        @foreach (var entry in VisibleEntries)
+        {
+            <PluginActionButton Plugin="entry.Plugin"
+                                Mount="entry.Mount"
+                                Values="entry.Values"
+                                IsRunning="@(string.Equals(RunningMountKey, entry.Mount.Key, StringComparison.Ordinal))"
+                                Disabled="Busy || LimitReached"
+                                OnRun="OnRun" />
+        }
+
+        @if (HiddenEntries.Count > 0)
+        {
+            <span class="plugin-action-more">
+                <button type="button"
+                        class="msg-action"
+                        title="更多插件"
+                        aria-expanded="@(_moreOpen ? "true" : "false")"
+                        @onclick="ToggleMore">
+                    ⋯
+                </button>
+
+                @if (_moreOpen)
+                {
+                    <div class="plugin-action-backdrop" @onclick="CloseMore"></div>
+                    <div class="plugin-action-menu">
+                        @foreach (var entry in HiddenEntries)
+                        {
+                            <button type="button"
+                                    class="plugin-action-menu-entry"
+                                    disabled="@(Busy || LimitReached)"
+                                    title="@entry.Plugin.Name"
+                                    @onclick="() => RunHiddenAsync(entry)">
+                                @entry.Plugin.Name
+                            </button>
+                        }
+                    </div>
+                }
+            </span>
+        }
+    </span>
+}
+
+@code {
+    /// <summary>内联按钮上限。</summary>
+    private const int MaxInline = 2;
+
+    [Parameter]
+    public IReadOnlyList<PluginActionEntry> Entries { get; set; } = [];
+
+    /// <summary>会话正在跑（普通生成或某张卡片），按钮统一禁用（单飞）。</summary>
+    [Parameter]
+    public bool Busy { get; set; }
+
+    /// <summary>这条消息的派生卡片已达上限。</summary>
+    [Parameter]
+    public bool LimitReached { get; set; }
+
+    /// <summary>正在运行的那张卡片对应的入口组合键（用来显示按钮上的转圈）。</summary>
+    [Parameter]
+    public string? RunningMountKey { get; set; }
+
+    [Parameter]
+    public EventCallback<PluginActionEntry> OnRun { get; set; }
+
+    private bool _moreOpen;
+
+    private IEnumerable<PluginActionEntry> VisibleEntries => Entries.Take(MaxInline);
+
+    private List<PluginActionEntry> HiddenEntries => Entries.Skip(MaxInline).ToList();
+
+    private void ToggleMore() => _moreOpen = !_moreOpen;
+
+    private void CloseMore() => _moreOpen = false;
+
+    /// <summary>「⋯」里的入口直接按当前参数跑（参数面板只对内联的两个提供）。</summary>
+    private async Task RunHiddenAsync(PluginActionEntry entry)
+    {
+        _moreOpen = false;
+        await OnRun.InvokeAsync(entry);
+    }
+}

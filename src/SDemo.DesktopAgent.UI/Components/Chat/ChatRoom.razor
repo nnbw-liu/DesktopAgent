@@ -104,6 +104,13 @@
                                 {
                                     <span class="msg-stat">耗时 @FormatDuration(message.DurationMs)</span>
                                 }
+
+                                @* 插件按钮排在复制之前；无参数点一下直接跑，有参数展开面板 *@
+                                <PluginActionBar Entries="BuildMessagePluginActions()"
+                                                 Busy="_isGenerating"
+                                                 LimitReached="@(message.Derived.Count >= MaxArtifactsPerMessage)"
+                                                 RunningMountKey="_runningMountKey"
+                                                 OnRun="@(entry => RunArtifactAsync(message, entry))" />
                             }
 
                             <button type="button"
@@ -146,6 +153,20 @@
                                 </button>
                             }
                         </div>
+
+                        @* 派生卡片：挂在原消息下，不新增对话轮，也不进入后续上下文 *@
+                        @if (message.Derived.Count > 0)
+                        {
+                            <div class="derived-list">
+                                @foreach (var artifact in message.Derived.ToList())
+                                {
+                                    <DerivedCard Artifact="artifact"
+                                                 PluginName="@PluginDisplayName(artifact.PluginId)"
+                                                 OnRetry="@(() => RetryArtifactAsync(message, artifact))"
+                                                 OnDelete="@(() => DeleteArtifactAsync(message, artifact))" />
+                                }
+                            </div>
+                        }
                     </article>
                 }
             </div>
@@ -224,6 +245,12 @@
 </section>
 
 @code {
+    /// <summary>每条消息最多挂 5 张派生卡片。</summary>
+    private const int MaxArtifactsPerMessage = 5;
+
+    /// <summary>单张卡片的文本上限，超过就截断。</summary>
+    private const int MaxArtifactTextChars = 32_000;
+
     private sealed record ModelOption(string Key, string Text, ModelProvider Provider, string ModelId);
 
     [Parameter, EditorRequired]
@@ -292,6 +319,9 @@
 
     /// <summary>本轮参数值（按会话记忆解析；用户改了就写回会话记忆）。</summary>
     private Dictionary<string, string> _parameterValues = new(StringComparer.Ordinal);
+
+    /// <summary>正在运行的派生卡片对应的入口组合键（按钮上显示转圈）。</summary>
+    private string? _runningMountKey;
 
     /// <summary>刚刚复制过的消息 Id（用于短暂显示对勾）。</summary>
     private string? _copiedMessageId;
@@ -798,6 +828,244 @@
         OnSessionChanged.HasDelegate ? OnSessionChanged.InvokeAsync(Session) : Task.CompletedTask;
 
     private void HandleStop() => _cts?.Cancel();
+
+    /// <summary>气泡上可用的插件入口（message 界面、可用且 show），参数按会话记忆解析。</summary>
+    private IReadOnlyList<PluginActionEntry> BuildMessagePluginActions()
+    {
+        var entries = new List<PluginActionEntry>();
+
+        foreach (var mount in PluginCatalog.Result.UsableMounts(PluginSurface.Message))
+        {
+            if (!mount.Show)
+            {
+                continue;
+            }
+
+            var plugin = PluginCatalog.Result.Find(mount.PluginId);
+            if (plugin is null || mount.Capability is not { } capability)
+            {
+                continue;
+            }
+
+            entries.Add(new PluginActionEntry(
+                plugin,
+                mount,
+                ParameterResolver.Resolve(capability, plugin.Id, mount.Id, Session.PluginMemory)));
+        }
+
+        return entries;
+    }
+
+    private string PluginDisplayName(string pluginId) =>
+        PluginCatalog.Result.Find(pluginId)?.Name ?? pluginId;
+
+    /// <summary>气泡按钮触发：新建一张派生卡片并开始流式加工（原文 = 该条消息的正文）。</summary>
+    private async Task RunArtifactAsync(ChatMessage message, PluginActionEntry entry)
+    {
+        // 单飞：同一会话同一时间只允许一个 Run。
+        if (_isGenerating || message.Derived.Count >= MaxArtifactsPerMessage)
+        {
+            return;
+        }
+
+        var option = _modelOptions.FirstOrDefault(item => item.Key == _selectedKey);
+        if (option is null)
+        {
+            message.Derived.Add(new DerivedArtifact(
+                Guid.NewGuid().ToString("N"),
+                entry.Plugin.Id,
+                entry.Mount.Id,
+                entry.Mount.CapabilityId,
+                entry.Values,
+                null,
+                string.Empty,
+                DerivedState.Failed,
+                "未配置模型：请先到「设置 → 模型设置」添加模型",
+                string.Empty,
+                0,
+                0,
+                0,
+                DateTime.Now));
+
+            StateHasChanged();
+            await NotifySessionChangedAsync();
+            return;
+        }
+
+        // 气泡 Run 也写会话记忆：下次再点同一个插件，语言还是上次选的。
+        RememberArtifactValues(entry);
+
+        message.Derived.Add(new DerivedArtifact(
+            Guid.NewGuid().ToString("N"),
+            entry.Plugin.Id,
+            entry.Mount.Id,
+            entry.Mount.CapabilityId,
+            entry.Values,
+            null,
+            string.Empty,
+            DerivedState.Running,
+            null,
+            option.ModelId,
+            0,
+            0,
+            0,
+            DateTime.Now));
+
+        await ExecuteArtifactAsync(message, message.Derived.Count - 1, entry, option);
+    }
+
+    /// <summary>重试：沿用同一插件 / 参数，把卡片重置成 Running 再跑一次。</summary>
+    private async Task RetryArtifactAsync(ChatMessage message, DerivedArtifact artifact)
+    {
+        if (_isGenerating)
+        {
+            return;
+        }
+
+        var index = message.Derived.FindIndex(item => string.Equals(item.Id, artifact.Id, StringComparison.Ordinal));
+        if (index < 0)
+        {
+            return;
+        }
+
+        var plugin = PluginCatalog.Result.Find(artifact.PluginId);
+        var mount = plugin?.Mounts.FirstOrDefault(item =>
+            item.IsUsable && string.Equals(item.Id, artifact.MountId, StringComparison.Ordinal));
+
+        if (plugin is null || mount?.Capability is null)
+        {
+            message.Derived[index] = artifact with { State = DerivedState.Failed, Error = "插件已被删除或不再可用" };
+            StateHasChanged();
+            await NotifySessionChangedAsync();
+            return;
+        }
+
+        var option = _modelOptions.FirstOrDefault(item => item.Key == _selectedKey);
+        if (option is null)
+        {
+            message.Derived[index] = artifact with { State = DerivedState.Failed, Error = "未配置模型：请先到「设置 → 模型设置」添加模型" };
+            StateHasChanged();
+            await NotifySessionChangedAsync();
+            return;
+        }
+
+        message.Derived[index] = artifact with
+        {
+            State = DerivedState.Running,
+            Error = null,
+            Text = string.Empty,
+            DurationMs = 0,
+            InputTokens = 0,
+            OutputTokens = 0,
+            ModelId = option.ModelId
+        };
+
+        await ExecuteArtifactAsync(message, index, new PluginActionEntry(plugin, mount, artifact.Values), option);
+    }
+
+    /// <summary>跑一次派生卡片：流式写入 Text，收尾时写状态与指标。</summary>
+    private async Task ExecuteArtifactAsync(
+        ChatMessage message,
+        int index,
+        PluginActionEntry entry,
+        ModelOption option)
+    {
+        _isGenerating = true;
+        _runningMountKey = entry.Mount.Key;
+
+        // 插件 Run 开始：会话图标跟随这个插件。
+        Session.LastPluginId = entry.Plugin.Id;
+        await SetGeneratingAsync(true);
+
+        using var cts = new CancellationTokenSource();
+        _cts = cts;
+
+        var metrics = new AgentRunMetrics();
+        var startedAt = Stopwatch.GetTimestamp();
+        StateHasChanged();
+
+        try
+        {
+            var request = new PluginRunRequest(
+                entry.Plugin,
+                entry.Mount,
+                entry.Values,
+                message.Content,
+                option.Provider,
+                option.ModelId,
+                metrics);
+
+            await foreach (var delta in PluginRunner.RunArtifactAsync(request, cts.Token))
+            {
+                if (delta.Text.Length == 0)
+                {
+                    continue;
+                }
+
+                var current = message.Derived[index];
+                var text = current.Text + delta.Text;
+                if (text.Length > MaxArtifactTextChars)
+                {
+                    text = string.Concat(text.AsSpan(0, MaxArtifactTextChars), "\n\n…（结果过长，已截断）");
+                }
+
+                message.Derived[index] = current with { Text = text };
+                StateHasChanged();
+            }
+
+            message.Derived[index] = message.Derived[index] with { State = DerivedState.Done };
+        }
+        catch (OperationCanceledException)
+        {
+            message.Derived[index] = message.Derived[index] with { State = DerivedState.Canceled };
+        }
+        catch (Exception ex)
+        {
+            message.Derived[index] = message.Derived[index] with { State = DerivedState.Failed, Error = ex.Message };
+        }
+        finally
+        {
+            message.Derived[index] = message.Derived[index] with
+            {
+                DurationMs = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds,
+                InputTokens = metrics.InputTokens,
+                OutputTokens = metrics.OutputTokens
+            };
+
+            _isGenerating = false;
+            _runningMountKey = null;
+            _cts = null;
+            await SetGeneratingAsync(false);
+            StateHasChanged();
+            await NotifySessionChangedAsync();
+        }
+    }
+
+    private async Task DeleteArtifactAsync(ChatMessage message, DerivedArtifact artifact)
+    {
+        if (artifact.IsRunning)
+        {
+            return;
+        }
+
+        var index = message.Derived.FindIndex(item => string.Equals(item.Id, artifact.Id, StringComparison.Ordinal));
+        if (index < 0)
+        {
+            return;
+        }
+
+        message.Derived.RemoveAt(index);
+        StateHasChanged();
+        await NotifySessionChangedAsync();
+    }
+
+    private void RememberArtifactValues(PluginActionEntry entry)
+    {
+        foreach (var pair in entry.Values)
+        {
+            Session.PluginMemory[PluginParameterResolver.MemoryKey(entry.Plugin.Id, entry.Mount.Id, pair.Key)] = pair.Value;
+        }
+    }
 
     public void Dispose()
     {

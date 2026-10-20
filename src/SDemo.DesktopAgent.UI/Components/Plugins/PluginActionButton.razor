@@ -1,0 +1,127 @@
+@using SDemo.DesktopAgent.Models
+@using SDemo.DesktopAgent.Plugins
+
+@* 气泡上的一个插件按钮：无参数时点击即执行；有参数时原地展开面板（OK / Cancel / Esc / 点外部）。 *@
+<span class="plugin-action">
+    <button type="button"
+            class="msg-action plugin-action-button @(IsRunning ? "is-running" : null)"
+            title="@Tooltip"
+            disabled="@(Disabled || IsRunning)"
+            @onclick="HandleButtonClick">
+        <PluginIcon Plugin="Plugin" />
+        @if (IsRunning)
+        {
+            <span class="plugin-action-spinner" aria-hidden="true"></span>
+        }
+    </button>
+
+    @if (_panelOpen)
+    {
+        <div class="plugin-action-backdrop" @onclick="ClosePanel"></div>
+
+        <div class="plugin-action-panel"
+             @ref="_panelElement"
+             tabindex="-1"
+             role="dialog"
+             aria-label="@($"{Plugin.Name} 参数")"
+             @onkeydown="HandlePanelKeyDown">
+            @foreach (var parameter in Parameters)
+            {
+                <PluginParameterControl Parameter="parameter"
+                                        Value="@DraftValue(parameter)"
+                                        Disabled="@IsRunning"
+                                        ValueChanged="value => SetDraft(parameter.Key, value)" />
+            }
+
+            <span class="plugin-action-panel-actions">
+                <button type="button" class="plugin-mini-button is-primary" @onclick="SubmitAsync">OK</button>
+                <button type="button" class="plugin-mini-button" @onclick="ClosePanel">Cancel</button>
+            </span>
+        </div>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public PluginDescriptor Plugin { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public PluginMount Mount { get; set; } = default!;
+
+    /// <summary>初始参数值（父组件按会话记忆解析好的）。</summary>
+    [Parameter]
+    public IReadOnlyDictionary<string, string> Values { get; set; } =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
+    [Parameter]
+    public bool IsRunning { get; set; }
+
+    /// <summary>会话忙 / 卡片已达上限时禁用。</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public EventCallback<PluginActionEntry> OnRun { get; set; }
+
+    private ElementReference _panelElement;
+    private bool _panelOpen;
+    private Dictionary<string, string> _draft = new(StringComparer.Ordinal);
+
+    private IReadOnlyList<PluginParameter> Parameters => Mount.Capability?.Parameters ?? [];
+
+    private string Tooltip =>
+        Mount.Capability is { Parameters.Count: > 0 }
+            ? $"{Plugin.Name}（点击选择参数）"
+            : $"{Plugin.Name}（点击直接执行）";
+
+    private async Task HandleButtonClick()
+    {
+        if (Disabled || IsRunning)
+        {
+            return;
+        }
+
+        if (Parameters.Count == 0)
+        {
+            await OnRun.InvokeAsync(new PluginActionEntry(Plugin, Mount, Values));
+            return;
+        }
+
+        _draft = new Dictionary<string, string>(Values, StringComparer.Ordinal);
+        _panelOpen = true;
+
+        // 等 DOM 渲染出来再把焦点放到面板上，Esc 才能关掉。
+        await Task.Yield();
+        await _panelElement.FocusAsync();
+    }
+
+    private string DraftValue(PluginParameter parameter) =>
+        _draft.TryGetValue(parameter.Key, out var value) ? value : parameter.Default ?? string.Empty;
+
+    private void SetDraft(string key, string value) => _draft[key] = value;
+
+    private void ClosePanel() => _panelOpen = false;
+
+    private async Task HandlePanelKeyDown(KeyboardEventArgs args)
+    {
+        if (string.Equals(args.Key, "Escape", StringComparison.Ordinal))
+        {
+            ClosePanel();
+            return;
+        }
+
+        if (string.Equals(args.Key, "Enter", StringComparison.Ordinal))
+        {
+            await SubmitAsync();
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        _panelOpen = false;
+        await OnRun.InvokeAsync(new PluginActionEntry(
+            Plugin,
+            Mount,
+            new Dictionary<string, string>(_draft, StringComparer.Ordinal)));
+    }
+}

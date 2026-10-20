@@ -16,6 +16,7 @@
              ActiveSessionIsEmpty="@(_view == MainView.Chat && _activeSession is { Messages.Count: 0 })"
              IsSettingsActive="@(_view == MainView.Settings)"
              PluginEntries="_pluginRailEntries"
+             Plugins="PluginCatalog.Result.Usable"
              OnNewChat="StartNewChat"
              OnStartPluginChat="StartPluginChat"
              OnOpenSession="OpenSession"
@@ -410,7 +411,8 @@
         InputTokens = message.InputTokens,
         OutputTokens = message.OutputTokens,
         ToolCalls = new Dictionary<string, int>(message.ToolCalls, StringComparer.OrdinalIgnoreCase),
-        Plugin = message.Plugin
+        Plugin = message.Plugin,
+        Derived = [.. message.Derived]
     };
 
     private static string BuildTitle(string text, IReadOnlyList<ChatAttachment> attachments)
