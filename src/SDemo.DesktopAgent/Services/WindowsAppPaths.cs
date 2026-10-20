@@ -26,6 +26,7 @@ public sealed class WindowsAppPaths : IAppPaths
         ChatsRoot = Path.Combine(DataRoot, "chats");
         UploadsRoot = Path.Combine(DataRoot, "uploads");
         SkillsRoot = Path.Combine(DataRoot, "skills");
+        PluginsRoot = Path.Combine(DataRoot, "plugins");
         DefaultWorkspaceRoot = !string.IsNullOrWhiteSpace(workspaceOverride)
             ? Path.GetFullPath(workspaceOverride)
             : Path.Combine(
@@ -42,6 +43,8 @@ public sealed class WindowsAppPaths : IAppPaths
     public string UploadsRoot { get; }
 
     public string SkillsRoot { get; }
+
+    public string PluginsRoot { get; }
 
     public string DefaultWorkspaceRoot { get; }
 }

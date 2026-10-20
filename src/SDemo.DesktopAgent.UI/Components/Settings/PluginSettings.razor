@@ -1,0 +1,168 @@
+@inject PluginCatalog Catalog
+
+@* 插件设置（M0 骨架）：只读列表。启用开关 / 排序 / 打开目录等正式交互留给 M4。 *@
+<div class="settings-pane">
+    <section class="settings-section">
+        <h2 class="settings-section-title">插件</h2>
+        <p class="settings-section-hint">
+            插件是「plugin.json + skill 文件」组成的声明式能力包，把文件夹放进插件目录就能生效，不需要编译。
+            这里目前是 M0 的只读骨架：只展示扫描结果与加载错误，启用开关 / 排序 / 参数默认值会在 M4 提供。
+        </p>
+
+        <div class="plugin-roots">
+            <div class="plugin-root">
+                <span class="field-label">本地插件目录</span>
+                <code class="plugin-path">@Catalog.LocalRoot</code>
+            </div>
+            <div class="plugin-root">
+                <span class="field-label">内置插件目录</span>
+                <code class="plugin-path">@Catalog.BuiltinRoot</code>
+            </div>
+        </div>
+
+        <div class="plugin-toolbar">
+            <span class="settings-message">@_status</span>
+            <button type="button" class="ghost-button" @onclick="Rescan">重新扫描</button>
+        </div>
+    </section>
+
+    @if (_result.IsEmpty)
+    {
+        <section class="settings-section">
+            <p class="plugin-empty">
+                还没有发现插件。在上面的「本地插件目录」里新建一个文件夹，写入 plugin.json 和 skills/xxx.md，
+                再点「重新扫描」。
+            </p>
+        </section>
+    }
+
+    @if (_result.Plugins.Count > 0)
+    {
+        <section class="settings-section">
+            <h2 class="settings-section-title">已加载</h2>
+
+            @foreach (var plugin in _result.Plugins)
+            {
+                <article class="plugin-item @(plugin.IsUsable ? null : "is-inactive") @(plugin.HasErrors ? "is-error" : null)">
+                    <div class="plugin-item-head">
+                        <span class="plugin-icon">@plugin.Initial</span>
+                        <span class="plugin-name">@plugin.Name</span>
+                        <span class="plugin-version">@plugin.Version</span>
+                        <span class="plugin-badge">@(plugin.Source == PluginSource.Builtin ? "内置" : "本地")</span>
+                        @if (plugin.IsOverridden)
+                        {
+                            <span class="plugin-badge plugin-badge--warn">已覆盖</span>
+                        }
+                        @if (plugin.StateText is { } stateText)
+                        {
+                            <span class="plugin-badge plugin-badge--warn">@stateText</span>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(plugin.Description))
+                    {
+                        <p class="plugin-desc">@plugin.Description</p>
+                    }
+
+                    <p class="plugin-meta">
+                        入口：@SurfaceSummary(plugin) · @plugin.Capabilities.Count 个能力 · 目录 @plugin.DirectoryName
+                    </p>
+
+                    @if (plugin.DisabledReason is { } reason)
+                    {
+                        <p class="plugin-issue">@reason</p>
+                    }
+
+                    @foreach (var issue in AllIssues(plugin))
+                    {
+                        <p class="plugin-issue @(issue.IsError ? "plugin-issue--error" : null)">@issue.ToDisplayString()</p>
+                    }
+                </article>
+            }
+        </section>
+    }
+
+    @if (_result.Failures.Count > 0)
+    {
+        <section class="settings-section">
+            <h2 class="settings-section-title">加载失败</h2>
+
+            @foreach (var failure in _result.Failures)
+            {
+                <article class="plugin-item is-error">
+                    <div class="plugin-item-head">
+                        <span class="plugin-icon">!</span>
+                        <span class="plugin-name">@failure.DisplayName</span>
+                        <span class="plugin-badge">@(failure.Source == PluginSource.Builtin ? "内置" : "本地")</span>
+                    </div>
+                    <p class="plugin-meta">目录 @failure.DirectoryPath</p>
+                    @foreach (var issue in failure.Issues)
+                    {
+                        <p class="plugin-issue @(issue.IsError ? "plugin-issue--error" : null)">@issue.ToDisplayString()</p>
+                    }
+                </article>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private PluginLoadResult _result = PluginLoadResult.Empty;
+    private string _status = string.Empty;
+
+    protected override void OnInitialized() => Show(Catalog.Result, "扫描于");
+
+    private void Rescan() => Show(Catalog.Scan(), "重新扫描于");
+
+    private void Show(PluginLoadResult result, string verb)
+    {
+        _result = result;
+        _status = $"{verb} {result.ScannedAt:HH:mm:ss} · 可用 {result.Usable.Count} 个，加载失败 {result.Failures.Count} 个";
+    }
+
+    private static string SurfaceSummary(PluginDescriptor plugin)
+    {
+        var parts = new List<string>();
+        if (plugin.UsableMounts(PluginSurface.Sidebar).Count > 0)
+        {
+            parts.Add("侧栏");
+        }
+
+        if (plugin.UsableMounts(PluginSurface.Composer).Count > 0)
+        {
+            parts.Add("输入框");
+        }
+
+        if (plugin.UsableMounts(PluginSurface.Message).Count > 0)
+        {
+            parts.Add("气泡");
+        }
+
+        return parts.Count == 0 ? "无可用入口" : string.Join(" / ", parts);
+    }
+
+    private static IEnumerable<PluginIssue> AllIssues(PluginDescriptor plugin)
+    {
+        foreach (var issue in plugin.Issues)
+        {
+            yield return issue;
+        }
+
+        // 能力与入口的问题各带一行来源，避免一堆「skill 文件不存在」分不清是谁的。
+        foreach (var capability in plugin.Capabilities)
+        {
+            foreach (var issue in capability.Issues)
+            {
+                yield return issue with { Message = $"[能力 {capability.Name}] {issue.Message}" };
+            }
+        }
+
+        foreach (var mount in plugin.Mounts)
+        {
+            foreach (var issue in mount.Issues)
+            {
+                yield return issue with { Message = $"[入口 {mount.Id}] {issue.Message}" };
+            }
+        }
+    }
+}

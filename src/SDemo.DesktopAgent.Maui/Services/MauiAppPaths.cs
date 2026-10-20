@@ -21,6 +21,7 @@ public sealed class MauiAppPaths : IAppPaths
         ChatsRoot = Path.Combine(DataRoot, "chats");
         UploadsRoot = Path.Combine(DataRoot, "uploads");
         SkillsRoot = Path.Combine(DataRoot, "skills");
+        PluginsRoot = Path.Combine(DataRoot, "plugins");
         DefaultWorkspaceRoot = !string.IsNullOrWhiteSpace(workspaceOverride)
             ? Path.GetFullPath(workspaceOverride)
             : DefaultWorkspace();
@@ -35,6 +36,8 @@ public sealed class MauiAppPaths : IAppPaths
     public string UploadsRoot { get; }
 
     public string SkillsRoot { get; }
+
+    public string PluginsRoot { get; }
 
     public string DefaultWorkspaceRoot { get; }
 
