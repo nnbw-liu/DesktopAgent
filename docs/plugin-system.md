@@ -1,6 +1,6 @@
 # 插件系统设计（v1）
 
-> 状态：M0（加载器）+ M1（输入框）+ M2（侧栏）+ M3（气泡）+ M4（设置）+ M5（内置翻译插件）已实现；M6 待实现
+> 状态：M0–M6 全部实现（加载器 / 输入框 / 侧栏 / 气泡 / 设置 / 内置翻译 / 双语对照）
 > 适用工程：`SDemo.DesktopAgent`（WPF 宿主 + MAUI 宿主，共用 Core / UI）
 > 首个插件：翻译（`translate`）
 > 相关代码：`src/SDemo.DesktopAgent.Core`、`src/SDemo.DesktopAgent.UI`、`src/SDemo.DesktopAgent.Core/Data/ChatDbContext.cs`
@@ -1220,7 +1220,7 @@ M0 ──┬──▶ M1 ──┬──▶ M2
 | 阶段 | 内容 | 验收 |
 | --- | --- | --- |
 | **M5 内置翻译** | 把 `plugin.json` + `translate.md` + 图标放进内置插件目录 | 三条入口全通，无需手工建目录（清单与 skill 已就位，M2 / M3 完成后三条入口才全通） |
-| **M6 双语对照** | 格式契约、`SegmentedOutputParser`、`SegmentedOutput.razor`、切换记忆、降级 | 切换零请求；模型不按格式输出时降级为纯译文并提示 |
+| **M6 双语对照** | 格式契约、`SegmentedOutputParser`、`SegmentedOutput.razor`、切换记忆、降级 | 切换零请求；模型不按格式输出时降级为纯译文并提示（已实现） |
 
 M5 建议在 M1 完成后就开始（先手工放目录），别等 M3/M4 全绿——它是检验「通用设计」是否成立的唯一标准。
 

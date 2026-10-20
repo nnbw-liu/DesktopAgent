@@ -11,6 +11,18 @@ public sealed class PluginPromptComposer
     public const string InputOpenTag = "<待处理文本>";
     public const string InputCloseTag = "</待处理文本>";
 
+    /// <summary>
+    /// 双语对照的格式契约：由宿主追加，插件作者不用写、也不允许改（见设计文档 §10.1）。
+    /// </summary>
+    public const string SegmentContract =
+        """
+        输出格式（必须严格遵守）：
+        把内容按段落逐段处理，每一段输出一对标签，先原文后译文：
+        <s>原文段落</s>
+        <t>译文段落</t>
+        逐段重复。标签外不要输出任何文字，不要使用代码块包裹这些标签。
+        """;
+
     private static readonly Regex PlaceholderPattern = new(
         @"\{\{\s*([a-z][a-zA-Z0-9_]*)\s*(\.\s*label\s*)?\}\}",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -40,7 +52,11 @@ public sealed class PluginPromptComposer
             return parameter?.ResolveLabel(value) ?? value;
         });
 
-        // 双语对照的格式契约由宿主追加（M6 实现），插件作者不需要也不应该自己写。
+        // 双语对照的格式契约由宿主追加：插件作者不需要也不应该自己写。
+        if (capability.OutputFormat == PluginOutputFormat.Segments)
+        {
+            rendered = rendered.TrimEnd() + "\n\n" + SegmentContract;
+        }
 
         return rendered.Trim();
     }

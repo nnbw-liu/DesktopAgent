@@ -99,6 +99,48 @@ public sealed class ChatStorePluginTests : IDisposable
     }
 
     [Fact]
+    public async Task 双语段落落库后能读回()
+    {
+        var store = new ChatStore(_root);
+        var values = new Dictionary<string, string>(StringComparer.Ordinal) { ["target"] = "ja" };
+        var segments = new List<OutputSegment>
+        {
+            new("A", "甲"),
+            new("B", "乙")
+        };
+
+        var session = new ChatSession
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = "双语对照",
+            UpdatedAt = DateTime.Now
+        };
+
+        var reply = new ChatMessage(ChatMessageRole.Assistant, "甲\n\n乙")
+        {
+            Plugin = new PluginMessageInfo("translate", "composer", "translate", values, segments)
+        };
+        reply.Derived.Add(new DerivedArtifact(
+            "a1", "translate", "bubble", "translate", values, segments, "甲\n\n乙",
+            DerivedState.Done, null, "mock-model", 1000, 12, 20, DateTime.Now));
+        session.Messages.Add(reply);
+
+        await store.SaveSessionAsync(session);
+
+        var loaded = Assert.Single(await store.LoadAllAsync([]));
+        var message = Assert.Single(loaded.Messages);
+
+        Assert.True(message.Plugin!.HasSegments);
+        Assert.Equal(2, message.Plugin.Segments!.Count);
+        Assert.Equal(new OutputSegment("A", "甲"), message.Plugin.Segments[0]);
+
+        var artifact = Assert.Single(message.Derived);
+        Assert.Equal(2, artifact.Segments!.Count);
+        Assert.Equal("乙", artifact.Segments[1].Target);
+        Assert.Equal("甲\n\n乙", artifact.Text);
+    }
+
+    [Fact]
     public async Task 老库缺列时自动补齐_读写都不抛异常()
     {
         var databasePath = Path.Combine(_root, "history.db");

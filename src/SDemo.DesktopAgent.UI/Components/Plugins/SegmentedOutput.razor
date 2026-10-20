@@ -1,0 +1,40 @@
+@using SDemo.DesktopAgent.Models
+
+@* 双语对照渲染：宽屏两列（原文 | 译文），窄屏上下；纯译文模式只渲染译文。
+   切换是纯渲染，不触发任何模型请求。 *@
+@if (Segments.Count == 0)
+{
+    <p class="segmented-empty">（没有可显示的段落）</p>
+}
+else if (Mode == PluginOutputMode.Translation)
+{
+    <div class="segmented-output is-translation">
+        @foreach (var segment in Segments)
+        {
+            @if (segment.Target.Length > 0)
+            {
+                <div class="segment-line msg-body--markdown">@((MarkupString)MarkdownRenderer.ToHtml(segment.Target))</div>
+            }
+        }
+    </div>
+}
+else
+{
+    <div class="segmented-output is-bilingual">
+        @foreach (var segment in Segments)
+        {
+            <div class="segment-row">
+                <div class="segment-source" title="原文">@segment.Source</div>
+                <div class="segment-target msg-body--markdown">@((MarkupString)MarkdownRenderer.ToHtml(segment.Target))</div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<OutputSegment> Segments { get; set; } = [];
+
+    [Parameter]
+    public PluginOutputMode Mode { get; set; } = PluginOutputMode.Bilingual;
+}

@@ -3211,6 +3211,108 @@ a {
     font-size: 11.5px;
 }
 
+/* ---------- 双语对照 ---------- */
+
+.mode-toggle,
+.msg-mode {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+}
+
+.mode-chip {
+    padding: 2px 8px;
+
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+
+    color: var(--muted);
+    font: inherit;
+    font-size: 10.5px;
+    cursor: pointer;
+}
+
+.mode-chip:hover {
+    color: var(--text);
+}
+
+.mode-chip.is-active {
+    background: var(--surface-hover);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.segmented-output {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.segment-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--border);
+}
+
+.segment-row:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.segment-source {
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--muted);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.segment-target {
+    min-width: 0;
+}
+
+.segment-target > :first-child,
+.segment-line > :first-child {
+    margin-top: 0;
+}
+
+.segment-target > :last-child,
+.segment-line > :last-child {
+    margin-bottom: 0;
+}
+
+.segmented-empty {
+    margin: 0;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.derived-note {
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--muted);
+}
+
+@media (max-width: 760px) {
+    /* 窄屏：对照改为上下排列，原文在上（弱化），译文在下 */
+    .segment-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+    }
+
+    .segment-source {
+        font-size: 12px;
+    }
+}
+
 /* ---------- 移动端 / 窄屏 ---------- */
 
 /* 刘海屏与系统栏：MAUI 的 Android/iOS 宿主是 edge-to-edge，内边距交给 env()；

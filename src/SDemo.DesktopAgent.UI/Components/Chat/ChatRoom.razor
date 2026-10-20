@@ -52,7 +52,14 @@
                             </div>
                         }
 
-                        @if (!string.IsNullOrWhiteSpace(message.Content))
+                        @if (message.Plugin is { Segments.Count: > 0 } messagePlugin)
+                        {
+                            @* 插件生成的回答：段落结构存在 PluginJson 里，可切换对照 / 纯译文（纯渲染，不发请求）*@
+                            <div class="msg-body msg-body--segments">
+                                <SegmentedOutput Segments="messagePlugin.Segments!" Mode="@ModeFor(messagePlugin.PluginId)" />
+                            </div>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(message.Content))
                         {
                             <div class="msg-body @(isUser ? null : "msg-body--markdown")">
                                 @if (isUser)
@@ -103,6 +110,22 @@
                                 @if (message.DurationMs > 0)
                                 {
                                     <span class="msg-stat">耗时 @FormatDuration(message.DurationMs)</span>
+                                }
+
+                                @if (message.Plugin is { Segments.Count: > 0 } modePlugin)
+                                {
+                                    <span class="msg-mode" role="group" aria-label="呈现方式">
+                                        <button type="button"
+                                                class="mode-chip @(ModeFor(modePlugin.PluginId) == PluginOutputMode.Bilingual ? "is-active" : null)"
+                                                @onclick="() => SetOutputModeAsync(modePlugin.PluginId, PluginOutputMode.Bilingual)">
+                                            对照
+                                        </button>
+                                        <button type="button"
+                                                class="mode-chip @(ModeFor(modePlugin.PluginId) == PluginOutputMode.Translation ? "is-active" : null)"
+                                                @onclick="() => SetOutputModeAsync(modePlugin.PluginId, PluginOutputMode.Translation)">
+                                            译文
+                                        </button>
+                                    </span>
                                 }
 
                                 @* 插件按钮排在复制之前；无参数点一下直接跑，有参数展开面板 *@
@@ -162,6 +185,9 @@
                                 {
                                     <DerivedCard Artifact="artifact"
                                                  PluginName="@PluginDisplayName(artifact.PluginId)"
+                                                 Mode="@ModeFor(artifact.PluginId)"
+                                                 SegmentsExpected="@SegmentsExpected(artifact)"
+                                                 OnToggleMode="@(mode => SetOutputModeAsync(artifact.PluginId, mode))"
                                                  OnRetry="@(() => RetryArtifactAsync(message, artifact))"
                                                  OnDelete="@(() => DeleteArtifactAsync(message, artifact))" />
                                 }
@@ -868,7 +894,7 @@
                 option.ModelId,
                 metrics);
 
-            await ConsumeAsync(reply, PluginRunner.RunComposerAsync(request, cts.Token));
+            await ConsumePluginAsync(reply, capability, PluginRunner.RunComposerAsync(request, cts.Token));
         }
         finally
         {
@@ -881,7 +907,119 @@
         }
     }
 
-    /// <summary>把流式增量写进消息；取消保留已生成部分，出错追加可读提示。</summary>
+    /// <summary>
+    /// 插件 Run 的流式收尾：<c>output = segments</c> 的能力边收边解析成段落，其余能力按纯文本累积。
+    /// </summary>
+    private async Task ConsumePluginAsync(
+        ChatMessage reply,
+        PluginCapability capability,
+        IAsyncEnumerable<AgentDelta> stream)
+    {
+        var accumulator = capability.OutputFormat == PluginOutputFormat.Segments
+            ? new SegmentedOutputAccumulator(MaxArtifactTextChars)
+            : null;
+
+        try
+        {
+            await foreach (var delta in stream)
+            {
+                if (delta.Text.Length > 0)
+                {
+                    if (accumulator is null)
+                    {
+                        reply.Content += delta.Text;
+                    }
+                    else
+                    {
+                        accumulator.Append(delta.Text);
+                        ApplySegments(reply, accumulator.Parse());
+                    }
+                }
+
+                if (delta.Reasoning.Length > 0)
+                {
+                    reply.Reasoning += delta.Reasoning;
+                }
+
+                StateHasChanged();
+            }
+
+            if (accumulator is not null)
+            {
+                ApplySegments(reply, accumulator.Parse(final: true));
+            }
+
+            if (accumulator is { Truncated: true })
+            {
+                AppendTruncationNote(reply);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 用户点了停止：把已经解析出的段落收尾，保留部分结果。
+            if (accumulator is not null)
+            {
+                ApplySegments(reply, accumulator.Parse(final: true));
+            }
+        }
+        catch (Exception ex)
+        {
+            if (accumulator is not null)
+            {
+                ApplySegments(reply, accumulator.Parse(final: true));
+            }
+
+            var message = $"调用失败：{ex.Message}";
+
+            if (reply.Plugin?.Segments is { Count: > 0 } segments)
+            {
+                // 有段落结构时把错误单独加成一段，两种呈现方式下都能看到。
+                reply.Plugin = reply.Plugin with
+                {
+                    Segments = [.. segments, new OutputSegment(string.Empty, message)]
+                };
+                reply.Content = string.IsNullOrWhiteSpace(reply.Content)
+                    ? message
+                    : reply.Content + "\n\n" + message;
+            }
+            else
+            {
+                var prefix = string.IsNullOrWhiteSpace(reply.Content) ? string.Empty : "\n\n";
+                reply.Content += $"{prefix}{message}";
+            }
+        }
+    }
+
+    /// <summary>把解析结果写回消息：正文用纯译文，段落结构随 PluginJson 落库。</summary>
+    private static void ApplySegments(ChatMessage reply, SegmentedParseResult parsed)
+    {
+        reply.Content = parsed.Text;
+
+        if (reply.Plugin is { } info)
+        {
+            reply.Plugin = info with
+            {
+                Segments = parsed.Segments.Count > 0 ? parsed.Segments : null
+            };
+        }
+    }
+
+    private static void AppendTruncationNote(ChatMessage reply)
+    {
+        const string note = "\n\n…（结果过长，已截断）";
+        reply.Content += note;
+
+        if (reply.Plugin?.Segments is { Count: > 0 } segments)
+        {
+            var last = segments[^1];
+            reply.Plugin = reply.Plugin with
+            {
+                Segments = [.. segments.Take(segments.Count - 1), last with { Target = last.Target + note }]
+            };
+        }
+    }
+
+    /// <summary>普通对话的流式累积：正文原样追加，出错追加可读提示。</summary>
     private async Task ConsumeAsync(ChatMessage reply, IAsyncEnumerable<AgentDelta> stream)
     {
         try
@@ -1095,6 +1233,11 @@
         var startedAt = Stopwatch.GetTimestamp();
         StateHasChanged();
 
+        var capability = entry.Mount.Capability;
+        var accumulator = capability?.OutputFormat == PluginOutputFormat.Segments
+            ? new SegmentedOutputAccumulator(MaxArtifactTextChars)
+            : null;
+
         try
         {
             var request = new PluginRunRequest(
@@ -1114,24 +1257,59 @@
                 }
 
                 var current = message.Derived[index];
-                var text = current.Text + delta.Text;
-                if (text.Length > MaxArtifactTextChars)
+
+                if (accumulator is not null)
                 {
-                    text = string.Concat(text.AsSpan(0, MaxArtifactTextChars), "\n\n…（结果过长，已截断）");
+                    accumulator.Append(delta.Text);
+                    var parsed = accumulator.Parse();
+                    message.Derived[index] = current with
+                    {
+                        Text = parsed.Text,
+                        Segments = parsed.Segments.Count > 0 ? parsed.Segments : null
+                    };
+                }
+                else
+                {
+                    var text = current.Text + delta.Text;
+                    if (text.Length > MaxArtifactTextChars)
+                    {
+                        text = string.Concat(text.AsSpan(0, MaxArtifactTextChars), "\n\n…（结果过长，已截断）");
+                    }
+
+                    message.Derived[index] = current with { Text = text };
                 }
 
-                message.Derived[index] = current with { Text = text };
                 StateHasChanged();
+            }
+
+            if (accumulator is not null)
+            {
+                FinalizeArtifactSegments(message, index, accumulator);
+            }
+
+            if (accumulator is { Truncated: true })
+            {
+                AppendArtifactTruncationNote(message, index);
             }
 
             message.Derived[index] = message.Derived[index] with { State = DerivedState.Done };
         }
         catch (OperationCanceledException)
         {
+            if (accumulator is not null)
+            {
+                FinalizeArtifactSegments(message, index, accumulator);
+            }
+
             message.Derived[index] = message.Derived[index] with { State = DerivedState.Canceled };
         }
         catch (Exception ex)
         {
+            if (accumulator is not null)
+            {
+                FinalizeArtifactSegments(message, index, accumulator);
+            }
+
             message.Derived[index] = message.Derived[index] with { State = DerivedState.Failed, Error = ex.Message };
         }
         finally
@@ -1150,6 +1328,39 @@
             StateHasChanged();
             await NotifySessionChangedAsync();
         }
+    }
+
+    private static void FinalizeArtifactSegments(
+        ChatMessage message,
+        int index,
+        SegmentedOutputAccumulator accumulator)
+    {
+        var parsed = accumulator.Parse(final: true);
+        var current = message.Derived[index];
+        message.Derived[index] = current with
+        {
+            Text = parsed.Text,
+            Segments = parsed.Segments.Count > 0 ? parsed.Segments : null
+        };
+    }
+
+    private static void AppendArtifactTruncationNote(ChatMessage message, int index)
+    {
+        const string note = "\n\n…（结果过长，已截断）";
+        var current = message.Derived[index];
+        var segments = current.Segments;
+
+        if (segments is { Count: > 0 })
+        {
+            var last = segments[^1];
+            segments = [.. segments.Take(segments.Count - 1), last with { Target = last.Target + note }];
+        }
+
+        message.Derived[index] = current with
+        {
+            Text = current.Text + note,
+            Segments = segments
+        };
     }
 
     private async Task DeleteArtifactAsync(ChatMessage message, DerivedArtifact artifact)
@@ -1183,6 +1394,38 @@
             Session.PluginMemory[PluginParameterResolver.MemoryKey(entry.Plugin.Id, entry.Mount.Id, pair.Key)] = pair.Value;
         }
     }
+
+    /// <summary>呈现方式（对照 / 纯译文）的记忆键：按插件记，三个入口共用。</summary>
+    private static string ModeMemoryKey(string pluginId) =>
+        $"{pluginId}/{PluginParameterResolver.OutputModeKey}";
+
+    /// <summary>当前呈现方式：会话记忆优先，没有就用设置里的新会话默认值。</summary>
+    private PluginOutputMode ModeFor(string pluginId)
+    {
+        if (Session.PluginMemory.TryGetValue(ModeMemoryKey(pluginId), out var value))
+        {
+            return string.Equals(value, "translation", StringComparison.OrdinalIgnoreCase)
+                ? PluginOutputMode.Translation
+                : PluginOutputMode.Bilingual;
+        }
+
+        return Registry.Preferences.DefaultOutputMode;
+    }
+
+    /// <summary>切换呈现方式：纯渲染，不重新请求模型；状态按会话记忆。</summary>
+    private async Task SetOutputModeAsync(string pluginId, PluginOutputMode mode)
+    {
+        Session.PluginMemory[ModeMemoryKey(pluginId)] =
+            mode == PluginOutputMode.Translation ? "translation" : "bilingual";
+
+        StateHasChanged();
+        await PersistSelectionAsync();
+    }
+
+    /// <summary>这个产物本来是不是要按段落返回（用来区分「纯文本能力」与「模型没按格式返回」）。</summary>
+    private bool SegmentsExpected(DerivedArtifact artifact) =>
+        Registry.Find(artifact.PluginId)?.FindCapability(artifact.CapabilityId)?.OutputFormat
+        == PluginOutputFormat.Segments;
 
     public void Dispose()
     {
