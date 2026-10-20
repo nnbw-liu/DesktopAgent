@@ -1,6 +1,6 @@
 @using SDemo.DesktopAgent.Models
 
-@* 派生卡片：挂在原消息下的加工结果。M3 只有纯文本模式（双语对照在 M6）。 *@
+@* 派生卡片：挂在原消息下的加工结果。segments 能力支持「对照 / 纯译文」纯渲染切换。 *@
 <article class="derived-card @StateClass" data-artifact="@Artifact.Id">
     <header class="derived-head">
         <span class="derived-badge">@PluginName</span>
@@ -21,6 +21,22 @@
             {
                 <span class="derived-meta">@Artifact.TotalTokens.ToString("N0") tokens</span>
             }
+        }
+
+        @if (HasSegments)
+        {
+            <span class="mode-toggle" role="group" aria-label="呈现方式">
+                <button type="button"
+                        class="mode-chip @(Mode == PluginOutputMode.Bilingual ? "is-active" : null)"
+                        @onclick="() => OnToggleMode.InvokeAsync(PluginOutputMode.Bilingual)">
+                    对照
+                </button>
+                <button type="button"
+                        class="mode-chip @(Mode == PluginOutputMode.Translation ? "is-active" : null)"
+                        @onclick="() => OnToggleMode.InvokeAsync(PluginOutputMode.Translation)">
+                    译文
+                </button>
+            </span>
         }
 
         <span class="derived-actions">
@@ -47,15 +63,26 @@
         </span>
     </header>
 
-    @if (Artifact.IsRunning && Artifact.Text.Length == 0)
+    @if (Artifact.IsRunning && !HasSegments && Artifact.Text.Length == 0)
     {
         <p class="derived-pending">
             <span class="derived-dot" aria-hidden="true"></span>处理中…
         </p>
     }
+    else if (HasSegments)
+    {
+        <div class="derived-body">
+            <SegmentedOutput Segments="Artifact.Segments!" Mode="Mode" />
+        </div>
+    }
     else if (Artifact.Text.Length > 0)
     {
         <div class="derived-body msg-body--markdown">@((MarkupString)MarkdownRenderer.ToHtml(Artifact.Text))</div>
+    }
+
+    @if (SegmentsExpected && Artifact.State == DerivedState.Done && !HasSegments)
+    {
+        <p class="derived-note">本次结果未按段落返回，已按纯译文展示。</p>
     }
 
     @if (Artifact.Error is { Length: > 0 } error)
@@ -72,6 +99,17 @@
     [Parameter]
     public string PluginName { get; set; } = string.Empty;
 
+    /// <summary>当前呈现方式（对照 / 纯译文）。</summary>
+    [Parameter]
+    public PluginOutputMode Mode { get; set; } = PluginOutputMode.Bilingual;
+
+    /// <summary>该能力本来是否要求分段输出（false 时不会提示「未按段落返回」）。</summary>
+    [Parameter]
+    public bool SegmentsExpected { get; set; }
+
+    [Parameter]
+    public EventCallback<PluginOutputMode> OnToggleMode { get; set; }
+
     [Parameter]
     public EventCallback OnRetry { get; set; }
 
@@ -82,6 +120,8 @@
     private IJSRuntime Js { get; set; } = default!;
 
     private bool _copied;
+
+    private bool HasSegments => Artifact.Segments is { Count: > 0 };
 
     private string StateClass => Artifact.State switch
     {

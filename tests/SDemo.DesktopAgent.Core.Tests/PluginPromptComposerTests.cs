@@ -45,6 +45,33 @@ public sealed class PluginPromptComposerTests
     }
 
     [Fact]
+    public void 分段能力追加宿主格式契约()
+    {
+        var capability = Capability("把文本翻译成 {{target.label}}。") with
+        {
+            OutputFormat = PluginOutputFormat.Segments
+        };
+
+        var prompt = _composer.BuildSystemPrompt(capability, Values("ja"));
+
+        Assert.Contains("输出格式（必须严格遵守）", prompt);
+        Assert.Contains("<s>原文段落</s>", prompt);
+        Assert.Contains("<t>译文段落</t>", prompt);
+        Assert.True(prompt.IndexOf("<s>原文段落</s>", StringComparison.Ordinal)
+                    > prompt.IndexOf("日本語", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void 纯文本能力不追加格式契约()
+    {
+        var capability = Capability("把文本翻译成 {{target.label}}。");
+
+        var prompt = _composer.BuildSystemPrompt(capability, Values("ja"));
+
+        Assert.DoesNotContain("输出格式（必须严格遵守）", prompt);
+    }
+
+    [Fact]
     public void 未定义的占位符原样保留()
     {
         var capability = Capability("正文里的 {{nope}} 不能变成空字符串。");
