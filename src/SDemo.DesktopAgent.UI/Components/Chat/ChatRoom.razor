@@ -1037,7 +1037,11 @@
         }
 
         var plugin = Registry.Find(artifact.PluginId);
-        var mount = Registry.FindMount($"{artifact.PluginId}/{artifact.MountId}");
+
+        // 重试是对已有卡片本身的动作：只要插件还启用就允许，不要求「气泡」开关还开着
+        // （关掉气泡只是不再显示新按钮，不该让旧卡片点重试就报「不可用」）。
+        var mount = plugin?.Mounts.FirstOrDefault(item =>
+            item.IsUsable && string.Equals(item.Id, artifact.MountId, StringComparison.Ordinal));
 
         if (plugin is null || mount?.Capability is null)
         {
