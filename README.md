@@ -250,7 +250,7 @@ $env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
 
 ## 设置页
 
-右侧整页，顶部分区切换，两个分区各自独立滚动：
+右侧整页，顶部分区切换（通用 / 模型 / 工具 / 插件），各分区独立滚动：
 
 **通用设置**
 
@@ -345,6 +345,33 @@ version: 1.0
 - 已用本地 mock 验证：开工具后请求体带 `tools` 数组；模型返回 `tool_calls` 后应用执行函数，并把 `role: tool` 的结果回传，再产出最终回复。
 - **写文件会先弹确认框**（路径 + 内容预览，可拒绝）；确认逻辑走 `FileWriteApprovalService`，工具线程 await 用户选择，停止生成/关闭页面按拒绝处理。
 - 写文件是唯一有副作用的工具，工作区路径固定，不接受绝对路径与 `..` 越界。
+
+## 插件（M0 骨架）
+
+插件是**零代码**的声明式能力包：一个目录 + `plugin.json` + 若干 `.md` 技能文件，不需要编译、不需要重装应用。完整设计见 [docs/plugin-system.md](docs/plugin-system.md)。
+
+目录：
+
+| 来源 | 位置 | 说明 |
+| --- | --- | --- |
+| 本地 | `%APPDATA%\SDemo\DesktopAgent\plugins\<目录>\` | 用户自制；同 `id` 时覆盖内置插件 |
+| 内置 | `<exe 目录>\plugins\<目录>\` | 随应用发布，仓库里是根目录的 `plugins/`，构建时复制 |
+
+当前进度：**M0 只做加载器与只读预览**——扫描、解析、校验、排序、去重，「设置 → 插件」能看到每个插件可用 / 不可用及具体原因（文件 + 行号 / JSON 路径）。把插件挂到输入框（M1）、侧栏（M2）、气泡（M3）以及启用开关（M4）都还没做。
+
+已实现的接缝：
+
+- `Core/Plugins/PluginCatalog.cs`：扫内置 + 本地两个目录，**吞掉所有解析异常**（坏插件只降级自己），本地覆盖同 `id` 的内置插件，结果缓存并支持 `Scan()` 重新扫描。
+- `Core/Plugins/PluginManifest.cs`：清单 DTO 与反序列化选项（允许 `//` 注释、尾逗号、大小写不敏感、UTF-8 BOM），未知字段按 JSON 路径记警告。
+- `Core/Plugins/PluginValidator.cs`：id 格式与唯一性、skill 路径越界（`Path.GetFullPath` + 前缀比较，必须 `.md`）、占位符必须有参数定义、参数 `kind` / `options`、`minHostVersion`、`plugin.json` 512 KB 与 skill 256 KB 上限、图标只收 SVG `path` 数据。
+- `Core/Plugins/PluginModels.cs`：`PluginDescriptor` / `Capability` / `Mount` / `Parameter` 描述符，入口组合键 `<pluginId>/<mountId>`。
+- `Core/Plugins/PluginHostVersion.cs`：宿主版本与 `minHostVersion` 比较。
+- `IAppPaths.PluginsRoot`：WPF / MAUI 的插件目录（Android 落在 `AppDataDirectory/plugins`）。
+- `UI/Components/Settings/PluginSettings.razor`：M0 的只读列表（M4 会换成正式管理页）。
+
+试一下：在 `%APPDATA%\SDemo\DesktopAgent\plugins\demo\` 放 `plugin.json` 和 `skills/main.md`，打开「设置 → 插件」即可看到；故意写错字段名或 skill 路径，条目会显示具体原因。
+
+**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（43 个用例：合法最小清单、缺 skill、路径穿越、未定义占位符、重复 id、超体积、无效 JSON、未知字段、minHostVersion、参数校验、DI 注册）。
 
 ## 主题实现
 

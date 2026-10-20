@@ -1,6 +1,6 @@
 # 插件系统设计（v1）
 
-> 状态：设计定稿，待实现
+> 状态：M0 已实现（清单模型 / Catalog / 校验器 / 参数 schema / 设置页只读列表），M1 起待实现
 > 适用工程：`SDemo.DesktopAgent`（WPF 宿主 + MAUI 宿主，共用 Core / UI）
 > 首个插件：翻译（`translate`）
 > 相关代码：`src/SDemo.DesktopAgent.Core`、`src/SDemo.DesktopAgent.UI`、`src/SDemo.DesktopAgent.Core/Data/ChatDbContext.cs`
@@ -1056,14 +1056,14 @@ M0 ──┬──▶ M1 ──┬──▶ M2
 
 **任务**
 
-- [ ] `IAppPaths.PluginsRoot`：WPF / MAUI-Windows 落在 `%APPDATA%\SDemo\DesktopAgent\plugins`，Android 落在 `AppDataDirectory/plugins`
-- [ ] `PluginManifest` 模型 + 反序列化选项（允许 `//` 注释、尾逗号、大小写不敏感）
-- [ ] `PluginCatalog.Scan()`：内置目录 + 本地目录，排序、去重、本地覆盖内置
-- [ ] `PluginValidator`：id 格式、skill 路径越界、占位符、参数 `kind`、`minHostVersion`、文件体积
-- [ ] 占位符提取与校验（`{{key}}` / `{{key.label}}`）
-- [ ] `PluginLoadResult`：可用列表 + 失败列表（含所属文件与位置）
-- [ ] 单元测试：合法最小清单、缺 skill、路径穿越、未定义占位符、重复 id、超体积
-- [ ] 临时可见性：设置页先渲染一个只读列表（正式 UI 留给 M4）
+- [x] `IAppPaths.PluginsRoot`：WPF / MAUI-Windows 落在 `%APPDATA%\SDemo\DesktopAgent\plugins`，Android 落在 `AppDataDirectory/plugins`
+- [x] `PluginManifest` 模型 + 反序列化选项（允许 `//` 注释、尾逗号、大小写不敏感）
+- [x] `PluginCatalog.Scan()`：内置目录 + 本地目录，排序、去重、本地覆盖内置
+- [x] `PluginValidator`：id 格式、skill 路径越界、占位符、参数 `kind`、`minHostVersion`、文件体积
+- [x] 占位符提取与校验（`{{key}}` / `{{key.label}}`）
+- [x] `PluginLoadResult`：可用列表 + 失败列表（含所属文件与位置）
+- [x] 单元测试：合法最小清单、缺 skill、路径穿越、未定义占位符、重复 id、超体积
+- [x] 临时可见性：设置页先渲染一个只读列表（正式 UI 留给 M4）
 
 **关键实现点**
 
@@ -1244,10 +1244,17 @@ src/SDemo.DesktopAgent.Core/Plugins/
   PluginCatalog.cs           扫描 / 校验 / 排序 / 变更事件
   PluginModels.cs            Capability、Mount、Parameter 描述符
   PluginValidator.cs         路径、占位符、id、版本校验
+  PluginHostVersion.cs       宿主版本与 minHostVersion 比较
   PluginParameterResolver.cs 默认值解析、系统语言映射、会话记忆读写
   PluginRunner.cs            Run 编排、分段、取消、产物写入
   PluginPromptComposer.cs    skill 渲染、定界包裹、格式契约追加
   SegmentedOutputParser.cs   <s>/<t> 解析与降级
+
+tests/SDemo.DesktopAgent.Core.Tests/
+  PluginCatalogTests.cs      扫描 / 校验 / 去重 / 降级 / 体积上限
+  PluginManifestTests.cs     注释、尾逗号、大小写、语法错误行号、未知字段
+  PluginModelTests.cs        问题定位文案、参数显示名、宿主版本比较
+  CompositionTests.cs        DI 注册与插件目录默认值
 
 src/SDemo.DesktopAgent.UI/Components/Plugins/
   PluginIcon.razor           图标渲染（paths / text 兜底）

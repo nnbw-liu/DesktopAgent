@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using SDemo.DesktopAgent.Plugins;
 
 namespace SDemo.DesktopAgent.Services;
 
@@ -19,6 +20,7 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<WorkspaceContext>();
         services.AddSingleton<ChatStore>();
         services.AddSingleton<SkillCatalog>();
+        services.AddSingleton<PluginCatalog>();
         services.AddSingleton<AgentToolbox>();
         services.AddSingleton<IAgentChatService, AgentChatService>();
 

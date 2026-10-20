@@ -27,6 +27,13 @@
                 @onclick="() => _tab = SettingsSection.Tools">
             工具设置
         </button>
+        <button type="button"
+                role="tab"
+                aria-selected="@(_tab == SettingsSection.Plugins)"
+                class="settings-tab @(_tab == SettingsSection.Plugins ? "is-active" : null)"
+                @onclick="() => _tab = SettingsSection.Plugins">
+            插件
+        </button>
     </nav>
 
     <div class="settings-body">
@@ -37,6 +44,9 @@
                 break;
             case SettingsSection.Models:
                 <ModelSettings />
+                break;
+            case SettingsSection.Plugins:
+                <PluginSettings />
                 break;
             default:
                 <ToolsSettings />

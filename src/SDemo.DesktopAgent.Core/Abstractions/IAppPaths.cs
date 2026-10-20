@@ -23,6 +23,12 @@ public interface IAppPaths
     string SkillsRoot { get; }
 
     /// <summary>
+    /// 用户插件目录：每个子目录一个插件包（目录里有 plugin.json）。
+    /// 桌面端是 %APPDATA%\SDemo\DesktopAgent\plugins，Android 是 <c>AppDataDirectory/plugins</c>。
+    /// </summary>
+    string PluginsRoot { get; }
+
+    /// <summary>
     /// 不属于任何工作区的会话默认使用的文件工具根目录。
     /// 桌面端是「我的文档\SDemo DesktopAgent」，移动端退化为应用私有目录。
     /// </summary>

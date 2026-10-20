@@ -6,6 +6,7 @@
 @inject WorkspaceContext WorkspaceContext
 @inject IFolderPickerService FolderPicker
 @inject ChatStore ChatStore
+@inject PluginCatalog PluginCatalog
 
 <div class="app-shell">
     <Sidebar Workspaces="Workspaces"
@@ -81,6 +82,9 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // 启动时扫一次插件目录（结果缓存，设置页打开时直接用；重新扫描走 Catalog.Scan()）。
+        PluginCatalog.EnsureLoaded();
+
         // 启动时从各个 SQLite 库恢复历史会话（工作区 DB + 历史聊天 DB）。
         _sessions = (await ChatStore.LoadAllAsync(Workspaces)).ToList();
         _activeSession = ChatSession.CreateEmpty();
