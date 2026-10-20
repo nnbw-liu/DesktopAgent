@@ -15,7 +15,9 @@
              ActiveWorkspaceId="@(_view == MainView.Chat ? _activeSession?.WorkspaceId : null)"
              ActiveSessionIsEmpty="@(_view == MainView.Chat && _activeSession is { Messages.Count: 0 })"
              IsSettingsActive="@(_view == MainView.Settings)"
+             PluginEntries="_pluginRailEntries"
              OnNewChat="StartNewChat"
+             OnStartPluginChat="StartPluginChat"
              OnOpenSession="OpenSession"
              OnOpenSettings="OpenSettings"
              OnNewChatInWorkspace="NewChatInWorkspace"
@@ -65,6 +67,9 @@
 
     private List<ChatSession> _sessions = [];
 
+    /// <summary>侧栏插件入口（启动 / 重新扫描后刷新）。</summary>
+    private IReadOnlyList<PluginRailEntry> _pluginRailEntries = [];
+
     // 启动后默认就是一个新建的空聊天室（尚不进入历史列表，等有内容才加入）。
     private ChatSession? _activeSession;
 
@@ -84,6 +89,8 @@
     {
         // 启动时扫一次插件目录（结果缓存，设置页打开时直接用；重新扫描走 Catalog.Scan()）。
         PluginCatalog.EnsureLoaded();
+        RefreshPluginRailEntries();
+        PluginCatalog.Changed += OnPluginCatalogChanged;
 
         // 启动时从各个 SQLite 库恢复历史会话（工作区 DB + 历史聊天 DB）。
         _sessions = (await ChatStore.LoadAllAsync(Workspaces)).ToList();
@@ -91,13 +98,47 @@
         UpdateWorkspaceRoot();
     }
 
+    /// <summary>刷新侧栏插件入口：只取侧栏界面上可用且 show 的入口。</summary>
+    private void RefreshPluginRailEntries() =>
+        _pluginRailEntries = PluginCatalog.Result
+            .UsableMounts(PluginSurface.Sidebar)
+            .Where(mount => mount.Show)
+            .Select(mount => (Mount: mount, Plugin: PluginCatalog.Result.Find(mount.PluginId)))
+            .Where(item => item.Plugin is not null)
+            .Select(item => new PluginRailEntry(item.Plugin!, item.Mount))
+            .ToList();
+
+    private void OnPluginCatalogChanged(object? sender, EventArgs e) =>
+        _ = InvokeAsync(() =>
+        {
+            RefreshPluginRailEntries();
+            StateHasChanged();
+        });
+
     /// <summary>新建聊天室：默认不归属任何工作区，进「历史聊天」。</summary>
-    private void StartNewChat()
+    private void StartNewChat() => StartNewChat(null);
+
+    /// <summary>
+    /// 新建聊天室并预选插件入口（侧栏插件入口与「新建聊天室」走同一条路径，
+    /// 只多做两件事：OriginMountId = ActiveMountId = mount，并写入空会话）。
+    /// </summary>
+    private void StartNewChat(string? mountKey)
     {
         _view = MainView.Chat;
-        _activeSession = ChatSession.CreateEmpty();
+
+        var session = ChatSession.CreateEmpty();
+        if (!string.IsNullOrWhiteSpace(mountKey))
+        {
+            session.OriginMountId = mountKey;
+            session.ActiveMountId = mountKey;
+        }
+
+        _activeSession = session;
         UpdateWorkspaceRoot();
     }
+
+    /// <summary>点侧栏插件入口：新建预选该插件的空会话。</summary>
+    private void StartPluginChat(PluginRailEntry entry) => StartNewChat(entry.Mount.Key);
 
     /// <summary>在指定工作区里新建聊天室。</summary>
     private void NewChatInWorkspace(Workspace workspace)
@@ -422,5 +463,9 @@
     private ValueTask ApplyThemeAsync(AppTheme theme) =>
         Js.InvokeVoidAsync("sdTheme.apply", theme == AppTheme.Dark ? "dark" : "light");
 
-    public void Dispose() => ThemeService.ThemeChanged -= OnThemeChanged;
+    public void Dispose()
+    {
+        ThemeService.ThemeChanged -= OnThemeChanged;
+        PluginCatalog.Changed -= OnPluginCatalogChanged;
+    }
 }

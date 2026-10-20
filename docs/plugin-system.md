@@ -1,6 +1,6 @@
 # 插件系统设计（v1）
 
-> 状态：M0（加载器）+ M1（输入框）已实现，M5 的内置翻译插件已就位；M2 / M3 / M4 / M6 待实现
+> 状态：M0（加载器）+ M1（输入框）+ M2（侧栏）已实现，M5 的内置翻译插件已就位；M3 / M4 / M6 待实现
 > 适用工程：`SDemo.DesktopAgent`（WPF 宿主 + MAUI 宿主，共用 Core / UI）
 > 首个插件：翻译（`translate`）
 > 相关代码：`src/SDemo.DesktopAgent.Core`、`src/SDemo.DesktopAgent.UI`、`src/SDemo.DesktopAgent.Core/Data/ChatDbContext.cs`
@@ -1124,11 +1124,11 @@ M0 ──┬──▶ M1 ──┬──▶ M2
 
 **任务**
 
-- [ ] `PluginRail.razor`：条目（图标 + 名称）、上下分割线、上限 6 + 「更多插件」
-- [ ] `AppShell.StartNewChat` 增加可选 `mount` 参数（不新写一套新建逻辑）
-- [ ] 写入 `OriginMountId = ActiveMountId = <mount>`
-- [ ] `Sidebar` 接收 mounts 并接线，样式复用 `.sidebar-item`
-- [ ] 空会话取消预选后不残留任何插件痕迹（除内部字段）
+- [x] `PluginRail.razor`：条目（图标 + 名称）、上下分割线、上限 6 + 「更多插件」
+- [x] `AppShell.StartNewChat` 增加可选 `mount` 参数（不新写一套新建逻辑）
+- [x] 写入 `OriginMountId = ActiveMountId = <mount>`
+- [x] `Sidebar` 接收 mounts 并接线，样式复用 `.sidebar-item`
+- [x] 空会话取消预选后不残留任何插件痕迹（除内部字段）
 
 **关键实现点**
 

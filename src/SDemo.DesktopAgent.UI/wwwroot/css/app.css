@@ -2767,6 +2767,55 @@ a {
     color: var(--muted);
 }
 
+/* ---------- 侧栏插件入口区 ---------- */
+
+.plugin-rail {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 6px 8px;
+
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+/* 有入口区时，内容区不再重复一条分割线 */
+.plugin-rail + .sidebar-content {
+    border-top: 0;
+}
+
+.plugin-rail .item-icon {
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+}
+
+.plugin-rail-icon {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+}
+
+.plugin-icon-svg {
+    width: 15px;
+    height: 15px;
+}
+
+.plugin-icon-text {
+    font-size: 10.5px;
+    font-weight: 600;
+}
+
+.plugin-rail-more .item-main {
+    border-radius: 8px;
+    color: var(--text-dim);
+}
+
+.plugin-rail-more .item-main:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
 /* ---------- 移动端 / 窄屏 ---------- */
 
 /* 刘海屏与系统栏：MAUI 的 Android/iOS 宿主是 edge-to-edge，内边距交给 env()；
