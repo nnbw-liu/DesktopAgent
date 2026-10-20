@@ -38,32 +38,4 @@ public sealed class CompositionTests
         Assert.Equal("plugins", Path.GetFileName(paths.PluginsRoot));
         Assert.StartsWith(paths.DataRoot, paths.PluginsRoot, StringComparison.OrdinalIgnoreCase);
     }
-
-    private sealed class StubAppPaths : IAppPaths
-    {
-        public StubAppPaths(string dataRoot)
-        {
-            DataRoot = dataRoot;
-            SettingsFile = Path.Combine(dataRoot, "settings.json");
-            ChatsRoot = Path.Combine(dataRoot, "chats");
-            UploadsRoot = Path.Combine(dataRoot, "uploads");
-            SkillsRoot = Path.Combine(dataRoot, "skills");
-            PluginsRoot = Path.Combine(dataRoot, "plugins");
-            DefaultWorkspaceRoot = Path.Combine(dataRoot, "workspace");
-        }
-
-        public string DataRoot { get; }
-
-        public string SettingsFile { get; }
-
-        public string ChatsRoot { get; }
-
-        public string UploadsRoot { get; }
-
-        public string SkillsRoot { get; }
-
-        public string PluginsRoot { get; }
-
-        public string DefaultWorkspaceRoot { get; }
-    }
 }

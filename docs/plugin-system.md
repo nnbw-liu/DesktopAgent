@@ -1,6 +1,6 @@
 # 插件系统设计（v1）
 
-> 状态：M0（加载器）+ M1（输入框）+ M2（侧栏）+ M3（气泡）+ M5（内置翻译插件）已实现；M4 / M6 待实现
+> 状态：M0（加载器）+ M1（输入框）+ M2（侧栏）+ M3（气泡）+ M4（设置）+ M5（内置翻译插件）已实现；M6 待实现
 > 适用工程：`SDemo.DesktopAgent`（WPF 宿主 + MAUI 宿主，共用 Core / UI）
 > 首个插件：翻译（`translate`）
 > 相关代码：`src/SDemo.DesktopAgent.Core`、`src/SDemo.DesktopAgent.UI`、`src/SDemo.DesktopAgent.Core/Data/ChatDbContext.cs`
@@ -640,12 +640,16 @@ public sealed record OutputSegment(string Source, string Target);
   "rememberParameterValues": true,
   "defaultOutputMode": "bilingual",
   "entries": [
-    { "id": "translate", "enabled": true, "inSidebar": true, "inComposer": true, "order": 10 }
+    { "id": "translate", "enabled": true, "inSidebar": true, "inComposer": true, "inMessage": true, "order": 10 }
   ]
 }
 ```
 
 `entries` 只在用户改过设置时写入；插件默认值来自 manifest 的 `show` / `order`。插件被删除后条目保留（下次装回来仍然生效），但不在界面上展示。
+
+> 入口开关的依赖关系：**侧栏依赖输入框**。侧栏入口只是「新建一个预选该插件的会话」，
+> 输入框入口关闭后进去也看不到插件，所以 `inComposer = false` 时 `inSidebar` 一律视为关闭
+> （设置页把侧栏那一项灰掉并给原因）。`inMessage` 是气泡按钮的独立开关，与输入框无关。
 
 ---
 
@@ -1188,12 +1192,12 @@ M0 ──┬──▶ M1 ──┬──▶ M2
 
 **任务**
 
-- [ ] `SettingsSection.Plugins` + `SettingsView` 新增分区
-- [ ] `PluginSettings.razor`：列表（内置 / 本地 / 加载失败）、启用开关、侧栏 / 输入框开关、顺序
-- [ ] 全局配置：总开关 `plugins.enabled`、`maxInComposer`、`maxInSidebar`、`rememberParameterValues`、默认输出模式
-- [ ] 「重新扫描」与「打开插件目录」（Android 隐藏后一个）
-- [ ] 设置变更 → `SettingsService.Changed` → composer / sidebar / rail 即时刷新
-- [ ] 失败条目展示文件与位置
+- [x] `SettingsSection.Plugins` + `SettingsView` 新增分区
+- [x] `PluginSettings.razor`：列表（内置 / 本地 / 加载失败）、启用开关、侧栏 / 输入框开关、顺序
+- [x] 全局配置：总开关 `plugins.enabled`、`maxInComposer`、`maxInSidebar`、`rememberParameterValues`、默认输出模式
+- [x] 「重新扫描」与「打开插件目录」（Android 隐藏后一个）
+- [x] 设置变更 → `SettingsService.Changed` → composer / sidebar / rail 即时刷新
+- [x] 失败条目展示文件与位置
 
 **关键实现点**
 
@@ -1245,10 +1249,14 @@ src/SDemo.DesktopAgent.Core/Plugins/
   PluginModels.cs            Capability、Mount、Parameter 描述符
   PluginValidator.cs         路径、占位符、id、版本校验
   PluginHostVersion.cs       宿主版本与 minHostVersion 比较
+  PluginRegistry.cs          目录结果 + 用户设置合并成运行时有效视图
   PluginParameterResolver.cs 默认值解析、系统语言映射、会话记忆读写
   PluginRunner.cs            Run 编排、分段、取消、产物写入
   PluginPromptComposer.cs    skill 渲染、定界包裹、格式契约追加
   SegmentedOutputParser.cs   <s>/<t> 解析与降级
+
+src/SDemo.DesktopAgent.Core/Models/
+  PluginPreferences.cs       settings.json 的 plugins 节点（开关 / 上限 / 每插件覆盖 / 隐私确认）
 
 src/SDemo.DesktopAgent.Core/Services/
   AgentMessageMapper.cs      请求上下文组装（只读正文与附件，派生卡片不参与）

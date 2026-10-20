@@ -3110,6 +3110,107 @@ a {
     }
 }
 
+/* ---------- 插件设置：全局配置与每个插件的控制 ---------- */
+
+.plugin-limits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin: 12px 0;
+}
+
+.plugin-limit {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    font-size: 12px;
+    color: var(--text-dim);
+    cursor: default;
+}
+
+.plugin-limit-input {
+    width: 64px;
+    padding: 5px 8px;
+}
+
+.plugin-limit-unit {
+    color: var(--muted);
+}
+
+.plugin-mode-segmented {
+    margin-bottom: 0;
+}
+
+.plugin-toolbar-actions {
+    display: inline-flex;
+    gap: 8px;
+}
+
+.plugin-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+}
+
+.plugin-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+
+    font-size: 11.5px;
+    color: var(--text-dim);
+    cursor: pointer;
+}
+
+.plugin-control.is-disabled {
+    opacity: .45;
+    cursor: default;
+}
+
+.plugin-control--order {
+    margin-left: auto;
+    gap: 6px;
+}
+
+.plugin-order-input {
+    width: 64px;
+    padding: 4px 8px;
+}
+
+.switch--sm {
+    width: 30px;
+    height: 18px;
+}
+
+.switch--sm::after {
+    width: 12px;
+    height: 12px;
+}
+
+.switch--sm:checked::after {
+    transform: translateX(12px);
+}
+
+/* 插件被停用 / 入口被关掉时的提示 */
+.plugin-notice {
+    max-width: 900px;
+    margin: 0 auto 6px;
+    padding: 6px 12px;
+
+    border: 1px solid var(--accent-border);
+    border-radius: 8px;
+    background: var(--accent-soft);
+
+    color: var(--accent-text);
+    font-size: 11.5px;
+}
+
 /* ---------- 移动端 / 窄屏 ---------- */
 
 /* 刘海屏与系统栏：MAUI 的 Android/iOS 宿主是 edge-to-edge，内边距交给 env()；

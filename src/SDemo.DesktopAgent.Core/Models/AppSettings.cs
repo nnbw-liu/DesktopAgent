@@ -28,4 +28,7 @@ public sealed class AppSettings
 
     /// <summary>工作区列表。</summary>
     public List<Workspace> Workspaces { get; set; } = [];
+
+    /// <summary>插件设置（总开关、显示上限、每个插件的启用 / 入口 / 顺序）。</summary>
+    public PluginPreferences Plugins { get; set; } = new();
 }

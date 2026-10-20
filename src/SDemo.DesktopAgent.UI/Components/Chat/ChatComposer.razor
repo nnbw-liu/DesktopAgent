@@ -230,7 +230,6 @@
 
 @code {
     private const int VisibleSkillCount = 3;
-    private const int VisiblePluginCount = 3;
     private const int MaxInlineParameters = 2;
     private const int MaxFilesPerUpload = 10;
 
@@ -282,6 +281,10 @@
     [Parameter]
     public IReadOnlyList<PluginMount> PluginMounts { get; set; } = [];
 
+    /// <summary>最多直接显示几个插件入口（来自设置 plugins.maxInComposer）。</summary>
+    [Parameter]
+    public int MaxVisiblePlugins { get; set; } = 3;
+
     /// <summary>当前选中的插件；为 null 表示全局模式（技能 + 插件入口都显示）。</summary>
     [Parameter]
     public PluginDescriptor? ActivePlugin { get; set; }
@@ -321,12 +324,14 @@
 
     private bool HasMore => Skills.Count > VisibleSkillCount;
 
-    /// <summary>最多内联 3 个插件入口，其余进「更多」。</summary>
-    private IEnumerable<PluginMount> VisibleMounts => PluginMounts.Take(VisiblePluginCount);
+    /// <summary>最多内联 N 个插件入口，其余进「更多」（N 来自设置）。</summary>
+    private IEnumerable<PluginMount> VisibleMounts =>
+        PluginMounts.Take(Math.Max(1, MaxVisiblePlugins));
 
-    private IEnumerable<PluginMount> HiddenMounts => PluginMounts.Skip(VisiblePluginCount);
+    private IEnumerable<PluginMount> HiddenMounts =>
+        PluginMounts.Skip(Math.Max(1, MaxVisiblePlugins));
 
-    private bool HasMoreMounts => PluginMounts.Count > VisiblePluginCount;
+    private bool HasMoreMounts => PluginMounts.Count > Math.Max(1, MaxVisiblePlugins);
 
     /// <summary>参数 ≤ 2 个时全部内联，其余用默认值（面板留到 M4 / 气泡的那个浮层）。</summary>
     private IEnumerable<PluginParameter> VisibleParameters =>

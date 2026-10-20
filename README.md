@@ -357,16 +357,16 @@ version: 1.0
 | 本地 | `%APPDATA%\SDemo\DesktopAgent\plugins\<目录>\` | 用户自制；同 `id` 时覆盖内置插件 |
 | 内置 | `<exe 目录>\plugins\<目录>\` | 随应用发布，仓库里是根目录的 `plugins/`，构建时复制 |
 
-当前进度：**M0（加载器）+ M1（输入框）+ M5（内置翻译插件）已完成**。
+当前进度：**M0（加载器）+ M1（输入框）+ M2（侧栏）+ M3（气泡）+ M4（设置）+ M5（内置翻译插件）已完成**，只剩 M6（双语对照）待做。
 
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
-| M0 骨架 | ✅ | 扫描、解析、校验、排序、去重；「设置 → 插件」只读列表能看到可用 / 不可用及原因（文件 + 行号 / JSON 路径） |
+| M0 骨架 | ✅ | 扫描、解析、校验、排序、去重；坏插件只降级自己，失败条目带文件 + 行号 / JSON 路径 |
 | M1 输入框 | ✅ | 选中插件后发送走插件 Run：chip + 内联参数、会话记忆、助手消息带「翻译 · SDemo」归属 |
 | M2 侧栏 | ✅ | 「新建聊天室」下方的插件入口区，点入口新建预选该插件的空会话（`OriginMountId = ActiveMountId`） |
 | M3 气泡 | ✅ | 助手消息底部的插件按钮 → 派生卡片（复制 / 重试 / 删除）；会话图标跟随 `LastPluginId`，普通推理后复位；派生内容不进上下文 |
-| M4 设置 | ⬜ | 启用开关、显示上限、打开插件目录；目前设置页只是只读列表 |
-| M5 内置翻译 | ✅ | `plugins/translate/`（三条入口只有输入框能跑，另外两条等 M2 / M3） |
+| M4 设置 | ✅ | 「设置 → 插件」：总开关、输入框/侧栏上限、参数记忆、默认呈现、每个插件的启用/输入框/侧栏/气泡/顺序、打开目录、重新扫描；改动即时生效。侧栏依赖输入框（关掉输入框后侧栏入口一并隐藏） |
+| M5 内置翻译 | ✅ | `plugins/translate/`（三条入口都可用） |
 | M6 双语对照 | ⬜ | 目前 `segments` 输出按纯文本处理 |
 
 已实现的接缝：
@@ -375,22 +375,24 @@ version: 1.0
 - `Core/Plugins/PluginManifest.cs`：清单 DTO 与反序列化选项（允许 `//` 注释、尾逗号、大小写不敏感、UTF-8 BOM），未知字段按 JSON 路径记警告。
 - `Core/Plugins/PluginValidator.cs`：id 格式与唯一性、skill 路径越界（`Path.GetFullPath` + 前缀比较，必须 `.md`）、占位符必须有参数定义、参数 `kind` / `options`、`minHostVersion`、`plugin.json` 512 KB 与 skill 256 KB 上限、图标只收 SVG `path` 数据。
 - `Core/Plugins/PluginModels.cs`：`PluginDescriptor` / `Capability` / `Mount` / `Parameter` 描述符，入口组合键 `<pluginId>/<mountId>`。
+- `Core/Plugins/PluginRegistry.cs`：把目录结果与用户设置合并成「有效视图」——总开关、插件启用、输入框 / 侧栏 / 气泡开关、顺序、显示上限；设置或重新扫描后立即刷新，UI 只从这里取入口。**侧栏依赖输入框**：关掉输入框入口后侧栏入口也隐藏（侧栏本来就只是进入预选插件的会话）。
+- `Core/Models/PluginPreferences.cs`：`settings.json` 的 `plugins` 节点（含每个插件的 `enabled` / `inComposer` / `inSidebar` / `inMessage` / `order` 与隐私确认列表）。旧设置文件没有该节点时用默认值，不写迁移。
 - `Core/Plugins/PluginParameterResolver.cs`：会话记忆 → `default` → `defaultFrom`（`system-language` / `system-locale`）→ `fallback` → 第一个 option；无效记忆值不会把会话卡死。
 - `Core/Plugins/PluginPromptComposer.cs`：skill 去 frontmatter、替换 `{{key}}` / `{{key.label}}`；用户输入单独成条并包进 `<待处理文本>`，`<` 全角转义。
 - `Core/Plugins/PluginRunner.cs`：单轮、无历史（除非能力打开 `allowHistory`）、无工具；超 60,000 字符直接报错而不是发出去。
 - `Core/Services/AgentChatService.cs`：抽出 `RunAsync(AgentRunPlan)`，普通对话与插件 Run 共用同一条请求组装。
-- `Core/Services/ChatStore.cs`：`sessions` 四个插件列 + `messages.PluginJson`；`UpgradeSchemaAsync` 现在**两张表各扫一遍**，老库升级不报 `no such column`。
+- `Core/Services/ChatStore.cs`：`sessions` 四个插件列 + `messages.PluginJson` / `DerivedJson`；`UpgradeSchemaAsync` **两张表各扫一遍**，老库升级不报 `no such column`；加载时把上次没跑完的 `Running` 卡片收尾成 `Failed`。
 - `UI/Components/Chat/ChatComposer.razor` + `PluginParameterControl.razor`：全局 / 插件模式切换、chip 带 `✕`、最多内联 2 个参数（`select` / `text` / `number` / `toggle`；多选未实现）。
 - `UI/Components/Sidebar/PluginRail.razor`：侧栏入口区（图标 + 名称，最多 6 个 + 「更多插件」），点击走 `AppShell.StartNewChat(mount)`，与「新建聊天室」同一条路径。
 - `UI/Components/Sidebar/Sidebar.razor`：会话图标跟随 `LastPluginId`（插件被删除时回默认图标）。
 - `UI/Components/Plugins/`：`PluginIcon`（只渲染 SVG `path`）、`PluginActionButton`（无参数点击即跑 / 有参数展开面板，OK / Cancel / Esc / 点外部）、`PluginActionBar`（最多内联 2 个，其余进「⋯」）、`DerivedCard`（流式文本、复制 / 重试 / 删除）。
 - `Core/Services/AgentMessageMapper.cs`：请求上下文只由消息正文与附件组成——**派生卡片永远不进去**，并有一条单测钉住这个约定。
-- `Core/Services/ChatStore.cs`：`messages.DerivedJson` 持久化；加载时把上次没跑完的 `Running` 卡片收尾成 `Failed`，避免界面永远转圈。
-- `UI/Components/Settings/PluginSettings.razor`：M0 的只读列表（M4 会换成正式管理页）。
+- `UI/Components/Settings/PluginSettings.razor`：总开关 / 上限 / 参数记忆 / 默认呈现 / 每个插件的启用、入口、顺序，加「打开插件目录」「重新扫描」和失败条目；改动即时生效。
+- 隐私：`privacy.sendsText` 的插件首次执行前弹一次确认（取消则不跑），确认结果记在 `plugins.privacyAcknowledged`。
 
-使用方式：侧栏「新建聊天室」下方有「翻译」入口，点一下就是预选翻译的空会话；输入框底部的「翻译」chip 选中后发送走插件 Run；任意助手消息底部（时间右侧）的插件图标点一下，无参数直接跑、有参数弹出语言面板，产物是挂在原消息下的卡片，重启仍在、也不会进入下一轮上下文。
+使用方式：侧栏「新建聊天室」下方有「翻译」入口，点一下就是预选翻译的空会话；输入框底部的「翻译」chip 选中后发送走插件 Run；任意助手消息底部（时间右侧）的插件图标点一下，无参数直接跑、有参数弹出语言面板，产物是挂在原消息下的卡片，重启仍在、也不会进入下一轮上下文。想关掉或调整上限：「设置 → 插件」。
 
-**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（83 个用例：清单解析、路径穿越、占位符、去重、超体积、`minHostVersion`、参数校验、DI 注册、参数解析顺序、提示词组装、老库补列、Run 请求组装、气泡模式不带历史、派生卡片不进入上下文、侧栏入口过滤、内置 translate 清单）。
+**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（101 个用例：清单解析、路径穿越、占位符、去重、超体积、`minHostVersion`、参数校验、DI 注册、参数解析顺序、提示词组装、老库补列、Run 请求组装、气泡模式不带历史、派生卡片不进入上下文、侧栏入口过滤、设置合并与优先级、旧设置文件兼容、内置 translate 清单）。
 
 ## 主题实现
 

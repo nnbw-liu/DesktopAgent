@@ -75,6 +75,11 @@ public sealed class SettingsService : ISettingsService
                     settings.Providers ??= [];
                     settings.Search ??= new SearchSettings();
 
+                    // 旧 settings.json 没有 plugins 节点（或写成 null）时用默认值，不做迁移。
+                    settings.Plugins ??= new PluginPreferences();
+                    settings.Plugins.Entries ??= [];
+                    settings.Plugins.PrivacyAcknowledged ??= [];
+
                     foreach (var provider in settings.Providers)
                     {
                         provider.ApiKey = !string.IsNullOrEmpty(provider.ApiKeyProtected)
