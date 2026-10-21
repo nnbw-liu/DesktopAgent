@@ -80,6 +80,9 @@ public sealed class SettingsService : ISettingsService
                     settings.Plugins.Entries ??= [];
                     settings.Plugins.PrivacyAcknowledged ??= [];
 
+                    // 旧 settings.json 没有 sandbox 节点时按默认（Required + AppContainer）处理。
+                    settings.Sandbox ??= new SandboxSettings();
+
                     foreach (var provider in settings.Providers)
                     {
                         provider.ApiKey = !string.IsNullOrEmpty(provider.ApiKeyProtected)

@@ -1,5 +1,8 @@
 using Microsoft.Extensions.Logging;
 using SDemo.DesktopAgent.Services;
+#if WINDOWS
+using SDemo.DesktopAgent.Platform.Windows.Composition;
+#endif
 
 namespace SDemo.DesktopAgent.Maui;
 
@@ -28,6 +31,13 @@ public static class MauiProgram
 
         // 平台无关：设置、主题、模型、会话、技能、Agent（与 WPF 同一套）。
         builder.Services.AddDesktopAgentCore();
+
+        // 沙箱骨架（S0）：Windows 用 AppContainer / Windows Sandbox 运行器，Android 用不可用实现。
+#if WINDOWS
+        builder.Services.AddWindowsSandbox();
+#else
+        builder.Services.AddUnavailableSandbox();
+#endif
 
         return builder.Build();
     }

@@ -31,4 +31,7 @@ public sealed class AppSettings
 
     /// <summary>插件设置（总开关、显示上限、每个插件的启用 / 入口 / 顺序）。</summary>
     public PluginPreferences Plugins { get; set; } = new();
+
+    /// <summary>执行沙箱配置（S0 起接入；AppContainer / Windows Sandbox 分别在 S1 / S4 落地）。</summary>
+    public SandboxSettings Sandbox { get; set; } = new();
 }

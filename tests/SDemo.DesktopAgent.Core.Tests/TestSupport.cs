@@ -17,6 +17,7 @@ internal sealed class StubAppPaths : IAppPaths
         SkillsRoot = Path.Combine(dataRoot, "skills");
         PluginsRoot = Path.Combine(dataRoot, "plugins");
         DefaultWorkspaceRoot = Path.Combine(dataRoot, "workspace");
+        SandboxRoot = Path.Combine(dataRoot, "sandbox");
     }
 
     public string DataRoot { get; }
@@ -32,6 +33,8 @@ internal sealed class StubAppPaths : IAppPaths
     public string PluginsRoot { get; }
 
     public string DefaultWorkspaceRoot { get; }
+
+    public string SandboxRoot { get; }
 }
 
 /// <summary>不做真正加密的 ISecureStore（SettingsService 会用到）。</summary>
@@ -55,6 +58,33 @@ internal sealed class StubSettingsService : ISettingsService
     {
         SaveCount++;
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+}
+
+/// <summary>一次性临时目录；测试结束递归删除。</summary>
+internal sealed class TempDirectory : IDisposable
+{
+    public TempDirectory()
+    {
+        Root = Path.Combine(Path.GetTempPath(), "sdemo-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Root);
+    }
+
+    public string Root { get; }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (Directory.Exists(Root))
+            {
+                Directory.Delete(Root, recursive: true);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 临时目录清不掉不影响测试结果。
+        }
     }
 }
 

@@ -22,6 +22,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 沙箱契约：纯 record / enum / 协议常量，无平台 API。 -->
+    <ProjectReference Include="..\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- 单元测试要直接构造内部 DTO（PluginManifestDto）验证清单解析 -->
     <InternalsVisibleTo Include="SDemo.DesktopAgent.Core.Tests" />
   </ItemGroup>

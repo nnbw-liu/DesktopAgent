@@ -14,6 +14,7 @@ public sealed class MauiAppPaths : IAppPaths
     {
         var overrideRoot = Environment.GetEnvironmentVariable("SDEMO_DATA_ROOT");
         var workspaceOverride = Environment.GetEnvironmentVariable("SDEMO_WORKSPACE_ROOT");
+        var sandboxOverride = Environment.GetEnvironmentVariable("SDEMO_SANDBOX_ROOT");
 
         DataRoot = !string.IsNullOrWhiteSpace(overrideRoot) ? Path.GetFullPath(overrideRoot) : DefaultDataRoot();
 
@@ -25,6 +26,10 @@ public sealed class MauiAppPaths : IAppPaths
         DefaultWorkspaceRoot = !string.IsNullOrWhiteSpace(workspaceOverride)
             ? Path.GetFullPath(workspaceOverride)
             : DefaultWorkspace();
+
+        SandboxRoot = !string.IsNullOrWhiteSpace(sandboxOverride)
+            ? Path.GetFullPath(sandboxOverride)
+            : DefaultSandboxRoot();
     }
 
     public string DataRoot { get; }
@@ -40,6 +45,8 @@ public sealed class MauiAppPaths : IAppPaths
     public string PluginsRoot { get; }
 
     public string DefaultWorkspaceRoot { get; }
+
+    public string SandboxRoot { get; }
 
     private static string DefaultDataRoot()
     {
@@ -63,6 +70,21 @@ public sealed class MauiAppPaths : IAppPaths
 #else
         // 移动端没有「我的文档」：文件工具只能落在应用私有目录里。
         return Path.Combine(FileSystem.Current.AppDataDirectory, "workspace");
+#endif
+    }
+
+    private static string DefaultSandboxRoot()
+    {
+#if WINDOWS
+        // 与 WPF 端一致：沙箱放本地应用数据，不能跟着漫游配置走。
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SDemo",
+            "DesktopAgent",
+            "sandbox");
+#else
+        // Android 没有可用的沙箱运行器；路径仍然给出，保证 IAppPaths 契约完整。
+        return Path.Combine(FileSystem.Current.AppDataDirectory, "sandbox");
 #endif
     }
 }

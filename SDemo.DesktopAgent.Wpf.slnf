@@ -2,8 +2,11 @@
   "solution": {
     "path": "SDemo.DesktopAgent.sln",
     "projects": [
+      "src\\SDemo.DesktopAgent.Sandbox.Contracts\\SDemo.DesktopAgent.Sandbox.Contracts.csproj",
       "src\\SDemo.DesktopAgent.Core\\SDemo.DesktopAgent.Core.csproj",
       "src\\SDemo.DesktopAgent.UI\\SDemo.DesktopAgent.UI.csproj",
+      "src\\SDemo.DesktopAgent.Windows\\SDemo.DesktopAgent.Windows.csproj",
+      "src\\SDemo.DesktopAgent.SandboxHost\\SDemo.DesktopAgent.SandboxHost.csproj",
       "src\\SDemo.DesktopAgent\\SDemo.DesktopAgent.csproj"
     ]
   }

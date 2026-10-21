@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 纯契约：只放 record / enum / 协议常量，不引用任何平台 API。
+         Core 与沙箱内的 SandboxHost 都引用它，保证两端理解的 job.json / result.json 是同一份定义。 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SDemo.DesktopAgent.Sandbox</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent.Sandbox.Contracts</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+</Project>
