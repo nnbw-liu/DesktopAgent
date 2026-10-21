@@ -1,0 +1,328 @@
+@using SDemo.DesktopAgent.Sandbox
+@using SDemo.DesktopAgent.Services
+@implements IDisposable
+@inject ISandboxJobService Sandbox
+@inject ChangeApplier Applier
+
+@* 沙箱作业完成后展示执行状态与工作区变更；应用动作只写回真实工作区，沙箱本身始终只碰副本。 *@
+@if (_outcome is not null)
+{
+    <section class="sandbox-panel" aria-label="沙箱变更">
+        <header class="sandbox-panel-head">
+            <div>
+                <h2 class="sandbox-panel-title">沙箱变更</h2>
+                <p class="sandbox-panel-sub">
+                    作业 @_outcome.JobId · @StatusText(_outcome.Result)
+                </p>
+            </div>
+            <button type="button" class="sandbox-panel-close" title="收起" @onclick="Dismiss">×</button>
+        </header>
+
+        @if (!string.IsNullOrWhiteSpace(_message))
+        {
+            <p class="sandbox-panel-message @(_messageIsError ? "is-error" : null)">@_message</p>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_outcome.Result.StdErr))
+        {
+            <details class="sandbox-panel-output">
+                <summary>错误输出</summary>
+                <pre>@_outcome.Result.StdErr</pre>
+            </details>
+        }
+
+        @if (_changes.Count == 0)
+        {
+            <p class="sandbox-panel-empty">本次没有产生工作区变更。</p>
+        }
+        else
+        {
+            <div class="sandbox-panel-toolbar">
+                <span class="sandbox-panel-count">@_changes.Count 项变更</span>
+                <button type="button" class="ghost-button" @onclick="SelectAll">全选可应用</button>
+                <button type="button"
+                        class="primary-button"
+                        disabled="@(_applying || !CanApply)"
+                        @onclick="BeginApply">
+                    @(_applying ? "应用中…" : $"应用选中（{SelectedAppliable}）")
+                </button>
+            </div>
+
+            <div class="sandbox-change-list">
+                @foreach (var change in _changes)
+                {
+                    var appliable = change.Kind != SandboxChangeKind.Deleted;
+                    <div class="sandbox-change @(_diffPath == change.RelativePath ? "is-active" : null)"
+                         @onclick="() => SelectDiff(change.RelativePath)">
+                        <label class="sandbox-change-check" @onclick:stopPropagation="true">
+                            <input type="checkbox"
+                                   checked="@_selected.Contains(change.RelativePath)"
+                                   disabled="@(!appliable)"
+                                   @onchange="args => Toggle(change.RelativePath, args)" />
+                        </label>
+                        <span class="sandbox-change-kind sandbox-change-kind--@change.Kind.ToString().ToLowerInvariant()">
+                            @KindText(change.Kind)
+                        </span>
+                        <span class="sandbox-change-path" title="@change.RelativePath">@change.RelativePath</span>
+                        <span class="sandbox-change-size">@FormatSize(change.Size)</span>
+                    </div>
+                }
+            </div>
+
+            @if (_diffPath is not null && ChangeByPath(_diffPath) is { } selectedChange)
+            {
+                <div class="sandbox-diff">
+                    <div class="sandbox-diff-head">
+                        <span>@selectedChange.RelativePath</span>
+                        <span>@KindText(selectedChange.Kind)</span>
+                    </div>
+
+                    @if (selectedChange.Kind == SandboxChangeKind.Deleted)
+                    {
+                        <p class="sandbox-diff-note">删除类变更在 S2 只展示，不会自动删除真实文件。</p>
+                    }
+                    else if (selectedChange.IsBinary)
+                    {
+                        <p class="sandbox-diff-note">二进制文件，不显示文本差异。</p>
+                    }
+                    else if (string.IsNullOrEmpty(selectedChange.Diff))
+                    {
+                        <p class="sandbox-diff-note">没有可显示的差异（内容可能只是元数据变化）。</p>
+                    }
+                    else
+                    {
+                        <pre class="sandbox-diff-body">@selectedChange.Diff</pre>
+                    }
+                </div>
+            }
+        }
+    </section>
+
+    @if (_confirming)
+    {
+        <div class="modal-backdrop">
+            <div class="modal" role="dialog" aria-modal="true">
+                <h2 class="modal-title">把这 @SelectedAppliable 项变更写回工作区？</h2>
+                <p class="modal-sub">
+                    只会写入上面勾选的新增 / 修改文件。真实工作区在沙箱运行后若已被改动，
+                    本次会整体中止，不会覆盖任何文件。
+                </p>
+                <div class="modal-actions">
+                    <button type="button" class="ghost-button" disabled="@_applying" @onclick="CancelApply">取消</button>
+                    <button type="button" class="primary-button" disabled="@_applying" @onclick="ApplyAsync">
+                        @(_applying ? "应用中…" : "确认应用")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private SandboxJobOutcome? _outcome;
+    private List<SandboxChange> _changes = [];
+    private readonly HashSet<string> _selected = new(StringComparer.OrdinalIgnoreCase);
+    private string? _diffPath;
+    private string? _sessionId;
+    private string? _message;
+    private bool _messageIsError;
+    private bool _confirming;
+    private bool _applying;
+    private bool _disposed;
+
+    [Parameter, EditorRequired]
+    public string SessionId { get; set; } = string.Empty;
+
+    private int SelectedAppliable => _changes.Count(change =>
+        change.Kind != SandboxChangeKind.Deleted && _selected.Contains(change.RelativePath));
+
+    private bool CanApply => SelectedAppliable > 0;
+
+    protected override void OnInitialized() => Sandbox.OutcomeAvailable += OnOutcome;
+
+    protected override void OnParametersSet()
+    {
+        if (!string.Equals(_sessionId, SessionId, StringComparison.Ordinal))
+        {
+            _sessionId = SessionId;
+            Dismiss();
+        }
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        Sandbox.OutcomeAvailable -= OnOutcome;
+    }
+
+    private void OnOutcome(object? sender, SandboxJobOutcome outcome) =>
+        _ = InvokeAsync(() =>
+        {
+            if (_disposed || string.IsNullOrEmpty(SessionId) ||
+                !string.Equals(outcome.SessionId, SessionId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _outcome = outcome;
+            _changes = [.. outcome.Changes];
+            _selected.Clear();
+            foreach (var change in _changes.Where(item => item.Kind != SandboxChangeKind.Deleted))
+            {
+                _selected.Add(change.RelativePath);
+            }
+
+            _diffPath = _changes.FirstOrDefault()?.RelativePath;
+            _message = outcome.Result.Failure == SandboxFailureCode.None
+                ? null
+                : $"执行未完成：{FailureText(outcome.Result)}";
+            _messageIsError = outcome.Result.Failure != SandboxFailureCode.None;
+            _confirming = false;
+            StateHasChanged();
+        });
+
+    private void SelectAll()
+    {
+        foreach (var change in _changes.Where(item => item.Kind != SandboxChangeKind.Deleted))
+        {
+            _selected.Add(change.RelativePath);
+        }
+    }
+
+    private void Toggle(string path, ChangeEventArgs args)
+    {
+        if (args.Value is true)
+        {
+            _selected.Add(path);
+        }
+        else
+        {
+            _selected.Remove(path);
+        }
+    }
+
+    private void SelectDiff(string path) => _diffPath = path;
+
+    private void BeginApply()
+    {
+        if (CanApply)
+        {
+            _confirming = true;
+            _message = null;
+        }
+    }
+
+    private void CancelApply() => _confirming = false;
+
+    private async Task ApplyAsync()
+    {
+        if (_outcome is not { } outcome || !CanApply || _applying)
+        {
+            return;
+        }
+
+        _applying = true;
+        _message = null;
+        StateHasChanged();
+
+        try
+        {
+            var manifestPath = Path.Combine(outcome.JobDirectory, "manifest.json");
+            var manifest = WorkspaceManifest.Load(manifestPath);
+            var workDirectory = Path.Combine(outcome.JobDirectory, "work");
+
+            var result = await Applier.ApplyAsync(
+                outcome.WorkspaceRoot,
+                workDirectory,
+                manifest,
+                _changes,
+                _selected,
+                CancellationToken.None);
+
+            if (result.Conflicts.Count > 0)
+            {
+                _message = "工作区在沙箱运行后被改动，已整体中止，未写入任何文件："
+                           + string.Join("、", result.Conflicts);
+                _messageIsError = true;
+            }
+            else
+            {
+                var applied = result.Applied.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                _changes = _changes.Where(change => !applied.Contains(change.RelativePath)).ToList();
+                _selected.RemoveWhere(applied.Contains);
+                _diffPath = _changes.FirstOrDefault()?.RelativePath;
+                _message = $"已应用 {result.Applied.Count} 项变更"
+                           + (result.Skipped.Count > 0 ? $"；跳过 {result.Skipped.Count} 项。" : "。");
+                _messageIsError = result.Applied.Count == 0 && result.Skipped.Count > 0;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            _message = $"应用变更失败：{ex.Message}";
+            _messageIsError = true;
+        }
+        finally
+        {
+            _applying = false;
+            _confirming = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Dismiss()
+    {
+        _outcome = null;
+        _changes = [];
+        _selected.Clear();
+        _diffPath = null;
+        _message = null;
+        _messageIsError = false;
+        _confirming = false;
+        StateHasChanged();
+    }
+
+    private SandboxChange? ChangeByPath(string path) =>
+        _changes.FirstOrDefault(change => string.Equals(change.RelativePath, path, StringComparison.OrdinalIgnoreCase));
+
+    private static string StatusText(SandboxResult result)
+    {
+        if (result.TimedOut)
+        {
+            return "执行超时";
+        }
+
+        if (result.Failure != SandboxFailureCode.None)
+        {
+            return FailureText(result);
+        }
+
+        return result.ExitCode == 0 ? "执行成功" : $"退出码 {result.ExitCode}";
+    }
+
+    private static string FailureText(SandboxResult result) => result.Failure switch
+    {
+        SandboxFailureCode.NotAvailable => result.Message ?? "沙箱不可用",
+        SandboxFailureCode.LaunchFailed => result.Message ?? "启动失败",
+        SandboxFailureCode.Timeout => "执行超时",
+        SandboxFailureCode.OutputLimit => "输出超过上限",
+        SandboxFailureCode.ProtocolError => result.Message ?? "协议错误",
+        SandboxFailureCode.HostCrashed => result.Message ?? "SandboxHost 异常退出",
+        SandboxFailureCode.WorkspaceTooLarge => result.Message ?? "工作区超过复制上限",
+        SandboxFailureCode.PathEscape => result.Message ?? "路径越界",
+        _ => result.Message ?? "执行失败"
+    };
+
+    private static string KindText(SandboxChangeKind kind) => kind switch
+    {
+        SandboxChangeKind.Added => "新增",
+        SandboxChangeKind.Modified => "修改",
+        _ => "删除"
+    };
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:0.0} KB",
+        _ => $"{bytes / (1024.0 * 1024.0):0.0} MB"
+    };
+}

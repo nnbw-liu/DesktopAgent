@@ -113,4 +113,8 @@ public sealed record SandboxJobOutcome(
     string JobId,
     SandboxResult Result,
     IReadOnlyList<SandboxChange> Changes,
-    string JobDirectory);
+    string JobDirectory)
+{
+    /// <summary>本次作业对应的真实工作区根目录；应用变更时必须写回这里，而不是切换后的工作区。</summary>
+    public string WorkspaceRoot { get; init; } = string.Empty;
+}

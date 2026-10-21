@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using SDemo.DesktopAgent.Plugins;
+using SDemo.DesktopAgent.Sandbox;
 
 namespace SDemo.DesktopAgent.Services;
 
@@ -18,6 +19,7 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<ISearchService, SearchService>();
         services.AddSingleton<FileWriteApprovalService>();
         services.AddSingleton<WorkspaceContext>();
+        services.AddSingleton<ChangeApplier>();
         services.AddSingleton<ChatStore>();
         services.AddSingleton<SkillCatalog>();
         services.AddSingleton<PluginCatalog>();

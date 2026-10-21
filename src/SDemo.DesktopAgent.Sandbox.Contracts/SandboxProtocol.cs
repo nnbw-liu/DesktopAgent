@@ -10,6 +10,7 @@ public static class SandboxProtocol
     public const string JobFileName = "job.json";
     public const string ResultFileName = "result.json";
     public const string PdfResultFileName = "pdf.json";
+    public const string ManifestFileName = "manifest.json";
 }
 
 /// <summary>job.json 里声明的作业模式。序列化为字符串，禁止写出数字。</summary>

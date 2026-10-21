@@ -12,6 +12,7 @@ public sealed class SandboxDirectory
 {
     public const string HostFolderName = "host";
     public const string JobsFolderName = "jobs";
+    public const string BaseFolderName = "base";
     public const string InputFolderName = "input";
     public const string WorkFolderName = "work";
     public const string HomeFolderName = "home";
@@ -75,6 +76,11 @@ public sealed class SandboxDirectory
         SandboxAcl.GrantModify(layout.WorkDirectory, sid);
         SandboxAcl.GrantModify(layout.HomeDirectory, sid);
         SandboxAcl.GrantModify(layout.OutputDirectory, sid);
+
+        // AppContainer 是 Low integrity，必须把可写目录也降为 Low，否则 ACL 通过但写入仍被拒绝。
+        SandboxAcl.SetLowIntegrity(layout.WorkDirectory);
+        SandboxAcl.SetLowIntegrity(layout.HomeDirectory);
+        SandboxAcl.SetLowIntegrity(layout.OutputDirectory);
 
         // home 下的 AppData / temp 必须在 home 的继承 ACE 之后创建，否则拿不到继承权限。
         Directory.CreateDirectory(Path.Combine(layout.HomeDirectory, "AppData", "Local"));

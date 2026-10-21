@@ -1,6 +1,7 @@
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using SDemo.DesktopAgent.Plugins;
+using SDemo.DesktopAgent.Sandbox;
 using SDemo.DesktopAgent.Services;
 using Xunit;
 
@@ -21,6 +22,9 @@ public sealed class CompositionTests
 
         using var provider = services.BuildServiceProvider();
         var catalog = provider.GetRequiredService<PluginCatalog>();
+
+        // UI 的 SandboxChangesPanel 直接注入 ChangeApplier；核心容器必须能构造它。
+        Assert.NotNull(provider.GetRequiredService<ChangeApplier>());
 
         Assert.Equal(Path.Combine(temp.Root, "plugins"), catalog.LocalRoot);
         Assert.Equal(Path.Combine(AppContext.BaseDirectory, "plugins"), catalog.BuiltinRoot);

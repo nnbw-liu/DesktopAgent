@@ -29,6 +29,7 @@ public static class WindowsSandboxServiceCollectionExtensions
         services.AddSingleton<SandboxSelector>();
         services.AddSingleton<ISandboxSelector>(sp => sp.GetRequiredService<SandboxSelector>());
 
+        services.AddSingleton<SandboxHostInstaller>();
         services.AddSingleton<SandboxJobService>();
         services.AddSingleton<ISandboxJobService>(sp => sp.GetRequiredService<SandboxJobService>());
 
