@@ -347,6 +347,13 @@ version: 1.0
 - **写文件会先弹确认框**（路径 + 内容预览，可拒绝）；确认逻辑走 `FileWriteApprovalService`，工具线程 await 用户选择，停止生成/关闭页面按拒绝处理。
 - 写文件是唯一有副作用的工具，工作区路径固定，不接受绝对路径与 `..` 越界。
 
+### 沙箱接入（规划）
+
+PowerShell、PDF 解析这类高风险能力必须先接入沙箱。完整的 S1–S6 开发手册见
+[docs/sandbox-development-manual.md](docs/sandbox-development-manual.md)。
+
+当前状态：设计基线，尚未实现；在沙箱与审批落地前，不要开放 PowerShell 工具。
+
 ## 插件
 
 插件是**零代码**的声明式能力包：一个目录 + `plugin.json` + 若干 `.md` 技能文件，不需要编译、不需要重装应用。完整设计见 [docs/plugin-system.md](docs/plugin-system.md)；**自己写插件请看 [插件开发手册](docs/plugin-authoring.md)**（清单字段、参数、入口、双语对照、报错对照表、可复制模板）。
