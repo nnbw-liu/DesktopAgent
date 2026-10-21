@@ -17,7 +17,7 @@ public sealed class BuiltinPluginTests
         var result = new PluginCatalog(builtinRoot, localRoot).Scan();
 
         Assert.Empty(result.Failures);
-        var translate = Assert.Single(result.Usable);
+        var translate = Assert.Single(result.Usable, plugin => plugin.Id == "translate");
         Assert.Equal("translate", translate.Id);
         Assert.Equal(PluginSource.Builtin, translate.Source);
         Assert.Equal("1.0.0", translate.Version);
@@ -49,6 +49,42 @@ public sealed class BuiltinPluginTests
     }
 
     [Fact]
+    public void 内置summarize插件可加载且三个入口都可用()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var builtinRoot = Path.Combine(repositoryRoot, "plugins");
+        var localRoot = Path.Combine(repositoryRoot, "plugins", "__not-a-plugin-root__");
+
+        var result = new PluginCatalog(builtinRoot, localRoot).Scan();
+
+        Assert.Empty(result.Failures);
+        var summarize = Assert.Single(result.Usable, plugin => plugin.Id == "summarize");
+        Assert.Equal(PluginSource.Builtin, summarize.Source);
+        Assert.Equal("1.0.0", summarize.Version);
+        Assert.False(summarize.HasErrors);
+        Assert.Empty(summarize.Issues);
+
+        Assert.Single(summarize.Capabilities);
+        Assert.Equal(3, summarize.Mounts.Count);
+        Assert.Single(summarize.UsableMounts(PluginSurface.Sidebar));
+        Assert.Single(summarize.UsableMounts(PluginSurface.Composer));
+        Assert.Single(summarize.UsableMounts(PluginSurface.Message));
+
+        var capability = Assert.Single(summarize.Capabilities);
+        Assert.True(capability.IsUsable);
+        Assert.Equal(PluginOutputFormat.Text, capability.OutputFormat);
+        Assert.True(capability.SendsText);
+        Assert.False(capability.AllowGlobalSkills);
+        Assert.False(capability.AllowHistory);
+        Assert.Empty(capability.Parameters);
+        Assert.Empty(capability.Issues);
+        Assert.DoesNotContain("{{", capability.SkillContent);
+
+        Assert.NotNull(summarize.Icon);
+        Assert.Equal(3, summarize.Icon!.Paths.Count);
+    }
+
+    [Fact]
     public void 内置translate插件的system提示词已渲染()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -66,6 +102,29 @@ public sealed class BuiltinPluginTests
         Assert.Contains("日本語（ja）", prompt);
         Assert.DoesNotContain("---", prompt);
         Assert.DoesNotContain("{{", prompt);
+    }
+
+    [Fact]
+    public void 内置summarize插件的system提示词已渲染()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var result = new PluginCatalog(
+            Path.Combine(repositoryRoot, "plugins"),
+            Path.Combine(repositoryRoot, "plugins", "__not-a-plugin-root__")).Scan();
+
+        var summarize = result.Find("summarize");
+        Assert.NotNull(summarize);
+
+        var capability = Assert.Single(summarize!.Capabilities);
+        var prompt = new PluginPromptComposer().BuildSystemPrompt(
+            capability,
+            new Dictionary<string, string>(StringComparer.Ordinal));
+
+        Assert.Contains("总结", prompt);
+        Assert.DoesNotContain("---", prompt);
+        Assert.DoesNotContain("{{", prompt);
+        Assert.DoesNotContain("<s>", prompt);
+        Assert.DoesNotContain("先原文后译文", prompt);
     }
 
     private static string FindRepositoryRoot()

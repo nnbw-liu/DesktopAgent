@@ -1,0 +1,29 @@
+{
+  "id": "summarize",
+  "name": "总结",
+  "version": "1.0.0",
+  "description": "把长文本提炼成结构清晰、要点完整的摘要。",
+  "icon": {
+    "paths": [
+      "M6.5 3.5h7l4 4v13h-11z",
+      "M13.5 3.5v4h4",
+      "M9.5 12h5M9.5 15h5M9.5 18h3"
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "summarize",
+      "name": "总结",
+      "skill": "skills/summarize.md",
+      "allowGlobalSkills": false,
+      "allowHistory": false,
+      "privacy": { "sendsText": true },
+      "output": { "format": "text" }
+    }
+  ],
+  "mounts": [
+    { "id": "sidebar", "surface": "sidebar", "capability": "summarize", "order": 10 },
+    { "id": "composer", "surface": "composer", "capability": "summarize", "order": 10 },
+    { "id": "bubble", "surface": "message", "capability": "summarize", "input": "message", "order": 10 }
+  ]
+}

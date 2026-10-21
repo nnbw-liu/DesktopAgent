@@ -7,10 +7,14 @@
 
 ```text
 plugins/
-└── translate/
-    ├── plugin.json      ← 必需
+├── translate/
+│   ├── plugin.json      ← 必需
+│   └── skills/
+│       └── translate.md ← 必需（capabilities[].skill 指向它）
+└── summarize/
+    ├── plugin.json
     └── skills/
-        └── translate.md ← 必需（capabilities[].skill 指向它）
+        └── summarize.md
 ```
 
 - 用户插件目录（可写、可覆盖内置插件）：
@@ -19,6 +23,7 @@ plugins/
 - 同 `id` 时**后加载的本地插件覆盖内置插件**，设置页会把内置那条标成「已覆盖」。
 - 扫描只认 `plugins/<目录>/plugin.json`，其它文件（包括本 README）会被忽略。
 
-清单格式、参数、占位符与校验规则见 [docs/plugin-system.md](../docs/plugin-system.md)。
+清单格式、参数、占位符与校验规则见 [docs/plugin-system.md](../docs/plugin-system.md)；
+按步骤制作插件见 [docs/plugin-authoring.md](../docs/plugin-authoring.md)。
 
-> M0 阶段这里只有说明文件；内置「翻译」插件在 M5 放进 `translate/`，即可验证内置加载这条接缝。
+> 当前内置两个插件：`translate`（翻译，双语对照）与 `summarize`（总结，纯文本）。
