@@ -40,7 +40,7 @@ public sealed class SandboxSelectorTests
     }
 
     [Fact]
-    public async Task 首选不可用时回退到另一个可用运行器()
+    public async Task Preferred时首选不可用可回退到另一个可用运行器()
     {
         var appContainer = new FakeRunner(SandboxKind.AppContainer, available: true, exitCode: 7);
         var windowsSandbox = new FakeRunner(SandboxKind.WindowsSandbox, available: false);
@@ -48,12 +48,28 @@ public sealed class SandboxSelectorTests
 
         var result = await selector.RunAsync(
             CreateRequest("job-00000003"),
-            new SandboxPolicy(SandboxRequirement.Required, SandboxKind.WindowsSandbox));
+            new SandboxPolicy(SandboxRequirement.Preferred, SandboxKind.WindowsSandbox));
 
         Assert.Equal(7, result.ExitCode);
         Assert.Equal(1, appContainer.RunCount);
         // 请求里的 Kind 要跟着选中的运行器改，不能让运行器执行一个“名义上不是自己”的请求。
         Assert.Equal(SandboxKind.AppContainer, appContainer.LastRequest?.Kind);
+    }
+
+    [Fact]
+    public async Task Required时首选不可用不降级()
+    {
+        var appContainer = new FakeRunner(SandboxKind.AppContainer, available: true, exitCode: 7);
+        var windowsSandbox = new FakeRunner(SandboxKind.WindowsSandbox, available: false);
+        var selector = new SandboxSelector([appContainer, windowsSandbox]);
+
+        var result = await selector.RunAsync(
+            CreateRequest("job-00000004"),
+            new SandboxPolicy(SandboxRequirement.Required, SandboxKind.WindowsSandbox));
+
+        Assert.Equal(SandboxFailureCode.NotAvailable, result.Failure);
+        Assert.Contains("已拒绝降级执行", result.Message);
+        Assert.Equal(0, appContainer.RunCount);
     }
 
     [Fact]

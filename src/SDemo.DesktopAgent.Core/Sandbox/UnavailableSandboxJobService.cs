@@ -25,6 +25,7 @@ public sealed class UnavailableSandboxJobService : ISandboxJobService
         string script,
         string? workingDirectory,
         int timeoutSeconds,
+        string? workspaceRoot = null,
         CancellationToken cancellationToken = default)
     {
         var reason = UnavailableSandboxRunner.Reason;

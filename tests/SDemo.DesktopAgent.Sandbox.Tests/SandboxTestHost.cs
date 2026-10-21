@@ -39,6 +39,8 @@ internal sealed class SandboxTestHost : IDisposable
 
     public ISandboxJobService Jobs => _provider.GetRequiredService<ISandboxJobService>();
 
+    public WorkspaceContext Workspace => _provider.GetRequiredService<WorkspaceContext>();
+
     public SandboxDirectory SandboxDirectory => _provider.GetRequiredService<SandboxDirectory>();
 
     public AppContainerProfileProvider Profiles => _provider.GetRequiredService<AppContainerProfileProvider>();

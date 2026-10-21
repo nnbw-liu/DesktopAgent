@@ -83,6 +83,10 @@ public sealed class SettingsService : ISettingsService
                     // 旧 settings.json 没有 sandbox 节点时按默认（Required + AppContainer）处理。
                     settings.Sandbox ??= new SandboxSettings();
 
+                    // 旧 settings.json 没有 tools 节点（或写成 null）时用默认值：新增工具包默认关闭。
+                    settings.Tools ??= new ToolSettings();
+                    settings.Tools.EnabledPacks ??= [];
+
                     foreach (var provider in settings.Providers)
                     {
                         provider.ApiKey = !string.IsNullOrEmpty(provider.ApiKeyProtected)

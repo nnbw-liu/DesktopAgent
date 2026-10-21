@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using SDemo.DesktopAgent.Services;
 using SDemo.DesktopAgent.Platform.Windows.Sandbox;
+using SDemo.DesktopAgent.Platform.Windows.Tools;
 
 namespace SDemo.DesktopAgent.Platform.Windows.Composition;
 
@@ -34,6 +35,9 @@ public static class WindowsSandboxServiceCollectionExtensions
         services.AddSingleton<ISandboxJobService>(sp => sp.GetRequiredService<SandboxJobService>());
 
         services.AddSingleton<SandboxJanitor>();
+
+        // S3：PowerShell 工具包。只有 Windows 宿主注册；Android 连这个工程都不引用。
+        services.AddSingleton<IAgentToolPack, PowerShellToolPack>();
 
         return services;
     }

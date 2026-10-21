@@ -3,6 +3,7 @@
 @inject ISettingsService Settings
 @inject ISearchService Search
 @inject ISandboxJobService Sandbox
+@inject AgentToolRegistry ToolRegistry
 
 @* 工具设置：联网搜索后端 + 文件写入确认 *@
 <div class="settings-pane">
@@ -92,6 +93,111 @@
         </label>
     </section>
 
+    @if (PowerShellDescriptor is not null)
+    {
+        <section class="settings-section">
+            <h2 class="settings-section-title">PowerShell</h2>
+            <p class="settings-section-hint">
+                PowerShell 只在 AppContainer 沙箱内执行：无网络，只能读写工作区副本；改动需要你在变更面板确认后才写回。
+                沙箱不可用时工具直接不可用，不会退回无沙箱直跑。
+            </p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">启用 PowerShell 工具（默认关闭）</span>
+                <span class="settings-row-hint">
+                    @(PowerShellAvailable
+                        ? "启用后还需要在输入框里打开工具 chip 才会交给模型。"
+                        : PowerShellUnavailableReason)
+                </span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@PowerShellEnabled"
+                   disabled="@(!PowerShellAvailable)"
+                   @onchange="TogglePowerShell" />
+        </label>
+
+        <div class="settings-grid">
+            <label class="field">
+                <span class="field-label">超时（秒）</span>
+                <input class="field-input"
+                       type="number"
+                       min="1"
+                       max="120"
+                       value="@Settings.Current.Sandbox.TimeoutSeconds"
+                       @onchange="ChangeTimeout" />
+                <span class="field-hint">1–120；模型请求的超时也受这个范围约束。</span>
+            </label>
+
+            <label class="field">
+                <span class="field-label">内存上限（MB）</span>
+                <input class="field-input"
+                       type="number"
+                       min="64"
+                       max="8192"
+                       value="@Settings.Current.Sandbox.MemoryLimitMB"
+                       @onchange="ChangeMemory" />
+                <span class="field-hint">单个沙箱进程的上限；整个 Job 另有 2 倍上限。</span>
+            </label>
+        </div>
+
+        <div class="settings-subsection">
+            <span class="field-label">沙箱模式</span>
+            <div class="segmented">
+                <button type="button"
+                        class="segmented-item @(IsSandboxMode(SandboxRequirement.Preferred) ? "is-active" : null)"
+                        @onclick="() => SetSandboxMode(SandboxRequirement.Preferred)">
+                    自动
+                </button>
+                <button type="button"
+                        class="segmented-item @(IsSandboxMode(SandboxRequirement.Required) ? "is-active" : null)"
+                        @onclick="() => SetSandboxMode(SandboxRequirement.Required)">
+                    强制
+                </button>
+                @if (IsDebugBuild && !Settings.Current.Sandbox.Enabled)
+                {
+                    <button type="button" class="segmented-item is-active is-danger" disabled>
+                        关闭（仅开发）
+                    </button>
+                }
+            </div>
+            <span class="field-hint">
+                自动 = 首选沙箱不可用时允许换用其他可用沙箱；强制 = 只用首选沙箱，首选不可用就拒绝。
+                两者都不会回退到无沙箱执行。
+            </span>
+        </div>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">每次执行都需要确认（固定开启）</span>
+                <span class="settings-row-hint">
+                    审批框会展示完整脚本；批准一次只对这一次执行有效，不支持“同脚本本会话自动批准”。
+                </span>
+            </span>
+            <input type="checkbox" class="switch" checked disabled />
+        </label>
+
+        @if (IsDebugBuild)
+        {
+            <div class="editor-footer">
+                <button type="button"
+                        class="ghost-button"
+                        @onclick="() => SetSandboxEnabled(!Settings.Current.Sandbox.Enabled)">
+                    @(Settings.Current.Sandbox.Enabled ? "关闭执行沙箱（仅开发）" : "重新启用执行沙箱")
+                </button>
+            </div>
+
+            @if (!Settings.Current.Sandbox.Enabled)
+            {
+                <p class="settings-message is-danger">
+                    执行沙箱已关闭：PowerShell 完全不可用，不会退回无沙箱执行。此选项只在调试构建里提供。
+                </p>
+            }
+        }
+        </section>
+    }
+
     <section class="settings-section">
         <h2 class="settings-section-title">执行沙箱</h2>
         <p class="settings-section-hint">
@@ -159,6 +265,74 @@
         { Available: true } => "sandbox-badge--warn",
         _ => "sandbox-badge--off"
     };
+
+    private AgentToolPackDescriptor? PowerShellDescriptor => ToolRegistry.Find("powershell");
+
+    /// <summary>PowerShell 工具包的用户开关；没有记录时按描述里的默认值（关闭）。</summary>
+    private bool PowerShellEnabled => Settings.Current.Tools.IsPackEnabled(
+        "powershell",
+        PowerShellDescriptor?.DefaultEnabled ?? false);
+
+    /// <summary>可用 = 沙箱总开关打开，并且 AppContainer + PowerShell 都通过实测。</summary>
+    private bool PowerShellAvailable =>
+        Settings.Current.Sandbox.Enabled && _availability is { Available: true, Verified: true };
+
+    private string PowerShellUnavailableReason => !Settings.Current.Sandbox.Enabled
+        ? "执行沙箱已在设置中关闭。"
+        : _availability switch
+        {
+            null => "正在检测沙箱…",
+            { Available: false } => _availability.Reason ?? "沙箱不可用。",
+            { Verified: false } => _availability.Reason ?? "PowerShell 尚未通过沙箱自检。",
+            _ => "沙箱可用。"
+        };
+
+    private bool IsSandboxMode(SandboxRequirement requirement) =>
+        Settings.Current.Sandbox.Enabled && Settings.Current.Sandbox.Requirement == requirement;
+
+#if DEBUG
+    private const bool IsDebugBuild = true;
+#else
+    private const bool IsDebugBuild = false;
+#endif
+
+    private void TogglePowerShell(ChangeEventArgs args)
+    {
+        Settings.Current.Tools.SetPackEnabled("powershell", args.Value is true);
+        Settings.Save();
+    }
+
+    private void ChangeTimeout(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var seconds))
+        {
+            Settings.Current.Sandbox.TimeoutSeconds = Math.Clamp(seconds, 1, 120);
+            Settings.Save();
+        }
+    }
+
+    private void ChangeMemory(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var megabytes))
+        {
+            Settings.Current.Sandbox.MemoryLimitMB = Math.Clamp(megabytes, 64, 8192);
+            Settings.Current.Sandbox.JobMemoryLimitMB = Math.Max(1024, Settings.Current.Sandbox.MemoryLimitMB * 2);
+            Settings.Save();
+        }
+    }
+
+    private void SetSandboxMode(SandboxRequirement requirement)
+    {
+        Settings.Current.Sandbox.Enabled = true;
+        Settings.Current.Sandbox.Requirement = requirement;
+        Settings.Save();
+    }
+
+    private void SetSandboxEnabled(bool enabled)
+    {
+        Settings.Current.Sandbox.Enabled = enabled;
+        Settings.Save();
+    }
 
     private string SandboxBadgeText => _availability switch
     {

@@ -34,6 +34,32 @@ public sealed class CompositionTests
     }
 
     [Fact]
+    public void 工具链依赖可构造()
+    {
+        using var temp = new TempPlugins();
+        var paths = new StubAppPaths(temp.Root);
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IAppPaths>(paths);
+        services.AddSingleton<ISecureStore>(new StubSecureStore());
+        services.AddSingleton<ISandboxJobService>(new StubSandboxJobService());
+        services.AddDesktopAgentCore();
+
+        using var provider = services.BuildServiceProvider();
+
+        // AgentChatService 需要审批 / 审计 / 沙箱作业三个接缝；缺一个都会在启动后崩。
+        Assert.NotNull(provider.GetRequiredService<IAgentChatService>());
+        Assert.NotNull(provider.GetRequiredService<IToolApprovalService>());
+        Assert.NotNull(provider.GetRequiredService<IToolAuditLog>());
+
+        var registry = provider.GetRequiredService<AgentToolRegistry>();
+        Assert.Equal(["search", "files"], registry.Descriptors.Select(descriptor => descriptor.Id));
+
+        // 校验 PowerShell 之外的核心包都有工具；PowerShell 由 Windows 宿主单独注册。
+        Assert.All(registry.Descriptors, descriptor => Assert.NotEmpty(descriptor.Functions));
+    }
+
+    [Fact]
     public void 本地插件目录默认在数据根目录下()
     {
         using var temp = new TempPlugins();

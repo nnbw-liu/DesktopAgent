@@ -17,6 +17,7 @@ public interface ISandboxJobService
         string script,
         string? workingDirectory,
         int timeoutSeconds,
+        string? workspaceRoot = null,
         CancellationToken cancellationToken = default);
 
     Task<PdfExtraction> ExtractPdfAsync(

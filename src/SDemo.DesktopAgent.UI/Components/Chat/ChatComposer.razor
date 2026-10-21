@@ -204,27 +204,19 @@
         </div>
 
         <div class="composer-actions">
-            <button type="button"
-                    class="composer-tool @(EnabledTools.Contains(AgentSkill.Search) ? "is-on" : null)"
-                    title="联网搜索"
-                    aria-pressed="@(EnabledTools.Contains(AgentSkill.Search) ? "true" : "false")"
-                    @onclick="() => OnToggleTool.InvokeAsync(AgentSkill.Search)">
-                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-                    <circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.35" />
-                    <path d="M10.2 10.2 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                </svg>
-            </button>
-
-            <button type="button"
-                    class="composer-tool @(EnabledTools.Contains(AgentSkill.Files) ? "is-on" : null)"
-                    title="文件读写"
-                    aria-pressed="@(EnabledTools.Contains(AgentSkill.Files) ? "true" : "false")"
-                    @onclick="() => OnToggleTool.InvokeAsync(AgentSkill.Files)">
-                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="M1.8 4.4a1.2 1.2 0 0 1 1.2-1.2h3l1.3 1.5h5.5a1.2 1.2 0 0 1 1.2 1.2v6.4a1.2 1.2 0 0 1-1.2 1.2H3a1.2 1.2 0 0 1-1.2-1.2z"
-                          fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
-                </svg>
-            </button>
+            @* 工具 chip 全部由工具包注册表驱动；不可用的包（未在设置启用 / 沙箱不可用）显示为禁用。 *@
+            @foreach (var pack in ToolPacks)
+            {
+                <button type="button"
+                        class="composer-tool @(pack.Enabled ? "is-on" : null) @(pack.Available ? null : "is-unavailable")"
+                        title="@pack.Title"
+                        aria-pressed="@(pack.Enabled ? "true" : "false")"
+                        disabled="@(!pack.Available)"
+                        @onclick="() => OnToggleToolPack.InvokeAsync(pack.Id)">
+                    <span class="composer-tool-glyph" aria-hidden="true">@pack.Glyph</span>
+                    <span class="composer-tool-name">@pack.Name</span>
+                </button>
+            }
 
             @FooterContent
 
@@ -297,12 +289,13 @@
     [Parameter]
     public EventCallback<string?> OnSelectSkill { get; set; }
 
-    /// <summary>当前启用的模型工具（多选：搜索 / 文件可以同时开）。</summary>
+    /// <summary>输入框里可用的工具包 chip（ChatRoom 按平台 / 沙箱 / 设置算好）。</summary>
     [Parameter]
-    public IReadOnlySet<AgentSkill> EnabledTools { get; set; } = new HashSet<AgentSkill>();
+    public IReadOnlyList<ToolPackChip> ToolPacks { get; set; } = [];
 
+    /// <summary>开关一个工具包（只切换本轮是否交给模型）。</summary>
     [Parameter]
-    public EventCallback<AgentSkill> OnToggleTool { get; set; }
+    public EventCallback<string> OnToggleToolPack { get; set; }
 
     /// <summary>输入框里可用的插件入口（ChatRoom 已按可用性过滤）。</summary>
     [Parameter]

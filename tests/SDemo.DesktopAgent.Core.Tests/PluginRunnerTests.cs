@@ -45,7 +45,8 @@ public sealed class PluginRunnerTests
         Assert.Contains("hello world", message.Content);
         Assert.Contains(PluginPromptComposer.InputCloseTag, message.Content);
 
-        Assert.Empty(plan.Tools);
+        Assert.Empty(plan.ToolPacks);
+        Assert.Equal(string.Empty, plan.SessionId);
         Assert.Same(metrics, plan.Metrics);
     }
 
@@ -222,7 +223,8 @@ public sealed class PluginRunnerTests
             ModelProvider provider,
             string modelId,
             IReadOnlyList<ChatMessage> history,
-            IReadOnlySet<AgentSkill> skills,
+            IReadOnlySet<string> toolPacks,
+            string sessionId,
             string? skillName = null,
             AgentRunMetrics? metrics = null,
             CancellationToken cancellationToken = default) =>

@@ -20,13 +20,16 @@ public sealed class SandboxJobServiceTests
 
         try
         {
+            // S3 起 workingDirectory 是“相对工作区的目录”；工作区由 WorkspaceContext 固定。
+            host.Workspace.RootPath = workspace;
+
             var outcome = await host.Jobs.RunPowerShellAsync(
                 "session-1",
                 "$before = Get-Content -Raw -Path 'a.txt'\n"
                 + "Set-Content -Path 'a.txt' -Value 'new' -Encoding UTF8\n"
                 + "Write-Output ('before=' + $before.Trim())\n"
                 + "Write-Output 'done'",
-                workspace,
+                workingDirectory: ".",
                 timeoutSeconds: 30);
 
             Assert.True(
@@ -80,15 +83,92 @@ public sealed class SandboxJobServiceTests
         try
         {
             host.Settings.Current.Sandbox.WorkspaceCopyLimitMB = 1;
+            host.Workspace.RootPath = workspace;
 
             var outcome = await host.Jobs.RunPowerShellAsync(
                 "session-1",
                 "Write-Output 'never'",
-                workspace,
+                workingDirectory: ".",
                 timeoutSeconds: 30);
 
             Assert.Equal(SandboxFailureCode.WorkspaceTooLarge, outcome.Result.Failure);
             Assert.Contains("工作区过大", outcome.Result.Message);
+            Assert.Empty(outcome.Changes);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(workspace, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // 清理失败不影响测试结论。
+            }
+        }
+    }
+
+    [Fact]
+    public async Task 相对子目录作为工作目录且变更仍按工作区根计算()
+    {
+        using var host = new SandboxTestHost();
+        var workspace = Path.Combine(Path.GetTempPath(), "sdemo-job-workspace", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(workspace, "sub"));
+        File.WriteAllText(Path.Combine(workspace, "sub", "a.txt"), "old\n");
+
+        try
+        {
+            host.Workspace.RootPath = workspace;
+
+            var outcome = await host.Jobs.RunPowerShellAsync(
+                "session-1",
+                "Set-Content -Path 'a.txt' -Value 'new' -Encoding UTF8\nWrite-Output 'sub-ok'",
+                workingDirectory: "sub",
+                timeoutSeconds: 30);
+
+            Assert.True(
+                outcome.Result.Failure == SandboxFailureCode.None,
+                $"failure={outcome.Result.Failure} message={outcome.Result.Message} stdout={outcome.Result.StdOut}");
+            Assert.Contains("sub-ok", outcome.Result.StdOut);
+            var change = Assert.Single(outcome.Changes);
+            Assert.Equal("sub/a.txt", change.RelativePath);
+            Assert.Equal(SandboxChangeKind.Modified, change.Kind);
+            Assert.Equal("old\n", File.ReadAllText(Path.Combine(workspace, "sub", "a.txt")));
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(workspace, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // 清理失败不影响测试结论。
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("../outside")]
+    [InlineData("..\\outside")]
+    [InlineData("C:\\Windows")]
+    public async Task 工作目录逃逸时拒绝执行(string workingDirectory)
+    {
+        using var host = new SandboxTestHost();
+        var workspace = Path.Combine(Path.GetTempPath(), "sdemo-job-workspace", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(workspace);
+
+        try
+        {
+            host.Workspace.RootPath = workspace;
+
+            var outcome = await host.Jobs.RunPowerShellAsync(
+                "session-1",
+                "Write-Output 'never'",
+                workingDirectory,
+                timeoutSeconds: 30);
+
+            Assert.Equal(SandboxFailureCode.PathEscape, outcome.Result.Failure);
             Assert.Empty(outcome.Changes);
         }
         finally

@@ -35,6 +35,23 @@ public sealed class SandboxSelector : ISandboxSelector
             };
         }
 
+        // Required = 只用首选沙箱类型；首选不可用时拒绝，而不是悄悄换一个沙箱。
+        // Preferred = 允许在沙箱类型之间降级；两者都不会降级到“无沙箱”。
+        if (policy.Requirement == SandboxRequirement.Required
+            && policy.Preferred != SandboxKind.None
+            && availability.Kind != policy.Preferred)
+        {
+            return new SandboxResult
+            {
+                JobId = request.JobId,
+                Kind = request.Kind,
+                ExitCode = -1,
+                Failure = SandboxFailureCode.NotAvailable,
+                Message =
+                    $"策略要求首选沙箱 {policy.Preferred}，但当前可用的是 {availability.Kind}；已拒绝降级执行。"
+            };
+        }
+
         var runner = _runners.First(r => r.Kind == availability.Kind);
 
         // 运行器选出来可能与调用方写的 Kind 不同（首选不可用时的降级），请求要跟着改。

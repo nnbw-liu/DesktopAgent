@@ -59,6 +59,7 @@ public sealed class SandboxJobService : ISandboxJobService
         string script,
         string? workingDirectory,
         int timeoutSeconds,
+        string? workspaceRoot = null,
         CancellationToken cancellationToken = default)
     {
         var settings = _settings.Current.Sandbox;
@@ -93,18 +94,27 @@ public sealed class SandboxJobService : ISandboxJobService
             return Failed(sessionId, SandboxFailureCode.NotAvailable, profileReason ?? "AppContainer profile 不可用。");
         }
 
-        var workspaceRoot = ResolveWorkspaceRoot(workingDirectory);
-        if (workspaceRoot is null)
+        var workspace = ResolveWorkspaceRoot(workspaceRoot);
+        if (workspace is null)
         {
             return Failed(
                 sessionId,
                 SandboxFailureCode.PathEscape,
-                "工作目录无效：必须是已存在、非磁盘根目录的本地目录。");
+                "工作区无效：必须是已存在、非磁盘根目录的本地目录。");
         }
 
-        if (SandboxPathGuard.IsUnder(_directory.Root, workspaceRoot))
+        if (SandboxPathGuard.IsUnder(_directory.Root, workspace))
         {
             return Failed(sessionId, SandboxFailureCode.PathEscape, "工作区不能位于沙箱根目录内。");
+        }
+
+        var workingDirectoryError = ResolveJobWorkingDirectory(
+            workspace,
+            workingDirectory,
+            out var jobWorkingDirectory);
+        if (workingDirectoryError is not null)
+        {
+            return Failed(sessionId, SandboxFailureCode.PathEscape, workingDirectoryError);
         }
 
         var jobId = NewJobId();
@@ -130,7 +140,7 @@ public sealed class SandboxJobService : ISandboxJobService
         try
         {
             manifest = await WorkspaceSnapshot.CreateAsync(
-                    workspaceRoot,
+                    workspace,
                     baseDirectory,
                     layout.WorkDirectory,
                     new WorkspaceCopyOptions
@@ -163,7 +173,7 @@ public sealed class SandboxJobService : ISandboxJobService
                 JobId = jobId,
                 Mode = SandboxJobMode.PowerShell,
                 ScriptFile = "input/script.ps1",
-                WorkingDirectory = "work",
+                WorkingDirectory = jobWorkingDirectory,
                 TimeoutSeconds = timeout,
                 MaxOutputBytes = maxOutputBytes
             };
@@ -205,7 +215,7 @@ public sealed class SandboxJobService : ISandboxJobService
 
             var outcome = new SandboxJobOutcome(sessionId, jobId, result, changes, layout.Root)
             {
-                WorkspaceRoot = workspaceRoot
+                WorkspaceRoot = workspace
             };
             OutcomeAvailable?.Invoke(this, outcome);
             return outcome;
@@ -245,11 +255,11 @@ public sealed class SandboxJobService : ISandboxJobService
         throw new NotSupportedException("沙箱 PDF 解析在 S5 阶段实现。");
     }
 
-    private string? ResolveWorkspaceRoot(string? workingDirectory)
+    private string? ResolveWorkspaceRoot(string? workspaceRoot)
     {
-        var candidate = string.IsNullOrWhiteSpace(workingDirectory)
+        var candidate = string.IsNullOrWhiteSpace(workspaceRoot)
             ? _workspace.RootPath
-            : workingDirectory;
+            : workspaceRoot;
 
         try
         {
@@ -261,12 +271,76 @@ public sealed class SandboxJobService : ISandboxJobService
                 return null;
             }
 
-            return fullPath;
+            return Path.TrimEndingDirectorySeparator(fullPath);
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// 把工具传入的相对目录解析成 job.json 里的 <c>work/...</c> 相对路径。
+    /// 只接受工作区内的相对路径：拒绝绝对路径、UNC、<c>..</c>、符号链接 / junction。
+    /// </summary>
+    private static string? ResolveJobWorkingDirectory(
+        string workspaceRoot,
+        string? workingDirectory,
+        out string jobWorkingDirectory)
+    {
+        jobWorkingDirectory = "work";
+
+        var value = string.IsNullOrWhiteSpace(workingDirectory) ? "." : workingDirectory.Trim();
+
+        if (value.Contains('\0')
+            || value.StartsWith(@"\\", StringComparison.Ordinal)
+            || value.StartsWith("//", StringComparison.Ordinal)
+            || Path.IsPathRooted(value))
+        {
+            return $"工作目录必须是工作区内的相对路径：{workingDirectory}";
+        }
+
+        var segments = value
+            .Replace('\\', '/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Where(segment => segment != ".")
+            .ToArray();
+
+        if (segments.Any(segment => segment == ".."))
+        {
+            return $"工作目录不能包含 ..：{workingDirectory}";
+        }
+
+        var full = Path.GetFullPath(
+            Path.Combine(workspaceRoot, string.Join(Path.DirectorySeparatorChar, segments)));
+
+        if (!SandboxPathGuard.IsUnder(workspaceRoot, full))
+        {
+            return $"工作目录超出工作区范围：{workingDirectory}";
+        }
+
+        if (!Directory.Exists(full))
+        {
+            return $"工作目录不存在：{workingDirectory}";
+        }
+
+        var current = workspaceRoot;
+        foreach (var segment in segments)
+        {
+            current = Path.Combine(current, segment);
+
+            if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+            {
+                return $"工作目录包含符号链接或 junction：{workingDirectory}";
+            }
+        }
+
+        if (segments.Length > 0)
+        {
+            jobWorkingDirectory = "work/" + string.Join('/', segments);
+        }
+
+        return null;
     }
 
     private static SandboxResult ReadResult(
