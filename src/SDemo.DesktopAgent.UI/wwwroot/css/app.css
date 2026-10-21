@@ -1428,6 +1428,69 @@ a {
     cursor: pointer;
 }
 
+/* 执行沙箱自检 */
+.sandbox-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.sandbox-badge {
+    flex: 0 0 auto;
+    padding: 3px 9px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.sandbox-badge--ok {
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.sandbox-badge--warn {
+    border-color: #b7791f;
+    background: rgba(183, 121, 31, .12);
+    color: #b7791f;
+}
+
+.sandbox-badge--off {
+    color: var(--muted);
+}
+
+.sandbox-checks {
+    display: grid;
+    gap: 6px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sandbox-check {
+    position: relative;
+    padding-left: 20px;
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+.sandbox-check::before {
+    position: absolute;
+    left: 0;
+}
+
+.sandbox-check.is-pass::before {
+    content: "✓";
+    color: var(--accent);
+}
+
+.sandbox-check.is-fail::before {
+    content: "✕";
+    color: #d9534f;
+}
+
 /* 开关 */
 .switch {
     appearance: none;

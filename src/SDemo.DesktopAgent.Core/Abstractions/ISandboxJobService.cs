@@ -24,4 +24,10 @@ public interface ISandboxJobService
         string? pages,
         int maxChars,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 运行设置页的“自检”：基本进程 / PowerShell / 读用户目录 / 写工作区 / 联网 /
+    /// 子进程 / 超时终止。Noop 实现返回全 false 并给出原因，不抛异常。
+    /// </summary>
+    Task<SandboxProbeReport> RunSelfTestAsync(CancellationToken cancellationToken = default);
 }

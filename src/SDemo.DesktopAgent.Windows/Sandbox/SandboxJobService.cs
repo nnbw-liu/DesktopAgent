@@ -14,11 +14,23 @@ public sealed class SandboxJobService : ISandboxJobService
 #pragma warning restore CS0067
 
     private readonly ISandboxSelector _selector;
+    private readonly SandboxProbe _probe;
 
-    public SandboxJobService(ISandboxSelector selector) => _selector = selector;
+    public SandboxJobService(ISandboxSelector selector, SandboxProbe probe)
+    {
+        _selector = selector;
+        _probe = probe;
+    }
 
     public Task<SandboxAvailability> GetAvailabilityAsync(CancellationToken cancellationToken = default) =>
         _selector.GetAvailabilityAsync(cancellationToken);
+
+    public async Task<SandboxProbeReport> RunSelfTestAsync(CancellationToken cancellationToken = default)
+    {
+        var report = await _probe.SelfTestAsync(cancellationToken).ConfigureAwait(false);
+        _probe.ResetCache();
+        return report;
+    }
 
     public async Task<SandboxJobOutcome> RunPowerShellAsync(
         string sessionId,

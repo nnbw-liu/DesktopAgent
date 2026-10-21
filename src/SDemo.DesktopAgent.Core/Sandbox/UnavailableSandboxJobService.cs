@@ -49,4 +49,15 @@ public sealed class UnavailableSandboxJobService : ISandboxJobService
             Pages: [],
             Truncated: false,
             Message: UnavailableSandboxRunner.Reason));
+
+    public Task<SandboxProbeReport> RunSelfTestAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SandboxProbeReport(
+            CmdOk: false,
+            PowerShellOk: false,
+            CannotReadUserProfile: false,
+            CannotWriteWorkspace: false,
+            NoNetwork: false,
+            SubprocessOk: false,
+            TimeoutOk: false,
+            Detail: UnavailableSandboxRunner.Reason));
 }

@@ -1,6 +1,8 @@
 @using SDemo.DesktopAgent.Models
+@using SDemo.DesktopAgent.Sandbox
 @inject ISettingsService Settings
 @inject ISearchService Search
+@inject ISandboxJobService Sandbox
 
 @* 工具设置：联网搜索后端 + 文件写入确认 *@
 <div class="settings-pane">
@@ -89,6 +91,47 @@
                    @onchange="ToggleConfirmWrite" />
         </label>
     </section>
+
+    <section class="settings-section">
+        <h2 class="settings-section-title">执行沙箱</h2>
+        <p class="settings-section-hint">
+            PowerShell 与 PDF 解析都在 AppContainer 中运行；沙箱不可用时直接拒绝执行，不会退回无沙箱直跑。
+        </p>
+
+        <div class="sandbox-status">
+            <span class="sandbox-badge @SandboxBadgeClass">@SandboxBadgeText</span>
+            <span class="settings-message">@_availability?.Reason</span>
+        </div>
+
+        <div class="editor-footer">
+            <button type="button" class="ghost-button" disabled="@_isSandboxTesting" @onclick="RunSandboxSelfTestAsync">
+                @(_isSandboxTesting ? "自检中…（会启动真实进程）" : "执行沙箱自检")
+            </button>
+        </div>
+
+        @if (_sandboxMessage is not null)
+        {
+            <p class="settings-message">@_sandboxMessage</p>
+        }
+
+        @if (_sandboxReport is not null)
+        {
+            <ul class="sandbox-checks">
+                <li class="@CheckClass(_sandboxReport.CmdOk)">基本进程：能在沙箱内启动 cmd</li>
+                <li class="@CheckClass(_sandboxReport.PowerShellOk)">PowerShell：能执行脚本并正确输出 UTF-8 中文</li>
+                <li class="@CheckClass(_sandboxReport.CannotReadUserProfile)">隔离：不能读取用户目录里的文件</li>
+                <li class="@CheckClass(_sandboxReport.CannotWriteWorkspace)">隔离：不能写入工作区</li>
+                <li class="@CheckClass(_sandboxReport.NoNetwork)">隔离：没有网络访问</li>
+                <li class="@CheckClass(_sandboxReport.SubprocessOk)">子进程：允许在 Job 内启动</li>
+                <li class="@CheckClass(_sandboxReport.TimeoutOk)">超时：到点终止整棵进程树</li>
+            </ul>
+
+            @if (!string.IsNullOrWhiteSpace(_sandboxReport.Detail))
+            {
+                <pre class="search-preview">@_sandboxReport.Detail</pre>
+            }
+        }
+    </section>
 </div>
 
 @code {
@@ -98,11 +141,54 @@
     private bool _isTesting;
     private string? _message;
     private string? _searchResult;
+    private SandboxAvailability? _availability;
+    private SandboxProbeReport? _sandboxReport;
+    private string? _sandboxMessage;
+    private bool _isSandboxTesting;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _endpoint = Settings.Current.Search.Endpoint;
         _apiKey = Settings.Current.Search.ApiKey;
+        _availability = await Sandbox.GetAvailabilityAsync();
+    }
+
+    private string SandboxBadgeClass => _availability switch
+    {
+        { Available: true, Verified: true } => "sandbox-badge--ok",
+        { Available: true } => "sandbox-badge--warn",
+        _ => "sandbox-badge--off"
+    };
+
+    private string SandboxBadgeText => _availability switch
+    {
+        { Available: true, Verified: true } => "已就绪",
+        { Available: true } => "仅基本进程可用",
+        _ => "不可用"
+    };
+
+    private static string CheckClass(bool passed) => passed ? "sandbox-check is-pass" : "sandbox-check is-fail";
+
+    private async Task RunSandboxSelfTestAsync()
+    {
+        _isSandboxTesting = true;
+        _sandboxReport = null;
+        _sandboxMessage = null;
+
+        try
+        {
+            _sandboxReport = await Sandbox.RunSelfTestAsync();
+            _availability = await Sandbox.GetAvailabilityAsync();
+            _sandboxMessage = _sandboxReport.AllPassed ? "自检全部通过。" : "自检未全部通过，详见下方。";
+        }
+        catch (Exception ex)
+        {
+            _sandboxMessage = $"自检执行失败：{ex.Message}";
+        }
+        finally
+        {
+            _isSandboxTesting = false;
+        }
     }
 
     private void SetBackend(SearchBackend backend)
