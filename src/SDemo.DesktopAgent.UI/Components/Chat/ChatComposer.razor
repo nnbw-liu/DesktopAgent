@@ -81,6 +81,16 @@
                                     title="@mount.Capability?.Name"
                                     disabled="@IsGenerating"
                                     @onclick="() => SelectMount(mount.Key)">
+                                <span class="skill-chip-icon" aria-hidden="true">
+                                    @if (PluginFor(mount.PluginId) is { } plugin)
+                                    {
+                                        <PluginIcon Plugin="plugin" />
+                                    }
+                                    else
+                                    {
+                                        @SkillInfo.GlyphOf(mount.Capability?.Name ?? mount.Id)
+                                    }
+                                </span>
                                 <span class="skill-chip-label">@(mount.Capability?.Name ?? mount.Id)</span>
                             </button>
                         }
@@ -106,8 +116,20 @@
                                                     class="skill-menu-entry"
                                                     title="@mount.Capability?.Name"
                                                     @onclick="() => SelectMount(mount.Key)">
-                                                <span class="skill-menu-name">@(mount.Capability?.Name ?? mount.Id)</span>
-                                                <span class="skill-menu-desc">@(mount.Capability?.SkillDescription ?? mount.PluginId)</span>
+                                                <span class="skill-menu-icon" aria-hidden="true">
+                                                    @if (PluginFor(mount.PluginId) is { } plugin)
+                                                    {
+                                                        <PluginIcon Plugin="plugin" />
+                                                    }
+                                                    else
+                                                    {
+                                                        @SkillInfo.GlyphOf(mount.Capability?.Name ?? mount.Id)
+                                                    }
+                                                </span>
+                                                <span class="skill-menu-text">
+                                                    <span class="skill-menu-name">@(mount.Capability?.Name ?? mount.Id)</span>
+                                                    <span class="skill-menu-desc">@(mount.Capability?.SkillDescription ?? mount.PluginId)</span>
+                                                </span>
                                             </button>
                                         }
                                     </div>
@@ -120,6 +142,7 @@
                 @if (!string.IsNullOrEmpty(SelectedSkill))
                 {
                     <span class="skill-chip is-on" title="@SelectedSkill">
+                        <span class="skill-chip-icon" aria-hidden="true">@GlyphOf(SelectedSkill)</span>
                         <span class="skill-chip-label">@SelectedSkill</span>
                         <button type="button" class="chip-close" title="取消技能" @onclick="ClearSkill">✕</button>
                     </span>
@@ -133,6 +156,7 @@
                                     class="skill-chip"
                                     title="@skill.Description"
                                     @onclick="() => ToggleSkill(skill.Name)">
+                                <span class="skill-chip-icon" aria-hidden="true">@skill.Glyph</span>
                                 <span class="skill-chip-label">@skill.Name</span>
                             </button>
                         }
@@ -158,8 +182,11 @@
                                                     class="skill-menu-entry @(IsSelected(skill.Name) ? "is-active" : null)"
                                                     title="@skill.Description"
                                                     @onclick="() => SelectSkill(skill.Name)">
-                                                <span class="skill-menu-name">@skill.Name</span>
-                                                <span class="skill-menu-desc">@skill.Description</span>
+                                                <span class="skill-menu-icon" aria-hidden="true">@skill.Glyph</span>
+                                                <span class="skill-menu-text">
+                                                    <span class="skill-menu-name">@skill.Name</span>
+                                                    <span class="skill-menu-desc">@skill.Description</span>
+                                                </span>
                                             </button>
                                         }
                                     </div>
@@ -280,6 +307,11 @@
     /// <summary>输入框里可用的插件入口（ChatRoom 已按可用性过滤）。</summary>
     [Parameter]
     public IReadOnlyList<PluginMount> PluginMounts { get; set; } = [];
+
+    /// <summary>插件 id → 插件描述：列表里的插件 chip 用它画图标；缺项时退回名称首字。</summary>
+    [Parameter]
+    public IReadOnlyDictionary<string, PluginDescriptor> PluginById { get; set; } =
+        new Dictionary<string, PluginDescriptor>();
 
     /// <summary>最多直接显示几个插件入口（来自设置 plugins.maxInComposer）。</summary>
     [Parameter]
@@ -479,6 +511,14 @@
 
         _attachments.Clear();
     }
+
+    private PluginDescriptor? PluginFor(string pluginId) =>
+        PluginById.TryGetValue(pluginId, out var plugin) ? plugin : null;
+
+    /// <summary>已选技能的字形：优先用技能列表里的 icon；技能文件被删时退回名字首字。</summary>
+    private string GlyphOf(string name) =>
+        Skills.FirstOrDefault(skill => string.Equals(skill.Name, name, StringComparison.Ordinal))?.Glyph
+        ?? SkillInfo.GlyphOf(name);
 
     private bool IsSelected(string name) =>
         string.Equals(SelectedSkill, name, StringComparison.Ordinal);

@@ -1108,8 +1108,8 @@ a {
     display: inline-flex;
     flex: 0 1 auto;
     align-items: center;
-    gap: 4px;
-    max-width: 134px;
+    gap: 5px;
+    max-width: 150px;
     min-width: 0;
     padding: 4px 9px;
     overflow: hidden;
@@ -1131,6 +1131,35 @@ a {
     color: var(--text-dim);
 }
 
+/* chip 左侧的 16px 字形/图标块（插件与技能共用） */
+.plugin-chip-icon,
+.skill-chip-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+
+    width: 16px;
+    height: 16px;
+
+    border-radius: 5px;
+    background: var(--accent-soft);
+
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--accent-text);
+}
+
+.skill-chip-icon .plugin-icon-svg {
+    width: 12px;
+    height: 12px;
+}
+
+.skill-chip-icon .plugin-icon-text {
+    font-size: 10px;
+}
+
 .skill-chip-label {
     flex: 0 1 auto;
     min-width: 0;
@@ -1144,6 +1173,10 @@ a {
     border-color: var(--accent-border);
     background: var(--accent-soft);
     color: var(--text);
+}
+
+.skill-chip.is-on .skill-chip-icon {
+    background: var(--accent-soft-hover);
 }
 
 .skill-chip--more {
@@ -1190,8 +1223,8 @@ a {
 
 .skill-menu-entry {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    align-items: flex-start;
+    gap: 8px;
     width: 100%;
     padding: 7px 10px;
     border: 0;
@@ -1209,6 +1242,47 @@ a {
 
 .skill-menu-entry.is-active {
     background: var(--accent-soft);
+}
+
+/* 菜单行左侧的图标块 */
+.skill-menu-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+
+    border-radius: 5px;
+    background: var(--accent-soft);
+
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--accent-text);
+}
+
+.skill-menu-entry.is-active .skill-menu-icon {
+    background: var(--accent-soft-hover);
+}
+
+.skill-menu-icon .plugin-icon-svg {
+    width: 13px;
+    height: 13px;
+}
+
+.skill-menu-icon .plugin-icon-text {
+    font-size: 10px;
+}
+
+.skill-menu-text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
 }
 
 .skill-menu-name {
@@ -2675,23 +2749,6 @@ a {
 }
 
 /* ---------- 输入框里的插件 chip 与内联参数 ---------- */
-
-.plugin-chip-icon {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-
-    width: 16px;
-    height: 16px;
-
-    border-radius: 5px;
-    background: var(--accent-soft);
-
-    font-size: 10px;
-    line-height: 1;
-    color: var(--accent-text);
-}
 
 .plugin-chip .skill-chip-label {
     max-width: 88px;

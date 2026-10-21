@@ -214,6 +214,7 @@
                       EnabledTools="_enabledTools"
                       OnToggleTool="ToggleTool"
                       PluginMounts="_composerMounts"
+                      PluginById="_composerPlugins"
                       MaxVisiblePlugins="@Registry.MaxFor(PluginSurface.Composer)"
                       ActivePlugin="_activePlugin"
                       ActiveMount="_activeMount"
@@ -359,6 +360,10 @@
 
     /// <summary>输入框可用的插件入口（composer 界面、可用且 show）。</summary>
     private IReadOnlyList<PluginMount> _composerMounts = [];
+
+    /// <summary>上面这些入口对应的插件：给 chip 画图标用。</summary>
+    private IReadOnlyDictionary<string, PluginDescriptor> _composerPlugins =
+        new Dictionary<string, PluginDescriptor>(StringComparer.Ordinal);
 
     /// <summary>当前选中的插件入口组合键（<c>&lt;pluginId&gt;/&lt;mountId&gt;</c>）。</summary>
     private string? _activeMountKey;
@@ -512,7 +517,16 @@
     }
 
     /// <summary>刷新输入框可用的插件入口（启动、重新扫描 / 设置改动后调用）。</summary>
-    private void RefreshPluginMounts() => _composerMounts = Registry.Mounts(PluginSurface.Composer);
+    private void RefreshPluginMounts()
+    {
+        _composerMounts = Registry.Mounts(PluginSurface.Composer);
+        _composerPlugins = _composerMounts
+            .Select(mount => mount.PluginId)
+            .Distinct(StringComparer.Ordinal)
+            .Select(id => Registry.Find(id))
+            .OfType<PluginDescriptor>()
+            .ToDictionary(plugin => plugin.Id, StringComparer.Ordinal);
+    }
 
     /// <summary>
     /// 按组合键恢复插件选择。插件被停用 / 删除 / 入口被关掉时退回全局模式并提示一句，

@@ -165,7 +165,7 @@ $env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
 
 1. **Header**：`HeaderContent` 参数放工作区（空聊天室）；上传的附件由 `ChatComposer` 追加在它下面，没有内容时整块不渲染、不占高度。
 2. **输入区**：`<textarea>` 多行输入，`field-sizing: content` 自动增高（上限 200px 后内部滚动）。
-3. **底部功能区**：左侧是「＋ 上传文件」和常用技能（最多直接显示 3 个，超出的进「更多」）；右侧依次是**搜索**、**文件**两个可同时点亮的图标按钮、模型选择器、发送按钮。`IsGenerating` 为 true 时发送按钮切换为停止图标（`.is-stop`）。模型选择会记到设置里（`lastProviderId` / `lastModelId`），下次启动自动选中。
+3. **底部功能区**：左侧是「＋ 上传文件」和常用技能（每个 chip 左侧带一个字形图标，最多直接显示 3 个，超出的进「更多」，菜单里同样是「图标 + 名称 + 说明」）；右侧依次是**搜索**、**文件**两个可同时点亮的图标按钮、模型选择器、发送按钮。`IsGenerating` 为 true 时发送按钮切换为停止图标（`.is-stop`）。模型选择会记到设置里（`lastProviderId` / `lastModelId`），下次启动自动选中。
 
 上传的附件会复制到 `%APPDATA%\SDemo\DesktopAgent\uploads\{sessionId}\`，显示在输入框 Header 里（新建聊天室时在工作区选择器下面）；发送后附件随消息持久化，消息气泡里也会显示。文本类附件（`.md` / `.txt` / `.json` / 常见代码后缀）会内联进模型上下文（单个最多 16K 字符、总量 48K），二进制附件只把名称 / 大小 / 路径告诉模型。也可以把文件直接**拖进输入框**：JS 把 drop 的文件写进 Blazor 的 file input，再走同一套上传逻辑。
 
@@ -304,7 +304,7 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 输入框底部现在是「上传文件 + 常用技能」和右侧的「工具 + 模型 + 发送」：
 
 - **＋ 上传文件**：多选，附件显示在 Header（新聊天室在工作区选择器下面），发送后随消息落库。
-- **常用技能**：直接读取技能库，最多同时显示 3 个，超出的放进「更多」菜单；点击后**只显示选中的那一个 chip**（带 `✕` 取消），其余技能隐藏，下一次发送把该技能全文注入系统提示词。
+- **常用技能**：直接读取技能库，最多同时显示 3 个，超出的放进「更多」菜单；每个 chip 左侧是技能图标（frontmatter 的 `icon`，没写就取名字首字）。点击后**只显示选中的那一个 chip**（带 `✕` 取消），其余技能隐藏，下一次发送把该技能全文注入系统提示词。
 - **模型工具（多选）**：右侧是「联网搜索」「文件读写」两个图标按钮，并排显示，各自独立开关、**可以同时启用**；点亮即启用，再点取消。启用了哪些，本次请求就只下发哪些工具；都不点亮 = 不下发任何工具。
 
 | 工具 | 下发的工具 | 实现 |
@@ -314,12 +314,13 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 
 ### 技能格式
 
-技能就是一个 Markdown 文件，**文件名就是技能名**。推荐使用标准的 YAML frontmatter，输入框的技能列表会优先取其中的 `description` 作为悬浮说明：
+技能就是一个 Markdown 文件，**文件名就是技能名**。推荐使用标准的 YAML frontmatter，输入框的技能列表会优先取其中的 `description` 作为悬浮说明、`icon` 作为 chip 上的图标（一个字符或 emoji，不写就取技能名首字）：
 
 ```markdown
 ---
 name: 总结
 description: 一句话说明这个技能做什么、什么时候用。
+icon: 总
 version: 1.0
 ---
 
