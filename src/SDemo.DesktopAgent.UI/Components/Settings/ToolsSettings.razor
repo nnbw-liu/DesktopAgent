@@ -98,7 +98,8 @@
         <section class="settings-section">
             <h2 class="settings-section-title">PowerShell</h2>
             <p class="settings-section-hint">
-                PowerShell 只在 AppContainer 沙箱内执行：无网络，只能读写工作区副本；改动需要你在变更面板确认后才写回。
+                PowerShell 只在沙箱内执行（默认 AppContainer，也可以选 Windows Sandbox 虚拟机）：无网络，
+                只能读写工作区副本；改动需要你在变更面板确认后才写回。
                 沙箱不可用时工具直接不可用，不会退回无沙箱直跑。
             </p>
 
@@ -201,17 +202,74 @@
     <section class="settings-section">
         <h2 class="settings-section-title">执行沙箱</h2>
         <p class="settings-section-hint">
-            PowerShell 与 PDF 解析都在 AppContainer 中运行；沙箱不可用时直接拒绝执行，不会退回无沙箱直跑。
+            PowerShell 与 PDF 解析都在沙箱中运行；沙箱不可用时直接拒绝执行，不会退回无沙箱直跑。
+            AppContainer 启动快、全版本可用；Windows Sandbox 是虚拟机级强隔离，仅 Pro / Enterprise / Education 可用，
+            每次启动约 10–30 秒。
         </p>
+
+        <div class="settings-subsection">
+            <span class="field-label">首选沙箱</span>
+            <div class="segmented">
+                <button type="button"
+                        class="segmented-item @(Settings.Current.Sandbox.Preferred == SandboxKind.AppContainer ? "is-active" : null)"
+                        @onclick="() => SetPreferredSandboxAsync(SandboxKind.AppContainer)">
+                    AppContainer
+                </button>
+                <button type="button"
+                        class="segmented-item @(Settings.Current.Sandbox.Preferred == SandboxKind.WindowsSandbox ? "is-active" : null)"
+                        @onclick="() => SetPreferredSandboxAsync(SandboxKind.WindowsSandbox)">
+                    Windows Sandbox
+                </button>
+            </div>
+            <span class="field-hint">
+                自动模式：首选不可用时允许换用另一种沙箱；强制模式：只用首选，不可用就拒绝。
+                两者都不会回退到无沙箱执行。
+            </span>
+        </div>
 
         <div class="sandbox-status">
             <span class="sandbox-badge @SandboxBadgeClass">@SandboxBadgeText</span>
-            <span class="settings-message">@_availability?.Reason</span>
+            <span class="settings-message">@EffectiveAvailabilityText</span>
+        </div>
+
+        <ul class="sandbox-checks">
+            <li class="@KindClass(_appContainerAvailability)">
+                AppContainer：@KindText(_appContainerAvailability)
+            </li>
+            <li class="@KindClass(_windowsSandboxAvailability)">
+                Windows Sandbox：@KindText(_windowsSandboxAvailability)
+            </li>
+        </ul>
+
+        @if (_windowsSandboxAvailability is { Available: true, Verified: false })
+        {
+            <p class="settings-message">
+                Windows Sandbox 还没通过自检：点「测试 Windows Sandbox」启动一次虚拟机（约 10–30 秒）后才能启用 PowerShell。
+            </p>
+        }
+
+        <div class="settings-grid">
+            <label class="field">
+                <span class="field-label">Windows Sandbox 内存（MB）</span>
+                <input class="field-input"
+                       type="number"
+                       min="2048"
+                       max="16384"
+                       value="@Settings.Current.Sandbox.WindowsSandboxMemoryMB"
+                       @onchange="ChangeWindowsSandboxMemory" />
+                <span class="field-hint">仅虚拟机模式使用；下限 2048 由系统规定。</span>
+            </label>
         </div>
 
         <div class="editor-footer">
             <button type="button" class="ghost-button" disabled="@_isSandboxTesting" @onclick="RunSandboxSelfTestAsync">
                 @(_isSandboxTesting ? "自检中…（会启动真实进程）" : "执行沙箱自检")
+            </button>
+            <button type="button"
+                    class="ghost-button"
+                    disabled="@(_isWindowsSandboxTesting || _windowsSandboxAvailability is not { Available: true })"
+                    @onclick="RunWindowsSandboxSelfTestAsync">
+                @(_isWindowsSandboxTesting ? "启动虚拟机自检中…（约 10–30 秒）" : "测试 Windows Sandbox")
             </button>
         </div>
 
@@ -237,6 +295,36 @@
                 <pre class="search-preview">@_sandboxReport.Detail</pre>
             }
         }
+
+        @if (_windowsSandboxMessage is not null)
+        {
+            <p class="settings-message">@_windowsSandboxMessage</p>
+        }
+
+        @if (_windowsSandboxReport is not null)
+        {
+            <ul class="sandbox-checks">
+                <li class="@CheckClass(_windowsSandboxReport.Launched)">启动：能启动 Windows Sandbox 虚拟机并跑完 run.ps1</li>
+                <li class="@CheckClass(_windowsSandboxReport.PowerShellOk)">PowerShell：能在虚拟机内执行脚本</li>
+                <li class="@CheckClass(_windowsSandboxReport.NoNetwork)">网络：虚拟机没有网络访问</li>
+            </ul>
+
+            @if (!string.IsNullOrWhiteSpace(_windowsSandboxReport.Detail))
+            {
+                <pre class="search-preview">@_windowsSandboxReport.Detail</pre>
+            }
+        }
+
+        @if (_windowsSandboxReport is { AllPassed: false } && _appContainerAvailability is { Available: true })
+        {
+            <div class="editor-footer">
+                <button type="button"
+                        class="ghost-button"
+                        @onclick="() => SetPreferredSandboxAsync(SandboxKind.AppContainer)">
+                    改用 AppContainer
+                </button>
+            </div>
+        }
     </section>
 </div>
 
@@ -248,16 +336,54 @@
     private string? _message;
     private string? _searchResult;
     private SandboxAvailability? _availability;
+    private SandboxAvailability? _appContainerAvailability;
+    private SandboxAvailability? _windowsSandboxAvailability;
     private SandboxProbeReport? _sandboxReport;
     private string? _sandboxMessage;
     private bool _isSandboxTesting;
+    private WindowsSandboxSelfTestReport? _windowsSandboxReport;
+    private string? _windowsSandboxMessage;
+    private bool _isWindowsSandboxTesting;
 
     protected override async Task OnInitializedAsync()
     {
         _endpoint = Settings.Current.Search.Endpoint;
         _apiKey = Settings.Current.Search.ApiKey;
-        _availability = await Sandbox.GetAvailabilityAsync();
+        await RefreshAvailabilityAsync();
     }
+
+    /// <summary>刷新“当前策略下的可用性”与两种沙箱各自的状态。</summary>
+    private async Task RefreshAvailabilityAsync()
+    {
+        _availability = await Sandbox.GetAvailabilityAsync();
+        _appContainerAvailability = await Sandbox.GetAvailabilityAsync(SandboxKind.AppContainer);
+        _windowsSandboxAvailability = await Sandbox.GetAvailabilityAsync(SandboxKind.WindowsSandbox);
+    }
+
+    private static string KindText(SandboxAvailability? availability) => availability switch
+    {
+        null => "检测中…",
+        { Available: true, Verified: true } => "可用（已验证）",
+        { Available: true } => "可用（未验证）",
+        _ => string.IsNullOrWhiteSpace(availability.Reason)
+            ? "不可用"
+            : $"不可用：{availability.Reason}"
+    };
+
+    private static string KindClass(SandboxAvailability? availability) => availability switch
+    {
+        { Available: true, Verified: true } => "sandbox-check is-pass",
+        { Available: true } => "sandbox-check is-warn",
+        _ => "sandbox-check is-fail"
+    };
+
+    private string EffectiveAvailabilityText => _availability switch
+    {
+        null => "正在检测沙箱…",
+        { Available: true, Verified: true } => "当前策略下沙箱可用，PowerShell 可以使用。",
+        { Reason: not null } => _availability.Reason!,
+        _ => "沙箱不可用。"
+    };
 
     private string SandboxBadgeClass => _availability switch
     {
@@ -334,6 +460,22 @@
         Settings.Save();
     }
 
+    private async Task SetPreferredSandboxAsync(SandboxKind kind)
+    {
+        Settings.Current.Sandbox.Preferred = kind;
+        Settings.Save();
+        await RefreshAvailabilityAsync();
+    }
+
+    private void ChangeWindowsSandboxMemory(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var megabytes))
+        {
+            Settings.Current.Sandbox.WindowsSandboxMemoryMB = Math.Clamp(megabytes, 2048, 16384);
+            Settings.Save();
+        }
+    }
+
     private string SandboxBadgeText => _availability switch
     {
         { Available: true, Verified: true } => "已就绪",
@@ -352,7 +494,7 @@
         try
         {
             _sandboxReport = await Sandbox.RunSelfTestAsync();
-            _availability = await Sandbox.GetAvailabilityAsync();
+            await RefreshAvailabilityAsync();
             _sandboxMessage = _sandboxReport.AllPassed ? "自检全部通过。" : "自检未全部通过，详见下方。";
         }
         catch (Exception ex)
@@ -362,6 +504,31 @@
         finally
         {
             _isSandboxTesting = false;
+        }
+    }
+
+    /// <summary>Windows Sandbox 自检会真的启动一次虚拟机，失败不影响 AppContainer。</summary>
+    private async Task RunWindowsSandboxSelfTestAsync()
+    {
+        _isWindowsSandboxTesting = true;
+        _windowsSandboxReport = null;
+        _windowsSandboxMessage = null;
+
+        try
+        {
+            _windowsSandboxReport = await Sandbox.RunWindowsSandboxSelfTestAsync();
+            await RefreshAvailabilityAsync();
+            _windowsSandboxMessage = _windowsSandboxReport.AllPassed
+                ? $"Windows Sandbox 自检通过（耗时 {_windowsSandboxReport.Duration.TotalSeconds:0.#} 秒）。"
+                : "Windows Sandbox 自检未通过；PowerShell 不会使用它。";
+        }
+        catch (Exception ex)
+        {
+            _windowsSandboxMessage = $"Windows Sandbox 自检执行失败：{ex.Message}";
+        }
+        finally
+        {
+            _isWindowsSandboxTesting = false;
         }
     }
 

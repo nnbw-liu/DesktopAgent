@@ -17,6 +17,12 @@ public sealed class SandboxSettings
     /// <summary>首选沙箱类型（S1 起为 AppContainer，S4 可选 Windows Sandbox）。</summary>
     public SandboxKind Preferred { get; set; } = SandboxKind.AppContainer;
 
+    /// <summary>
+    /// Windows Sandbox 虚拟机内存（MB，下限由系统规定为 2048）。只影响 S4 的强隔离模式，
+    /// 与 AppContainer 的 MemoryLimitMB 不是一回事。
+    /// </summary>
+    public int WindowsSandboxMemoryMB { get; set; } = 4096;
+
     /// <summary>单次执行超时秒数（S2 限制 1–120）。</summary>
     public int TimeoutSeconds { get; set; } = 30;
 

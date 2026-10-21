@@ -48,12 +48,18 @@ public sealed class SandboxDirectory
             Path.Combine(jobRoot, OutputFolderName));
     }
 
-    /// <summary>创建根目录 / jobs / host，并给这些目录加上 Package SID 的穿越 / 读执行权限。</summary>
-    public void EnsureRoot(SecurityIdentifier sid)
+    /// <summary>创建根目录 / jobs / host，不施加任何 ACL（Windows Sandbox 不需要 Package SID）。</summary>
+    public void EnsureRoot()
     {
         Directory.CreateDirectory(Root);
         Directory.CreateDirectory(JobsDirectory);
         Directory.CreateDirectory(HostDirectory);
+    }
+
+    /// <summary>创建根目录 / jobs / host，并给这些目录加上 Package SID 的穿越 / 读执行权限。</summary>
+    public void EnsureRoot(SecurityIdentifier sid)
+    {
+        EnsureRoot();
 
         EnsureAncestorsTraverse(sid);
         SandboxAcl.GrantTraverse(Root, sid);
@@ -61,15 +67,26 @@ public sealed class SandboxDirectory
         SandboxAcl.GrantReadExecute(HostDirectory, sid);
     }
 
-    /// <summary>创建 job 目录并施加 ACL，返回布局。重复调用是幂等的。</summary>
-    public SandboxJobLayout EnsureJob(string jobId, SecurityIdentifier sid)
+    /// <summary>
+    /// 只创建 job 目录（input / work / output），不施加 ACL、不降完整性级别。
+    /// Windows Sandbox 用映射目录访问这些路径，AppContainer 走 <see cref="EnsureJob"/>。
+    /// </summary>
+    public SandboxJobLayout CreateJob(string jobId)
     {
         var layout = GetLayout(jobId);
         Directory.CreateDirectory(layout.Root);
         Directory.CreateDirectory(layout.InputDirectory);
         Directory.CreateDirectory(layout.WorkDirectory);
-        Directory.CreateDirectory(layout.HomeDirectory);
         Directory.CreateDirectory(layout.OutputDirectory);
+
+        return layout;
+    }
+
+    /// <summary>创建 job 目录并施加 ACL，返回布局。重复调用是幂等的。</summary>
+    public SandboxJobLayout EnsureJob(string jobId, SecurityIdentifier sid)
+    {
+        var layout = CreateJob(jobId);
+        Directory.CreateDirectory(layout.HomeDirectory);
 
         SandboxAcl.GrantTraverse(layout.Root, sid);
         SandboxAcl.GrantReadExecute(layout.InputDirectory, sid);

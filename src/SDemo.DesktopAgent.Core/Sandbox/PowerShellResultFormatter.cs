@@ -42,7 +42,7 @@ public static class PowerShellResultFormatter
         }
 
         var builder = new StringBuilder();
-        builder.Append("沙箱：").AppendLine(result.Kind.ToString());
+        builder.Append("沙箱：").AppendLine(SandboxName(result.Kind));
         builder.Append("退出码：").AppendLine(result.ExitCode.ToString());
 
         if (result.TimedOut)
@@ -124,6 +124,16 @@ public static class PowerShellResultFormatter
         SandboxChangeKind.Added => "A",
         SandboxChangeKind.Modified => "M",
         _ => "D"
+    };
+
+    /// <summary>模型看到的沙箱名称；Windows Sandbox 要能看出这是虚拟机而不是 AppContainer。</summary>
+    private static string SandboxName(SandboxKind kind) => kind switch
+    {
+        SandboxKind.AppContainer => "AppContainer",
+        SandboxKind.WindowsSandbox => "Windows Sandbox（VM）",
+        SandboxKind.JobObject => "JobObject",
+        SandboxKind.None => "未使用沙箱",
+        _ => kind.ToString()
     };
 
     private static string Suffix(string? message) =>

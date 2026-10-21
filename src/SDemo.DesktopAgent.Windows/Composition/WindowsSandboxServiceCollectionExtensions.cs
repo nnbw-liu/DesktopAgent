@@ -18,7 +18,14 @@ public static class WindowsSandboxServiceCollectionExtensions
         services.AddSingleton(sp => new SandboxDirectory(sp.GetRequiredService<IAppPaths>().SandboxRoot));
         services.AddSingleton<AppContainerProfileProvider>();
         services.AddSingleton<AppContainerSandboxRunner>();
-        services.AddSingleton<WindowsSandboxRunner>();
+
+        // S4：Windows Sandbox。启动器单独注册，运行器用显式工厂构造，避免依赖 Func<> 的自动解析；
+        // 测试可以直接 new WindowsSandboxRunner(fakeLauncher, fakeHostInfo) 注入假实现。
+        services.AddSingleton<IWindowsSandboxLauncher, WindowsSandboxProcessLauncher>();
+        services.AddSingleton(sp => new WindowsSandboxRunner(
+            sp.GetRequiredService<IWindowsSandboxLauncher>(),
+            WindowsSandboxAvailability.ReadHostInfo,
+            sp.GetRequiredService<SandboxDirectory>()));
 
         // 两个运行器都进 ISandboxRunner 集合，SandboxSelector 才能按策略挑；
         // 最后注册的 AppContainer 是 GetRequiredService<ISandboxRunner>() 的默认值。

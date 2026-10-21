@@ -54,7 +54,8 @@ public sealed class PowerShellToolPack : IAgentToolPack
                 name: FunctionId,
                 description:
                     "在工作区副本中运行 Windows PowerShell 5.1 脚本；改动需要用户确认后才会写回真实工作区。"
-                    + "沙箱无网络、不能读取用户文件；脚本运行在 ConstrainedLanguage 模式，不要依赖 .NET 静态方法或 Add-Type。")
+                    + "沙箱无网络、不能读取用户文件；AppContainer 模式下脚本运行在 ConstrainedLanguage，"
+                    + "不能依赖 .NET 静态方法或 Add-Type。")
         ];
     }
 
@@ -126,7 +127,7 @@ public sealed class PowerShellToolPack : IAgentToolPack
                 Kind: ToolApprovalKind.ProcessExecution,
                 Title: "运行 PowerShell 脚本",
                 Summary:
-                    $"沙箱：{availability.Kind}；目录：{displayDirectory}；超时：{timeout}s；无网络，只能访问工作区副本",
+                    $"沙箱：{SandboxLabel(availability.Kind)}；目录：{displayDirectory}；超时：{timeout}s；无网络，只能访问工作区副本",
                 Detail: script,
                 Risk: AgentToolRisk.High,
                 AllowSessionRemember: false,
@@ -227,6 +228,14 @@ public sealed class PowerShellToolPack : IAgentToolPack
 
         return PowerShellResultFormatter.Format(outcome);
     }
+
+    /// <summary>审批框里的沙箱标签：Windows Sandbox 需要让用户预期到 VM 启动时间。</summary>
+    private static string SandboxLabel(SandboxKind kind) => kind switch
+    {
+        SandboxKind.WindowsSandbox => "Windows Sandbox（VM，无网络，启动约 10–30 秒）",
+        SandboxKind.AppContainer => "AppContainer",
+        _ => kind.ToString()
+    };
 
     private static void WriteAudit(
         ToolContext context,

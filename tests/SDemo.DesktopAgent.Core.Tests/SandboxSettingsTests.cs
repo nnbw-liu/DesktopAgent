@@ -23,6 +23,7 @@ public sealed class SandboxSettingsTests
         Assert.Equal(8, settings.MaxProcesses);
         Assert.False(settings.WorkspaceReadOnly);
         Assert.Equal(200, settings.WorkspaceCopyLimitMB);
+        Assert.Equal(4096, settings.WindowsSandboxMemoryMB);
         Assert.False(settings.RetainScriptsInAuditLog);
         Assert.Equal(7, settings.AuditRetentionDays);
     }

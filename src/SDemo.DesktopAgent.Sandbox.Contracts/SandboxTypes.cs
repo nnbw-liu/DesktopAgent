@@ -56,6 +56,12 @@ public sealed record SandboxRequest
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     public required string OutputDirectory { get; init; }
     public SandboxLimits Limits { get; init; } = new();
+
+    /// <summary>
+    /// Windows Sandbox 专用启动参数。只有 <see cref="Kind"/> 为 <see cref="SandboxKind.WindowsSandbox"/>
+    /// 时使用；其他运行器忽略它，缺失时 Windows Sandbox 运行器按协议错误拒绝执行。
+    /// </summary>
+    public WindowsSandboxJobSpec? WindowsSandbox { get; init; }
 }
 
 /// <summary>一次沙箱执行的结果。进程没有真正跑起来时用 <see cref="Failure"/> 说明原因。</summary>
