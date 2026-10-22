@@ -17,6 +17,12 @@ public sealed class SandboxSettings
     /// <summary>首选沙箱类型（S1 起为 AppContainer，S4 可选 Windows Sandbox）。</summary>
     public SandboxKind Preferred { get; set; } = SandboxKind.AppContainer;
 
+    /// <summary>
+    /// Windows Sandbox 虚拟机内存（MB，下限由系统规定为 2048）。只影响 S4 的强隔离模式，
+    /// 与 AppContainer 的 MemoryLimitMB 不是一回事。
+    /// </summary>
+    public int WindowsSandboxMemoryMB { get; set; } = 4096;
+
     /// <summary>单次执行超时秒数（S2 限制 1–120）。</summary>
     public int TimeoutSeconds { get; set; } = 30;
 
@@ -40,4 +46,10 @@ public sealed class SandboxSettings
 
     /// <summary>审计日志保留天数（S6 清理使用）。</summary>
     public int AuditRetentionDays { get; set; } = 7;
+
+    /// <summary>
+    /// 上传 PDF 时自动提取前几页文本（经沙箱，S5）。关闭后附件只保留二进制 / 路径，
+    /// 模型仍可用 <c>pdf_read</c> 按需读取。
+    /// </summary>
+    public bool PdfAutoExtract { get; set; } = true;
 }

@@ -17,7 +17,11 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IModelCatalogService, ModelCatalogService>();
         services.AddSingleton<ISearchService, SearchService>();
-        services.AddSingleton<FileWriteApprovalService>();
+        services.AddSingleton<IToolApprovalService, ToolApprovalService>();
+        services.AddSingleton<IToolAuditLog, JsonlToolAuditLog>();
+        services.AddSingleton<AgentToolRegistry>();
+        services.AddSingleton<IAgentToolPack, SearchToolPack>();
+        services.AddSingleton<IAgentToolPack, FileToolPack>();
         services.AddSingleton<WorkspaceContext>();
         services.AddSingleton<ChangeApplier>();
         services.AddSingleton<ChatStore>();
@@ -27,7 +31,6 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<PluginPromptComposer>();
         services.AddSingleton<PluginParameterResolver>();
         services.AddSingleton<IPluginRunner, PluginRunner>();
-        services.AddSingleton<AgentToolbox>();
         services.AddSingleton<IAgentChatService, AgentChatService>();
 
         return services;

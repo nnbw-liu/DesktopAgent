@@ -49,6 +49,10 @@ public partial class App : Application
         _tray = new TrayIconService(mainWindow);
 
         mainWindow.Show();
+
+        // S6：启动时清理过期 job / 残留 tmp / 过期 trash；有未应用变更的 job 会被跳过。
+        // 清理失败不能影响启动，所以用后台任务且不阻塞 UI。
+        _ = _serviceProvider.GetRequiredService<ISandboxMaintenance>().CleanupAsync();
     }
 
     protected override void OnExit(ExitEventArgs e)

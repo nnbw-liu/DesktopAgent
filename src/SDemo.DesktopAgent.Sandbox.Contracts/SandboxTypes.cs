@@ -56,6 +56,12 @@ public sealed record SandboxRequest
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     public required string OutputDirectory { get; init; }
     public SandboxLimits Limits { get; init; } = new();
+
+    /// <summary>
+    /// Windows Sandbox 专用启动参数。只有 <see cref="Kind"/> 为 <see cref="SandboxKind.WindowsSandbox"/>
+    /// 时使用；其他运行器忽略它，缺失时 Windows Sandbox 运行器按协议错误拒绝执行。
+    /// </summary>
+    public WindowsSandboxJobSpec? WindowsSandbox { get; init; }
 }
 
 /// <summary>一次沙箱执行的结果。进程没有真正跑起来时用 <see cref="Failure"/> 说明原因。</summary>
@@ -117,4 +123,7 @@ public sealed record SandboxJobOutcome(
 {
     /// <summary>本次作业对应的真实工作区根目录；应用变更时必须写回这里，而不是切换后的工作区。</summary>
     public string WorkspaceRoot { get; init; } = string.Empty;
+
+    /// <summary>删除类变更的回收站目录：<c>{sandbox}\trash\{jobId}</c>；不可用时为空。</summary>
+    public string TrashDirectory { get; init; } = string.Empty;
 }

@@ -34,4 +34,7 @@ public sealed class AppSettings
 
     /// <summary>执行沙箱配置（S0 起接入；AppContainer / Windows Sandbox 分别在 S1 / S4 落地）。</summary>
     public SandboxSettings Sandbox { get; set; } = new();
+
+    /// <summary>工具包开关（搜索 / 文件 / PowerShell 等，按 <c>AgentToolPackDescriptor.Id</c> 记录）。</summary>
+    public ToolSettings Tools { get; set; } = new();
 }

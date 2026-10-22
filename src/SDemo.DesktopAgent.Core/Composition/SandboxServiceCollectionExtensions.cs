@@ -13,6 +13,7 @@ public static class SandboxServiceCollectionExtensions
     {
         services.AddSingleton<ISandboxRunner, UnavailableSandboxRunner>();
         services.AddSingleton<ISandboxJobService, UnavailableSandboxJobService>();
+        services.AddSingleton<ISandboxMaintenance, UnavailableSandboxMaintenance>();
 
         return services;
     }

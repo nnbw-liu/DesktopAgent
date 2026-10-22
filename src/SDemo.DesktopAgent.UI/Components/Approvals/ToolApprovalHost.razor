@@ -1,0 +1,90 @@
+@using SDemo.DesktopAgent.Services
+@implements IDisposable
+@inject IToolApprovalService Approvals
+
+@* 顶层审批宿主：挂在 AppShell，切换会话时审批框不会消失；同一时间只显示一个请求。 *@
+@if (Approvals.Current is { } request)
+{
+    <div class="modal-backdrop">
+        <div class="modal modal--approval" role="dialog" aria-modal="true" aria-labelledby="approval-title">
+            <h2 class="modal-title" id="approval-title">@request.Title</h2>
+            <p class="modal-sub">@KindHint(request.Kind)</p>
+
+            <div class="approval-meta">
+                <span class="approval-risk approval-risk--@RiskClass(request.Risk)">风险：@RiskText(request.Risk)</span>
+                <span class="modal-path">@request.Summary</span>
+            </div>
+
+            <pre class="modal-preview modal-preview--script">@DetailText(request)</pre>
+
+            <div class="modal-actions">
+                <button type="button" class="ghost-button" @onclick="() => Resolve(ToolApprovalDecision.Deny)">
+                    拒绝
+                </button>
+
+                @if (request.AllowSessionRemember)
+                {
+                    <button type="button"
+                            class="ghost-button"
+                            @onclick="() => Resolve(ToolApprovalDecision.ApproveForSession)">
+                        本会话允许
+                    </button>
+                }
+
+                <button type="button" class="primary-button" @onclick="() => Resolve(ToolApprovalDecision.ApproveOnce)">
+                    仅本次
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized() => Approvals.Changed += OnChanged;
+
+    public void Dispose() => Approvals.Changed -= OnChanged;
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void Resolve(ToolApprovalDecision decision) => Approvals.Resolve(decision);
+
+    private static string KindHint(ToolApprovalKind kind) => kind switch
+    {
+        ToolApprovalKind.FileWrite => "模型请求写入文件，确认后才会落盘。",
+        ToolApprovalKind.ProcessExecution =>
+            "脚本将在一个没有网络、只能访问工作区副本的沙箱中运行。请确认脚本内容与实际执行一致。",
+        ToolApprovalKind.ApplyChanges => "将把沙箱内的改动写回真实工作区。",
+        _ => string.Empty
+    };
+
+    private static string RiskText(AgentToolRisk risk) => risk switch
+    {
+        AgentToolRisk.High => "高",
+        AgentToolRisk.Medium => "中",
+        _ => "低"
+    };
+
+    private static string RiskClass(AgentToolRisk risk) => risk switch
+    {
+        AgentToolRisk.High => "high",
+        AgentToolRisk.Medium => "medium",
+        _ => "low"
+    };
+
+    /// <summary>
+    /// 脚本完整展示（工具层已把上限压到 64KB）；文件内容可能很大，界面只截断显示，
+    /// 但真正写入的仍是审批请求里的完整内容。
+    /// </summary>
+    private static string DetailText(ToolApprovalRequest request)
+    {
+        if (request.Kind == ToolApprovalKind.ProcessExecution)
+        {
+            return request.Detail;
+        }
+
+        const int maximum = 8000;
+        return request.Detail.Length <= maximum
+            ? request.Detail
+            : string.Concat(request.Detail.AsSpan(0, maximum), "\n…（内容过长，仅显示前 8000 字符）");
+    }
+}
