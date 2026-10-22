@@ -1,8 +1,10 @@
 using System.Runtime.CompilerServices;
+using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Models;
 using SDemo.DesktopAgent.Plugins;
 using SDemo.DesktopAgent.Services;
 using Xunit;
+using ChatRole = Microsoft.Extensions.AI.ChatRole;
 
 namespace SDemo.DesktopAgent.Core.Tests;
 
@@ -13,7 +15,7 @@ public sealed class PluginRunnerTests
     public async Task 组装单轮请求_skill进system_输入进user()
     {
         var chat = new StubChatService();
-        var runner = new PluginRunner(chat, new PluginPromptComposer());
+        var runner = CreateRunner(chat);
         var descriptor = BuildDescriptor();
         var mount = Assert.Single(descriptor.Mounts);
         var values = new Dictionary<string, string>(StringComparer.Ordinal) { ["target"] = "ja" };
@@ -36,14 +38,14 @@ public sealed class PluginRunnerTests
 
         var plan = chat.Plan!;
         Assert.Equal("test-model", plan.ModelId);
-        Assert.Contains("日本語（ja）", plan.Instructions);
-        Assert.DoesNotContain("---", plan.Instructions);
+        Assert.Contains("日本語（ja）", plan.Context.Instructions);
+        Assert.DoesNotContain("---", plan.Context.Instructions);
 
-        var message = Assert.Single(plan.Messages);
-        Assert.Equal(ChatMessageRole.User, message.Role);
-        Assert.Contains(PluginPromptComposer.InputOpenTag, message.Content);
-        Assert.Contains("hello world", message.Content);
-        Assert.Contains(PluginPromptComposer.InputCloseTag, message.Content);
+        var message = Assert.Single(plan.Context.Messages);
+        Assert.Equal(ChatRole.User, message.Role);
+        Assert.Contains(PluginPromptComposer.InputOpenTag, message.Text);
+        Assert.Contains("hello world", message.Text);
+        Assert.Contains(PluginPromptComposer.InputCloseTag, message.Text);
 
         Assert.Empty(plan.ToolPacks);
         Assert.Equal(string.Empty, plan.SessionId);
@@ -54,7 +56,7 @@ public sealed class PluginRunnerTests
     public async Task 默认不带历史()
     {
         var chat = new StubChatService();
-        var runner = new PluginRunner(chat, new PluginPromptComposer());
+        var runner = CreateRunner(chat);
         var descriptor = BuildDescriptor();
         var history = new List<ChatMessage>
         {
@@ -64,14 +66,14 @@ public sealed class PluginRunnerTests
 
         await ConsumeAsync(runner, descriptor, history, allowHistory: false);
 
-        Assert.Single(chat.Plan!.Messages);
+        Assert.Single(chat.Plan!.Context.Messages);
     }
 
     [Fact]
     public async Task 能力打开历史时带上最近消息()
     {
         var chat = new StubChatService();
-        var runner = new PluginRunner(chat, new PluginPromptComposer());
+        var runner = CreateRunner(chat);
         var descriptor = BuildDescriptor(allowHistory: true);
         var history = new List<ChatMessage>
         {
@@ -81,15 +83,15 @@ public sealed class PluginRunnerTests
 
         await ConsumeAsync(runner, descriptor, history, allowHistory: true);
 
-        Assert.Equal(3, chat.Plan!.Messages.Count);
-        Assert.Equal("上一轮的问题", chat.Plan.Messages[0].Content);
+        Assert.Equal(3, chat.Plan!.Context.Messages.Count);
+        Assert.Equal("上一轮的问题", chat.Plan.Context.Messages[0].Text);
     }
 
     [Fact]
     public async Task 气泡模式永远不带历史()
     {
         var chat = new StubChatService();
-        var runner = new PluginRunner(chat, new PluginPromptComposer());
+        var runner = CreateRunner(chat);
         var descriptor = BuildDescriptor(allowHistory: true);
         var history = new List<ChatMessage>
         {
@@ -109,15 +111,15 @@ public sealed class PluginRunnerTests
         {
         }
 
-        var message = Assert.Single(chat.Plan!.Messages);
-        Assert.Contains("待加工的原文", message.Content);
+        var message = Assert.Single(chat.Plan!.Context.Messages);
+        Assert.Contains("待加工的原文", message.Text);
     }
 
     [Fact]
     public async Task 超长输入直接报错而不是发出去()
     {
         var chat = new StubChatService();
-        var runner = new PluginRunner(chat, new PluginPromptComposer());
+        var runner = CreateRunner(chat);
         var descriptor = BuildDescriptor();
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
@@ -165,6 +167,12 @@ public sealed class PluginRunnerTests
         BaseUrl = "https://example.com/v1",
         ApiKey = "k"
     };
+
+    /// <summary>插件 Runner 需要唯一的上下文入口；测试里用默认设置 + 启发式计量。</summary>
+    private static PluginRunner CreateRunner(StubChatService chat) => new(
+        chat,
+        new PluginPromptComposer(),
+        new ContextBuilder(new HeuristicTokenCounter(), new StubSettingsService()));
 
     private static PluginDescriptor BuildDescriptor(bool allowHistory = false)
     {
@@ -219,22 +227,13 @@ public sealed class PluginRunnerTests
     {
         public AgentRunPlan? Plan { get; private set; }
 
-        public IAsyncEnumerable<AgentDelta> StreamAsync(
-            ModelProvider provider,
-            string modelId,
-            IReadOnlyList<ChatMessage> history,
-            IReadOnlySet<string> toolPacks,
-            string sessionId,
-            string? skillName = null,
-            AgentRunMetrics? metrics = null,
-            CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException("插件运行不应该走 StreamAsync。");
-
         public async IAsyncEnumerable<AgentDelta> RunAsync(
             AgentRunPlan plan,
+            ContextRunTelemetry? telemetry = null,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             Plan = plan;
+            telemetry?.GetType();
             await Task.Yield();
             yield return new AgentDelta("译文", string.Empty);
         }

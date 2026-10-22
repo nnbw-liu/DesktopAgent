@@ -30,6 +30,12 @@ public sealed class ModelProvider
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? LegacyApiKey { get; set; }
 
+    /// <summary>
+    /// provider 级默认档案：模型名推断不出档位时使用（可空）。
+    /// 正常情况下由单个模型的 <see cref="ModelEntry.Profile"/> 显式覆盖，这里只在 settings.json 里手写。
+    /// </summary>
+    public ModelProfile? DefaultProfile { get; set; }
+
     /// <summary>模型目录。</summary>
     public List<ModelEntry> Models { get; set; } = [];
 
@@ -45,6 +51,12 @@ public sealed class ModelEntry
 
     /// <summary>可选显示名称。</summary>
     public string? DisplayName { get; set; }
+
+    /// <summary>
+    /// 显式档案（窗口 / 输出上限 / 能力位）。为空表示按模型名推断，
+    /// 推断不出来时再退回 provider 默认，最后按 8K 保守处理。
+    /// </summary>
+    public ModelProfile? Profile { get; set; }
 
     [JsonIgnore]
     public string Name => string.IsNullOrWhiteSpace(DisplayName) ? Id : DisplayName;

@@ -1,11 +1,12 @@
 @using System.Diagnostics
 @using System.IO
+@using SDemo.DesktopAgent.Context
 @using SDemo.DesktopAgent.Models
 @using SDemo.DesktopAgent.Sandbox
 @using Microsoft.AspNetCore.Components
 @inject IJSRuntime Js
 @inject ISettingsService Settings
-@inject IAgentChatService Agent
+@inject IAgentSessionRunner Runner
 @inject IToolApprovalService Approvals
 @inject AgentToolRegistry ToolRegistry
 @inject ISandboxJobService Sandbox
@@ -203,6 +204,15 @@
                         }
                     </article>
                 }
+
+                @* 宿主提示：不是模型输出，也不进入下一次请求的上下文（P1 §6：溢出 / 中途裁剪）。 *@
+                @if (!string.IsNullOrWhiteSpace(_contextNotice))
+                {
+                    <div class="context-notice">
+                        <span class="context-notice-text">@_contextNotice</span>
+                        <button type="button" class="context-notice-close" title="关闭提示" @onclick="DismissContextNotice">✕</button>
+                    </div>
+                }
             </div>
         </div>
     }
@@ -264,6 +274,12 @@
                     <button type="button" class="model-picker-empty" @onclick="() => OnOpenModelSettings.InvokeAsync()">
                         未配置模型 · 去设置
                     </button>
+                }
+
+                @* P1：上下文占用环 + 分段明细；关闭 showContextMeter 后不渲染。 *@
+                @if (Settings.Current.Context.ShowContextMeter)
+                {
+                    <ContextMeter Report="_contextPreview" />
                 }
             </FooterContent>
         </ChatComposer>
@@ -343,6 +359,12 @@
     private string? _selectedKey;
     private CancellationTokenSource? _cts;
 
+    /// <summary>最近一次算出的上下文报告（预览或真实请求），驱动占用环与明细。</summary>
+    private ContextReport? _contextPreview;
+
+    /// <summary>宿主提示（溢出重试 / 需压缩）；不渲染进对话正文，也不进入后续上下文。</summary>
+    private string? _contextNotice;
+
     /// <summary>常用技能（本地技能库）。</summary>
     private IReadOnlyList<SkillInfo> _skills = [];
 
@@ -413,6 +435,7 @@
 
         // 沙箱探测可能要启动一次进程：先按“未验证”渲染 chip，后台刷新后再更新。
         _ = RefreshSandboxAvailabilityAsync();
+        RefreshContextPreview();
     }
 
     protected override void OnParametersSet()
@@ -429,6 +452,8 @@
             _isGenerating = false;
             ApplyActiveMount(Session.ActiveMountId);
             RefreshToolPacks();
+            _contextNotice = null;
+            RefreshContextPreview();
         }
     }
 
@@ -446,6 +471,7 @@
         {
             RefreshModelOptions();
             RefreshToolPacks();
+            RefreshContextPreview();
             _ = RefreshSandboxAvailabilityAsync();
             StateHasChanged();
         });
@@ -497,10 +523,56 @@
     {
         _selectedKey = args.Value?.ToString();
         RememberSelection();
+        _contextNotice = null;
+        RefreshContextPreview();
     }
 
     /// <summary>选择技能：再次点击同一个则取消。</summary>
-    private void SelectSkill(string? name) => _selectedSkill = name;
+    private void SelectSkill(string? name)
+    {
+        _selectedSkill = name;
+        RefreshContextPreview();
+    }
+
+    /// <summary>
+    /// 重新估算「下一次请求」的上下文占用；只读、不发请求。
+    /// 预算超限时把错误报告留在 <see cref="_contextPreview"/>，让占用环仍然显示真实数值。
+    /// </summary>
+    private void RefreshContextPreview()
+    {
+        var option = CurrentModelOption();
+
+        if (option is null || Session.Messages.Count == 0)
+        {
+            _contextPreview = null;
+            return;
+        }
+
+        try
+        {
+            _contextPreview = Runner.Preview(new AgentRunRequest(
+                Session.Messages.ToList(),
+                option.Provider,
+                option.ModelId,
+                new HashSet<string>(_enabledToolPacks, StringComparer.Ordinal),
+                _selectedSkill,
+                Session.Id)).Report;
+        }
+        catch (ContextBudgetException ex)
+        {
+            _contextPreview = ex.Report;
+        }
+        catch (Exception)
+        {
+            // 预览失败不影响发送：设置页可能刚被改坏，真正发送时还会再报一次。
+            _contextPreview = null;
+        }
+    }
+
+    private ModelOption? CurrentModelOption() =>
+        _modelOptions.FirstOrDefault(option => string.Equals(option.Key, _selectedKey, StringComparison.Ordinal));
+
+    private void DismissContextNotice() => _contextNotice = null;
 
     /// <summary>开关一个工具包（只有可用时才允许；不可用的 chip 在 UI 上已禁用）。</summary>
     private void ToggleToolPack(string packId)
@@ -960,26 +1032,33 @@
         }
         var metrics = new AgentRunMetrics();
         var startedAt = Stopwatch.GetTimestamp();
+        var telemetry = new ContextRunTelemetry();
+        _contextNotice = null;
 
         try
         {
             await ConsumeAsync(
                 reply,
-                Agent.StreamAsync(
-                    option.Provider,
-                    option.ModelId,
-                    history,
-                    enabledPacks,
-                    Session.Id,
-                    _selectedSkill,
-                    metrics,
-                    cts.Token));
+                Runner.StreamAsync(
+                    new AgentRunRequest(
+                        history,
+                        option.Provider,
+                        option.ModelId,
+                        enabledPacks,
+                        _selectedSkill,
+                        Session.Id,
+                        metrics),
+                    telemetry,
+                    cts.Token),
+                telemetry);
         }
         finally
         {
             ApplyMetrics(reply, metrics, startedAt);
             _isGenerating = false;
             _cts = null;
+            _contextPreview = telemetry.Report ?? _contextPreview;
+            _contextNotice = telemetry.ContextNotice;
             await SetGeneratingAsync(false);
             StateHasChanged();
             await NotifySessionChangedAsync();
@@ -1163,7 +1242,10 @@
     }
 
     /// <summary>普通对话的流式累积：正文原样追加，出错追加可读提示。</summary>
-    private async Task ConsumeAsync(ChatMessage reply, IAsyncEnumerable<AgentDelta> stream)
+    private async Task ConsumeAsync(
+        ChatMessage reply,
+        IAsyncEnumerable<AgentDelta> stream,
+        ContextRunTelemetry telemetry)
     {
         try
         {
@@ -1179,12 +1261,28 @@
                     reply.Reasoning += delta.Reasoning;
                 }
 
+                // 中途裁剪 / 中途提示需要让用户看到，但仍不进模型上下文。
+                if (!string.IsNullOrWhiteSpace(telemetry.ContextNotice))
+                {
+                    _contextNotice = telemetry.ContextNotice;
+                }
+
                 StateHasChanged();
             }
         }
         catch (OperationCanceledException)
         {
             // 用户点了停止。
+        }
+        catch (ContextBudgetException ex)
+        {
+            // 发送前的预算拦截：只给宿主提示，不在气泡里伪造一段「模型回复」。
+            _contextPreview = ex.Report ?? _contextPreview;
+            _contextNotice = ex.Message;
+            if (string.IsNullOrWhiteSpace(reply.Content))
+            {
+                Session.Messages.Remove(reply);
+            }
         }
         catch (Exception ex)
         {
@@ -1202,6 +1300,11 @@
         foreach (var pair in metrics.ToolCalls)
         {
             reply.ToolCalls[pair.Key] = pair.Value;
+        }
+
+        if (metrics.ToolTrace.Count > 0)
+        {
+            reply.ToolTrace.AddRange(metrics.ToolTrace);
         }
     }
 

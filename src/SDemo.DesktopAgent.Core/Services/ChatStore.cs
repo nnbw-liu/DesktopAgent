@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Data;
 using SDemo.DesktopAgent.Models;
 
@@ -277,6 +278,10 @@ public sealed class ChatStore
             messageRecord.DerivedJson = message.Derived.Count == 0
                 ? null
                 : JsonSerializer.Serialize(message.Derived, JsonOptions);
+            messageRecord.ToolTraceJson = message.ToolTrace.Count == 0
+                ? null
+                : JsonSerializer.Serialize(message.ToolTrace, JsonOptions);
+            messageRecord.IsPinned = message.IsPinned;
             keep.Add(message.Id);
         }
 
@@ -347,7 +352,12 @@ public sealed class ChatStore
             ("OriginMountId", "TEXT NULL"),
             ("ActiveMountId", "TEXT NULL"),
             ("LastPluginId", "TEXT NULL"),
-            ("PluginMemoryJson", "TEXT NULL")
+            ("PluginMemoryJson", "TEXT NULL"),
+            // P1 建列、P2 写入；提前建好可以避免两期各改一次迁移。
+            ("Summary", "TEXT NULL"),
+            ("SummaryThroughOrder", "INTEGER NOT NULL DEFAULT 0"),
+            ("SummaryUpdatedAt", "TEXT NULL"),
+            ("SummaryTokens", "INTEGER NOT NULL DEFAULT 0")
         ]),
         ("messages",
         [
@@ -358,7 +368,9 @@ public sealed class ChatStore
             ("OutputTokens", "INTEGER NOT NULL DEFAULT 0"),
             ("ToolCallsJson", "TEXT NULL"),
             ("PluginJson", "TEXT NULL"),
-            ("DerivedJson", "TEXT NULL")
+            ("DerivedJson", "TEXT NULL"),
+            ("ToolTraceJson", "TEXT NULL"),
+            ("IsPinned", "INTEGER NOT NULL DEFAULT 0")
         ])
     ];
 
@@ -539,6 +551,33 @@ public sealed class ChatStore
         }
     }
 
+    /// <summary>工具轨迹：坏数据降级成空列表；超过上限的只保留最近的部分。</summary>
+    private static List<ToolTraceEntry> DeserializeToolTrace(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            var entries = JsonSerializer.Deserialize<List<ToolTraceEntry>>(json, JsonOptions);
+            if (entries is null)
+            {
+                return [];
+            }
+
+            return entries
+                .Where(entry => !string.IsNullOrWhiteSpace(entry.ToolId))
+                .TakeLast(ToolTraceFormatter.MaxEntriesPerMessage)
+                .ToList();
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
     private static ChatSession ToSession(SessionRecord record, string? workspaceId) => new()
     {
         Id = record.Id,
@@ -564,7 +603,9 @@ public sealed class ChatStore
                 OutputTokens = message.OutputTokens,
                 ToolCalls = DeserializeToolCalls(message.ToolCallsJson),
                 Plugin = DeserializePlugin(message.PluginJson),
-                Derived = DeserializeDerived(message.DerivedJson)
+                Derived = DeserializeDerived(message.DerivedJson),
+                ToolTrace = DeserializeToolTrace(message.ToolTraceJson),
+                IsPinned = message.IsPinned
             })
             .ToList()
     };

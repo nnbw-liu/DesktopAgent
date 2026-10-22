@@ -256,13 +256,15 @@ $env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
 
 - **外观**：跟随系统 / 浅色 / 深色。写入 `AppSettings.Theme`，`ThemeService.SetPreference()` 立即切换 WPF 资源字典与 WebView，`SettingsService.Save()` 落盘；“跟随系统”时仍响应 `WM_SETTINGCHANGE`。
 - **语言**：目前只有简体中文（`en-US` 选项禁用，等资源本地化接入）。
+- **上下文**：展示当前生效的预算参数（预算占窗口、保留轮次、轨迹预算、附件内联上限、已校准模型数），可关闭占用环、可一键「重置校准」。
 - **版本信息**：应用版本、.NET 运行时、操作系统、WebView2 版本。
 
 **模型设置**
 - 提供商列表；列表滚动区独立，**「添加模型提供商」固定在列表底部**（列表超出高度时也在视口底部，不会跟着滚动）。
 - 点击后该按钮位置变成 `ProviderEditor` 表单：ProviderId、显示名称（为空时水印跟随 ProviderId）、API 地址、API Key（可切换显示/隐藏）、模型目录。
 - 卡片上的「编辑」可以直接改地址 / Key / 模型目录，不必删了重建。
-- 模型目录支持两种方式：**获取模型**（`GET {baseUrl}/models`，标准 OpenAI 返回 `data[].id`）与**手动添加**（回车或点「添加」），已添加的模型以 chip 形式展示、可单个移除。
+- 模型目录支持两种方式：**获取模型**（`GET {baseUrl}/models`，标准 OpenAI 返回 `data[].id`）与**手动添加**（回车或点「添加」），已添加的模型以分行列表展示、可单个移除。
+- 每个模型右侧有窗口档位（自动 / 8K / 32K / 128K / 200K）；选「自动」按模型名推断，拿不准选 8K 只会让预算更保守。档位随 `ModelEntry.Profile` 落盘，决定上下文预算。
 - 获取失败会翻译成可读提示：`404` 表示该服务没有 `/models` 接口（**火山方舟 Agent Plan 的 `/api/plan/v3` 就是这种**），此时把模型 ID 手动加进目录即可。
 - 保存前校验 ProviderId 唯一、地址为绝对 http(s)；只填域名时自动补 `/v1`。
 - 移除提供商需要点两次（先变「确认移除」再删），避免误触。
@@ -298,6 +300,19 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 - 取消通过 `CancellationToken`，抛 `TaskCanceledException`（`OperationCanceledException` 子类），先于通用 `Exception` 捕获；HTTP 错误是 `System.ClientModel.ClientResultException`。
 - 每次请求都新建 agent（当前实现简单直接）；后续可按 provider+model 缓存，减少构建与连接开销。
 - 包体积：framework-dependent 输出约 +10MB；WPF/Blazor Hybrid 默认不裁剪，**不要开** `PublishTrimmed`/AOT（反射与序列化路径未验证）。
+
+## 上下文预算与硬裁剪
+
+每次请求都会先估算 token、按预算裁剪，再交给 Agent Framework；原始消息不删除，数据库里的历史保持完整。实现说明见 [docs/context-budget.md](docs/context-budget.md)。
+
+- **单一入口**：`ContextBuilder` 是唯一组装请求的地方（普通对话 → `AgentSessionRunner`，插件 → `PluginRunner` 的 passthrough）。
+- **预算**：`total = (window - 输出预留 - 安全余量) * 0.85`；8K 窗口下输入预算约 4.9K，保留最近 6 轮（小模型 4 轮）。
+- **裁剪顺序**：保留最近轮次 → 从最旧整轮淘汰 → 历史附件改桩 → 工具轨迹限额 → pin 截断；当前输入永不淘汰。
+- **工具循环**：`ContextBudgetChatClient` 在 FICC 内层，第二次请求前强裁过长工具结果、必要时整块淘汰历史，避免「工具结果一多就 400」。
+- **溢出重试**：识别到上下文溢出时按半预算只重试一次，并把服务端提示的窗口记进 `context-calibration.json`。
+- **计量校准**：用服务端 `usage.input_tokens` 修正启发式估算（EMA，连续 3 次偏差过大自动停用）；「设置 → 通用」可重置。
+- **UI**：输入框右下角是占用环（估算 / 输入预算），>80% 变黄、>95% 变红；点开看系统提示词 / 技能 / 历史 / 附件 / 轨迹 / pin 的分段明细。宿主提示（溢出重试、需压缩）显示在消息区末尾，不会进入上下文。
+- **模型窗口**：模型编辑器里每个模型可单独选「自动 / 8K / 32K / 128K / 200K」，自动档按模型名与家族推断，拿不准就选 8K（只会更保守）。
 
 ## 技能与工具
 

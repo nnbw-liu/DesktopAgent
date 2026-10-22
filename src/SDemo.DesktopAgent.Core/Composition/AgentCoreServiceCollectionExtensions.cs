@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Plugins;
 using SDemo.DesktopAgent.Sandbox;
 
@@ -26,6 +27,13 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<ChangeApplier>();
         services.AddSingleton<ChatStore>();
         services.AddSingleton<SkillCatalog>();
+
+        // P1 上下文层：单一入口 + 计量 + 校准 + 溢出自愈。
+        services.AddSingleton<ITokenCounter, HeuristicTokenCounter>();
+        services.AddSingleton<TokenCalibrationStore>();
+        services.AddSingleton<ContextBuilder>();
+        services.AddSingleton<IAgentSessionRunner, AgentSessionRunner>();
+
         services.AddSingleton<PluginCatalog>();
         services.AddSingleton<PluginRegistry>();
         services.AddSingleton<PluginPromptComposer>();

@@ -25,6 +25,11 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         session.Property(record => record.ActiveMountId);
         session.Property(record => record.LastPluginId);
         session.Property(record => record.PluginMemoryJson);
+        // P1 只建列（P2 才开始写入摘要）；老库由 ChatStore.RequiredColumns 补列。
+        session.Property(record => record.Summary);
+        session.Property(record => record.SummaryThroughOrder);
+        session.Property(record => record.SummaryUpdatedAt);
+        session.Property(record => record.SummaryTokens);
         session.HasIndex(record => record.UpdatedAt);
         session.HasMany(record => record.Messages)
             .WithOne()
@@ -46,6 +51,8 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         message.Property(record => record.ToolCallsJson);
         message.Property(record => record.PluginJson);
         message.Property(record => record.DerivedJson);
+        message.Property(record => record.ToolTraceJson);
+        message.Property(record => record.IsPinned);
         message.HasIndex(record => record.SessionId);
     }
 }
@@ -76,6 +83,17 @@ public sealed class SessionRecord
 
     /// <summary>会话级插件记忆的 JSON，例如 {"translate/composer/target":"ja"}。</summary>
     public string? PluginMemoryJson { get; set; }
+
+    /// <summary>滚动摘要正文；P1 只建列，P2 写入。</summary>
+    public string? Summary { get; set; }
+
+    /// <summary>摘要覆盖到哪条消息的序号（不含）；0 表示还没有摘要。</summary>
+    public int SummaryThroughOrder { get; set; }
+
+    public DateTime? SummaryUpdatedAt { get; set; }
+
+    /// <summary>摘要正文的 token 估算。</summary>
+    public int SummaryTokens { get; set; }
 
     public List<MessageRecord> Messages { get; set; } = [];
 }
@@ -116,4 +134,10 @@ public sealed class MessageRecord
 
     /// <summary>派生卡片（DerivedArtifact[]）的 JSON。</summary>
     public string? DerivedJson { get; set; }
+
+    /// <summary>工具轨迹（ToolTraceEntry[]）的 JSON。</summary>
+    public string? ToolTraceJson { get; set; }
+
+    /// <summary>pin 标记；裁剪时永不淘汰。</summary>
+    public bool IsPinned { get; set; }
 }

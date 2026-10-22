@@ -1,0 +1,81 @@
+@using SDemo.DesktopAgent.Context
+@* P1 上下文占用环：显示「估算输入 token / 输入预算」，点击展开分段明细。
+   数值来自 ContextReport（服务端返回 usage 后会用实际值回填，见 AgentSessionRunner）。 *@
+
+<div class="context-meter-wrap">
+    <button type="button"
+            class="context-meter @TierClass"
+            title="@Tooltip"
+            aria-label="@Tooltip"
+            aria-expanded="@_open"
+            disabled="@(Report is null)"
+            @onclick="Toggle">
+        <span class="context-meter-ring" style="@RingStyle" aria-hidden="true"></span>
+        <span class="context-meter-value">@UsedText</span>
+    </button>
+
+    @if (_open && Report is not null)
+    {
+        <div class="context-popover" role="dialog" aria-label="上下文占用明细">
+            <div class="context-popover-head">
+                <span class="context-popover-title">上下文占用</span>
+                <button type="button" class="context-popover-close" title="关闭" @onclick="Close">✕</button>
+            </div>
+            <ContextBreakdown Report="Report" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public ContextReport? Report { get; set; }
+
+    private bool _open;
+
+    private double Ratio => Report is null || Report.Total <= 0
+        ? 0
+        : Math.Clamp((double)Report.Estimated / Report.Total, 0, 1);
+
+    private string TierClass => Ratio switch
+    {
+        >= 0.95 => "is-danger",
+        >= 0.80 => "is-warn",
+        _ => string.Empty
+    };
+
+    private string RingStyle =>
+        $"background: conic-gradient(var(--context-ring-fill) {Ratio * 100:F1}%, var(--context-ring-track) 0)";
+
+    private string UsedText => Report is null
+        ? "—"
+        : $"{Format(Report.Estimated)} / {Format(Report.Total)}";
+
+    private string Tooltip => Report is null
+        ? "上下文占用：还没有可估算的消息"
+        : $"输入预算 {Format(Report.Total)}（估算 {Format(Report.Estimated)}）\n"
+          + $"窗口 {Format(Report.ContextWindow)} · 输出预留 {Format(Report.ReservedOutput)} · 安全余量 {Format(Report.Safety)}\n"
+          + (Report.ActualInputTokens > 0
+              ? $"服务端实际输入 {Format(Report.ActualInputTokens.Value)}（校准 ×{Report.CalibrationFactor:F2}）"
+              : "估算值：服务端未返回 usage")
+          + "\n点击查看分段明细";
+
+    private void Toggle()
+    {
+        if (Report is null)
+        {
+            return;
+        }
+
+        _open = !_open;
+    }
+
+    private void Close() => _open = false;
+
+    internal static string Format(int tokens) => tokens switch
+    {
+        >= 100_000 => $"{tokens / 1000.0:F0}K",
+        >= 10_000 => $"{tokens / 1000.0:F1}K",
+        >= 1000 => $"{tokens / 1000.0:F1}K",
+        _ => tokens.ToString()
+    };
+}

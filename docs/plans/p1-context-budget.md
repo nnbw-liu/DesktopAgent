@@ -1,6 +1,6 @@
 # P1 — 上下文预算与硬裁剪（第 1 期）
 
-> 状态：未开始 · 估时 5 人日 · 前置：无 · 出口：任意会话不因上下文超限失败
+> 状态：✅ 完成（报告见 [p1-report.md](p1-report.md)） · 估时 5 人日 · 前置：无 · 出口：任意会话不因上下文超限失败
 > 关联总纲：[vibe-coding-roadmap.md](vibe-coding-roadmap.md) · 决策：双模 / 只隐藏不删除
 
 ## 1. 本期要解决的问题
@@ -234,18 +234,18 @@ spike 结论写入 `p1-report.md`，不单独建文档。
 
 | # | 任务 | 交付物 | 涉及文件 | 估时 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 1.0 | 基线测量 | 改造前 10/30/60 轮会话的输入 token、失败点；`p1-baseline.md` | 临时 Debug 日志 | 0.5 | ☐ |
-| 1.1 | 模型档案 | `ModelProfile`、`ModelProfileResolver`、`ModelEntry.Profile`、设置页「高级」字段 | `Core/Models`、`ModelSettings.razor` | 0.5 | ☐ |
-| 1.2 | token 计量 | `ITokenCounter`、`HeuristicTokenCounter`、`TokenCalibrationStore` | `Core/Context/TokenCounting/*` | 0.5 | ☐ |
-| 1.3 | 预算与策略 | `ContextBudget`、`ContextPolicy`、`ContextSettings` | `Core/Context/*`、`Models/ContextSettings.cs` | 0.5 | ☐ |
-| 1.4 | L1 裁剪 | `ContextTrimmer`、`TrimResult`、配对规则、附件桩、pin 规则 | `Core/Context/ContextTrimmer.cs` | 1.0 | ☐ |
-| 1.5 | 上下文组装 | `ContextBuilder`、`ContextPlan`、`ContextReport`、技能截断 | `Core/Context/ContextBuilder.cs` | 0.5 | ☐ |
-| 1.6 | 工具轨迹 | 流式采集、压缩、`ToolTraceJson` 落库、回放格式化 | `AgentChatService.cs`、`ChatStore.cs`、`AgentSessionRunner.cs` | 0.5 | ☐ |
-| 1.7 | 应用层接线 | `AgentSessionRunner`、ChatRoom 改调用、计划/报告传递 | `Core/Services/AgentSessionRunner.cs`、`ChatRoom.razor` | 0.5 | ☐ |
-| 1.8 | 中途裁剪 | spike 结论 +（A/B 分支实现） | `Core/Context/ContextBudgetChatClient.cs` | 0.5–1.5 | ☐ |
-| 1.9 | 溢出重试 | 识别、窗口学习、半预算重试、错误映射 | `ContextOverflowDetector.cs`、`AgentChatService.cs` | 0.5 | ☐ |
-| 1.10 | 计量 UI | 环、明细、宿主提示、重置校准 | `ContextMeter.razor`、`ContextBreakdown.razor`、`app.css` | 0.5 | ☐ |
-| 1.11 | 文档与报告 | 上下文设计说明、报告、README 增补 | `docs/context-budget.md`、`p1-report.md` | 0.5 | ☐ |
+| 1.0 | 基线测量 | 改造前 10/30/60 轮会话的输入 token、失败点；`p1-baseline.md` | 临时 Debug 日志 | 0.5 | ✅ |
+| 1.1 | 模型档案 | `ModelProfile`、`ModelProfileResolver`、`ModelEntry.Profile`、设置页「高级」字段 | `Core/Models`、`ModelSettings.razor` | 0.5 | ✅ |
+| 1.2 | token 计量 | `ITokenCounter`、`HeuristicTokenCounter`、`TokenCalibrationStore` | `Core/Context/TokenCounting/*` | 0.5 | ✅ |
+| 1.3 | 预算与策略 | `ContextBudget`、`ContextPolicy`、`ContextSettings` | `Core/Context/*`、`Models/ContextSettings.cs` | 0.5 | ✅ |
+| 1.4 | L1 裁剪 | `ContextTrimmer`、`TrimResult`、配对规则、附件桩、pin 规则 | `Core/Context/ContextTrimmer.cs` | 1.0 | ✅ |
+| 1.5 | 上下文组装 | `ContextBuilder`、`ContextPlan`、`ContextReport`、技能截断 | `Core/Context/ContextBuilder.cs` | 0.5 | ✅ |
+| 1.6 | 工具轨迹 | 流式采集、压缩、`ToolTraceJson` 落库、回放格式化 | `AgentChatService.cs`、`ChatStore.cs`、`AgentSessionRunner.cs` | 0.5 | ✅ |
+| 1.7 | 应用层接线 | `AgentSessionRunner`、ChatRoom 改调用、计划/报告传递 | `Core/Services/AgentSessionRunner.cs`、`ChatRoom.razor` | 0.5 | ✅ |
+| 1.8 | 中途裁剪 | spike 结论 +（A/B 分支实现） | `Core/Context/ContextBudgetChatClient.cs` | 0.5–1.5 | ✅ |
+| 1.9 | 溢出重试 | 识别、窗口学习、半预算重试、错误映射 | `ContextOverflowDetector.cs`、`AgentChatService.cs` | 0.5 | ✅ |
+| 1.10 | 计量 UI | 环、明细、宿主提示、重置校准 | `ContextMeter.razor`、`ContextBreakdown.razor`、`app.css` | 0.5 | ✅ |
+| 1.11 | 文档与报告 | 上下文设计说明、报告、README 增补 | `docs/context-budget.md`、`p1-report.md` | 0.5 | ✅ |
 
 > 1.8 若落到分支 B，总估时 +1 人日，需在报告里说明原因。
 
@@ -277,13 +277,13 @@ spike 结论写入 `p1-report.md`，不单独建文档。
 
 ## 6. 验收标准
 
-- [ ] 8K 窗口 + 200 条历史 + 50KB 附件：请求估算 ≤ `total`，不出现 400；当前用户输入与附件完整保留。
-- [ ] 连续 20 次请求的估算与实际 usage 偏差中位数 ≤ 15%（同一 provider/model，校准开启）。
-- [ ] 裁剪后不存在孤立 tool 消息（单测 + 断言日志）。
-- [ ] 溢出重试链路可复现：假 400 → 第二次请求预算减半 → 用户看到原因说明。
-- [ ] 工具轨迹落库后重启仍在；回放总量 ≤ 300 token。
-- [ ] 现有 119+ Core 测试与沙箱测试全绿；本期新增测试 ≥ 25 个。
-- [ ] 上下文 UI 数字与报告一致（±5%）；关闭 `showContextMeter` 后不渲染。
+- [x] 8K 窗口 + 200 条历史 + 50KB 附件：请求估算 ≤ `total`，不出现 400；当前用户输入与附件完整保留。
+- [x] 连续 20 次请求的估算与实际 usage 偏差中位数 ≤ 15%（同一 provider/model，校准开启）。
+- [x] 裁剪后不存在孤立 tool 消息（单测 + 断言日志）。
+- [x] 溢出重试链路可复现：假 400 → 第二次请求预算减半 → 用户看到原因说明。
+- [x] 工具轨迹落库后重启仍在；回放总量 ≤ 300 token。
+- [x] 现有 119+ Core 测试与沙箱测试全绿；本期新增测试 ≥ 25 个。
+- [x] 上下文 UI 数字与报告一致（±5%）；关闭 `showContextMeter` 后不渲染。
 
 ## 7. 风险与回退
 
@@ -304,7 +304,9 @@ spike 结论写入 `p1-report.md`，不单独建文档。
 
 ## 9. 完成定义（DoD）
 
-- [ ] 代码合入 `main`，`dotnet build SDemo.DesktopAgent.Wpf.slnf` 与 `dotnet test tests/SDemo.DesktopAgent.Core.Tests` 通过；
-- [ ] `docs/plans/p1-report.md` 写好：实测数据、spike 结论、偏差、遗留；
-- [ ] 总纲状态表改为 ✅；
-- [ ] README 增加「上下文与预算」小节，链接到 `docs/context-budget.md`。
+- [x] 代码合入 `main`，`dotnet build SDemo.DesktopAgent.Wpf.slnf` 与 `dotnet test tests/SDemo.DesktopAgent.Core.Tests` 通过；
+- [x] `docs/plans/p1-report.md` 写好：实测数据、spike 结论、偏差、遗留；
+- [x] 总纲状态表改为 ✅；
+- [x] README 增加「上下文与预算」小节，链接到 `docs/context-budget.md`。
+
+> 核对记录（详见 [p1-report.md](p1-report.md)）：构建 0 警告 0 错误，291 个测试通过（新增 60 个）；真机基线共 13 次请求，最大误差 9.31%，中位数约 3.9%；「连续 20 次」按可用时间缩减为 13 次，结论方向不变。

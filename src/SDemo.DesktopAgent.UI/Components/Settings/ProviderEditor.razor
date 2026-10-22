@@ -65,15 +65,26 @@
         }
         else
         {
-            <div class="model-chips">
+            <div class="model-list">
                 @foreach (var model in _models)
                 {
-                    <span class="model-chip">
-                        @model
+                    <div class="model-row">
+                        <span class="model-id" title="@model">@model</span>
+                        <select class="field-input field-input--select model-tier"
+                                title="上下文窗口档位；「自动」按模型名推断，拿不准就选 8K"
+                                value="@TierFor(model)"
+                                @onchange="args => SetTier(model, args)">
+                            <option value="@ModelProfilePresets.Auto">自动识别</option>
+                            @foreach (var tier in ModelProfilePresets.Tiers)
+                            {
+                                <option value="@tier.Preset">@tier.Preset 窗口</option>
+                            }
+                        </select>
                         <button type="button" class="chip-remove" title="移除" @onclick="() => RemoveModel(model)">✕</button>
-                    </span>
+                    </div>
                 }
             </div>
+            <p class="field-hint">窗口档位只影响预算与裁剪；选错只会更保守，不会发坏请求。</p>
         }
 
         <div class="model-add">
@@ -121,6 +132,10 @@
     private bool _isFetching;
     private string? _error;
     private readonly List<string> _models = [];
+
+    /// <summary>模型 ID → 窗口档位（"auto" 或 8K/32K/128K/200K）；不在这里的按自动处理。</summary>
+    private readonly Dictionary<string, string> _tiers = new(StringComparer.OrdinalIgnoreCase);
+
     private ElementReference _idInput;
 
     private bool IsEditing => Existing is not null;
@@ -137,6 +152,20 @@
         _baseUrl = Existing.BaseUrl;
         _apiKey = Existing.ApiKey;
         _models.AddRange(Existing.Models.Select(model => model.Id));
+
+        foreach (var model in Existing.Models)
+        {
+            _tiers[model.Id] = model.Profile?.Preset ?? ModelProfilePresets.Auto;
+        }
+    }
+
+    private string TierFor(string modelId) =>
+        _tiers.TryGetValue(modelId, out var tier) ? tier : ModelProfilePresets.Auto;
+
+    private void SetTier(string modelId, ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString();
+        _tiers[modelId] = string.IsNullOrWhiteSpace(value) ? ModelProfilePresets.Auto : value;
     }
 
     /// <summary>显示名称为空时，水印跟随 ProviderId 的内容。</summary>
@@ -211,6 +240,7 @@
 
         _models.Add(value);
         _models.Sort(StringComparer.OrdinalIgnoreCase);
+        _tiers[value] = ModelProfilePresets.Auto;
         _modelInput = string.Empty;
         _error = null;
     }
@@ -218,6 +248,7 @@
     private void RemoveModel(string model)
     {
         _models.Remove(model);
+        _tiers.Remove(model);
         _error = null;
     }
 
@@ -268,7 +299,13 @@
             DisplayName = _displayName.Trim(),
             BaseUrl = baseUrl.TrimEnd('/'),
             ApiKey = _apiKey.Trim(),
-            Models = _models.Select(m => new ModelEntry { Id = m }).ToList()
+            Models = _models
+                .Select(m => new ModelEntry
+                {
+                    Id = m,
+                    Profile = ModelProfilePresets.FromPreset(TierFor(m))
+                })
+                .ToList()
         };
 
         await OnSaved.InvokeAsync(provider);

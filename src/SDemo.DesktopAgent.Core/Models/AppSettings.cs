@@ -37,4 +37,7 @@ public sealed class AppSettings
 
     /// <summary>工具包开关（搜索 / 文件 / PowerShell 等，按 <c>AgentToolPackDescriptor.Id</c> 记录）。</summary>
     public ToolSettings Tools { get; set; } = new();
+
+    /// <summary>上下文预算与裁剪（P1 起；旧文件没有该节点时按默认值）。</summary>
+    public ContextSettings Context { get; set; } = new();
 }

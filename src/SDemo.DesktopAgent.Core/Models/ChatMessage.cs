@@ -6,7 +6,6 @@ public enum ChatMessageRole
     User,
     Assistant
 }
-
 /// <summary>一条聊天消息。助手消息在流式生成过程中会不断追加文本与思维链。</summary>
 public sealed class ChatMessage(ChatMessageRole role, string content)
 {
@@ -45,6 +44,15 @@ public sealed class ChatMessage(ChatMessageRole role, string content)
     /// 持久化到 DerivedJson，但<b>不进入后续请求上下文</b>。
     /// </summary>
     public List<DerivedArtifact> Derived { get; init; } = [];
+
+    /// <summary>
+    /// pin 的消息永不被裁剪淘汰（数量上限见 <see cref="ContextSettings.MaxPinnedMessages"/>）。
+    /// P1 只落字段与规则，完整 pin 交互在 P2。
+    /// </summary>
+    public bool IsPinned { get; set; }
+
+    /// <summary>本条助手消息的工具轨迹；持久化到 ToolTraceJson，回放时压成紧凑行。</summary>
+    public List<Context.ToolTraceEntry> ToolTrace { get; init; } = [];
 
     public int TotalTokens => InputTokens + OutputTokens;
 }

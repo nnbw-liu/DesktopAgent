@@ -416,7 +416,9 @@
         OutputTokens = message.OutputTokens,
         ToolCalls = new Dictionary<string, int>(message.ToolCalls, StringComparer.OrdinalIgnoreCase),
         Plugin = message.Plugin,
-        Derived = [.. message.Derived]
+        Derived = [.. message.Derived],
+        ToolTrace = [.. message.ToolTrace],
+        IsPinned = message.IsPinned
     };
 
     private static string BuildTitle(string text, IReadOnlyList<ChatAttachment> attachments)

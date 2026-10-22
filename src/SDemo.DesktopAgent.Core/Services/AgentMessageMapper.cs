@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using Microsoft.Extensions.AI;
+using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Models;
 using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
 using ChatMessageModel = SDemo.DesktopAgent.Models.ChatMessage;
@@ -9,9 +10,10 @@ using ChatRoleModel = SDemo.DesktopAgent.Models.ChatMessageRole;
 namespace SDemo.DesktopAgent.Services;
 
 /// <summary>
-/// 把领域消息映射成发给模型的消息。这里是「消息里哪些东西会进入上下文」的唯一入口：
-/// 只读 <see cref="ChatMessageModel.Content"/> 与附件，<b>派生卡片（Derived）永远不参与</b>——
+/// 把领域消息渲染成「实际发给模型的文本」。这里是「消息里哪些东西会进入上下文」的唯一实现：
+/// 只读 <see cref="ChatMessageModel.Content"/>、附件与工具轨迹，<b>派生卡片（Derived）永远不参与</b>——
 /// 译文不该污染下一轮推理。改这个文件前请先看 PluginDerivedContextTests。
+/// 消息取舍（保留哪几条）由 <see cref="ContextTrimmer"/> 决定，这里只负责渲染。
 /// </summary>
 internal static class AgentMessageMapper
 {
@@ -29,35 +31,80 @@ internal static class AgentMessageMapper
     public static bool ShouldInclude(ChatMessageModel message) =>
         !string.IsNullOrWhiteSpace(message.Content) || message.Attachments.Count > 0;
 
+    /// <summary>兼容入口：全量内联附件 + 回放轨迹（测试与旧调用方使用）。</summary>
     public static AIChatMessage ToRequestMessage(ChatMessageModel message) => new(
         message.Role == ChatRoleModel.User ? ChatRole.User : ChatRole.Assistant,
-        BuildContent(message));
+        BuildContent(message, int.MaxValue, RenderTrace(message)).Text);
 
-    /// <summary>把附件内容拼进发给模型的消息；文本文件内联，二进制文件只给元信息。</summary>
-    private static string BuildContent(ChatMessageModel message)
+    /// <summary>ContextBuilder 使用的渲染入口；裁剪器通过委托调用它。</summary>
+    public static RenderedContent Render(
+        ChatMessageModel message,
+        int attachmentCharLimit,
+        string? toolTraceText) => BuildContent(message, attachmentCharLimit, toolTraceText);
+
+    /// <summary>
+    /// 渲染正文：<paramref name="attachmentCharLimit"/> 为 0 表示附件只保留「已省略」桩。
+    /// 返回的 <see cref="RenderedContent.AttachmentBlock"/> / <see cref="RenderedContent.TraceText"/>
+    /// 用于分段计量（附件、轨迹各占多少 token）。
+    /// </summary>
+    private static RenderedContent BuildContent(
+        ChatMessageModel message,
+        int attachmentCharLimit,
+        string? toolTraceText)
     {
-        if (message.Attachments.Count == 0)
+        var text = new StringBuilder(message.Content);
+        string? attachmentBlock = null;
+        string? traceBlock = null;
+
+        if (message.Attachments.Count > 0)
         {
-            return message.Content;
+            var block = RenderAttachments(message.Attachments, attachmentCharLimit);
+
+            if (block.Length > 0)
+            {
+                attachmentBlock = block.ToString();
+                text.AppendLine().AppendLine().Append(attachmentBlock);
+            }
         }
 
-        var builder = new StringBuilder(message.Content);
-        var budget = AttachmentCharsTotal;
+        if (!string.IsNullOrWhiteSpace(toolTraceText))
+        {
+            traceBlock = $"[工具轨迹]\n{toolTraceText}";
+            text.AppendLine().AppendLine().Append(traceBlock);
+        }
 
-        foreach (var attachment in message.Attachments)
+        return new RenderedContent(text.ToString(), attachmentBlock, traceBlock);
+    }
+
+    private static StringBuilder RenderAttachments(IReadOnlyList<ChatAttachment> attachments, int charLimit)
+    {
+        var builder = new StringBuilder();
+
+        // 全量入口（ToRequestMessage）仍然按 48K 总量封顶，避免一次读入巨型文件。
+        var budget = charLimit <= 0 ? 0 : Math.Min(charLimit, AttachmentCharsTotal);
+
+        foreach (var attachment in attachments)
         {
             builder.AppendLine().AppendLine();
+
+            if (budget <= 0)
+            {
+                // 历史轮 / 超出内联上限：只留桩，路径保留，模型需要时可用工具重新读取。
+                builder.Append("[附件已省略：")
+                    .Append(attachment.FileName)
+                    .Append(", ")
+                    .Append(ByteSize.FormatSize(attachment.Size))
+                    .Append(", ")
+                    .Append(attachment.FilePath)
+                    .Append(']');
+                continue;
+            }
+
             builder.Append("【附件：")
                 .Append(attachment.FileName)
                 .Append("（")
                 .Append(ByteSize.FormatSize(attachment.Size))
                 .Append("）】");
-
-            if (budget <= 0)
-            {
-                builder.AppendLine().Append("（附件内容较多，后续附件已省略）");
-                continue;
-            }
 
             var text = TryReadText(attachment, Math.Min(AttachmentCharsPerFile, budget));
 
@@ -86,7 +133,7 @@ internal static class AgentMessageMapper
             budget -= text.Length;
         }
 
-        return builder.ToString();
+        return builder;
     }
 
     private static bool IsPdf(ChatAttachment attachment) =>
@@ -143,5 +190,20 @@ internal static class AgentMessageMapper
         {
             return null;
         }
+    }
+
+    private static string? RenderTrace(ChatMessageModel message)
+    {
+        if (message.ToolTrace.Count == 0)
+        {
+            return null;
+        }
+
+        // 兼容入口没有预算概念：按最大条数渲染，单条仍然只保留摘要。
+        var lines = message.ToolTrace
+            .TakeLast(ToolTraceFormatter.MaxEntriesPerMessage)
+            .Select(ToolTraceFormatter.RenderLine);
+
+        return string.Join('\n', lines);
     }
 }
