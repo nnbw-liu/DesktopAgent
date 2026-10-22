@@ -83,8 +83,8 @@
 | 套件 | 结果 |
 | --- | --- |
 | `SDemo.DesktopAgent.Core.Tests` | **231 通过**（S5 为 225；新增 3 个删除应用测试 + 3 个审计保留 / 轮转 / 变更明细测试） |
-| `SDemo.DesktopAgent.Sandbox.Tests` | **199 通过 + 1 跳过**（S5 为 193；新增 6 个 Janitor 测试；P1 删除回归位暂时 Skip） |
-| 合计 | **430 通过，1 跳过，0 失败** |
+| `SDemo.DesktopAgent.Sandbox.Tests` | **200 通过 + 1 跳过**（S5 为 193；新增 6 个 Janitor 测试；P1 删除回归位暂时 Skip） |
+| 合计 | **431 通过，1 跳过，0 失败** |
 
 新增 / 覆盖重点：
 
@@ -181,7 +181,8 @@
 
 - 合并 PR 后按现有 WPF / MAUI 发布流程出包；无数据库迁移，协议仍为 v1。
 - 新增文件 `applied.json`、`trash\` 目录对旧版本无影响；旧版本忽略它们。
-- 默认设置不变：沙箱开启、Required + AppContainer；PowerShell 工具仍默认关闭。
+- 默认设置：沙箱开启、Required + AppContainer；文件 / PDF / PowerShell 作为内置能力默认开启，
+  由模型按需调用（S6 UI 验收后调整），PowerShell 仍每次审批。
 
 ### 回滚
 

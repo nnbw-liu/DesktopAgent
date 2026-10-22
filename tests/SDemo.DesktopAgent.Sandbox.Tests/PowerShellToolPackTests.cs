@@ -15,9 +15,21 @@ namespace SDemo.DesktopAgent.Sandbox.Tests;
 public sealed class PowerShellToolPackTests
 {
     [Fact]
+    public void 工具包是内置能力且默认开启()
+    {
+        var descriptor = new PowerShellToolPack().Descriptor;
+
+        Assert.True(descriptor.BuiltIn);
+        Assert.True(descriptor.DefaultEnabled);
+        Assert.True(descriptor.WindowsOnly);
+    }
+
+    [Fact]
     public async Task 工具包未启用时直接拒绝()
     {
         var harness = new Harness();
+        // 默认已改为开启；这里显式关闭，覆盖“用户全局关掉”的分支。
+        harness.Settings.Current.Tools.SetPackEnabled(PowerShellToolPack.PackId, false);
 
         var text = await harness.RunAsync("Write-Output ok");
 
