@@ -125,8 +125,10 @@
 - **Windows Sandbox 功能未安装**：本机无法启动虚拟机，S4/S6 的 Windows Sandbox 真机路径只跑到了
   `.wsb` 生成 / 可用性检测 / 假启动器测试，未做虚拟机 e2e。
 - **Win10 Home 与 Win11 Pro 未验证**：本机只有一个 Windows 版本，无法完成手册要求的三环境手工验证。
-- 标准用户下已验证 PowerShell 拒绝 / 自检 / PDF / 变更面板主路径；管理员场景未单独验证。
+- 标准用户下自动化 e2e 覆盖 PowerShell / PDF / 自检 / 变更应用（`SDemo.DesktopAgent.Sandbox.Tests`）；
+  设置页与变更面板的 UI 只做了构建 + 代码审查，未逐项点击验收。
 - 发布 / 回滚演练：仓库没有安装包 / 发布流水线，本次只做文档化演练（§6），未实际发布。
+- 本阶段 PR：#13 `https://github.com/nnbw-liu/DesktopAgent/pull/13`（stacked 在 S5 PR #12 之上）。
 
 ## 4. 与手册的偏差
 
@@ -181,7 +183,7 @@
 
 ## 7. 手工验收清单（手册附录 E S6）
 
-- [x] 删除变更：二次确认 + 移入 trash（本机 AppContainer e2e + 单元测试）
+- [x] 删除变更：二次确认 + 移入 trash（单元测试覆盖；UI 未逐项点击）
 - [x] Janitor：24h / tmp / wsb / trash / 未处理变更保护（单元测试）
 - [x] 审计：保留天数、10MB 轮转、默认不落脚本正文（单元测试）
 - [x] 安全回归：矩阵见 §2.1，既有真实沙箱用例全部通过
