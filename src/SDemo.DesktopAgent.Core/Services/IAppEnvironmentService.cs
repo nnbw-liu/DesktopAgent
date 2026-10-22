@@ -18,4 +18,7 @@ public interface IAppEnvironmentService
 
     /// <summary>当前宿主名称，例如 “Blazor Hybrid · WPF” / “Blazor Hybrid · MAUI (Windows)”。</summary>
     string HostName { get; }
+
+    /// <summary>在系统文件管理器中打开目录（不存在时先创建）；移动端不支持时抛 <see cref="PlatformNotSupportedException"/>。</summary>
+    void OpenFolder(string path);
 }

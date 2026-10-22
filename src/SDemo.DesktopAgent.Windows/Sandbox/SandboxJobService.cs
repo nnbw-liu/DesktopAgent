@@ -398,7 +398,8 @@ public sealed class SandboxJobService : ISandboxJobService
 
             var outcome = new SandboxJobOutcome(sessionId, jobId, result, changes, layout.Root)
             {
-                WorkspaceRoot = workspace
+                WorkspaceRoot = workspace,
+                TrashDirectory = _directory.GetTrashDirectory(jobId)
             };
             OutcomeAvailable?.Invoke(this, outcome);
             return outcome;

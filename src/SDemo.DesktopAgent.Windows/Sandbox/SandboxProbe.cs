@@ -5,12 +5,12 @@ using SDemo.DesktopAgent.Services;
 namespace SDemo.DesktopAgent.Platform.Windows.Sandbox;
 
 /// <summary>
-/// 沙箱探针：可用性探测（cmd + PowerShell，缓存 5 分钟）与设置页“执行沙箱”自检。
+/// 沙箱探针：可用性探测（cmd + PowerShell，缓存 10 分钟）与设置页“执行沙箱”自检。
 /// 自检里 CannotReadUserProfile / CannotWriteWorkspace / NoNetwork 为 true 表示“被拒绝”，即隔离生效。
 /// </summary>
 public sealed class SandboxProbe
 {
-    private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(10);
     private const string PowerShellPath = @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
 
     private readonly ISandboxRunner _runner;

@@ -222,6 +222,13 @@ public sealed class PowerShellToolPack : IAgentToolPack
                 StdoutBytes = Encoding.UTF8.GetByteCount(result.StdOut),
                 StderrBytes = Encoding.UTF8.GetByteCount(result.StdErr),
                 ChangeCount = outcome.Changes.Count,
+                Changes = outcome.Changes
+                    .Select(change => new ToolAuditChange(
+                        change.Kind.ToString(),
+                        "sha256:" + Convert.ToHexString(
+                                SHA256.HashData(Encoding.UTF8.GetBytes(change.RelativePath)))
+                            .ToLowerInvariant()))
+                    .ToArray(),
                 Approval = "ApproveOnce",
                 Error = result.Message
             });

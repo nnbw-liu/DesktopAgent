@@ -39,6 +39,11 @@ public static class MauiProgram
         builder.Services.AddUnavailableSandbox();
 #endif
 
-        return builder.Build();
+        var app = builder.Build();
+
+        // S6：启动时清理过期沙箱数据；Android 是空实现，不会做任何 IO。
+        _ = app.Services.GetRequiredService<ISandboxMaintenance>().CleanupAsync();
+
+        return app;
     }
 }

@@ -13,6 +13,7 @@ public sealed class SandboxDirectory
     public const string HostFolderName = "host";
     public const string JobsFolderName = "jobs";
     public const string BaseFolderName = "base";
+    public const string TrashFolderName = "trash";
     public const string InputFolderName = "input";
     public const string WorkFolderName = "work";
     public const string HomeFolderName = "home";
@@ -27,6 +28,19 @@ public sealed class SandboxDirectory
     public string HostDirectory => Path.Combine(Root, HostFolderName);
 
     public string JobsDirectory => Path.Combine(Root, JobsFolderName);
+
+    public string TrashRoot => Path.Combine(Root, TrashFolderName);
+
+    /// <summary>删除类变更的回收站：每个 job 一个目录，保留相对路径。</summary>
+    public string GetTrashDirectory(string jobId)
+    {
+        if (!IsValidJobId(jobId))
+        {
+            throw new ArgumentException("jobId 必须是 8–64 个字母 / 数字 / 连字符。", nameof(jobId));
+        }
+
+        return Path.Combine(TrashRoot, jobId);
+    }
 
     public static bool IsValidJobId(string? jobId) =>
         !string.IsNullOrEmpty(jobId) && JobIdPattern.IsMatch(jobId);
@@ -136,7 +150,7 @@ public sealed class SandboxDirectory
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // 清理失败不影响结果；S6 由 SandboxJanitor 统一处理。
+            // 清理失败不影响结果；残留文件由 S6 SandboxJanitor 在启动时统一清理。
         }
     }
 

@@ -123,4 +123,7 @@ public sealed record SandboxJobOutcome(
 {
     /// <summary>本次作业对应的真实工作区根目录；应用变更时必须写回这里，而不是切换后的工作区。</summary>
     public string WorkspaceRoot { get; init; } = string.Empty;
+
+    /// <summary>删除类变更的回收站目录：<c>{sandbox}\trash\{jobId}</c>；不可用时为空。</summary>
+    public string TrashDirectory { get; init; } = string.Empty;
 }
