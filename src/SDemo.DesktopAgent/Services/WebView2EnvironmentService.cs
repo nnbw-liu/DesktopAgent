@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
@@ -19,6 +21,17 @@ public sealed class WebView2EnvironmentService : IAppEnvironmentService
     public string OsDescription => RuntimeInformation.OSDescription;
 
     public string HostName => "Blazor Hybrid · WPF";
+
+    public void OpenFolder(string path)
+    {
+        Directory.CreateDirectory(path);
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "explorer.exe",
+            Arguments = $"\"{path}\"",
+            UseShellExecute = true
+        });
+    }
 
     public string WebViewVersion
     {

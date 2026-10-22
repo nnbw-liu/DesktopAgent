@@ -16,4 +16,10 @@
     <ProjectReference Include="..\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- PDF 解析只在沙箱内的 helper 进程里跑：解析器漏洞 / 崩溃不牵涉主进程。
+         版本锁定，不用浮动版本。 -->
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+  </ItemGroup>
+
 </Project>

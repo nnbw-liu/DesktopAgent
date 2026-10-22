@@ -70,6 +70,21 @@ public sealed class WindowsSandboxCompositionTests
     }
 
     [Fact]
+    public void PDF工具包与附件提取器都注册了()
+    {
+        using var host = new SandboxTestHost();
+        var provider = host.Provider;
+
+        var packs = provider.GetServices<IAgentToolPack>()
+            .Select(pack => pack.Descriptor.Id)
+            .ToArray();
+        Assert.Contains("pdf", packs);
+
+        var extractor = provider.GetRequiredService<IPdfAttachmentExtractor>();
+        Assert.IsType<SandboxPdfAttachmentExtractor>(extractor);
+    }
+
+    [Fact]
     public async Task 作业服务能按类型查询可用性()
     {
         using var host = new SandboxTestHost();

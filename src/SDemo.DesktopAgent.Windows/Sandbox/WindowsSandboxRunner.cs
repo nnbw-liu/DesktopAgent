@@ -32,7 +32,7 @@ public sealed class WindowsSandboxRunner : ISandboxRunner
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     // Windows Sandbox 没有官方生命周期 API：应用退出时至少把本次会话里仍在跑的虚拟机杀掉，
-    // 避免留下无主的 WindowsSandbox* 进程（硬杀进程 / 断电仍会残留，S6 的 Janitor 兜底）。
+    // 避免留下无主的 WindowsSandbox* 进程（硬杀进程 / 断电仍会残留；S6 Janitor 只清文件，不按进程名杀进程）。
     private static readonly object ActiveGate = new();
     private static readonly List<IWindowsSandboxInstance> ActiveInstances = [];
 
@@ -511,7 +511,7 @@ public sealed class WindowsSandboxRunner : ISandboxRunner
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // 清理失败不影响结果；S6 由 SandboxJanitor 统一处理。
+            // 清理失败不影响结果；残留文件由 S6 SandboxJanitor 在启动时统一清理。
         }
     }
 

@@ -110,14 +110,15 @@ public sealed class SandboxHostTests
     }
 
     [Fact]
-    public async Task PDF模式明确提示S5实现()
+    public async Task PDF模式缺少inputFile时按协议错误拒绝()
     {
         using var job = new HostJob("Write-Output 'x'");
         job.WriteJobJson(mode: SandboxJobMode.PdfInfo, scriptFile: null);
         var run = await RunAsync(job);
 
         Assert.Equal(0, run.ExitCode);
-        Assert.Contains("S5", ReadResult(job).Error);
+        Assert.Contains("inputFile", ReadResult(job).Error);
+        Assert.False(File.Exists(Path.Combine(job.Output, SandboxProtocol.PdfResultFileName)));
     }
 
     [Fact]

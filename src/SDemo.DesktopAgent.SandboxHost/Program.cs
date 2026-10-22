@@ -108,18 +108,27 @@ internal static class Program
         {
             throw new SandboxProtocolException("PowerShell 模式缺少 scriptFile。");
         }
+
+        if (job.Mode is SandboxJobMode.PdfExtract or SandboxJobMode.PdfInfo
+            && string.IsNullOrWhiteSpace(job.InputFile))
+        {
+            throw new SandboxProtocolException("PDF 模式缺少 inputFile。");
+        }
+
+        // OCR 是预留能力：目前没有任何实现，显式请求必须失败，不能悄悄退化成“只读文本层”。
+        if (job.Ocr)
+        {
+            throw job.Mode is SandboxJobMode.PdfExtract or SandboxJobMode.PdfInfo
+                ? new SandboxProtocolException("OCR 尚未实现（ocr=true 暂不支持）。")
+                : new SandboxProtocolException("ocr 只适用于 PDF 模式。");
+        }
     }
 
     private static async Task<SandboxResultDocument> ExecuteAsync(SandboxJobDocument job, string jobRoot) =>
         job.Mode switch
         {
             SandboxJobMode.PowerShell => await PowerShellRunner.RunAsync(job, jobRoot).ConfigureAwait(false),
-            SandboxJobMode.PdfExtract or SandboxJobMode.PdfInfo => new SandboxResultDocument
-            {
-                JobId = job.JobId,
-                ExitCode = -1,
-                Error = "PDF 模式在 S5 实现。"
-            },
+            SandboxJobMode.PdfExtract or SandboxJobMode.PdfInfo => PdfCommand.Run(job, jobRoot),
             _ => new SandboxResultDocument
             {
                 JobId = job.JobId,

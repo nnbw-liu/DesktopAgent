@@ -56,6 +56,63 @@ public sealed class ToolAuditLogTests
         log.Write(Entry(scriptPreview: null));
     }
 
+    [Fact]
+    public void 变更明细只写类型与路径hash()
+    {
+        using var temp = new TempDirectory();
+        var log = new JsonlToolAuditLog(new StubAppPaths(temp.Root), new StubSettingsService());
+
+        log.Write(Entry(scriptPreview: null) with
+        {
+            Changes = [new ToolAuditChange("Deleted", "sha256:pathhash")]
+        });
+
+        var line = Assert.Single(ReadLines(log));
+        Assert.Contains("\"kind\":\"Deleted\"", line.Replace(" ", string.Empty));
+        Assert.Contains("\"pathSha256\":\"sha256:pathhash\"", line.Replace(" ", string.Empty));
+        Assert.DoesNotContain("secret.txt", line);
+    }
+
+    [Fact]
+    public void 超过保留天数的日志在首次写入时清理()
+    {
+        using var temp = new TempDirectory();
+        var settings = new StubSettingsService();
+        settings.Current.Sandbox.AuditRetentionDays = 7;
+        var log = new JsonlToolAuditLog(new StubAppPaths(temp.Root), settings);
+        Directory.CreateDirectory(log.DirectoryPath);
+
+        var expired = Path.Combine(log.DirectoryPath, "tools-20200101.jsonl");
+        File.WriteAllText(expired, "{}\n");
+        File.SetLastWriteTimeUtc(expired, DateTime.UtcNow.AddDays(-30));
+        var recent = Path.Combine(log.DirectoryPath, "tools-20200102.jsonl");
+        File.WriteAllText(recent, "{}\n");
+
+        log.Write(Entry(scriptPreview: null));
+
+        Assert.False(File.Exists(expired));
+        Assert.True(File.Exists(recent));
+        Assert.Contains("run_powershell", File.ReadAllText(log.FilePathFor(DateTime.Now)));
+    }
+
+    [Fact]
+    public void 单文件超过10MB时轮转()
+    {
+        using var temp = new TempDirectory();
+        var log = new JsonlToolAuditLog(new StubAppPaths(temp.Root), new StubSettingsService());
+        Directory.CreateDirectory(log.DirectoryPath);
+
+        var today = log.FilePathFor(DateTime.Now);
+        File.WriteAllText(today, new string('x', (int)JsonlToolAuditLog.MaxFileBytes + 1));
+
+        log.Write(Entry(scriptPreview: null));
+
+        var rotated = Path.Combine(log.DirectoryPath, $"tools-{DateTime.Now:yyyyMMdd}-1.jsonl");
+        Assert.True(File.Exists(rotated));
+        Assert.True(new FileInfo(rotated).Length > JsonlToolAuditLog.MaxFileBytes);
+        Assert.Single(File.ReadAllLines(today), line => !string.IsNullOrWhiteSpace(line));
+    }
+
     private static ToolAuditEntry Entry(string? scriptPreview) => new()
     {
         SessionId = "session",

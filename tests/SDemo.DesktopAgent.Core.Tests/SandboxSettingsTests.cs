@@ -26,6 +26,7 @@ public sealed class SandboxSettingsTests
         Assert.Equal(4096, settings.WindowsSandboxMemoryMB);
         Assert.False(settings.RetainScriptsInAuditLog);
         Assert.Equal(7, settings.AuditRetentionDays);
+        Assert.True(settings.PdfAutoExtract);
     }
 
     [Fact]

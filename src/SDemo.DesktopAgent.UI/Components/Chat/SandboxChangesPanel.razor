@@ -51,7 +51,7 @@
             <div class="sandbox-change-list">
                 @foreach (var change in _changes)
                 {
-                    var appliable = change.Kind != SandboxChangeKind.Deleted;
+                    var appliable = change.Kind != SandboxChangeKind.Deleted || CanDelete;
                     <div class="sandbox-change @(_diffPath == change.RelativePath ? "is-active" : null)"
                          @onclick="() => SelectDiff(change.RelativePath)">
                         <label class="sandbox-change-check" @onclick:stopPropagation="true">
@@ -79,7 +79,10 @@
 
                     @if (selectedChange.Kind == SandboxChangeKind.Deleted)
                     {
-                        <p class="sandbox-diff-note">删除类变更在 S2 只展示，不会自动删除真实文件。</p>
+                        <p class="sandbox-diff-note">
+                            删除类变更会把真实文件移到沙箱的 trash 目录（<code>sandbox\trash\{_outcome?.JobId}</code>），
+                            不会永久删除；当前文件若在沙箱运行后被改过，会跳过删除。
+                        </p>
                     }
                     else if (selectedChange.IsBinary)
                     {
@@ -102,11 +105,26 @@
     {
         <div class="modal-backdrop">
             <div class="modal" role="dialog" aria-modal="true">
-                <h2 class="modal-title">把这 @SelectedAppliable 项变更写回工作区？</h2>
+                <h2 class="modal-title">应用这 @SelectedAppliable 项变更？</h2>
                 <p class="modal-sub">
-                    只会写入上面勾选的新增 / 修改文件。真实工作区在沙箱运行后若已被改动，
-                    本次会整体中止，不会覆盖任何文件。
+                    @SelectedWrites 项新增 / 修改会写回真实工作区；@SelectedDeletions 项删除会移动到沙箱的
+                    trash 目录，不会永久删除。工作区在沙箱运行后若已被改动，新增 / 修改会整体中止，
+                    删除项也会跳过。
                 </p>
+
+                @if (SelectedDeletions > 0)
+                {
+                    <div class="modal-sub">
+                        <p>将从真实工作区移除 @SelectedDeletions 个文件：</p>
+                        <ul>
+                            @foreach (var path in SelectedDeletionPaths)
+                            {
+                                <li><code>@path</code></li>
+                            }
+                        </ul>
+                    </div>
+                }
+
                 <div class="modal-actions">
                     <button type="button" class="ghost-button" disabled="@_applying" @onclick="CancelApply">取消</button>
                     <button type="button" class="primary-button" disabled="@_applying" @onclick="ApplyAsync">
@@ -134,7 +152,22 @@
     public string SessionId { get; set; } = string.Empty;
 
     private int SelectedAppliable => _changes.Count(change =>
+        _selected.Contains(change.RelativePath)
+        && (change.Kind != SandboxChangeKind.Deleted || CanDelete));
+
+    private int SelectedWrites => _changes.Count(change =>
         change.Kind != SandboxChangeKind.Deleted && _selected.Contains(change.RelativePath));
+
+    private int SelectedDeletions => _changes.Count(change =>
+        change.Kind == SandboxChangeKind.Deleted && _selected.Contains(change.RelativePath));
+
+    private IReadOnlyList<string> SelectedDeletionPaths => _changes
+        .Where(change => change.Kind == SandboxChangeKind.Deleted && _selected.Contains(change.RelativePath))
+        .Select(change => change.RelativePath)
+        .ToArray();
+
+    /// <summary>没有 trash 目录（例如 S2 旧结果 / 非 Windows 实现）时不允许勾选删除。</summary>
+    private bool CanDelete => !string.IsNullOrWhiteSpace(_outcome?.TrashDirectory);
 
     private bool CanApply => SelectedAppliable > 0;
 
@@ -237,6 +270,7 @@
                 manifest,
                 _changes,
                 _selected,
+                outcome.TrashDirectory,
                 CancellationToken.None);
 
             if (result.Conflicts.Count > 0)
@@ -248,11 +282,17 @@
             else
             {
                 var applied = result.Applied.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var deletedApplied = _changes.Count(change =>
+                    change.Kind == SandboxChangeKind.Deleted && applied.Contains(change.RelativePath));
+
                 _changes = _changes.Where(change => !applied.Contains(change.RelativePath)).ToList();
                 _selected.RemoveWhere(applied.Contains);
                 _diffPath = _changes.FirstOrDefault()?.RelativePath;
                 _message = $"已应用 {result.Applied.Count} 项变更"
-                           + (result.Skipped.Count > 0 ? $"；跳过 {result.Skipped.Count} 项。" : "。");
+                           + (deletedApplied > 0
+                               ? $"（其中删除 {deletedApplied} 项已移入 sandbox\\trash，可从那里找回）。"
+                               : "。")
+                           + (result.Skipped.Count > 0 ? $" 跳过 {result.Skipped.Count} 项。" : string.Empty);
                 _messageIsError = result.Applied.Count == 0 && result.Skipped.Count > 0;
             }
         }
@@ -271,6 +311,22 @@
 
     private void Dismiss()
     {
+        // 关闭面板 = 用户选择不应用本次变更；记下来，Janitor 才能在 24 小时后安全清理，
+        // 而不是因为“还有未应用 diff”永久保留这个 job。
+        if (_outcome is { } outcome && _changes.Count > 0)
+        {
+            try
+            {
+                Applier.MarkResolved(
+                    Path.Combine(outcome.JobDirectory, "work"),
+                    _changes.Select(change => change.RelativePath));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // 标记失败不影响关闭面板；最坏情况是 job 被 Janitor 多保留一段时间。
+            }
+        }
+
         _outcome = null;
         _changes = [];
         _selected.Clear();
