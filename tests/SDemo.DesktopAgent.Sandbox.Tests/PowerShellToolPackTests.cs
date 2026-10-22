@@ -313,6 +313,11 @@ public sealed class PowerShellToolPackTests
         public Task<SandboxAvailability> GetAvailabilityAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(Availability);
 
+        public Task<SandboxAvailability> GetAvailabilityAsync(
+            SandboxKind kind,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Availability with { Kind = kind });
+
         public Task<SandboxJobOutcome> RunPowerShellAsync(
             string sessionId,
             string script,
@@ -333,6 +338,10 @@ public sealed class PowerShellToolPackTests
             throw new NotSupportedException();
 
         public Task<SandboxProbeReport> RunSelfTestAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<WindowsSandboxSelfTestReport> RunWindowsSandboxSelfTestAsync(
+            CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 

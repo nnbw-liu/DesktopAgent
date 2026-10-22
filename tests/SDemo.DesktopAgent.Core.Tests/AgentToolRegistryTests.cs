@@ -113,6 +113,16 @@ internal sealed class StubSandboxJobService : ISandboxJobService
             "测试环境没有沙箱。",
             Detail: null));
 
+    public Task<SandboxAvailability> GetAvailabilityAsync(
+        SandboxKind kind,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SandboxAvailability(
+            kind,
+            Available: false,
+            Verified: false,
+            "测试环境没有沙箱。",
+            Detail: null));
+
     public Task<SandboxJobOutcome> RunPowerShellAsync(
         string sessionId,
         string script,
@@ -130,6 +140,10 @@ internal sealed class StubSandboxJobService : ISandboxJobService
         throw new NotSupportedException();
 
     public Task<SandboxProbeReport> RunSelfTestAsync(CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<WindowsSandboxSelfTestReport> RunWindowsSandboxSelfTestAsync(
+        CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 }
 

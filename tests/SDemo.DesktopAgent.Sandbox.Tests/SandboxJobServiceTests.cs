@@ -184,6 +184,77 @@ public sealed class SandboxJobServiceTests
         }
     }
 
+    [Fact]
+    public async Task 强制WindowsSandbox但不可用时拒绝执行()
+    {
+        using var host = new SandboxTestHost();
+        var availability = await host.Jobs.GetAvailabilityAsync(SandboxKind.WindowsSandbox);
+        if (availability.Available)
+        {
+            // 已启用 WSB 的机器上会真的启动虚拟机，交给手工验收。
+            return;
+        }
+
+        host.Settings.Current.Sandbox.Preferred = SandboxKind.WindowsSandbox;
+        host.Settings.Current.Sandbox.Requirement = SandboxRequirement.Required;
+
+        var outcome = await host.Jobs.RunPowerShellAsync(
+            "session-1",
+            "Write-Output 'never'",
+            workingDirectory: ".",
+            timeoutSeconds: 30);
+
+        Assert.Equal(SandboxFailureCode.NotAvailable, outcome.Result.Failure);
+        Assert.Contains("已拒绝降级执行", outcome.Result.Message);
+        Assert.Contains("Windows Sandbox", outcome.Result.Message);
+        Assert.Empty(outcome.Changes);
+        Assert.Empty(outcome.JobDirectory);
+    }
+
+    [Fact]
+    public async Task 自动模式首选WindowsSandbox不可用时降级到AppContainer()
+    {
+        using var host = new SandboxTestHost();
+        var availability = await host.Jobs.GetAvailabilityAsync(SandboxKind.WindowsSandbox);
+        if (availability.Available)
+        {
+            return;
+        }
+
+        var workspace = Path.Combine(Path.GetTempPath(), "sdemo-job-workspace", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(workspace);
+
+        try
+        {
+            host.Workspace.RootPath = workspace;
+            host.Settings.Current.Sandbox.Preferred = SandboxKind.WindowsSandbox;
+            host.Settings.Current.Sandbox.Requirement = SandboxRequirement.Preferred;
+
+            var outcome = await host.Jobs.RunPowerShellAsync(
+                "session-1",
+                "Write-Output 'fallback-ok'",
+                workingDirectory: ".",
+                timeoutSeconds: 30);
+
+            Assert.True(
+                outcome.Result.Failure == SandboxFailureCode.None,
+                $"failure={outcome.Result.Failure} message={outcome.Result.Message}");
+            Assert.Equal(SandboxKind.AppContainer, outcome.Result.Kind);
+            Assert.Contains("fallback-ok", outcome.Result.StdOut);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(workspace, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // 清理失败不影响测试结论。
+            }
+        }
+    }
+
     private static string ReadOrMissing(string path) =>
         File.Exists(path) ? File.ReadAllText(path) : "<missing>";
 }

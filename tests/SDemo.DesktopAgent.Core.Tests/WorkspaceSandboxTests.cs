@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using SDemo.DesktopAgent.Sandbox;
 using SDemo.DesktopAgent.Sandbox.Protocol;
 using Xunit;
@@ -291,6 +292,87 @@ public sealed class ChangeApplierTests
 
         Assert.Equal(["../outside.txt"], result.Skipped);
         Assert.Equal("evil", File.ReadAllText(outside));
+    }
+
+    [Fact]
+    public async Task 删除变更移动到trash并记录applied()
+    {
+        using var temp = new TempDirectory();
+        var workspace = Path.Combine(temp.Root, "workspace");
+        var job = Path.Combine(temp.Root, "job");
+        var trash = Path.Combine(job, "trash", "job-1");
+        WorkspaceSnapshotTests.Write(workspace, "a.txt", "old\n");
+        var manifest = await SnapshotAsync(workspace, job);
+        File.Delete(Path.Combine(job, "work", "a.txt"));
+        var changes = await WorkspaceDiff.ComputeAsync(Path.Combine(job, "work"), Path.Combine(job, "base"), manifest);
+
+        var result = await new ChangeApplier().ApplyAsync(
+            workspace,
+            Path.Combine(job, "work"),
+            manifest,
+            changes,
+            new HashSet<string> { "a.txt" },
+            trash);
+
+        Assert.Equal(["a.txt"], result.Applied);
+        Assert.False(File.Exists(Path.Combine(workspace, "a.txt")));
+        Assert.Equal("old\n", File.ReadAllText(Path.Combine(trash, "a.txt")));
+
+        var applied = JsonSerializer.Deserialize<string[]>(
+            File.ReadAllText(Path.Combine(job, SandboxProtocol.AppliedChangesFileName)),
+            SandboxJson.Options);
+        Assert.Equal(["a.txt"], applied!);
+    }
+
+    [Fact]
+    public async Task 删除目标被用户改过后跳过且不移动()
+    {
+        using var temp = new TempDirectory();
+        var workspace = Path.Combine(temp.Root, "workspace");
+        var job = Path.Combine(temp.Root, "job");
+        var trash = Path.Combine(job, "trash", "job-1");
+        WorkspaceSnapshotTests.Write(workspace, "a.txt", "old\n");
+        var manifest = await SnapshotAsync(workspace, job);
+        File.Delete(Path.Combine(job, "work", "a.txt"));
+        WorkspaceSnapshotTests.Write(workspace, "a.txt", "user edited\n");
+        var changes = await WorkspaceDiff.ComputeAsync(Path.Combine(job, "work"), Path.Combine(job, "base"), manifest);
+
+        var result = await new ChangeApplier().ApplyAsync(
+            workspace,
+            Path.Combine(job, "work"),
+            manifest,
+            changes,
+            new HashSet<string> { "a.txt" },
+            trash);
+
+        Assert.Empty(result.Applied);
+        Assert.Equal(["a.txt"], result.Skipped);
+        Assert.Equal("user edited\n", File.ReadAllText(Path.Combine(workspace, "a.txt")));
+        Assert.False(File.Exists(Path.Combine(trash, "a.txt")));
+    }
+
+    [Fact]
+    public async Task 删除变更的路径穿越同样被拒绝()
+    {
+        using var temp = new TempDirectory();
+        var workspace = Path.Combine(temp.Root, "workspace");
+        var job = Path.Combine(temp.Root, "job");
+        WorkspaceSnapshotTests.Write(workspace, "a.txt", "old\n");
+        var manifest = await SnapshotAsync(workspace, job);
+        var outside = Path.Combine(temp.Root, "outside.txt");
+        File.WriteAllText(outside, "keep");
+        var changes = new[] { new SandboxChange("../outside.txt", SandboxChangeKind.Deleted, 4, false, null) };
+
+        var result = await new ChangeApplier().ApplyAsync(
+            workspace,
+            Path.Combine(job, "work"),
+            manifest,
+            changes,
+            new HashSet<string> { "../outside.txt" },
+            Path.Combine(job, "trash", "job-1"));
+
+        Assert.Equal(["../outside.txt"], result.Skipped);
+        Assert.True(File.Exists(outside));
     }
 
     private static async Task<WorkspaceManifest> SnapshotAsync(string workspace, string job)

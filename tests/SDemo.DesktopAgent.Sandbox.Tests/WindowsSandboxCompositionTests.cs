@@ -47,7 +47,7 @@ public sealed class WindowsSandboxCompositionTests
     }
 
     [Fact]
-    public async Task WindowsSandbox运行器仍明确报告S4未实现()
+    public async Task WindowsSandbox运行器报告本机的真实检测结果()
     {
         using var host = new SandboxTestHost();
         var runner = host.Provider.GetServices<ISandboxRunner>()
@@ -55,8 +55,63 @@ public sealed class WindowsSandboxCompositionTests
 
         var availability = await runner.ProbeAsync();
 
-        Assert.False(availability.Available);
+        Assert.Equal(SandboxKind.WindowsSandbox, availability.Kind);
         Assert.False(availability.Verified);
-        Assert.Contains("S4", availability.Reason);
+
+        if (availability.Available)
+        {
+            // 功能已启用的机器：可用但尚未自检。
+            Assert.Contains("自检", availability.Reason);
+        }
+        else
+        {
+            Assert.False(string.IsNullOrWhiteSpace(availability.Reason));
+        }
+    }
+
+    [Fact]
+    public void PDF工具包与附件提取器都注册了()
+    {
+        using var host = new SandboxTestHost();
+        var provider = host.Provider;
+
+        var packs = provider.GetServices<IAgentToolPack>()
+            .Select(pack => pack.Descriptor.Id)
+            .ToArray();
+        Assert.Contains("pdf", packs);
+
+        var extractor = provider.GetRequiredService<IPdfAttachmentExtractor>();
+        Assert.IsType<SandboxPdfAttachmentExtractor>(extractor);
+    }
+
+    [Fact]
+    public async Task 作业服务能按类型查询可用性()
+    {
+        using var host = new SandboxTestHost();
+
+        var appContainer = await host.Jobs.GetAvailabilityAsync(SandboxKind.AppContainer);
+        var windowsSandbox = await host.Jobs.GetAvailabilityAsync(SandboxKind.WindowsSandbox);
+
+        Assert.Equal(SandboxKind.AppContainer, appContainer.Kind);
+        Assert.Equal(SandboxKind.WindowsSandbox, windowsSandbox.Kind);
+        Assert.False(windowsSandbox.Verified);
+    }
+
+    [Fact]
+    public async Task WindowsSandbox不可用时自检给出原因而不是抛异常()
+    {
+        using var host = new SandboxTestHost();
+        var availability = await host.Jobs.GetAvailabilityAsync(SandboxKind.WindowsSandbox);
+        if (availability.Available)
+        {
+            // 已启用 WSB 的机器上真的会启动虚拟机，交给手工验收，不在普通测试里跑。
+            return;
+        }
+
+        var report = await host.Jobs.RunWindowsSandboxSelfTestAsync();
+
+        Assert.False(report.Launched);
+        Assert.False(report.AllPassed);
+        Assert.False(string.IsNullOrWhiteSpace(report.Detail));
     }
 }

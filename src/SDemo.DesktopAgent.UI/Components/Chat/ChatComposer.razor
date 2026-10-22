@@ -24,6 +24,10 @@
                             </svg>
                             <span class="attachment-name">@attachment.FileName</span>
                             <span class="attachment-size">@AttachmentStore.FormatSize(attachment.Size)</span>
+                            @if (attachment.PageCount is int pageCount)
+                            {
+                                <span class="attachment-size" title="PDF 页数">@pageCount 页</span>
+                            }
                             <button type="button" class="attachment-remove" title="移除附件" @onclick="() => RemoveAttachment(attachment)">✕</button>
                         </span>
                     }

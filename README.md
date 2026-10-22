@@ -347,12 +347,44 @@ version: 1.0
 - **写文件会先弹确认框**（路径 + 内容预览，可拒绝）；确认逻辑走 `FileWriteApprovalService`，工具线程 await 用户选择，停止生成/关闭页面按拒绝处理。
 - 写文件是唯一有副作用的工具，工作区路径固定，不接受绝对路径与 `..` 越界。
 
-### 沙箱接入（规划）
+### 沙箱执行（S1–S6 已完成）
 
-PowerShell、PDF 解析这类高风险能力必须先接入沙箱。完整的 S1–S6 开发手册见
-[docs/sandbox-development-manual.md](docs/sandbox-development-manual.md)。
+PowerShell 与 PDF 解析都在沙箱里运行；沙箱不可用时直接拒绝执行，**不会**退回主进程直跑。
+完整开发手册见 [docs/sandbox-development-manual.md](docs/sandbox-development-manual.md)，
+S6 验收与偏差见 [docs/sandbox-s6-report.md](docs/sandbox-s6-report.md)，
+常见问题见 [docs/sandbox-troubleshooting.md](docs/sandbox-troubleshooting.md)。
 
-当前状态：设计基线，尚未实现；在沙箱与审批落地前，不要开放 PowerShell 工具。
+| 阶段 | 状态 | 能力 |
+| --- | --- | --- |
+| S1 AppContainer | ✅ | Job Object + Package SID ACL；无网络、不能读用户目录、只能读写 job 副本 |
+| S2 工作区副本 | ✅ | `base` / `work` 快照 + manifest + diff；变更面板确认后原子写回，冲突整体中止 |
+| S3 PowerShell | ✅ | `run_powershell` 工具；每次执行都要审批；超时 / 内存 / 进程数 / 输出上限 |
+| S4 Windows Sandbox | ✅ | 可选虚拟机级隔离；仅 Pro / Enterprise / Education，自检后才会启用 |
+| S5 PDF | ✅ | `pdf_read` / `pdf_info`；PdfPig 在 SandboxHost 内解析；加密 / 扫描件明确报错 |
+| S6 加固与交付 | ✅ | 删除进回收站、启动清理、审计保留与轮转、设置页维护入口、安全回归 |
+
+关键路径（可用环境变量覆盖）：
+
+| 内容 | 默认位置 |
+| --- | --- |
+| 沙箱根 | `%LOCALAPPDATA%\SDemo\DesktopAgent\sandbox`（`SDEMO_SANDBOX_ROOT`） |
+| 作业 / 回收站 | `sandbox\jobs\<jobId>` / `sandbox\trash\<jobId>` |
+| 审计日志 | `%APPDATA%\SDemo\DesktopAgent\logs\tools-yyyyMMdd.jsonl` |
+
+S6 行为要点：
+
+- **PowerShell 默认关闭**：设置里打开工具包、并在输入框点亮 `powershell` chip 后才会交给模型；
+  每次执行仍需审批。沙箱不可用时直接拒绝，不会无沙箱直跑。
+- **删除类变更**：默认不勾选；确认后移动到 `sandbox\trash\{jobId}\{相对路径}`，不永久删除。
+  删除前校验文件仍是快照版本，用户改过就跳过；目录删除不支持。
+- **自动清理**：启动时删除超过 24 小时的 job、1 小时前的残留 `*.tmp` / `*.wsb`、7 天前的 trash；
+  有未应用变更的 job 会保留，设置页会列出被跳过的 job。
+- **审计**：默认只记元数据与脚本 hash / 长度，不记脚本正文、stdout / stderr；保留 7 天，
+  单文件超过 10MB 轮转。设置页可打开日志目录。
+- **PDF 附件**：上传时自动提取前 3 页（16,384 字符）；可在设置关闭，之后仍可用 `pdf_read`
+  按需读取。PDF 工具默认读前 5 页，扫描件没有 OCR。
+- **清理沙箱数据**：设置页提供二次确认的清空入口，会删除 jobs / trash / 临时文件与 AppContainer profile；
+  `host` 程序保留，下次使用自动重建 profile。
 
 ## 插件
 
