@@ -97,6 +97,18 @@ public sealed class VerificationRunner : IVerificationRunner
             ? TestResultParser.Parse(commandLine, result.StdOut, result.StdErr, result.ExitCode, result.DurationMs)
             : BuildResultParser.Parse(commandLine, result.StdOut, result.StdErr, result.ExitCode, result.DurationMs);
 
+        if (!record.Success && record.TopIssues.Count == 0)
+        {
+            var fallback = string.Join('\n', result.StdErr, result.StdOut)
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .TakeLast(5)
+                .Select(line => line.Trim())
+                .Where(line => line.Length > 0)
+                .ToArray();
+
+            record = record with { TopIssues = fallback };
+        }
+
         _audit.Write(new ToolAuditEntry
         {
             SessionId = "verification",

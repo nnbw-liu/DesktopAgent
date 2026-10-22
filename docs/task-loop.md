@@ -63,7 +63,7 @@ dirty        = lastEditAt > lastVerified（或从未成功验证）
 
 ## 6. 边界
 
-- 5 个基准任务的步数 / 验证 / 撤销统计尚未跑，报告里单列为未完成项。
+- 5 个基准任务已跑（`tools/p5-bench`，ds / deepseek-flash）：4/5 成功，A/C/D/E 分别 5/4/7/6 步且验证通过；B 在 8 次工具上限处被阻断，未完成编辑。详见 [p5-report.md](plans/p5-report.md)。
 - 撤销只针对最近一个 checkpoint；多次生成后不能选择更早的检查点（API 已有 `List`，UI 暂未做历史选择）。
 - 自动续跑依赖 UI 入口，尚未做假模型端到端集成测试；策略本身有单测。
 - 验证门只认本会话轨迹；外部编辑器改动不会让徽标变 dirty。
