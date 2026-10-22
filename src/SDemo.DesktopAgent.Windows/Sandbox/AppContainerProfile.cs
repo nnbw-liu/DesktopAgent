@@ -82,6 +82,18 @@ public sealed class AppContainerProfile : IDisposable
         }
     }
 
+    /// <summary>
+    /// 删除 AppContainer profile（卸载 / “清理沙箱数据”用）。
+    /// profile 本来不存在时按成功处理：清理是幂等的。
+    /// </summary>
+    public static bool Delete()
+    {
+        var hr = NativeMethods.DeleteAppContainerProfile(ProfileName);
+
+        // 0x80070002 = ERROR_FILE_NOT_FOUND；0x800700B7 = 已存在时不会走到这里。
+        return hr >= 0 || (hr & 0xFFFF) == 2;
+    }
+
     public void Dispose()
     {
         if (_disposed)

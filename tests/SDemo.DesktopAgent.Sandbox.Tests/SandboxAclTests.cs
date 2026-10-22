@@ -1,3 +1,4 @@
+using System.Security.AccessControl;
 using SDemo.DesktopAgent.Platform.Windows.Sandbox;
 using Xunit;
 
@@ -15,14 +16,11 @@ public sealed class SandboxAclTests
         Assert.True(profile is not null, reason);
         host.SandboxDirectory.EnsureRoot(profile!.Sid);
 
-        var rules = SandboxAcl.GetRules(host.Paths.SandboxRoot, profile.Sid);
-
-        var rule = Assert.Single(rules);
+        var rule = ExplicitRule(host.Paths.SandboxRoot, profile.Sid);
         Assert.Equal(
-            System.Security.AccessControl.FileSystemRights.Traverse
-            | System.Security.AccessControl.FileSystemRights.ReadAttributes,
-            rule.FileSystemRights & ~System.Security.AccessControl.FileSystemRights.Synchronize);
-        Assert.Equal(System.Security.AccessControl.InheritanceFlags.None, rule.InheritanceFlags);
+            FileSystemRights.Traverse | FileSystemRights.ReadAttributes,
+            rule.FileSystemRights & ~FileSystemRights.Synchronize);
+        Assert.Equal(InheritanceFlags.None, rule.InheritanceFlags);
     }
 
     [Fact]
@@ -35,8 +33,8 @@ public sealed class SandboxAclTests
         host.SandboxDirectory.EnsureRoot(profile!.Sid);
         host.SandboxDirectory.EnsureRoot(profile.Sid);
 
-        Assert.Single(SandboxAcl.GetRules(host.Paths.SandboxRoot, profile.Sid));
-        Assert.Single(SandboxAcl.GetRules(host.SandboxDirectory.HostDirectory, profile.Sid));
+        Assert.Single(ExplicitRules(host.Paths.SandboxRoot, profile.Sid));
+        Assert.Single(ExplicitRules(host.SandboxDirectory.HostDirectory, profile.Sid));
     }
 
     [Fact]
@@ -49,13 +47,40 @@ public sealed class SandboxAclTests
         var layout = host.SandboxDirectory.EnsureJob("job-00000001", profile.Sid);
 
         Assert.Equal(
-            System.Security.AccessControl.FileSystemRights.ReadAndExecute,
-            SandboxAcl.GetRules(host.SandboxDirectory.HostDirectory, profile.Sid).Single().FileSystemRights & ~System.Security.AccessControl.FileSystemRights.Synchronize);
+            FileSystemRights.ReadAndExecute,
+            ExplicitRule(host.SandboxDirectory.HostDirectory, profile.Sid).FileSystemRights & ~FileSystemRights.Synchronize);
         Assert.Equal(
-            System.Security.AccessControl.FileSystemRights.ReadAndExecute,
-            SandboxAcl.GetRules(layout.InputDirectory, profile.Sid).Single().FileSystemRights & ~System.Security.AccessControl.FileSystemRights.Synchronize);
+            FileSystemRights.ReadAndExecute,
+            ExplicitRule(layout.InputDirectory, profile.Sid).FileSystemRights & ~FileSystemRights.Synchronize);
         Assert.Equal(
-            System.Security.AccessControl.FileSystemRights.Modify,
-            SandboxAcl.GetRules(layout.WorkDirectory, profile.Sid).Single().FileSystemRights & ~System.Security.AccessControl.FileSystemRights.Synchronize);
+            FileSystemRights.Modify,
+            ExplicitRule(layout.WorkDirectory, profile.Sid).FileSystemRights & ~FileSystemRights.Synchronize);
     }
+
+    [Fact]
+    public void 已继承只读权限时仍会补上修改权限()
+    {
+        using var host = new SandboxTestHost();
+        var profile = host.Profiles.TryGet(out var reason);
+        Assert.True(profile is not null, reason);
+
+        var parent = Path.Combine(host.Root, "acl-parent");
+        var child = Path.Combine(parent, "child");
+        Directory.CreateDirectory(parent);
+        SandboxAcl.GrantReadExecute(parent, profile!.Sid);
+        Directory.CreateDirectory(child);
+
+        // child 已继承 RX；GrantModify 必须新增显式 Modify，而不是被只读 ACE 骗过。
+        SandboxAcl.GrantModify(child, profile.Sid);
+
+        Assert.Equal(
+            FileSystemRights.Modify,
+            ExplicitRule(child, profile.Sid).FileSystemRights & ~FileSystemRights.Synchronize);
+    }
+
+    private static FileSystemAccessRule ExplicitRule(string path, System.Security.Principal.SecurityIdentifier sid) =>
+        Assert.Single(ExplicitRules(path, sid));
+
+    private static FileSystemAccessRule[] ExplicitRules(string path, System.Security.Principal.SecurityIdentifier sid) =>
+        SandboxAcl.GetRules(path, sid).Where(rule => !rule.IsInherited).ToArray();
 }

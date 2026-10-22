@@ -12,6 +12,8 @@ public sealed class SandboxDirectory
 {
     public const string HostFolderName = "host";
     public const string JobsFolderName = "jobs";
+    public const string BaseFolderName = "base";
+    public const string TrashFolderName = "trash";
     public const string InputFolderName = "input";
     public const string WorkFolderName = "work";
     public const string HomeFolderName = "home";
@@ -26,6 +28,19 @@ public sealed class SandboxDirectory
     public string HostDirectory => Path.Combine(Root, HostFolderName);
 
     public string JobsDirectory => Path.Combine(Root, JobsFolderName);
+
+    public string TrashRoot => Path.Combine(Root, TrashFolderName);
+
+    /// <summary>删除类变更的回收站：每个 job 一个目录，保留相对路径。</summary>
+    public string GetTrashDirectory(string jobId)
+    {
+        if (!IsValidJobId(jobId))
+        {
+            throw new ArgumentException("jobId 必须是 8–64 个字母 / 数字 / 连字符。", nameof(jobId));
+        }
+
+        return Path.Combine(TrashRoot, jobId);
+    }
 
     public static bool IsValidJobId(string? jobId) =>
         !string.IsNullOrEmpty(jobId) && JobIdPattern.IsMatch(jobId);
@@ -47,12 +62,18 @@ public sealed class SandboxDirectory
             Path.Combine(jobRoot, OutputFolderName));
     }
 
-    /// <summary>创建根目录 / jobs / host，并给这些目录加上 Package SID 的穿越 / 读执行权限。</summary>
-    public void EnsureRoot(SecurityIdentifier sid)
+    /// <summary>创建根目录 / jobs / host，不施加任何 ACL（Windows Sandbox 不需要 Package SID）。</summary>
+    public void EnsureRoot()
     {
         Directory.CreateDirectory(Root);
         Directory.CreateDirectory(JobsDirectory);
         Directory.CreateDirectory(HostDirectory);
+    }
+
+    /// <summary>创建根目录 / jobs / host，并给这些目录加上 Package SID 的穿越 / 读执行权限。</summary>
+    public void EnsureRoot(SecurityIdentifier sid)
+    {
+        EnsureRoot();
 
         EnsureAncestorsTraverse(sid);
         SandboxAcl.GrantTraverse(Root, sid);
@@ -60,21 +81,37 @@ public sealed class SandboxDirectory
         SandboxAcl.GrantReadExecute(HostDirectory, sid);
     }
 
-    /// <summary>创建 job 目录并施加 ACL，返回布局。重复调用是幂等的。</summary>
-    public SandboxJobLayout EnsureJob(string jobId, SecurityIdentifier sid)
+    /// <summary>
+    /// 只创建 job 目录（input / work / output），不施加 ACL、不降完整性级别。
+    /// Windows Sandbox 用映射目录访问这些路径，AppContainer 走 <see cref="EnsureJob"/>。
+    /// </summary>
+    public SandboxJobLayout CreateJob(string jobId)
     {
         var layout = GetLayout(jobId);
         Directory.CreateDirectory(layout.Root);
         Directory.CreateDirectory(layout.InputDirectory);
         Directory.CreateDirectory(layout.WorkDirectory);
-        Directory.CreateDirectory(layout.HomeDirectory);
         Directory.CreateDirectory(layout.OutputDirectory);
+
+        return layout;
+    }
+
+    /// <summary>创建 job 目录并施加 ACL，返回布局。重复调用是幂等的。</summary>
+    public SandboxJobLayout EnsureJob(string jobId, SecurityIdentifier sid)
+    {
+        var layout = CreateJob(jobId);
+        Directory.CreateDirectory(layout.HomeDirectory);
 
         SandboxAcl.GrantTraverse(layout.Root, sid);
         SandboxAcl.GrantReadExecute(layout.InputDirectory, sid);
         SandboxAcl.GrantModify(layout.WorkDirectory, sid);
         SandboxAcl.GrantModify(layout.HomeDirectory, sid);
         SandboxAcl.GrantModify(layout.OutputDirectory, sid);
+
+        // AppContainer 是 Low integrity，必须把可写目录也降为 Low，否则 ACL 通过但写入仍被拒绝。
+        SandboxAcl.SetLowIntegrity(layout.WorkDirectory);
+        SandboxAcl.SetLowIntegrity(layout.HomeDirectory);
+        SandboxAcl.SetLowIntegrity(layout.OutputDirectory);
 
         // home 下的 AppData / temp 必须在 home 的继承 ACE 之后创建，否则拿不到继承权限。
         Directory.CreateDirectory(Path.Combine(layout.HomeDirectory, "AppData", "Local"));
@@ -113,7 +150,7 @@ public sealed class SandboxDirectory
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // 清理失败不影响结果；S6 由 SandboxJanitor 统一处理。
+            // 清理失败不影响结果；残留文件由 S6 SandboxJanitor 在启动时统一清理。
         }
     }
 

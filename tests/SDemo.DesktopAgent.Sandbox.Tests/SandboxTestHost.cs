@@ -19,10 +19,12 @@ internal sealed class SandboxTestHost : IDisposable
         Root = Path.Combine(Path.GetTempPath(), "sdemo-sandbox-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Root);
         Paths = new TestAppPaths(Root);
+        Settings = new TestSettingsService();
 
         var services = new ServiceCollection();
         services.AddSingleton<IAppPaths>(Paths);
-        services.AddSingleton<ISettingsService>(new TestSettingsService());
+        services.AddSingleton<ISettingsService>(Settings);
+        services.AddSingleton<WorkspaceContext>();
         services.AddWindowsSandbox();
         _provider = services.BuildServiceProvider();
     }
@@ -31,9 +33,13 @@ internal sealed class SandboxTestHost : IDisposable
 
     public TestAppPaths Paths { get; }
 
+    public TestSettingsService Settings { get; }
+
     public ServiceProvider Provider => _provider;
 
     public ISandboxJobService Jobs => _provider.GetRequiredService<ISandboxJobService>();
+
+    public WorkspaceContext Workspace => _provider.GetRequiredService<WorkspaceContext>();
 
     public SandboxDirectory SandboxDirectory => _provider.GetRequiredService<SandboxDirectory>();
 

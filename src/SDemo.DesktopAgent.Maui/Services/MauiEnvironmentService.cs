@@ -1,4 +1,5 @@
 using SDemo.DesktopAgent.Services;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -69,5 +70,20 @@ public sealed class MauiEnvironmentService : IAppEnvironmentService
             return "未知";
 #endif
         }
+    }
+
+    public void OpenFolder(string path)
+    {
+#if WINDOWS
+        Directory.CreateDirectory(path);
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "explorer.exe",
+            Arguments = $"\"{path}\"",
+            UseShellExecute = true
+        });
+#else
+        throw new PlatformNotSupportedException("移动端不支持打开日志目录。");
+#endif
     }
 }

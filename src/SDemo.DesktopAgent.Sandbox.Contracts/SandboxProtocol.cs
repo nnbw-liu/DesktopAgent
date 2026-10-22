@@ -10,6 +10,13 @@ public static class SandboxProtocol
     public const string JobFileName = "job.json";
     public const string ResultFileName = "result.json";
     public const string PdfResultFileName = "pdf.json";
+    public const string ManifestFileName = "manifest.json";
+
+    /// <summary>已处理（应用或忽略）的变更路径：Janitor 用它判断 job 里是否还有未确认的 diff。</summary>
+    public const string AppliedChangesFileName = "applied.json";
+
+    /// <summary>PDF 作业固定复制到 <c>input/document.pdf</c>：不接受用户路径，避免路径注入。</summary>
+    public const string PdfInputFileName = "document.pdf";
 }
 
 /// <summary>job.json 里声明的作业模式。序列化为字符串，禁止写出数字。</summary>
@@ -30,6 +37,14 @@ public sealed record SandboxJobDocument
     public string? InputFile { get; init; }
     public string? Pages { get; init; }
     public int MaxChars { get; init; } = 20_000;
+
+    /// <summary>
+    /// 预留给 OCR（S5 未实现）：显式 <c>true</c> 会被 SandboxHost 按协议错误拒绝，
+    /// 避免“宿主以为要求了 / helper 静默忽略”的不一致。后续接入 OCR 时在
+    /// <c>PdfCommand</c> 里按这个字段分流，并在 <c>pdf.json</c> 增加 <c>ocrUsed</c> 等字段。
+    /// </summary>
+    public bool Ocr { get; init; }
+
     public string WorkingDirectory { get; init; } = "work";
     public int TimeoutSeconds { get; init; } = 30;
     public int MaxOutputBytes { get; init; } = 8 * 1024 * 1024;

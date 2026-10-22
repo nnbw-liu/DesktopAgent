@@ -1092,6 +1092,23 @@ a {
     color: var(--accent);
 }
 
+.composer-tool:disabled,
+.composer-tool.is-unavailable {
+    opacity: .42;
+    cursor: not-allowed;
+}
+
+.composer-tool-glyph {
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.composer-tool-name {
+    display: none;
+}
+
 .composer-file-input {
     display: none;
 }
@@ -1491,6 +1508,11 @@ a {
     color: #d9534f;
 }
 
+.sandbox-check.is-warn::before {
+    content: "!";
+    color: #b7791f;
+}
+
 /* 开关 */
 .switch {
     appearance: none;
@@ -1596,6 +1618,74 @@ a {
     gap: 8px;
     margin-top: 16px;
 }
+
+/* 通用审批（文件写入 / PowerShell 执行）：脚本区更高一点，仍是等宽、可滚动 */
+.modal--approval {
+    width: min(680px, calc(100vw - 48px));
+}
+
+.modal-preview--script {
+    max-height: 360px;
+}
+
+.approval-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.approval-meta .modal-path {
+    margin-bottom: 0;
+}
+
+.approval-risk {
+    flex: 0 0 auto;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.approval-risk--high {
+    background: rgba(196, 43, 28, .14);
+    color: #c42b1c;
+}
+
+.approval-risk--medium {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.approval-risk--low {
+    background: var(--surface-hover);
+    color: var(--muted);
+}
+
+/* 设置页：并排的两个数字输入 + 子区块 */
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+}
+
+.settings-subsection {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 14px;
+}
+
+.segmented-item.is-danger {
+    border-color: #c42b1c;
+    color: #c42b1c;
+}
+
+.settings-message.is-danger {
+    color: #c42b1c;
+}
+
 
 /* ---------- 启动与错误界面 ---------- */
 
@@ -3445,6 +3535,191 @@ a {
 }
 
 /* 手机上 268px 的固定侧栏会把主区挤没：改成上下布局，侧栏变成可滚动的顶部面板。 */
+/* ---------- 沙箱变更面板 ---------- */
+
+.sandbox-panel {
+    flex: 0 0 auto;
+    max-height: 42vh;
+    margin: 0 18px 10px;
+    padding: 12px 14px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+}
+
+.sandbox-panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.sandbox-panel-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.sandbox-panel-sub {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.sandbox-panel-close {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.sandbox-panel-close:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.sandbox-panel-message {
+    margin: 8px 0;
+    padding: 7px 9px;
+    border-radius: 7px;
+    background: var(--surface-hover);
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+.sandbox-panel-message.is-error {
+    color: #e5534b;
+    background: rgba(229, 83, 75, 0.12);
+}
+
+.sandbox-panel-output {
+    margin: 8px 0;
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+.sandbox-panel-output pre {
+    max-height: 120px;
+    margin: 4px 0 0;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.sandbox-panel-empty,
+.sandbox-panel-count {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.sandbox-panel-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 8px;
+}
+
+.sandbox-panel-count {
+    margin-right: auto;
+}
+
+.sandbox-change-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 22vh;
+    overflow: auto;
+}
+
+.sandbox-change {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 6px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.sandbox-change:hover,
+.sandbox-change.is-active {
+    background: var(--surface-hover);
+}
+
+.sandbox-change-check input {
+    margin: 0;
+}
+
+.sandbox-change-kind {
+    flex: 0 0 auto;
+    min-width: 34px;
+    padding: 1px 5px;
+    border-radius: 5px;
+    text-align: center;
+    font-size: 11px;
+    background: var(--surface-hover);
+}
+
+.sandbox-change-kind--added {
+    color: #2ea043;
+}
+
+.sandbox-change-kind--modified {
+    color: #d29922;
+}
+
+.sandbox-change-kind--deleted {
+    color: #e5534b;
+}
+
+.sandbox-change-path {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sandbox-change-size {
+    flex: 0 0 auto;
+    color: var(--muted);
+}
+
+.sandbox-diff {
+    margin-top: 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+}
+
+.sandbox-diff-head {
+    display: flex;
+    justify-content: space-between;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.sandbox-diff-body {
+    max-height: 26vh;
+    margin: 6px 0 0;
+    overflow: auto;
+    white-space: pre;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.sandbox-diff-note {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+}
+
 @media (max-width: 760px) {
     .app-shell {
         flex-direction: column;
@@ -3461,5 +3736,10 @@ a {
     .main-area {
         flex: 1 1 auto;
         min-height: 0;
+    }
+
+    .sandbox-panel {
+        margin: 0 10px 8px;
+        max-height: 50vh;
     }
 }

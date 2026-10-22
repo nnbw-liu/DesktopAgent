@@ -28,6 +28,41 @@ internal static class NativeMethods
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     internal static extern bool ConvertSidToStringSid(IntPtr sid, out IntPtr stringSid);
 
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern bool ConvertStringSidToSid(string stringSid, out IntPtr sid);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern bool InitializeAcl(IntPtr pAcl, int nAclLength, int dwAclRevision);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern bool AddAccessAllowedAceEx(
+        IntPtr pAcl,
+        int dwAceRevision,
+        int aceFlags,
+        int accessMask,
+        IntPtr pSid);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern int GetLengthSid(IntPtr pSid);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern uint SetNamedSecurityInfo(
+        string pObjectName,
+        int objectType,
+        int securityInfo,
+        IntPtr psidOwner,
+        IntPtr psidGroup,
+        IntPtr pDacl,
+        IntPtr pSacl);
+
+    // 完整性标签（AppContainer 以 Low integrity 运行，必须允许其向下写 work/home/output）。
+    internal const int SeFileObject = 1;
+    internal const int LabelSecurityInformation = 0x10;
+    internal const int AclRevision = 2;
+    internal const int ObjectInheritAce = 0x1;
+    internal const int ContainerInheritAce = 0x2;
+    internal const int SystemMandatoryLabelNoWriteUp = 0x1;
+
     [DllImport("advapi32.dll")]
     internal static extern IntPtr FreeSid(IntPtr sid);
 
