@@ -83,8 +83,8 @@
 | 套件 | 结果 |
 | --- | --- |
 | `SDemo.DesktopAgent.Core.Tests` | **231 通过**（S5 为 225；新增 3 个删除应用测试 + 3 个审计保留 / 轮转 / 变更明细测试） |
-| `SDemo.DesktopAgent.Sandbox.Tests` | **199 通过**（S5 为 193；新增 6 个 Janitor 测试） |
-| 合计 | **430 通过，0 失败** |
+| `SDemo.DesktopAgent.Sandbox.Tests` | **199 通过 + 1 跳过**（S5 为 193；新增 6 个 Janitor 测试；P1 删除回归位暂时 Skip） |
+| 合计 | **430 通过，1 跳过，0 失败** |
 
 新增 / 覆盖重点：
 
@@ -120,13 +120,17 @@
 
 ## 3. 真机验收状态（重要）
 
-- 本机：Windows 10 Pro 26H2（Build 26340.9616），标准用户（Administrators deny-only），.NET SDK 10.0.401。
+- 本机：Windows 11 Pro 26H2（Build 26200），标准用户（Administrators deny-only），.NET SDK 10.0.401；
+  Windows Sandbox 功能已启用。
 - AppContainer 真实集成测试（Sandbox 套件）全部通过，包括 runner、自检、PDF e2e、Job Object。
-- **Windows Sandbox 功能未安装**：本机无法启动虚拟机，S4/S6 的 Windows Sandbox 真机路径只跑到了
-  `.wsb` 生成 / 可用性检测 / 假启动器测试，未做虚拟机 e2e。
-- **Win10 Home 与 Win11 Pro 未验证**：本机只有一个 Windows 版本，无法完成手册要求的三环境手工验证。
-- 标准用户下自动化 e2e 覆盖 PowerShell / PDF / 自检 / 变更应用（`SDemo.DesktopAgent.Sandbox.Tests`）；
-  设置页与变更面板的 UI 只做了构建 + 代码审查，未逐项点击验收。
+- Windows Sandbox：已完成功能安装；自检通过（27.3 秒，启动 / PowerShell / 无网络），实际只读脚本执行退出码 0；
+  但 stdout 为空（P2），文件变更 / 删除未在 VM 内验证。
+- **Win10 Home 未验证**：本机是 Win11 Pro 26H2；Win11 Pro + 标准用户的 UI / 沙箱验收已完成。
+- 已做一轮真实 UI 点击验收，详见
+  [sandbox-ui-acceptance-s6.md](sandbox-ui-acceptance-s6.md)：
+  设置、审计、清理、彻底清理、删除面板（宿主模拟 diff）均通过。
+- **UI 验收发现的阻塞项**：AppContainer 内 `Remove-Item` 相对路径失败（P1）、Windows Sandbox stdout 为空（P2）、
+  host payload 缺 dll（P0，已修复）。P1 修复前，真实脚本删除不会产生 `Deleted` 变更，S6 删除能力不算完成。
 - 发布 / 回滚演练：仓库没有安装包 / 发布流水线，本次只做文档化演练（§6），未实际发布。
 - 本阶段 PR：#13 `https://github.com/nnbw-liu/DesktopAgent/pull/13`（stacked 在 S5 PR #12 之上）。
 
@@ -148,6 +152,12 @@
 
 ## 5. 已知限制 / 后续
 
+- **P1（阻塞删除）**：AppContainer 内 PowerShell 当前目录是 `SDEMO:` PSDrive，`Remove-Item` / `Rename-Item`
+  的相对路径会 `Access is denied`（`[IO.File]::Delete` 正常）。真实脚本因此不会产生 `Deleted` 变更；
+  修复前 S6 删除能力不完整，回归位 `AppContainer作业删除文件产生Deleted变更` 暂时 Skip。
+- **P2**：Windows Sandbox 实际执行脚本退出码 0，但 `stdout.txt` / `result.json.stdout` 为空；VM 内输出不可读。
+- **P3**：PowerShell 启动会在 work 副本写 `Microsoft/Windows/PowerShell/ModuleAnalysisCache`，污染变更面板。
+- **P0（已修复）**：WPF / MAUI 输出目录缺少 `sandbox-host` 完整 payload；已加构建复制与 dll 校验。
 - 扫描件 OCR 仍未实现：`job.json` 的 `ocr` 字段保留，`ocr=true` 会被明确拒绝；后续接 OCR 引擎时
   在 `SandboxHost` 内实现并保持“无网络、只读 input”的约束。
 - trash 没有 UI 浏览 / 一键还原；用户需到 `sandbox\trash\<jobId>\` 手动取回。
@@ -164,8 +174,8 @@
 - [x] Core / Sandbox 套件全部通过
 - [x] MAUI Windows 目标可构建
 - [x] README / 故障排查 / 本报告更新
-- [ ] Win10 Home + Win11 Pro + 标准用户手工验收（本机不具备条件）
-- [ ] Windows Sandbox 真机 e2e（本机功能未安装）
+- [ ] Win10 Home + Win11 Pro + 标准用户手工验收（Win11 Pro + 标准用户已验收；本机无 Win10 Home）
+- [ ] Windows Sandbox 真机 e2e（自检通过；实际脚本 stdout 为空，P2）
 
 ### 发布
 
@@ -183,11 +193,12 @@
 
 ## 7. 手工验收清单（手册附录 E S6）
 
-- [x] 删除变更：二次确认 + 移入 trash（单元测试覆盖；UI 未逐项点击）
-- [x] Janitor：24h / tmp / wsb / trash / 未处理变更保护（单元测试）
-- [x] 审计：保留天数、10MB 轮转、默认不落脚本正文（单元测试）
+- [ ] 删除变更：二次确认 + 移入 trash（应用 / trash / 标记已通过 UI 验收；真实脚本删除被 P1 阻塞）
+- [x] Janitor：24h / tmp / wsb / trash / 未处理变更保护（单测 + UI 清理验收）
+- [x] 审计：保留天数、10MB 轮转、默认不落脚本正文（单测 + UI 开关 / 打开目录验收）
 - [x] 安全回归：矩阵见 §2.1，既有真实沙箱用例全部通过
 - [x] 性能：探测缓存 10 分钟、排除目录、200MB 上限、host / profile 复用
 - [x] 文档：README / 故障排查 / 本报告
 - [ ] 发布 / 回滚演练：已文档化，未实际发布（仓库无发布流水线）
-- [ ] Win10 Home + Win11 Pro + 标准用户三环境手工验证：本机只有 Win10 Pro，无法完成
+- [ ] Win10 Home + Win11 Pro + 标准用户三环境手工验证：Win11 Pro + 标准用户已验收，Win10 Home 无环境
+- [ ] P1：AppContainer 内 `Remove-Item` 相对路径失败，修复后启用跳过的回归测试

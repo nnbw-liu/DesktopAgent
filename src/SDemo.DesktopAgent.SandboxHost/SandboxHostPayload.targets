@@ -1,0 +1,35 @@
+<Project>
+
+  <!--
+    把 SandboxHost 的构建输出复制到宿主应用的 sandbox-host\ 目录。
+    SandboxHostInstaller 会在运行时把它复制到 sandbox\host；
+    如果宿主输出里没有这份完整 payload，安装器会退回到应用目录，
+    只拿到 exe / deps / runtimeconfig 而缺少 managed dll，沙箱启动即失败。
+  -->
+  <PropertyGroup>
+    <SandboxHostTargetFramework>net10.0-windows10.0.19041.0</SandboxHostTargetFramework>
+    <SandboxHostOutputDirectory>$(MSBuildThisFileDirectory)bin\$(Configuration)\$(SandboxHostTargetFramework)\</SandboxHostOutputDirectory>
+  </PropertyGroup>
+
+  <Target Name="CopySandboxHostPayload" AfterTargets="Build">
+    <ItemGroup>
+      <SandboxHostPayloadFiles Include="$(SandboxHostOutputDirectory)**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SandboxHostPayloadFiles)"
+          DestinationFolder="$(OutDir)sandbox-host\%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+    <!-- 应用输出必须带上 host 的 managed dll；否则安装器回退到应用目录时只能拿到 exe，沙箱启动即失败。 -->
+    <Error Condition="Exists('$(SandboxHostOutputDirectory)SDemo.DesktopAgent.SandboxHost.dll') And !Exists('$(OutDir)sandbox-host\SDemo.DesktopAgent.SandboxHost.dll')"
+           Text="SandboxHost payload 复制不完整：缺少 $(OutDir)sandbox-host\SDemo.DesktopAgent.SandboxHost.dll" />
+  </Target>
+
+  <Target Name="CopySandboxHostPayloadToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <SandboxHostPublishFiles Include="$(SandboxHostOutputDirectory)**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SandboxHostPublishFiles)"
+          DestinationFolder="$(PublishDir)sandbox-host\%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

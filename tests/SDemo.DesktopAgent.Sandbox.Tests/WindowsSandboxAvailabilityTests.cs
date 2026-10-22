@@ -84,7 +84,15 @@ public sealed class WindowsSandboxAvailabilityTests
 
         if (availability.Available)
         {
-            Assert.Null(availability.Reason);
+            if (availability.Verified)
+            {
+                Assert.Null(availability.Reason);
+            }
+            else
+            {
+                // 可用但未自检：Reason 会提示先跑自检，UI 依赖这条文案。
+                Assert.Contains("自检", availability.Reason);
+            }
         }
         else
         {

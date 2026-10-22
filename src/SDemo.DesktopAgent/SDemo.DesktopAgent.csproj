@@ -51,4 +51,7 @@
           CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- SandboxHost 完整 payload（含 managed dll）必须出现在输出目录的 sandbox-host\ 下。 -->
+  <Import Project="..\SDemo.DesktopAgent.SandboxHost\SandboxHostPayload.targets" />
+
 </Project>
