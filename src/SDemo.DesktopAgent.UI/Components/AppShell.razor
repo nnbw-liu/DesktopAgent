@@ -59,6 +59,9 @@
                       OnPickWorkspace="PickWorkspace" />
         }
     </main>
+
+    @* 审批宿主放在 AppShell 顶层：切换会话 / 页面时，待确认的请求不会跟着消失。 *@
+    <ToolApprovalHost />
 </div>
 
 @code {

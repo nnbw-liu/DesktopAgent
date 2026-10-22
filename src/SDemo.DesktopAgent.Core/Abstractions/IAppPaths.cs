@@ -33,4 +33,11 @@ public interface IAppPaths
     /// 桌面端是「我的文档\SDemo DesktopAgent」，移动端退化为应用私有目录。
     /// </summary>
     string DefaultWorkspaceRoot { get; }
+
+    /// <summary>
+    /// 执行沙箱根目录：<c>host\</c>（自包含 SandboxHost）与 <c>jobs\{jobId}\</c> 都在它下面。
+    /// Windows 是 %LOCALAPPDATA%\SDemo\DesktopAgent\sandbox（不放漫游配置目录）；
+    /// Android 是 <c>AppDataDirectory/sandbox</c>，但移动端没有可用的沙箱运行器。
+    /// </summary>
+    string SandboxRoot { get; }
 }

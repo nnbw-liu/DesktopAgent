@@ -44,7 +44,7 @@ public sealed class PluginRunner : IPluginRunner
     private const int HistoryMaxChars = 24_000;
 
     // v1 的声明式插件不支持工具。
-    private static readonly HashSet<AgentSkill> NoTools = [];
+    private static readonly HashSet<string> NoTools = [];
 
     private readonly IAgentChatService _chat;
     private readonly PluginPromptComposer _composer;
@@ -97,6 +97,7 @@ public sealed class PluginRunner : IPluginRunner
             instructions,
             messages,
             NoTools,
+            SessionId: string.Empty,
             request.Metrics);
 
         await foreach (var delta in _chat.RunAsync(plan, cancellationToken))

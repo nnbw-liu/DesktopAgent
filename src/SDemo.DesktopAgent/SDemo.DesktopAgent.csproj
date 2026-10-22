@@ -37,6 +37,8 @@
   <ItemGroup>
     <!-- 界面与服务都来自共享工程，本工程只保留 WPF 宿主（窗口、托盘、主题资源、平台实现） -->
     <ProjectReference Include="..\SDemo.DesktopAgent.Core\SDemo.DesktopAgent.Core.csproj" />
+    <!-- Windows 专属实现（沙箱运行器与 DI 骨架）：WPF 与 MAUI-Windows 共用。 -->
+    <ProjectReference Include="..\SDemo.DesktopAgent.Windows\SDemo.DesktopAgent.Windows.csproj" />
     <ProjectReference Include="..\SDemo.DesktopAgent.UI\SDemo.DesktopAgent.UI.csproj" />
   </ItemGroup>
 
