@@ -1,4 +1,6 @@
 using System.Text;
+using SDemo.DesktopAgent.Models;
+using SDemo.DesktopAgent.Services;
 
 namespace SDemo.DesktopAgent.Context;
 
@@ -23,8 +25,9 @@ public static class StatePackFormatter
         var edits = state.RecentEdits.Take(WorkspaceStateProvider.MaxRecentEdits).ToList();
         var actions = state.RecentActions.Take(WorkspaceStateProvider.MaxRecentActions).ToList();
         var truncated = false;
+        var planText = RenderPlan(state.Todos, counter);
 
-        var text = Render(state, tree, edits, actions, truncated);
+        var text = Render(state, tree, edits, actions, planText, truncated);
         var tokens = counter.CountMessage("system", text);
 
         // 截断顺序：结构 → 最近改动 → 最近动作；验证块最后（不参与截断）。
@@ -32,7 +35,7 @@ public static class StatePackFormatter
         {
             tree.RemoveAt(tree.Count - 1);
             truncated = true;
-            text = Render(state, tree, edits, actions, truncated);
+            text = Render(state, tree, edits, actions, planText, truncated);
             tokens = counter.CountMessage("system", text);
         }
 
@@ -40,7 +43,7 @@ public static class StatePackFormatter
         {
             edits.RemoveAt(edits.Count - 1);
             truncated = true;
-            text = Render(state, tree, edits, actions, truncated);
+            text = Render(state, tree, edits, actions, planText, truncated);
             tokens = counter.CountMessage("system", text);
         }
 
@@ -48,7 +51,7 @@ public static class StatePackFormatter
         {
             actions.RemoveAt(actions.Count - 1);
             truncated = true;
-            text = Render(state, tree, edits, actions, truncated);
+            text = Render(state, tree, edits, actions, planText, truncated);
             tokens = counter.CountMessage("system", text);
         }
 
@@ -60,6 +63,7 @@ public static class StatePackFormatter
         IReadOnlyList<string> tree,
         IReadOnlyList<RecentEdit> edits,
         IReadOnlyList<RecentAction> actions,
+        string planText,
         bool truncated)
     {
         var builder = new StringBuilder();
@@ -126,10 +130,42 @@ public static class StatePackFormatter
             }
         }
 
+        if (!string.IsNullOrEmpty(planText))
+        {
+            builder.AppendLine().Append(planText).AppendLine();
+        }
+
         builder.AppendLine("## 验证");
         builder.AppendLine(string.IsNullOrWhiteSpace(state.LastVerification)
             ? "未运行验证"
             : state.LastVerification);
+
+        return builder.ToString().TrimEnd();
+    }
+
+    /// <summary>当前计划独立限 200 token；没有计划时不占预算。</summary>
+    private static string RenderPlan(IReadOnlyList<TodoItem>? todos, ITokenCounter counter)
+    {
+        if (todos is null || todos.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder();
+        builder.AppendLine("## 当前计划");
+
+        foreach (var item in todos.Take(TodoToolPack.MaxItems))
+        {
+            var line = $"{item.Icon} {item.Content}";
+            var candidate = builder.ToString() + line;
+            if (counter.CountMessage("system", candidate) > 200)
+            {
+                builder.AppendLine("…（计划已截断）");
+                break;
+            }
+
+            builder.AppendLine(line);
+        }
 
         return builder.ToString().TrimEnd();
     }

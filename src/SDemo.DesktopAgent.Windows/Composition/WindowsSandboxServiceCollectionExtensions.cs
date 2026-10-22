@@ -57,6 +57,8 @@ public static class WindowsSandboxServiceCollectionExtensions
         services.AddSingleton<IAgentToolPack, CommandToolPack>();
         services.AddSingleton<SDemo.DesktopAgent.Execution.IWorkspaceWarmupService,
             SDemo.DesktopAgent.Platform.Windows.Execution.WorkspaceWarmupService>();
+        services.AddSingleton<SDemo.DesktopAgent.Execution.IVerificationRunner,
+            SDemo.DesktopAgent.Platform.Windows.Execution.VerificationRunner>();
 
         // S5：PDF 工具包与附件文本提取。解析在 SandboxHost（沙箱内）完成，宿主只负责编排。
         services.AddSingleton<IAgentToolPack, PdfToolPack>();

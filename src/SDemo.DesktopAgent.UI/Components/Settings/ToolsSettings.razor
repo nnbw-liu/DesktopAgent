@@ -159,6 +159,26 @@
             <button type="button" class="primary-button" @onclick="SaveExecutionPolicy">保存直跑设置</button>
         </div>
 
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">改动后自动提示验证（最多续跑 1 次）</span>
+                <span class="settings-row-hint">有编辑但没有成功验证时，宿主追加一条 user 提示；不会伪造 tool 消息。</span>
+            </span>
+            <input type="checkbox" class="switch"
+                   checked="@Settings.Current.Verification.AutoVerifyAfterEdit"
+                   @onchange="ToggleAutoVerify" />
+        </label>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">编辑前创建检查点（可撤销最近一次改动）</span>
+                <span class="settings-row-hint">每个 turn 一个 checkpoint，保留最近 20 个；撤销前会检查 hash 冲突。</span>
+            </span>
+            <input type="checkbox" class="switch"
+                   checked="@Settings.Current.Checkpoints.Enabled"
+                   @onchange="ToggleCheckpoints" />
+        </label>
+
         <div class="settings-subsection">
             <span class="field-label">当前工作区命令</span>
             @if (CurrentWorkspace is null)
@@ -803,6 +823,18 @@
         Settings.Save();
         _allowlistText = string.Join(", ", allowlist);
         _executionMessage = "直跑设置已保存。";
+    }
+
+    private void ToggleAutoVerify(ChangeEventArgs args)
+    {
+        Settings.Current.Verification.AutoVerifyAfterEdit = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleCheckpoints(ChangeEventArgs args)
+    {
+        Settings.Current.Checkpoints.Enabled = args.Value is true;
+        Settings.Save();
     }
 
     private void ChangeExecutionTimeout(ChangeEventArgs args)

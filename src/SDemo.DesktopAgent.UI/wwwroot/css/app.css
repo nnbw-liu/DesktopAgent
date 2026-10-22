@@ -4325,3 +4325,25 @@ a {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* P5：会话 todo 面板 */
+.todo-panel { margin: 8px 24px 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.todo-panel-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: 0; background: transparent; color: var(--text); cursor: pointer; font-size: 13px; text-align: left; }
+.todo-panel-checks { color: var(--accent); }
+.todo-panel-chevron { margin-left: auto; color: var(--text-muted); }
+.todo-list { margin: 0; padding: 0 12px 10px 30px; }
+.todo-item { padding: 3px 0; font-size: 13px; color: var(--text-muted); }
+.todo-item--active { color: var(--text); }
+.todo-item--done .todo-content { text-decoration: line-through; opacity: 0.7; }
+.todo-icon { margin-right: 6px; }
+
+/* P5：验证门徽标 */
+.verification-badge { display: flex; align-items: center; gap: 10px; margin: 8px 24px 0; padding: 8px 12px; border: 1px solid var(--warning, #d9a441); border-radius: 10px; background: var(--surface); font-size: 13px; }
+.verification-badge--fail { border-color: var(--danger, #d9534f); }
+.verification-badge-text { flex: 1; color: var(--text); }
+.verification-badge-note { color: var(--text-muted); font-size: 12px; }
+
+/* P5：改动摘要里的撤销 */
+.edit-summary-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); }
+.edit-summary-conflict { flex: 1; min-width: 240px; color: var(--danger, #d9534f); font-size: 12px; }
+.edit-summary-note { color: var(--text-muted); font-size: 12px; }

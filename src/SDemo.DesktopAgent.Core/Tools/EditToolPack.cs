@@ -15,6 +15,10 @@ public sealed class EditToolPack : IAgentToolPack
 {
     private static readonly UTF8Encoding Utf8NoBom = new(false);
 
+    private readonly CheckpointStore? _checkpoints;
+
+    public EditToolPack(CheckpointStore? checkpoints = null) => _checkpoints = checkpoints;
+
     public AgentToolPackDescriptor Descriptor { get; } = new(
         Id: "edits",
         Name: "代码编辑",
@@ -41,7 +45,7 @@ public sealed class EditToolPack : IAgentToolPack
 
     public IReadOnlyList<AITool> Create(ToolContext context)
     {
-        var functions = new EditFunctions(context);
+        var functions = new EditFunctions(context, _checkpoints);
 
         return
         [
@@ -57,7 +61,7 @@ public sealed class EditToolPack : IAgentToolPack
         ];
     }
 
-    private sealed class EditFunctions(ToolContext context)
+    private sealed class EditFunctions(ToolContext context, CheckpointStore? checkpoints)
     {
         private const int MaxApprovalDiffChars = 60_000;
 
@@ -115,6 +119,22 @@ public sealed class EditToolPack : IAgentToolPack
                 }
             }
 
+            if (checkpoints is not null && context.Settings.Current.Checkpoints.Enabled)
+            {
+                try
+                {
+                    checkpoints.Capture(
+                        context.SessionId,
+                        context.TurnId ?? context.SessionId,
+                        context.WorkspaceRoot,
+                        parsed.Files.Select(file => file.NewPath));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+                {
+                    return $"未写入任何文件：创建检查点失败：{ex.Message}";
+                }
+            }
+
             var result = new PatchApplier().Apply(context.WorkspaceRoot, parsed, expectedHash, cancellationToken);
             if (!result.Success)
             {
@@ -124,6 +144,19 @@ public sealed class EditToolPack : IAgentToolPack
             foreach (var change in result.Changes)
             {
                 context.Reads?.RecordRead(context.SessionId, change.Path, change.NewHash);
+            }
+
+            try
+            {
+                checkpoints?.MarkEdited(
+                    context.SessionId,
+                    context.TurnId ?? context.SessionId,
+                    context.WorkspaceRoot,
+                    result.Changes.Select(change => change.Path));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                // checkpoint 的 after-hash 写失败不应回滚已经成功的编辑。
             }
 
             return result.Message;
@@ -178,6 +211,22 @@ public sealed class EditToolPack : IAgentToolPack
                 }
             }
 
+            if (checkpoints is not null && context.Settings.Current.Checkpoints.Enabled)
+            {
+                try
+                {
+                    checkpoints.Capture(
+                        context.SessionId,
+                        context.TurnId ?? context.SessionId,
+                        context.WorkspaceRoot,
+                        [relative]);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+                {
+                    return $"未写入文件：创建检查点失败：{ex.Message}";
+                }
+            }
+
             var directory = Path.GetDirectoryName(target);
             if (!string.IsNullOrEmpty(directory))
             {
@@ -208,6 +257,20 @@ public sealed class EditToolPack : IAgentToolPack
                 FileReadRegistry.HashText(content));
 
             context.Reads?.RecordRead(context.SessionId, relative, change.NewHash);
+
+            try
+            {
+                checkpoints?.MarkEdited(
+                    context.SessionId,
+                    context.TurnId ?? context.SessionId,
+                    context.WorkspaceRoot,
+                    [relative]);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                // 同上：检查点元数据失败不影响已写入的文件。
+            }
+
             return PatchApplier.FormatSuccess([change]);
         }
 

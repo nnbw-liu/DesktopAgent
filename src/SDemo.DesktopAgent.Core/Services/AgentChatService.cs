@@ -102,7 +102,8 @@ public sealed class AgentChatService : IAgentChatService
             _audit,
             _reads,
             plan.Metrics,
-            plan.Session);
+            plan.Session,
+            plan.Metrics?.RunId);
 
         var tools = _tools.Create(context, plan.ToolPacks, plan.Metrics);
         var agent = CreateAgent(plan.Provider, plan.ModelId, tools, plan.Context, telemetry);

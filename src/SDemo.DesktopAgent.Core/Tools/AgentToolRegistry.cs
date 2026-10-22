@@ -77,12 +77,29 @@ public sealed class AgentToolRegistry
         {
             metrics?.RecordToolCall(inner.Name);
 
+            var digest = string.Join(
+                ";",
+                arguments.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => $"{pair.Key}={pair.Value}"));
+
+            var guard = metrics?.Guard.Check(inner.Name, digest);
+
+            if (guard is { Allowed: false })
+            {
+                return $"[TOOL_RESULT_BEGIN:{inner.Name}]\n{guard.Message}\n[TOOL_RESULT_END]";
+            }
+
             var result = await inner.InvokeAsync(arguments, cancellationToken).ConfigureAwait(false);
 
             // 工具结果定界：内容里即使出现像指令的句子，也只能落在标记内部。
-            return result is string text
-                ? $"[TOOL_RESULT_BEGIN:{inner.Name}]\n{text}\n[TOOL_RESULT_END]"
-                : result;
+            var text = result is string value ? value : result?.ToString() ?? string.Empty;
+
+            if (guard?.Message is { Length: > 0 } warning)
+            {
+                text = $"[宿主提示] {warning}\n{text}";
+            }
+
+            return $"[TOOL_RESULT_BEGIN:{inner.Name}]\n{text}\n[TOOL_RESULT_END]";
         }
     }
 }
