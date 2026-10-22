@@ -40,7 +40,7 @@ public sealed class SandboxSelectorTests
     }
 
     [Fact]
-    public async Task 首选不可用时回退到另一个可用运行器()
+    public async Task Preferred时首选不可用可回退到另一个可用运行器()
     {
         var appContainer = new FakeRunner(SandboxKind.AppContainer, available: true, exitCode: 7);
         var windowsSandbox = new FakeRunner(SandboxKind.WindowsSandbox, available: false);
@@ -48,12 +48,28 @@ public sealed class SandboxSelectorTests
 
         var result = await selector.RunAsync(
             CreateRequest("job-00000003"),
-            new SandboxPolicy(SandboxRequirement.Required, SandboxKind.WindowsSandbox));
+            new SandboxPolicy(SandboxRequirement.Preferred, SandboxKind.WindowsSandbox));
 
         Assert.Equal(7, result.ExitCode);
         Assert.Equal(1, appContainer.RunCount);
         // 请求里的 Kind 要跟着选中的运行器改，不能让运行器执行一个“名义上不是自己”的请求。
         Assert.Equal(SandboxKind.AppContainer, appContainer.LastRequest?.Kind);
+    }
+
+    [Fact]
+    public async Task Required时首选不可用不降级()
+    {
+        var appContainer = new FakeRunner(SandboxKind.AppContainer, available: true, exitCode: 7);
+        var windowsSandbox = new FakeRunner(SandboxKind.WindowsSandbox, available: false);
+        var selector = new SandboxSelector([appContainer, windowsSandbox]);
+
+        var result = await selector.RunAsync(
+            CreateRequest("job-00000004"),
+            new SandboxPolicy(SandboxRequirement.Required, SandboxKind.WindowsSandbox));
+
+        Assert.Equal(SandboxFailureCode.NotAvailable, result.Failure);
+        Assert.Contains("已拒绝降级执行", result.Message);
+        Assert.Equal(0, appContainer.RunCount);
     }
 
     [Fact]
@@ -74,6 +90,54 @@ public sealed class SandboxSelectorTests
         Assert.Contains("WindowsSandbox", availability.Reason);
     }
 
+    [Fact]
+    public async Task 首选WindowsSandbox可用时选中它()
+    {
+        var appContainer = new FakeRunner(SandboxKind.AppContainer, available: true);
+        var windowsSandbox = new FakeRunner(SandboxKind.WindowsSandbox, available: true);
+        var selector = new SandboxSelector([appContainer, windowsSandbox]);
+
+        var selection = await selector.SelectAsync(
+            new SandboxPolicy(SandboxRequirement.Required, SandboxKind.WindowsSandbox));
+
+        Assert.True(selection.IsAvailable);
+        Assert.Same(windowsSandbox, selection.Runner);
+        Assert.Equal(SandboxKind.WindowsSandbox, selection.Availability.Kind);
+    }
+
+    [Fact]
+    public async Task 要求已验证时跳过未验证的沙箱()
+    {
+        var appContainer = new FakeRunner(SandboxKind.AppContainer, available: true, verified: true);
+        var windowsSandbox = new FakeRunner(SandboxKind.WindowsSandbox, available: true, verified: false);
+        var selector = new SandboxSelector([appContainer, windowsSandbox]);
+
+        var selection = await selector.SelectAsync(
+            new SandboxPolicy(SandboxRequirement.Preferred, SandboxKind.WindowsSandbox),
+            requireVerified: true);
+
+        // 自动模式：首选（WSB）没通过自检，允许换用已验证的 AppContainer。
+        Assert.Same(appContainer, selection.Runner);
+        Assert.Equal(SandboxKind.AppContainer, selection.Availability.Kind);
+    }
+
+    [Fact]
+    public async Task 强制首选的沙箱未验证时拒绝降级()
+    {
+        var appContainer = new FakeRunner(SandboxKind.AppContainer, available: true, verified: true);
+        var windowsSandbox = new FakeRunner(SandboxKind.WindowsSandbox, available: true, verified: false);
+        var selector = new SandboxSelector([appContainer, windowsSandbox]);
+
+        var selection = await selector.SelectAsync(
+            new SandboxPolicy(SandboxRequirement.Required, SandboxKind.WindowsSandbox),
+            requireVerified: true);
+
+        Assert.Null(selection.Runner);
+        Assert.False(selection.IsAvailable);
+        Assert.Contains("已拒绝降级执行", selection.Availability.Reason);
+        Assert.Contains("尚未通过自检", selection.Availability.Reason);
+    }
+
     private static SandboxRequest CreateRequest(string jobId) => new()
     {
         JobId = jobId,
@@ -83,7 +147,8 @@ public sealed class SandboxSelectorTests
         OutputDirectory = "output"
     };
 
-    private sealed class FakeRunner(SandboxKind kind, bool available, int exitCode = 0) : ISandboxRunner
+    private sealed class FakeRunner(SandboxKind kind, bool available, int exitCode = 0, bool? verified = null)
+        : ISandboxRunner
     {
         public SandboxKind Kind => kind;
 
@@ -95,7 +160,7 @@ public sealed class SandboxSelectorTests
             Task.FromResult(new SandboxAvailability(
                 kind,
                 available,
-                Verified: available,
+                Verified: verified ?? available,
                 available ? null : "测试：不可用",
                 Detail: null));
 

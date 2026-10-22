@@ -20,11 +20,22 @@ public sealed class UnavailableSandboxJobService : ISandboxJobService
             UnavailableSandboxRunner.Reason,
             Detail: null));
 
+    public Task<SandboxAvailability> GetAvailabilityAsync(
+        SandboxKind kind,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SandboxAvailability(
+            kind,
+            Available: false,
+            Verified: false,
+            UnavailableSandboxRunner.Reason,
+            Detail: null));
+
     public Task<SandboxJobOutcome> RunPowerShellAsync(
         string sessionId,
         string script,
         string? workingDirectory,
         int timeoutSeconds,
+        string? workspaceRoot = null,
         CancellationToken cancellationToken = default)
     {
         var reason = UnavailableSandboxRunner.Reason;
@@ -49,4 +60,24 @@ public sealed class UnavailableSandboxJobService : ISandboxJobService
             Pages: [],
             Truncated: false,
             Message: UnavailableSandboxRunner.Reason));
+
+    public Task<SandboxProbeReport> RunSelfTestAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SandboxProbeReport(
+            CmdOk: false,
+            PowerShellOk: false,
+            CannotReadUserProfile: false,
+            CannotWriteWorkspace: false,
+            NoNetwork: false,
+            SubprocessOk: false,
+            TimeoutOk: false,
+            Detail: UnavailableSandboxRunner.Reason));
+
+    public Task<WindowsSandboxSelfTestReport> RunWindowsSandboxSelfTestAsync(
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new WindowsSandboxSelfTestReport(
+            Launched: false,
+            PowerShellOk: false,
+            NoNetwork: false,
+            TimeSpan.Zero,
+            UnavailableSandboxRunner.Reason));
 }

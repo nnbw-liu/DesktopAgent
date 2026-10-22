@@ -12,16 +12,35 @@ public interface ISandboxJobService
 
     Task<SandboxAvailability> GetAvailabilityAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>单独查询某一种沙箱的可用性（设置页按类型展示状态）。</summary>
+    Task<SandboxAvailability> GetAvailabilityAsync(
+        SandboxKind kind,
+        CancellationToken cancellationToken = default);
+
     Task<SandboxJobOutcome> RunPowerShellAsync(
         string sessionId,
         string script,
         string? workingDirectory,
         int timeoutSeconds,
+        string? workspaceRoot = null,
         CancellationToken cancellationToken = default);
 
     Task<PdfExtraction> ExtractPdfAsync(
         string path,
         string? pages,
         int maxChars,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 运行设置页的“自检”：基本进程 / PowerShell / 读用户目录 / 写工作区 / 联网 /
+    /// 子进程 / 超时终止。Noop 实现返回全 false 并给出原因，不抛异常。
+    /// </summary>
+    Task<SandboxProbeReport> RunSelfTestAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Windows Sandbox 自检：启动一次虚拟机（约 10–30 秒）验证 PowerShell 与无网络。
+    /// 通过后该沙箱才被视为 Verified；不可用时返回 <c>Launched = false</c> 并给出原因，不抛异常。
+    /// </summary>
+    Task<WindowsSandboxSelfTestReport> RunWindowsSandboxSelfTestAsync(
         CancellationToken cancellationToken = default);
 }

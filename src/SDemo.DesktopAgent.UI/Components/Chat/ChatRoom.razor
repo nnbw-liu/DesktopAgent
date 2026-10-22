@@ -1,10 +1,14 @@
 @using System.Diagnostics
+@using System.IO
 @using SDemo.DesktopAgent.Models
+@using SDemo.DesktopAgent.Sandbox
 @using Microsoft.AspNetCore.Components
 @inject IJSRuntime Js
 @inject ISettingsService Settings
 @inject IAgentChatService Agent
-@inject FileWriteApprovalService Approvals
+@inject IToolApprovalService Approvals
+@inject AgentToolRegistry ToolRegistry
+@inject ISandboxJobService Sandbox
 @inject SkillCatalog SkillCatalog
 @inject PluginRegistry Registry
 @inject PluginParameterResolver ParameterResolver
@@ -85,6 +89,10 @@
                                         </svg>
                                         <span class="attachment-name">@attachment.FileName</span>
                                         <span class="attachment-size">@AttachmentStore.FormatSize(attachment.Size)</span>
+                                        @if (attachment.PageCount is int pageCount)
+                                        {
+                                            <span class="attachment-size" title="PDF 页数">@pageCount 页</span>
+                                        }
                                     </span>
                                 }
                             </div>
@@ -199,6 +207,8 @@
         </div>
     }
 
+    <SandboxChangesPanel SessionId="@Session.Id" />
+
     <div class="chat-composer-area">
         @if (_pluginNotice is { } notice)
         {
@@ -211,8 +221,8 @@
                       Skills="_skills"
                       SelectedSkill="@_selectedSkill"
                       OnSelectSkill="SelectSkill"
-                      EnabledTools="_enabledTools"
-                      OnToggleTool="ToggleTool"
+                      ToolPacks="_toolPacks"
+                      OnToggleToolPack="ToggleToolPack"
                       PluginMounts="_composerMounts"
                       PluginById="_composerPlugins"
                       MaxVisiblePlugins="@Registry.MaxFor(PluginSurface.Composer)"
@@ -259,22 +269,7 @@
         </ChatComposer>
     </div>
 
-    @* 文件写入确认：模型调用 write_file 时弹出 *@
-    @if (_pendingWrite is not null)
-    {
-        <div class="modal-backdrop">
-            <div class="modal" role="dialog" aria-modal="true">
-                <h2 class="modal-title">允许写入这个文件吗？</h2>
-                <p class="modal-sub">模型请求写入文件，确认后才会落盘。</p>
-                <code class="modal-path">@_pendingWrite.Path</code>
-                <pre class="modal-preview">@PreviewWrite(_pendingWrite.Content)</pre>
-                <div class="modal-actions">
-                    <button type="button" class="ghost-button" @onclick="() => ResolveWrite(false)">拒绝</button>
-                    <button type="button" class="primary-button" @onclick="() => ResolveWrite(true)">允许写入</button>
-                </div>
-            </div>
-        </div>
-    }
+    @* 文件写入 / PowerShell 执行的确认框已移到 AppShell 顶层的 ToolApprovalHost，切换会话不会消失。 *@
 
     @* 隐私提示：privacy.sendsText 的插件首次使用确认一次 *@
     @if (_privacyPlugin is { } privacyPlugin)
@@ -347,7 +342,6 @@
     private List<ModelOption> _modelOptions = [];
     private string? _selectedKey;
     private CancellationTokenSource? _cts;
-    private FileWriteRequest? _pendingWrite;
 
     /// <summary>常用技能（本地技能库）。</summary>
     private IReadOnlyList<SkillInfo> _skills = [];
@@ -355,8 +349,19 @@
     /// <summary>当前选中的技能名（为空表示不套用技能）。</summary>
     private string? _selectedSkill;
 
-    /// <summary>当前启用的模型工具（多选，可同时开搜索与文件）。</summary>
-    private readonly HashSet<AgentSkill> _enabledTools = [];
+    /// <summary>本轮启用的工具包 id（多选；最终仍以 chip 的可用性为准）。</summary>
+    private readonly HashSet<string> _enabledToolPacks = new(StringComparer.Ordinal);
+
+    /// <summary>输入框里的工具 chip：注册表描述 + 设置开关 + 沙箱可用性。</summary>
+    private IReadOnlyList<ToolPackChip> _toolPacks = [];
+
+    /// <summary>最近一次沙箱可用性（异步探测 + 设置变更后刷新）。</summary>
+    private SandboxAvailability? _sandboxAvailability;
+
+    /// <summary>AppContainer 单独的可用性：PDF 解析固定在 AppContainer 里跑，和首选沙箱无关。</summary>
+    private SandboxAvailability? _appContainerAvailability;
+
+    private bool _toolPackAvailabilityLoading;
 
     /// <summary>输入框可用的插件入口（composer 界面、可用且 show）。</summary>
     private IReadOnlyList<PluginMount> _composerMounts = [];
@@ -402,9 +407,12 @@
         _skills = SkillCatalog.List();
         RefreshPluginMounts();
         RefreshModelOptions();
+        RefreshToolPacks();
         Settings.Changed += OnSettingsChanged;
-        Approvals.Changed += OnApprovalChanged;
         Registry.Changed += OnRegistryChanged;
+
+        // 沙箱探测可能要启动一次进程：先按“未验证”渲染 chip，后台刷新后再更新。
+        _ = RefreshSandboxAvailabilityAsync();
     }
 
     protected override void OnParametersSet()
@@ -415,11 +423,12 @@
             _sessionId = Session.Id;
             _draft = string.Empty;
             _selectedSkill = null;
-            _enabledTools.Clear();
+            _enabledToolPacks.Clear();
             _copiedMessageId = null;
             _cts?.Cancel();
             _isGenerating = false;
             ApplyActiveMount(Session.ActiveMountId);
+            RefreshToolPacks();
         }
     }
 
@@ -436,18 +445,10 @@
         _ = InvokeAsync(() =>
         {
             RefreshModelOptions();
+            RefreshToolPacks();
+            _ = RefreshSandboxAvailabilityAsync();
             StateHasChanged();
         });
-
-    /// <summary>写入确认状态变化（可能来自后台线程）。</summary>
-    private void OnApprovalChanged() =>
-        _ = InvokeAsync(() =>
-        {
-            _pendingWrite = Approvals.Pending;
-            StateHasChanged();
-        });
-
-    private void ResolveWrite(bool approved) => Approvals.Resolve(approved);
 
     private bool IsReasoningOpen(string messageId) => _openReasoning.Contains(messageId);
 
@@ -460,12 +461,6 @@
     }
 
     private Task SelectWorkspace(Workspace workspace) => OnWorkspaceChanged.InvokeAsync(workspace);
-
-    private static string PreviewWrite(string content)
-    {
-        var normalized = content.Replace("\r\n", "\n");
-        return normalized.Length <= 1200 ? normalized : normalized[..1200] + "\n…（已截断）";
-    }
 
     private void RefreshModelOptions()
     {
@@ -507,13 +502,123 @@
     /// <summary>选择技能：再次点击同一个则取消。</summary>
     private void SelectSkill(string? name) => _selectedSkill = name;
 
-    /// <summary>开关一个模型工具；搜索与文件可以同时启用。</summary>
-    private void ToggleTool(AgentSkill tool)
+    /// <summary>开关一个工具包（只有可用时才允许；不可用的 chip 在 UI 上已禁用）。</summary>
+    private void ToggleToolPack(string packId)
     {
-        if (!_enabledTools.Remove(tool))
+        var chip = _toolPacks.FirstOrDefault(item => string.Equals(item.Id, packId, StringComparison.Ordinal));
+        if (chip is null || !chip.Available)
         {
-            _enabledTools.Add(tool);
+            return;
         }
+
+        if (!_enabledToolPacks.Remove(packId))
+        {
+            _enabledToolPacks.Add(packId);
+        }
+
+        RefreshToolPacks();
+    }
+
+    /// <summary>
+    /// 按注册表 + 设置 + 沙箱可用性重建 chip。PowerShell 需要 <c>Available &amp;&amp; Verified</c>：
+    /// 只有 cmd 能跑不算可用，否则模型会拿到一个必然失败的工具。
+    /// </summary>
+    private void RefreshToolPacks()
+    {
+        var settings = Settings.Current;
+        var chips = new List<ToolPackChip>();
+
+        foreach (var descriptor in ToolRegistry.Descriptors)
+        {
+            var masterEnabled = settings.Tools.IsPackEnabled(descriptor.Id, descriptor.DefaultEnabled);
+            string? unavailableReason = null;
+
+            if (!masterEnabled)
+            {
+                unavailableReason = "在「设置 → 工具设置」中启用";
+            }
+            else if (descriptor.Id == "powershell")
+            {
+                if (!settings.Sandbox.Enabled)
+                {
+                    unavailableReason = "执行沙箱已在设置中关闭";
+                }
+                else if (_sandboxAvailability is not { Available: true, Verified: true })
+                {
+                    unavailableReason = _toolPackAvailabilityLoading
+                        ? "正在检测沙箱…"
+                        : _sandboxAvailability?.Reason ?? "沙箱不可用或未验证";
+                }
+            }
+            else if (descriptor.Id == "pdf")
+            {
+                // PDF helper 只在 AppContainer 里跑；不要求 PowerShell 的 Verified。
+                if (!settings.Sandbox.Enabled)
+                {
+                    unavailableReason = "执行沙箱已在设置中关闭";
+                }
+                else if (_appContainerAvailability is not { Available: true })
+                {
+                    unavailableReason = _toolPackAvailabilityLoading
+                        ? "正在检测沙箱…"
+                        : _appContainerAvailability?.Reason ?? "AppContainer 沙箱不可用";
+                }
+            }
+
+            var available = unavailableReason is null;
+
+            chips.Add(new ToolPackChip(
+                descriptor.Id,
+                descriptor.Name,
+                descriptor.Description,
+                descriptor.Glyph,
+                available && _enabledToolPacks.Contains(descriptor.Id),
+                available,
+                unavailableReason));
+        }
+
+        _toolPacks = chips;
+
+        // 包在设置里被关掉 / 沙箱失效时，把本轮的选择也清掉，避免继续传给模型。
+        _enabledToolPacks.RemoveWhere(id => chips.FirstOrDefault(chip => chip.Id == id) is not { Available: true });
+    }
+
+    private async Task RefreshSandboxAvailabilityAsync()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _toolPackAvailabilityLoading = true;
+
+        try
+        {
+            // 两个查询分开：PowerShell 看策略选出的沙箱，PDF 固定看 AppContainer。
+            _sandboxAvailability = await Sandbox.GetAvailabilityAsync();
+            _appContainerAvailability = await Sandbox.GetAvailabilityAsync(SandboxKind.AppContainer);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or SystemException)
+        {
+            var failure = new SandboxAvailability(
+                SandboxKind.None,
+                Available: false,
+                Verified: false,
+                $"沙箱状态检测失败：{ex.Message}",
+                Detail: null);
+            _sandboxAvailability = failure;
+            _appContainerAvailability = failure;
+        }
+        finally
+        {
+            _toolPackAvailabilityLoading = false;
+        }
+
+        await InvokeAsync(() =>
+        {
+            RefreshToolPacks();
+            StateHasChanged();
+        });
     }
 
     /// <summary>刷新输入框可用的插件入口（启动、重新扫描 / 设置改动后调用）。</summary>
@@ -828,8 +933,8 @@
         _openReasoning.Add(reply.Id);
         StateHasChanged();
 
-        // 工具是多选的：把所有勾选的工具一起传给模型。
-        var enabledSkills = new HashSet<AgentSkill>(_enabledTools);
+        // 工具是多选的：把所有勾选的工具包一起传给模型。
+        var enabledPacks = new HashSet<string>(_enabledToolPacks, StringComparer.Ordinal);
         var metrics = new AgentRunMetrics();
         var startedAt = Stopwatch.GetTimestamp();
 
@@ -841,7 +946,8 @@
                     option.Provider,
                     option.ModelId,
                     history,
-                    enabledSkills,
+                    enabledPacks,
+                    Session.Id,
                     _selectedSkill,
                     metrics,
                     cts.Token));
@@ -1080,7 +1186,12 @@
     private Task NotifySessionChangedAsync() =>
         OnSessionChanged.HasDelegate ? OnSessionChanged.InvokeAsync(Session) : Task.CompletedTask;
 
-    private void HandleStop() => _cts?.Cancel();
+    /// <summary>用户点停止：终止生成，并拒绝所有排队中的审批（包括沙箱执行）。</summary>
+    private void HandleStop()
+    {
+        _cts?.Cancel();
+        Approvals.CancelAll();
+    }
 
     /// <summary>气泡上可用的插件入口（message 界面、已被用户启用），参数按会话记忆解析。</summary>
     private IReadOnlyList<PluginActionEntry> BuildMessagePluginActions()
@@ -1445,13 +1556,9 @@
     {
         _disposed = true;
         Settings.Changed -= OnSettingsChanged;
-        Approvals.Changed -= OnApprovalChanged;
         Registry.Changed -= OnRegistryChanged;
 
-        // 组件销毁时若还有待确认的写入，按拒绝处理，避免工具线程一直挂着。
-        if (Approvals.Pending is not null)
-        {
-            Approvals.Resolve(false);
-        }
+        // 审批宿主在 AppShell 顶层，切换会话时不该取消别的会话正在等待的请求；
+        // 只有本组件自己的生成被取消时，cancellationToken 会让对应请求按拒绝结束。
     }
 }

@@ -60,9 +60,25 @@ internal static class AgentMessageMapper
             }
 
             var text = TryReadText(attachment, Math.Min(AttachmentCharsPerFile, budget));
+
+            // PDF 的二进制本身读不出文本，但模型需要原始路径才能在后续调用 pdf_read 读取其他页。
+            if (attachment.PageCount is int pageCount)
+            {
+                builder.AppendLine().Append($"（PDF 共 {pageCount} 页，文件路径：{attachment.FilePath}）");
+            }
+
+            if (attachment.HasTextLayer is false)
+            {
+                builder.AppendLine().Append("（未检测到文本层；当前未启用 OCR，无法读取扫描件内容）");
+                continue;
+            }
+
             if (text is null)
             {
-                builder.AppendLine().Append($"（二进制或无法读取的文件，路径：{attachment.FilePath}）");
+                builder.AppendLine().Append(
+                    IsPdf(attachment)
+                        ? $"（PDF 文本提取未完成，可用 pdf_read 工具重试；路径：{attachment.FilePath}）"
+                        : $"（二进制或无法读取的文件，路径：{attachment.FilePath}）");
                 continue;
             }
 
@@ -73,21 +89,39 @@ internal static class AgentMessageMapper
         return builder.ToString();
     }
 
+    private static bool IsPdf(ChatAttachment attachment) =>
+        string.Equals(Path.GetExtension(attachment.FilePath), ".pdf", StringComparison.OrdinalIgnoreCase);
+
     private static string? TryReadText(ChatAttachment attachment, int maxChars)
     {
+        // PDF 上传时已由沙箱提取前几页到 sidecar；优先读它，避免把二进制 PDF 当“无法读取”。
+        if (!string.IsNullOrWhiteSpace(attachment.ExtractedTextPath))
+        {
+            var extracted = ReadLimitedText(attachment.ExtractedTextPath, maxChars);
+            if (!string.IsNullOrWhiteSpace(extracted))
+            {
+                return extracted;
+            }
+        }
+
         if (!TextExtensions.Contains(Path.GetExtension(attachment.FilePath)))
         {
             return null;
         }
 
+        return ReadLimitedText(attachment.FilePath, maxChars);
+    }
+
+    private static string? ReadLimitedText(string path, int maxChars)
+    {
         try
         {
-            if (!File.Exists(attachment.FilePath))
+            if (!File.Exists(path))
             {
                 return null;
             }
 
-            using var reader = new StreamReader(attachment.FilePath, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            using var reader = new StreamReader(path, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
             var buffer = new char[Math.Min(maxChars, 8192)];
             var builder = new StringBuilder();
 
