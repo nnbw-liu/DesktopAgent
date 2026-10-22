@@ -1,7 +1,8 @@
 # P2 — 压缩与工作记忆（第 2 期）
 
-> 状态：未开始 · 估时 6 人日 · 前置：P1 · 出口：超预算时只隐藏不删除，压缩后还能接着干活
+> 状态：✅ 完成（2026-10-22） · 估时 6 人日 · 前置：P1 · 出口：超预算时只隐藏不删除，压缩后还能接着干活
 > 关联总纲：[vibe-coding-roadmap.md](vibe-coding-roadmap.md) · 决策：只隐藏不删除 / 摘要模型可配置
+> 结果：[p2-report.md](p2-report.md) · 真机数据：[p2-golden-questions.md](p2-golden-questions.md)
 
 ## 1. 本期要解决的问题
 
@@ -37,11 +38,15 @@ P1 只能「裁」：裁掉的轮次就真的没了。用户会立刻遇到两�
 ```
 AgentSessionRunner.StreamAsync
   1. preflight = ContextBuilder.Build(...)          // 不含摘要
-  2. if preflight.OverBudget && autoCompact:
+  2. if preflight.OmittedMessages > 0 && autoCompact:
         ContextCompactor.EnsureAsync(session, preflight)
         重新 Build（此时带 summary + state）
-  3. 仍超 → L1 激进裁剪 → 仍超 → 报错（带报告）
+  3. if Build 抛 NeedsCompaction（单条就超）:
+        压缩后重建；仍超才报错（带报告）
 ```
+
+> 实际实现（见报告 §6.1）：P1 的裁剪器总会把请求裁到预算内，因此「超预算」表现为
+> `OmittedMessages > 0`（已经开始丢历史），而不是 plan 的 `Estimated > Total`。
 
 `EnsureAsync` 的增量逻辑：
 
@@ -111,6 +116,7 @@ public interface IContextSummarizer
 ```
 ## 目标与约束
 - 用户最近诉求：<最后 3 条用户消息各 120 字>
+- 用户早期诉求：<最早 4 条用户消息各 120 字>   # 保住首块历史里的长期约束
 ## 已确认决策
 - 无（自动摘要无法可靠提取）
 ## 关键事实
@@ -192,16 +198,16 @@ P1 已建列，本期开始写入：`Summary`、`SummaryThroughOrder`、`Summary
 
 | # | 任务 | 交付物 | 涉及文件 | 估时 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 2.1 | 摘要器接口与提示词 | `IContextSummarizer`、`SummaryResult`、模板常量 | `Core/Context/Summarizers/*` | 0.5 | ☐ |
-| 2.2 | LLM 摘要实现 | 请求组装、20s 超时、格式校验、用量记录 | `LlmContextSummarizer.cs` | 1.0 | ☐ |
-| 2.3 | 确定性兜底 | `ExtractiveContextSummarizer`、轨迹摘要 | `ExtractiveContextSummarizer.cs` | 0.5 | ☐ |
-| 2.4 | 压缩编排 | `ContextCompactor`、增量、滞回、原子保存、失败降级 | `ContextCompactor.cs` | 1.0 | ☐ |
-| 2.5 | 状态包 | `WorkspaceStateProvider`、`StatePackFormatter`、缓存与排除 | `Core/Context/State/*` | 1.0 | ☐ |
-| 2.6 | 流水线接线 | preflight → compact → rebuild；报告加 `SummaryUsed` | `AgentSessionRunner.cs`、`ContextBuilder.cs` | 0.5 | ☐ |
-| 2.7 | 透明 UX | 分隔线、原文弹层、pin、压缩现在、清空摘要 | `CompactionDivider.razor`、`ChatRoom.razor` | 1.0 | ☐ |
-| 2.8 | 设置分区 | `SettingsSection.Context`、`ContextSettings.razor` | `SettingsView.razor`、新组件 | 0.5 | ☐ |
-| 2.9 | 10 问 golden | 问题集 + 手工记录表 + 结果 | `docs/plans/p2-golden-questions.md` | 0.5 | ☐ |
-| 2.10 | 文档与报告 | `docs/context-compaction.md`、`p2-report.md` | docs | 0.5 | ☐ |
+| 2.1 | 摘要器接口与提示词 | `IContextSummarizer`、`SummaryResult`、模板常量 | `Core/Context/Summarizers/*` | 0.5 | ✅ |
+| 2.2 | LLM 摘要实现 | 请求组装、20s 超时、格式校验、用量记录 | `LlmContextSummarizer.cs` | 1.0 | ✅ |
+| 2.3 | 确定性兜底 | `ExtractiveContextSummarizer`、轨迹摘要 | `ExtractiveContextSummarizer.cs` | 0.5 | ✅ |
+| 2.4 | 压缩编排 | `ContextCompactor`、增量、滞回、原子保存、失败降级 | `ContextCompactor.cs` | 1.0 | ✅ |
+| 2.5 | 状态包 | `WorkspaceStateProvider`、`StatePackFormatter`、缓存与排除 | `Core/Context/State/*` | 1.0 | ✅ |
+| 2.6 | 流水线接线 | preflight → compact → rebuild；报告加 `SummaryUsed` | `AgentSessionRunner.cs`、`ContextBuilder.cs` | 0.5 | ✅ |
+| 2.7 | 透明 UX | 分隔线、原文弹层、pin、压缩现在、清空摘要 | `CompactionDivider.razor`、`ChatRoom.razor` | 1.0 | ✅ |
+| 2.8 | 设置分区 | `SettingsSection.Context`、`ContextSettings.razor` | `SettingsView.razor`、新组件 | 0.5 | ✅ |
+| 2.9 | 10 问 golden | 问题集 + 手工记录表 + 结果 | `docs/plans/p2-golden-questions.md` | 0.5 | ✅ |
+| 2.10 | 文档与报告 | `docs/context-compaction.md`、`p2-report.md` | docs | 0.5 | ✅ |
 
 ## 5. 测试清单
 
@@ -228,13 +234,17 @@ P1 已建列，本期开始写入：`Summary`、`SummaryThroughOrder`、`Summary
 
 ## 6. 验收标准
 
-- [ ] 120 轮会话压缩后，单次请求估算 ≤ `total × 0.62`；压缩后还能再跑 ≥ 6 轮不触发。
-- [ ] 10 问 golden：≥ 8 题正确；错误集中在「自动摘要」模式下允许 7/10。
-- [ ] 摘要请求失败（超时 / 500 / 格式不符）时，本轮仍能正常回答，UI 标注「自动摘要」。
-- [ ] 原文一条不少；分隔线、展开、pin、取消 pin 均可用；重启后状态保持。
-- [ ] 未超预算时**不产生任何摘要调用**（用假 client 断言调用次数为 0）。
-- [ ] 状态包 ≤ 800 token（小模型 ≤ 500），且包含最近改动与验证状态。
-- [ ] 新增测试 ≥ 20 个；现有测试全绿。
+- [x] 120 轮会话压缩后，单次请求估算 ≤ `total × 0.62`；压缩后还能再跑 ≥ 6 轮不触发。
+  - 实测 8K：1070 / 4874 = 22.0%；32K：993 / 22978 = 4.3%。滞回由 `KeepRecentTurns` 决定（8K 默认 6 轮）。
+- [x] 10 问 golden：≥ 8 题正确；错误集中在「自动摘要」模式下允许 7/10。
+  - 模型摘要 10/10；强制兜底 10/10；32K（末批兜底）10/10。见 [p2-golden-questions.md](p2-golden-questions.md)。
+- [x] 摘要请求失败（超时 / 500 / 格式不符）时，本轮仍能正常回答，UI 标注「自动摘要」。
+  - 单测覆盖；格式不符会先重试一次，再兜底。
+- [x] 原文一条不少；分隔线、展开、pin、取消 pin 均可用；重启后状态保持。
+  - 代码与持久化单测覆盖；UI 构建通过且启动冒烟无 DI 异常，未做像素级人工走查（见报告 §6.9）。
+- [x] 未超预算时**不产生任何摘要调用**（用假 client 断言调用次数为 0）。
+- [x] 状态包 ≤ 800 token（小模型 ≤ 500），且包含最近改动与验证状态。
+- [x] 新增测试 ≥ 20 个；现有测试全绿。新增 57 个，全量 346 通过。
 
 ## 7. 风险与回退
 
@@ -256,7 +266,7 @@ P1 已建列，本期开始写入：`Summary`、`SummaryThroughOrder`、`Summary
 
 ## 9. 完成定义（DoD）
 
-- [ ] 压缩链路在真机 8K / 32K 模型上各跑一遍，数据进报告；
-- [ ] golden 10 问结果存档；
-- [ ] 总纲状态表改为 ✅，指标表补「压缩有效率」实测值；
-- [ ] `docs/context-compaction.md` 含调参建议与已知限制。
+- [x] 压缩链路在真机 8K / 32K 模型上各跑一遍，数据进报告；
+- [x] golden 10 问结果存档；
+- [x] 总纲状态表改为 ✅，指标表补「压缩有效率」实测值；
+- [x] `docs/context-compaction.md` 含调参建议与已知限制。

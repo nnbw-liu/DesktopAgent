@@ -77,7 +77,7 @@ tokens = ceil(cjk * 0.7 + (len - cjk) / 3.8) + 4 + extraOverhead
 2. 从最旧的整轮开始淘汰，直到消息预算内；被省略的消息在第一条保留消息前加一行 `[已省略 N 条较早消息…]`。
 3. 历史附件改为桩：`[附件已省略：文件名, 大小, 路径]`；当前轮附件在 `AttachmentInlineTokens`（默认 4096 token，按 2 字符/token 换算）以内内联，超出只留桩——文件仍可用 `read_file` / `pdf_read` 重新读取。
 4. 工具轨迹按 `ToolTraceTokenBudget`（默认 300）从新到旧回放，放不下的折成一行「另有 N 次调用已省略」。
-5. pin 消息：数量上限 `MaxPinnedMessages`（20），总占比不超过 `PinnedShareLimit`（30%），超量时截断正文到 `PinnedTruncateChars`。P1 只落字段与规则，完整 pin 交互在 P2。
+5. pin 消息：数量上限 `MaxPinnedMessages`（20），总占比不超过 `PinnedShareLimit`（30%），超量时截断正文到 `PinnedTruncateChars`。P1 先落字段与规则；P2 已接完整交互，且 pin 的消息即使被摘要覆盖也仍以原文发送（见 [context-compaction.md](context-compaction.md)）。
 
 裁剪后的请求消息是 `Microsoft.Extensions.AI.ChatMessage` 的新列表；领域对象（`SDemo.DesktopAgent.Models.ChatMessage`）不被修改。
 
@@ -108,7 +108,7 @@ MAF 1.25 的 `FunctionInvokingChatClient`（FICC）插在装饰器**外层**，�
 
 ## 8. 400 溢出自愈（`AgentSessionRunner`）
 
-1. 发送前 `ContextBuilder` 若仍超预算 → 直接抛 `NeedsCompaction`，不发请求；提示用户新建会话 / 减少附件 / 调大窗口（P2 接摘要）。
+1. 发送前 `ContextBuilder` 若仍超预算 → 直接抛 `NeedsCompaction`，不发请求。P2 起先尝试增量摘要再重建；压缩不可用 / 压缩后仍超时才提示用户（新建会话 / 减少附件 / 调大窗口），见 [context-compaction.md](context-compaction.md)。
 2. 传输层抛出异常时，`ContextOverflowDetector` 只在「文案明确是上下文长度 + 状态码为 400（或没有状态码）」时判定为溢出，同时尝试从文案里学习窗口值。
 3. **只重试一次**：按 `OverflowRetryScale`（默认 0.5）重算预算并重新裁剪；已吐出正文后不再重试，避免内容重复和成本翻倍。
 4. 重试仍失败 → `ContextBudgetException(ContextOverflow)`；学到的窗口写入校准文件，下次直接按真实窗口建预算。
@@ -143,9 +143,10 @@ MAF 1.25 的 `FunctionInvokingChatClient`（FICC）插在装饰器**外层**，�
 - `ContextBreakdown`：点开后展示分段条形图与明细；**各段之和 = 报告估算**，UI 数字直接来自报告，不做二次换算（因此 UI 与报告一致）。
 - 宿主提示（`ContextRunTelemetry.ContextNotice`）显示在消息区末尾，带关闭按钮；它不是模型输出，也不会进入下一轮上下文。
 
-## 11. 已知边界（P1 范围内）
+## 11. 已知边界（P1 + P2 范围内）
 
-- P1 只做**确定性裁剪**：超预算且无法再裁时直接报错，不做摘要；摘要、pin 交互、状态包属于 P2。
+- P1 只做**确定性裁剪**；P2 增加**滚动摘要 + 工作记忆状态包**（见 [context-compaction.md](context-compaction.md)），超预算且无法再裁时不再直接失败，而是先摘要再重建。原文仍永久保留。
+- 压缩的触发条件是「L1 已开始淘汰历史」（`OmittedMessages > 0`），不是 plan 的 `Estimated > Total`；细节与调参见 [context-compaction.md](context-compaction.md)。
 - 50KB 附件在 8K 窗口下不会全部内联：当前轮最多内联约 4096 token 的正文，其余只留文件名 / 路径，模型需要全文时用工具重新读取。这是有意的取舍，不是缺陷。
 - 估算器是启发式的，靠校准逼近真实 usage；基线误差数据见 [p1-baseline.md](plans/p1-baseline.md)。
 - 中途裁剪只覆盖 `GetResponseAsync` / `GetStreamingResponseAsync` 的请求；它不感知工具语义，只保证 tool_call / result 成对。

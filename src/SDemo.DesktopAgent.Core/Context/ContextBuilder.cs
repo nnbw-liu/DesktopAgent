@@ -58,13 +58,22 @@ public sealed class ContextBuilder
             return BuildPassthrough(request, profile, budget, calibrationFactor, instructions);
         }
 
-        var messageBudget = Math.Max(128, budget.Total - systemTokens - skillTokens);
+        // P2：滚动摘要 + 工作区状态包进入固定块；两者各自计量，先于历史消息分配预算。
+        var injection = BuildInjection(request, budget, settings, systemTokens, skillTokens);
+        var finalInstructions = injection.Text.Length == 0
+            ? instructions
+            : instructions + injection.Text;
+
+        var messageBudget = Math.Max(
+            128,
+            budget.Total - systemTokens - skillTokens - injection.SummaryTokens - injection.StateTokens);
         var trimOptions = TrimOptions.FromPolicy(
             policy,
             messageBudget,
             _counter,
             calibrationFactor,
-            request.PinnedMessageIds);
+            request.PinnedMessageIds,
+            request.SummaryThroughOrder);
 
         var trim = _trimmer.Trim(request.Messages, trimOptions, AgentMessageMapper.Render);
 
@@ -77,9 +86,11 @@ public sealed class ContextBuilder
             .ToList();
 
         var stats = trim.Stats;
-        var segments = CalibrateSegments(stats, systemTokens, skillTokens, calibrationFactor);
+        var segments = CalibrateSegments(
+            stats, systemTokens, skillTokens, calibrationFactor, injection.SummaryTokens, injection.StateTokens);
         var estimated = segments.Total;
-        var rawEstimated = systemTokens + skillTokens + stats.MessageTokens;
+        var rawEstimated = systemTokens + skillTokens + stats.MessageTokens
+            + injection.SummaryTokens + injection.StateTokens;
 
         var report = new ContextReport(
             request.Provider.Id,
@@ -101,13 +112,19 @@ public sealed class ContextBuilder
             PinnedTruncated: stats.PinnedTruncated,
             AttachmentsStubbed: stats.AttachmentsStubbed,
             Trimmed: stats.Trimmed || skillTruncated,
-            Passthrough: false);
+            Passthrough: false,
+            SummaryUsed: injection.SummaryTokens > 0,
+            SummaryTokens: injection.SummaryTokens,
+            CompactedMessages: stats.CompactedMessages,
+            SummaryFallback: injection.SummaryTokens > 0 && request.SummaryFallback,
+            StatePackUsed: injection.StateTokens > 0,
+            StatePackTokens: injection.StateTokens);
 
         if (estimated > budget.Total)
         {
             var message =
                 $"上下文超出预算：估算 {FormatTokens(estimated)} token / 预算 {FormatTokens(budget.Total)}，"
-                + $"窗口 {FormatTokens(budget.Window)}。P1 的确定性裁剪已到极限，P2 会在这里接入摘要压缩；"
+                + $"窗口 {FormatTokens(budget.Window)}。确定性裁剪与摘要仍不足；"
                 + "临时办法：新建会话、减少附件，或在设置里把该模型的窗口调大。";
 
             throw new ContextBudgetException(AgentErrorKind.NeedsCompaction, message, report);
@@ -118,7 +135,7 @@ public sealed class ContextBuilder
             request.ModelId,
             profile,
             budget,
-            instructions,
+            finalInstructions,
             aiMessages,
             report);
     }
@@ -281,7 +298,9 @@ public sealed class ContextBuilder
         TrimStats stats,
         int systemTokens,
         int skillTokens,
-        double calibrationFactor)
+        double calibrationFactor,
+        int summaryTokens = 0,
+        int statePackTokens = 0)
     {
         var factor = calibrationFactor <= 0 ? 1.0 : calibrationFactor;
         int Scale(int raw) => (int)Math.Round(raw * factor, MidpointRounding.AwayFromZero);
@@ -292,7 +311,119 @@ public sealed class ContextBuilder
             Turns: Scale(stats.TurnTokens),
             Attachments: Scale(stats.AttachmentTokens),
             ToolTrace: Scale(stats.TraceTokens),
-            Pinned: Scale(stats.PinnedTokens));
+            Pinned: Scale(stats.PinnedTokens),
+            Summary: Scale(summaryTokens),
+            StatePack: Scale(statePackTokens));
+    }
+
+    /// <summary>
+    /// 摘要与状态包的固定块（P2 §3.2 / §3.3）。先保证摘要（压缩的主产物），
+    /// 状态包用剩余额度；两者各自带标题，来源与计量都在 <see cref="ContextSegments"/> 里。
+    /// </summary>
+    private InjectionBlock BuildInjection(
+        ContextBuildRequest request,
+        ContextBudget budget,
+        ContextSettings settings,
+        int systemTokens,
+        int skillTokens)
+    {
+        var hasSummary = !string.IsNullOrWhiteSpace(request.SummaryText);
+        var hasState = !string.IsNullOrWhiteSpace(request.StatePackText);
+
+        if (!hasSummary && !hasState)
+        {
+            return InjectionBlock.Empty;
+        }
+
+        // 给历史消息留出至少 128 token：注入块不能把裁剪器逼进「什么都放不下」。
+        var remaining = Math.Max(0, budget.Total - systemTokens - skillTokens - 128);
+        if (remaining < 64)
+        {
+            return InjectionBlock.Empty;
+        }
+
+        var text = string.Empty;
+        var summaryTokens = 0;
+        var statePackTokens = 0;
+
+        if (hasSummary)
+        {
+            var summaryCap = Math.Min(
+                Math.Clamp(settings.SummaryMaxTokens, 128, 4096),
+                Math.Max(0, remaining * 2 / 3));
+
+            if (summaryCap >= 64)
+            {
+                var body = SummaryFormat.Cap(request.SummaryText, summaryCap, _counter);
+                var block = SummaryHeader + body;
+                summaryTokens = _counter.CountMessage("system", block);
+                text += block;
+            }
+        }
+
+        if (hasState)
+        {
+            var small = budget.Window <= 8192;
+            var configured = small
+                ? settings.StatePackSmallModelTokenBudget
+                : settings.StatePackTokenBudget;
+
+            var stateCap = Math.Min(
+                Math.Clamp(configured, 64, 2048),
+                Math.Max(0, remaining - summaryTokens));
+
+            if (stateCap >= 64)
+            {
+                var body = TruncateBlock(request.StatePackText!, stateCap, "状态包已截断");
+                var block = StateHeader + body;
+                statePackTokens = _counter.CountMessage("system", block);
+                text += block;
+            }
+        }
+
+        return new InjectionBlock(text, summaryTokens, statePackTokens);
+    }
+
+    /// <summary>按 token 上限截断任意文本块（状态包专用：超限时保留前面的结构部分）。</summary>
+    private string TruncateBlock(string text, int maxTokens, string note)
+    {
+        var normalized = text.Trim();
+
+        if (_counter.CountMessage("system", normalized) <= maxTokens)
+        {
+            return normalized;
+        }
+
+        var suffix = $"\n…（{note}）";
+        var low = 0;
+        var high = normalized.Length;
+
+        while (low < high)
+        {
+            var mid = (low + high + 1) / 2;
+            var candidate = normalized[..mid] + suffix;
+
+            if (_counter.CountMessage("system", candidate) <= maxTokens)
+            {
+                low = mid;
+            }
+            else
+            {
+                high = mid - 1;
+            }
+        }
+
+        return string.Concat(normalized.AsSpan(0, low).TrimEnd(), suffix);
+    }
+
+    private const string SummaryHeader =
+        "\n\n## 已压缩的历史（模型不再看到原文；需要细节时请用工具重新读取）\n";
+
+    private const string StateHeader = "\n\n## 工作区状态（宿主生成，不是用户输入）\n";
+
+    private sealed record InjectionBlock(string Text, int SummaryTokens, int StateTokens)
+    {
+        public static InjectionBlock Empty { get; } = new(string.Empty, 0, 0);
     }
 
     private static ModelEntry? FindEntry(ModelProvider provider, string modelId) =>

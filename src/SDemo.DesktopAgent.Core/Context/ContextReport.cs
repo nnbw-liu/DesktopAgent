@@ -33,7 +33,13 @@ public sealed record ContextReport(
     bool MidTurnTrimmed = false,
     bool OverflowRetried = false,
     int? ActualInputTokens = null,
-    int? LearnedWindow = null)
+    int? LearnedWindow = null,
+    bool SummaryUsed = false,
+    int SummaryTokens = 0,
+    int CompactedMessages = 0,
+    bool SummaryFallback = false,
+    bool StatePackUsed = false,
+    int StatePackTokens = 0)
 {
     /// <summary>占输入预算的比例（0~1+）。</summary>
     public double Occupancy => Total <= 0 ? 0 : (double)Estimated / Total;
@@ -49,9 +55,11 @@ public sealed record ContextSegments(
     int Turns,
     int Attachments,
     int ToolTrace,
-    int Pinned)
+    int Pinned,
+    int Summary = 0,
+    int StatePack = 0)
 {
-    public int Total => System + Skills + Turns + Attachments + ToolTrace + Pinned;
+    public int Total => System + Skills + Turns + Attachments + ToolTrace + Pinned + Summary + StatePack;
 }
 
 /// <summary>
@@ -77,4 +85,8 @@ public sealed record ContextBuildRequest(
     IReadOnlySet<string>? PinnedMessageIds = null,
     string? InstructionsOverride = null,
     bool Passthrough = false,
-    double BudgetScale = 1.0);
+    double BudgetScale = 1.0,
+    string? SummaryText = null,
+    int SummaryThroughOrder = 0,
+    string? StatePackText = null,
+    bool SummaryFallback = false);

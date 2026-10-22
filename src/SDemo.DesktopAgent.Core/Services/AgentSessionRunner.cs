@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Models;
 using ChatMessageModel = SDemo.DesktopAgent.Models.ChatMessage;
+using ChatSessionModel = SDemo.DesktopAgent.Models.ChatSession;
 
 namespace SDemo.DesktopAgent.Services;
 
@@ -14,16 +15,29 @@ public sealed record AgentRunRequest(
     IReadOnlySet<string> ToolPacks,
     string? SkillName = null,
     string SessionId = "",
-    AgentRunMetrics? Metrics = null);
+    AgentRunMetrics? Metrics = null,
+    ChatSessionModel? Session = null);
+
+/// <summary>手动「压缩现在」的输入。</summary>
+public sealed record AgentCompactRequest(
+    ChatSessionModel Session,
+    ModelProvider Provider,
+    string ModelId,
+    string SessionId = "");
 
 /// <summary>
-/// 应用层入口（§3.1）：负责「预算 → 裁剪 → 传输 → 校准 → 溢出重试」，
+/// 应用层入口（§3.1）：负责「预算 → 压缩 / 裁剪 → 传输 → 校准 → 溢出重试」，
 /// UI 只调用它，不再自己拼历史或决定发多少条消息。
 /// </summary>
 public interface IAgentSessionRunner
 {
     /// <summary>只组装上下文、不发请求：用于输入框旁的占用预览。</summary>
     ContextPlan Preview(AgentRunRequest request);
+
+    /// <summary>手动触发一次增量压缩（会话菜单「压缩现在」）。</summary>
+    Task<CompactionOutcome> CompactAsync(
+        AgentCompactRequest request,
+        CancellationToken cancellationToken = default);
 
     /// <summary>流式执行；<paramref name="telemetry"/> 由调用方创建，流结束后读取报告。</summary>
     IAsyncEnumerable<AgentDelta> StreamAsync(
@@ -40,23 +54,62 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
     private readonly SkillCatalog? _skills;
     private readonly TokenCalibrationStore? _calibration;
     private readonly ISettingsService _settings;
+    private readonly ContextCompactor? _compactor;
+    private readonly WorkspaceStateProvider? _statePack;
+    private readonly WorkspaceContext? _workspace;
 
     public AgentSessionRunner(
         IAgentChatService chat,
         ContextBuilder builder,
         ISettingsService settings,
         SkillCatalog? skills = null,
-        TokenCalibrationStore? calibration = null)
+        TokenCalibrationStore? calibration = null,
+        ContextCompactor? compactor = null,
+        WorkspaceStateProvider? statePack = null,
+        WorkspaceContext? workspace = null)
     {
         _chat = chat;
         _builder = builder;
         _settings = settings;
         _skills = skills;
         _calibration = calibration;
+        _compactor = compactor;
+        _statePack = statePack;
+        _workspace = workspace;
     }
 
     public ContextPlan Preview(AgentRunRequest request) =>
-        _builder.Build(BuildRequest(request, scale: 1.0));
+        _builder.Build(BuildRequest(request, scale: 1.0, BuildStatePackText(request)));
+
+    public async Task<CompactionOutcome> CompactAsync(
+        AgentCompactRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (_compactor is null)
+        {
+            return CompactionOutcome.Failure("摘要压缩未启用。");
+        }
+
+        var settings = _settings.Current.Context ?? new ContextSettings();
+        var profile = _builder.ResolveProfile(new ContextBuildRequest(
+            request.Provider,
+            request.ModelId,
+            request.Session.Messages.ToList()));
+        var budget = ContextBudget.Create(profile, settings);
+        var (summaryProvider, summaryModel) = ResolveSummaryTarget(
+            request.Provider, request.ModelId, settings);
+
+        return await _compactor.EnsureAsync(
+            new ContextCompactionRequest(
+                request.Session,
+                summaryProvider,
+                summaryModel,
+                profile,
+                settings,
+                budget,
+                Force: true),
+            cancellationToken).ConfigureAwait(false);
+    }
 
     public async IAsyncEnumerable<AgentDelta> StreamAsync(
         AgentRunRequest request,
@@ -64,9 +117,11 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var settings = _settings.Current.Context ?? new ContextSettings();
+        var statePackText = BuildStatePackText(request);
 
-        // 1. preflight：预算 + L1 裁剪；仍超限时直接抛出「需压缩」（P2 接摘要）。
-        var plan = BuildOrReportFailure(request, scale: 1.0, telemetry);
+        // 1. preflight：预算 + 压缩 / L1 裁剪；摘要失败或仍超限时抛出「需压缩」。
+        var plan = await BuildOrCompactAsync(request, scale: 1.0, telemetry, statePackText, cancellationToken)
+            .ConfigureAwait(false);
         telemetry.Plan = plan;
         telemetry.Report = plan.Report;
 
@@ -143,7 +198,9 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             telemetry.ContextNotice = "上下文超限，已按半预算重试一次。";
         }
 
-        var retryPlan = BuildOrReportFailure(request, settings.OverflowRetryScale, telemetry);
+        var retryPlan = await BuildOrCompactAsync(
+                request, settings.OverflowRetryScale, telemetry, statePackText, cancellationToken)
+            .ConfigureAwait(false);
         telemetry.Plan = retryPlan;
 
         // 第一次尝试的估算不算进本次校准：那次请求没有成功，usage 也不完整。
@@ -206,24 +263,167 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         CompleteRun(request, retryPlan, telemetry);
     }
 
-    private ContextPlan BuildOrReportFailure(
+    /// <summary>
+    /// 组装上下文。P2 的触发条件是「L1 已经需要淘汰历史」：此时先把被淘汰的一段压成摘要，
+    /// 再带摘要重建（被淘汰的消息不再丢失，而是变成摘要）。压缩失败 / 没有可压缩内容时，
+    /// 继续使用 P1 的硬裁剪结果，不阻塞请求。
+    /// </summary>
+    private async Task<ContextPlan> BuildOrCompactAsync(
         AgentRunRequest request,
         double scale,
-        ContextRunTelemetry telemetry)
+        ContextRunTelemetry telemetry,
+        string? statePackText,
+        CancellationToken cancellationToken)
     {
+        var settings = _settings.Current.Context ?? new ContextSettings();
+        var buildRequest = BuildRequest(request, scale, statePackText);
+
+        ContextPlan plan;
+
         try
         {
-            return _builder.Build(BuildRequest(request, scale));
+            plan = _builder.Build(buildRequest);
         }
         catch (ContextBudgetException ex)
         {
             telemetry.Report = ex.Report;
-            telemetry.ContextNotice = ex.Message;
+
+            if (ex.Kind != AgentErrorKind.NeedsCompaction || !CanCompact(request, settings))
+            {
+                telemetry.ContextNotice = ex.Message;
+                ExceptionDispatchInfo.Capture(ex).Throw();
+                throw; // 不可达；让编译器看到方法总有返回值。
+            }
+
+            // 连 L1 都放不下：必须压缩；压缩不出来就保持 P1 的报错。
+            return await CompactAndRebuildAsync(
+                request, scale, telemetry, statePackText, ex, cancellationToken).ConfigureAwait(false);
+        }
+
+        // 没有淘汰任何历史 = 没超预算：一次摘要调用都不发生（P2 DoD）。
+        if (plan.Report.OmittedMessages == 0 || !CanCompact(request, settings))
+        {
+            return plan;
+        }
+
+        var outcome = await CompactAsync(
+            request, scale, telemetry, cancellationToken).ConfigureAwait(false);
+
+        if (!outcome.Compacted)
+        {
+            // 摘要不可用 / 没有可压缩内容：保持 L1 结果，继续回答。
+            return plan;
+        }
+
+        try
+        {
+            var rebuilt = _builder.Build(BuildRequest(request, scale, statePackText));
+            telemetry.Report = rebuilt.Report;
+            return rebuilt;
+        }
+        catch (ContextBudgetException afterCompact)
+        {
+            // 近期轮次本身太大，摘要帮不上忙：这一轮仍按 L1 结果发送（摘要留给下一轮）。
+            telemetry.Report = plan.Report;
+            telemetry.ContextNotice = afterCompact.Message;
+            return plan;
+        }
+    }
+
+    /// <summary>L1 放不下时：压缩 → 重建；失败则原样抛出 <paramref name="original"/>。</summary>
+    private async Task<ContextPlan> CompactAndRebuildAsync(
+        AgentRunRequest request,
+        double scale,
+        ContextRunTelemetry telemetry,
+        string? statePackText,
+        ContextBudgetException original,
+        CancellationToken cancellationToken)
+    {
+        var outcome = await CompactAsync(
+            request, scale, telemetry, cancellationToken).ConfigureAwait(false);
+
+        if (!outcome.Compacted)
+        {
+            throw original;
+        }
+
+        try
+        {
+            var rebuilt = _builder.Build(BuildRequest(request, scale, statePackText));
+            telemetry.Report = rebuilt.Report;
+            return rebuilt;
+        }
+        catch (ContextBudgetException again)
+        {
+            telemetry.Report = again.Report;
             throw;
         }
     }
 
-    private ContextBuildRequest BuildRequest(AgentRunRequest request, double scale) => new(
+    private bool CanCompact(AgentRunRequest request, ContextSettings settings) =>
+        settings.AutoCompact && request.Session is not null && _compactor is not null;
+
+    /// <summary>解析摘要模型并跑一次增量压缩；异常不外抛（自动压缩路径必须不阻塞）。</summary>
+    private async Task<CompactionOutcome> CompactAsync(
+        AgentRunRequest request,
+        double scale,
+        ContextRunTelemetry telemetry,
+        CancellationToken cancellationToken)
+    {
+        if (request.Session is null || _compactor is null)
+        {
+            return CompactionOutcome.NotNeeded("未启用压缩。");
+        }
+
+        var settings = _settings.Current.Context ?? new ContextSettings();
+        var buildRequest = BuildRequest(request, scale, statePackText: null);
+        var profile = _builder.ResolveProfile(buildRequest);
+
+        var budget = new ContextPolicy(profile, settings).Budget;
+        if (Math.Abs(scale - 1.0) > 1e-9 && scale > 0)
+        {
+            budget = budget.Scale(scale);
+        }
+
+        var (summaryProvider, summaryModel) = ResolveSummaryTarget(
+            request.Provider, request.ModelId, settings);
+
+        CompactionOutcome outcome;
+
+        try
+        {
+            outcome = await _compactor.EnsureAsync(
+                new ContextCompactionRequest(
+                    request.Session,
+                    summaryProvider,
+                    summaryModel,
+                    profile,
+                    settings,
+                    budget),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return CompactionOutcome.Failure($"压缩失败，继续使用硬裁剪：{ex.Message}", ex.Message);
+        }
+
+        // 只有真正压缩 / 压缩失败才给用户提示；「没有可压缩的新增历史」属于正常状态。
+        if (outcome.Compacted || outcome.Failed)
+        {
+            telemetry.ContextNotice = outcome.Message;
+        }
+
+        return outcome;
+    }
+
+    private ContextBuildRequest BuildRequest(
+        AgentRunRequest request,
+        double scale,
+        string? statePackText) => new(
         request.Provider,
         request.ModelId,
         request.Messages,
@@ -233,7 +433,75 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             .Where(message => message.IsPinned)
             .Select(message => message.Id)
             .ToHashSet(StringComparer.Ordinal),
-        BudgetScale: scale);
+        BudgetScale: scale,
+        SummaryText: request.Session?.Summary,
+        SummaryThroughOrder: request.Session?.SummaryThroughOrder ?? 0,
+        StatePackText: statePackText,
+        SummaryFallback: request.Session?.SummaryIsFallback ?? false);
+
+    /// <summary>
+    /// 工作区状态包：树（30s 缓存）+ 最近改动 + 最近动作。没有工作区 / 关闭时返回 null，
+    /// 不阻塞请求。
+    /// </summary>
+    private string? BuildStatePackText(AgentRunRequest request)
+    {
+        if (_statePack is null || _workspace is null || request.Session is null)
+        {
+            return null;
+        }
+
+        var settings = _settings.Current.Context ?? new ContextSettings();
+        if (!settings.StatePackEnabled)
+        {
+            return null;
+        }
+
+        var root = _workspace.RootPath;
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            return null;
+        }
+
+        try
+        {
+            var profile = _builder.ResolveProfile(BuildRequest(request, 1.0, statePackText: null));
+            var cap = profile.IsSmallModel
+                ? settings.StatePackSmallModelTokenBudget
+                : settings.StatePackTokenBudget;
+
+            var state = _statePack.Build(root, request.Session);
+            return StatePackFormatter.Format(state, cap, _builder.Counter).Text;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            // 状态包是增强信息：读不到工作区时不影响本轮请求。
+            return null;
+        }
+    }
+
+    /// <summary>摘要模型：显式配置优先，配置失效时回退当前会话模型（P2 §3.5）。</summary>
+    private (ModelProvider Provider, string ModelId) ResolveSummaryTarget(
+        ModelProvider sessionProvider,
+        string sessionModelId,
+        ContextSettings settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.SummaryProviderId)
+            || string.IsNullOrWhiteSpace(settings.SummaryModelId))
+        {
+            return (sessionProvider, sessionModelId);
+        }
+
+        var provider = _settings.Current.Providers.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, settings.SummaryProviderId, StringComparison.Ordinal));
+
+        if (provider is null
+            || !provider.Models.Any(model => string.Equals(model.Id, settings.SummaryModelId, StringComparison.Ordinal)))
+        {
+            return (sessionProvider, sessionModelId);
+        }
+
+        return (provider, settings.SummaryModelId);
+    }
 
     private static AgentRunPlan ToPlan(AgentRunRequest request, ContextPlan context) => new(
         request.Provider,

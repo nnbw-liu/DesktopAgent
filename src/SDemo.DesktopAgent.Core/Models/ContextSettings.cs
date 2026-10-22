@@ -21,8 +21,32 @@ public sealed class ContextSettings
     /// <summary>系统提示词 + 技能等固定块占总预算的上限比例。</summary>
     public double FixedCapRatio { get; set; } = 0.40;
 
-    /// <summary>超预算时自动压缩。P1 只落配置，P2 生效。</summary>
+    /// <summary>超预算时自动压缩（增量摘要 + 状态包）。P2 生效。</summary>
     public bool AutoCompact { get; set; } = true;
+
+    /// <summary>摘要模型的 provider id；为空表示用当前会话的 provider。</summary>
+    public string? SummaryProviderId { get; set; }
+
+    /// <summary>摘要模型的 id；为空表示用当前会话的模型。</summary>
+    public string? SummaryModelId { get; set; }
+
+    /// <summary>摘要正文的 token 上限（默认 800；同时用于压缩目标校验）。</summary>
+    public int SummaryMaxTokens { get; set; } = 800;
+
+    /// <summary>单次喂给摘要模型的历史 chunk 上限（默认 6000 token，超过则分块增量摘要）。</summary>
+    public int SummaryInputMaxTokens { get; set; } = 6000;
+
+    /// <summary>摘要请求超时（秒）；超时走确定性兜底。</summary>
+    public int SummaryTimeoutSeconds { get; set; } = 20;
+
+    /// <summary>是否把工作区状态包放进每次请求的固定块。</summary>
+    public bool StatePackEnabled { get; set; } = true;
+
+    /// <summary>状态包 token 上限（普通模型）。</summary>
+    public int StatePackTokenBudget { get; set; } = 800;
+
+    /// <summary>状态包 token 上限（≤8K 模型，避免挤掉历史）。</summary>
+    public int StatePackSmallModelTokenBudget { get; set; } = 500;
 
     /// <summary>工具循环内部的请求也做 L1 裁剪（§3.7 分支 A）。</summary>
     public bool MidTurnTrim { get; set; } = true;

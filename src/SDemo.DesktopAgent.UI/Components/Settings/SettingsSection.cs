@@ -5,6 +5,7 @@ public enum SettingsSection
 {
     General,
     Models,
+    Context,
     Tools,
     Plugins
 }

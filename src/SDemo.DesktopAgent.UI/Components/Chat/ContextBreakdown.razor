@@ -43,7 +43,16 @@
         <span class="context-row-value">@ContextMeter.Format(Report.ContextWindow)</span>
     </div>
 
-    @* 省略 / 裁剪只影响「有没有发出去」，不算进当前占用。 *@
+    @if (Report.SummaryUsed)
+    {
+        <p class="context-note">
+            已压缩 @Report.CompactedMessages 条历史（摘要约 @ContextMeter.Format(Report.SummaryTokens) token）@(Report.SummaryFallback ? " · 自动摘要" : string.Empty)
+        </p>
+    }
+    @if (Report.StatePackUsed)
+    {
+        <p class="context-note">工作区状态包约 @ContextMeter.Format(Report.StatePackTokens) token</p>
+    }
     @if (Report.OmittedMessages > 0)
     {
         <p class="context-note">已省略 @Report.OmittedMessages 条较早消息（约 @ContextMeter.Format(Report.OmittedTokens) token）</p>
@@ -61,6 +70,18 @@
         @if (Report.Passthrough)
         {
             <span class="context-flag">直通</span>
+        }
+        @if (Report.SummaryUsed)
+        {
+            <span class="context-flag">已压缩</span>
+        }
+        @if (Report.SummaryFallback)
+        {
+            <span class="context-flag is-warn">自动摘要</span>
+        }
+        @if (Report.StatePackUsed)
+        {
+            <span class="context-flag">状态包</span>
         }
         @if (Report.Trimmed)
         {
@@ -109,6 +130,9 @@
         yield return ("技能", segments.Skills, "seg-skills", string.Empty);
         yield return ("历史对话", segments.Turns, "seg-turns",
             Report.TotalTurns > Report.KeptTurns ? $"{Report.KeptTurns}/{Report.TotalTurns} 轮" : string.Empty);
+        yield return ("已压缩摘要", segments.Summary, "seg-summary",
+            Report.CompactedMessages > 0 ? $"{Report.CompactedMessages} 条" : string.Empty);
+        yield return ("工作区状态", segments.StatePack, "seg-state", string.Empty);
         yield return ("附件", segments.Attachments, "seg-attachments", string.Empty);
         yield return ("工具轨迹", segments.ToolTrace, "seg-trace", string.Empty);
         yield return ("Pin 消息", segments.Pinned, "seg-pinned", string.Empty);
@@ -127,6 +151,8 @@
         yield return ("seg-system", Percent(segments.System));
         yield return ("seg-skills", Percent(segments.Skills));
         yield return ("seg-turns", Percent(segments.Turns));
+        yield return ("seg-summary", Percent(segments.Summary));
+        yield return ("seg-state", Percent(segments.StatePack));
         yield return ("seg-attachments", Percent(segments.Attachments));
         yield return ("seg-trace", Percent(segments.ToolTrace));
         yield return ("seg-pinned", Percent(segments.Pinned));

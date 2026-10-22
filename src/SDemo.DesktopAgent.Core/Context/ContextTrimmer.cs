@@ -24,14 +24,16 @@ public sealed record TrimOptions(
     double PinnedShareLimit = 0.30,
     int PinnedTruncateChars = 500,
     int ToolTraceTokenBudget = 300,
-    int AttachmentInlineChars = 8192)
+    int AttachmentInlineChars = 8192,
+    int SkipBefore = 0)
 {
     public static TrimOptions FromPolicy(
         ContextPolicy policy,
         int messageBudget,
         ITokenCounter counter,
         double calibrationFactor,
-        IReadOnlySet<string>? pinnedMessageIds) => new(
+        IReadOnlySet<string>? pinnedMessageIds,
+        int skipBefore = 0) => new(
         MessageBudget: messageBudget,
         TotalBudget: policy.Budget.Total,
         KeepRecentTurns: policy.KeepRecentTurns,
@@ -42,7 +44,8 @@ public sealed record TrimOptions(
         PinnedShareLimit: policy.PinnedShareLimit,
         PinnedTruncateChars: policy.PinnedTruncateChars,
         ToolTraceTokenBudget: policy.ToolTraceTokenBudget,
-        AttachmentInlineChars: policy.AttachmentInlineChars);
+        AttachmentInlineChars: policy.AttachmentInlineChars,
+        SkipBefore: skipBefore);
 }
 
 /// <summary>裁剪后的一条请求消息。</summary>
@@ -78,7 +81,8 @@ public sealed record TrimStats(
     int PinnedCount,
     bool PinnedTruncated,
     bool AttachmentsStubbed,
-    bool Trimmed)
+    bool Trimmed,
+    int CompactedMessages = 0)
 {
     public int MessageTokens => TurnTokens + AttachmentTokens + TraceTokens + PinnedTokens;
 
@@ -112,13 +116,12 @@ public sealed class ContextTrimmer
         var totalTurns = turns.Count;
         var currentTurn = totalTurns - 1;
         var keepFrom = Math.Max(0, totalTurns - Math.Max(1, options.KeepRecentTurns));
+        var skipBefore = Math.Clamp(options.SkipBefore, 0, messages.Count);
 
         var pinnedIds = ResolvePinnedIds(messages, options);
-        var keep = new bool[messages.Count];
-        Array.Fill(keep, true);
+        var pinned = new bool[messages.Count];
 
         // 超过 pin 上限时只保留最近的 N 条，其余按普通消息参与淘汰。
-        var pinned = new bool[messages.Count];
         var pinnedCandidates = Enumerable.Range(0, messages.Count)
             .Where(index => pinnedIds.Contains(messages[index].Id))
             .ToList();
@@ -135,14 +138,25 @@ public sealed class ContextTrimmer
             pinned[index] = true;
         }
 
-        var evictableTurns = Enumerable.Range(0, keepFrom).ToList();
+        // 已被摘要覆盖的消息不再发送：它们由系统块里的摘要代表（P2 §3.2）。
+        // 例外：用户 pin 的消息始终保留原文（pin 的语义就是「别让模型忘掉这条」）。
+        var keep = new bool[messages.Count];
+
+        for (var index = 0; index < messages.Count; index++)
+        {
+            keep[index] = index >= skipBefore || pinned[index];
+        }
+
+        var evictableTurns = Enumerable.Range(0, keepFrom)
+            .Where(index => turns[index].Start >= skipBefore)
+            .ToList();
         var nextEvictable = 0;
 
         var attachmentChars = Math.Max(0, options.AttachmentInlineChars);
         var traceBudget = Math.Max(0, options.ToolTraceTokenBudget);
 
         var traceTexts = AllocateTraces(messages, keep, pinned, traceBudget, options.Counter);
-        var rendered = RenderAll(messages, keep, pinned, attachmentChars, traceTexts, render, options.Counter);
+        var rendered = RenderAll(messages, keep, pinned, attachmentChars, traceTexts, render, options.Counter, skipBefore);
         var rawTokens = rendered.Sum(item => item.Tokens);
 
         var budgetRaw = EffectiveRawBudget(options);
@@ -197,7 +211,7 @@ public sealed class ContextTrimmer
                 }
             }
 
-            rendered = RenderAll(messages, keep, pinned, attachmentChars, traceTexts, render, options.Counter);
+            rendered = RenderAll(messages, keep, pinned, attachmentChars, traceTexts, render, options.Counter, skipBefore);
             rawTokens = rendered.Sum(item => item.Tokens);
         }
 
@@ -227,16 +241,18 @@ public sealed class ContextTrimmer
             rawTokens = rendered.Sum(item => item.Tokens);
         }
 
-        var omittedMessages = rendered.Count(item => !item.Kept);
-        var omittedTokens = rendered.Where(item => !item.Kept).Sum(item => item.Tokens);
+        var compactedMessages = rendered.Count(item => item.Compacted);
+        var omittedMessages = rendered.Count(item => !item.Kept && !item.Compacted);
+        var omittedTokens = rendered.Where(item => !item.Kept && !item.Compacted).Sum(item => item.Tokens);
         var omittedTurns = turns.Count(turn => Enumerable.Range(turn.Start, turn.End - turn.Start)
-            .Any(index => !rendered[index].Kept));
+            .Any(index => !rendered[index].Kept && !rendered[index].Compacted));
 
         var kept = rendered.Where(item => item.Kept).ToList();
 
         // 省略提示只放在第一条保留消息前；不新增 system 消息（§3.5 规则 5）。
         var omissionNote = omittedMessages > 0
-            ? $"[上下文提示] 已省略 {omittedMessages} 条更早消息（约 {FormatTokens(omittedTokens)} token）；需要时请重新读取文件或使用工具。"
+            ? $"[上下文提示] {(compactedMessages > 0 ? $"更早的 {compactedMessages} 条历史已压缩为摘要；" : string.Empty)}"
+              + $"已省略 {omittedMessages} 条更早消息（约 {FormatTokens(omittedTokens)} token）；需要时请重新读取文件或使用工具。"
             : null;
 
         var keptMessages = new List<TrimmedMessage>(kept.Count);
@@ -271,8 +287,9 @@ public sealed class ContextTrimmer
             TotalTurns: totalTurns,
             PinnedCount: kept.Count(item => item.IsPinned),
             PinnedTruncated: pinnedTruncated,
-            AttachmentsStubbed: rendered.Any(item => item.AttachmentsStubbed),
-            Trimmed: omittedMessages > 0 || pinnedTruncated || attachmentChars < options.AttachmentInlineChars);
+            AttachmentsStubbed: rendered.Any(item => item.AttachmentsStubbed && !item.Compacted),
+            Trimmed: omittedMessages > 0 || pinnedTruncated || attachmentChars < options.AttachmentInlineChars,
+            CompactedMessages: compactedMessages);
 
         return new TrimResult(keptMessages, stats);
     }
@@ -336,7 +353,8 @@ public sealed class ContextTrimmer
         int attachmentChars,
         IReadOnlyDictionary<string, string> traceTexts,
         ContextMessageRenderer render,
-        ITokenCounter counter)
+        ITokenCounter counter,
+        int skipBefore)
     {
         var items = new List<RenderedItem>(messages.Count);
 
@@ -367,7 +385,8 @@ public sealed class ContextTrimmer
                 Math.Max(0, trace),
                 Math.Max(0, total - attachment - trace),
                 // 历史消息带附件、或附件块被内联上限压掉时，都记一次「已改桩」。
-                AttachmentsStubbed: message.Attachments.Count > 0 && (!inline || content.AttachmentBlock is null)));
+                AttachmentsStubbed: message.Attachments.Count > 0 && (!inline || content.AttachmentBlock is null),
+                Compacted: index < skipBefore && !pinned[index]));
         }
 
         return items;
@@ -445,5 +464,6 @@ public sealed class ContextTrimmer
         int AttachmentTokens,
         int TraceTokens,
         int TurnTokens,
-        bool AttachmentsStubbed);
+        bool AttachmentsStubbed,
+        bool Compacted);
 }

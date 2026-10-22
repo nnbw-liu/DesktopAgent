@@ -384,6 +384,14 @@
             return;
         }
 
+        var branchMessages = source.Messages
+            .Take(index + 1)
+            .Select(CloneMessage)
+            .ToList();
+
+        // 摘要只在「分支覆盖了摘要范围」时复制；否则分支里没有原文可对应，直接丢弃摘要。
+        var keepSummary = source.HasSummary && source.SummaryThroughOrder <= branchMessages.Count;
+
         var branch = new ChatSession
         {
             Id = Guid.NewGuid().ToString("N"),
@@ -391,10 +399,12 @@
             Meta = "刚刚",
             WorkspaceId = source.WorkspaceId,
             UpdatedAt = DateTime.Now,
-            Messages = source.Messages
-                .Take(index + 1)
-                .Select(CloneMessage)
-                .ToList()
+            Messages = branchMessages,
+            Summary = keepSummary ? source.Summary : null,
+            SummaryThroughOrder = keepSummary ? source.SummaryThroughOrder : 0,
+            SummaryUpdatedAt = keepSummary ? source.SummaryUpdatedAt : null,
+            SummaryTokens = keepSummary ? source.SummaryTokens : 0,
+            SummaryIsFallback = keepSummary && source.SummaryIsFallback
         };
 
         _sessions.Insert(0, branch);

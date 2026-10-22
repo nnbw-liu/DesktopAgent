@@ -241,6 +241,21 @@ public sealed class ChatStore
             ? null
             : JsonSerializer.Serialize(session.PluginMemory, JsonOptions);
 
+        // 摘要覆盖范围超出当前消息数（删过消息 / 手工改库）：视为过期，归零后下次重算。
+        if (session.SummaryThroughOrder < 0 || session.SummaryThroughOrder > session.Messages.Count)
+        {
+            session.SummaryThroughOrder = 0;
+            session.Summary = null;
+            session.SummaryTokens = 0;
+            session.SummaryUpdatedAt = null;
+            session.SummaryIsFallback = false;
+        }
+
+        record.Summary = session.HasSummary ? session.Summary : null;
+        record.SummaryThroughOrder = session.HasSummary ? session.SummaryThroughOrder : 0;
+        record.SummaryTokens = session.HasSummary ? session.SummaryTokens : 0;
+        record.SummaryUpdatedAt = session.HasSummary ? session.SummaryUpdatedAt : null;
+
         var existing = record.Messages.ToDictionary(message => message.Id, StringComparer.Ordinal);
         var keep = new HashSet<string>(StringComparer.Ordinal);
         var order = 0;
@@ -578,35 +593,55 @@ public sealed class ChatStore
         }
     }
 
-    private static ChatSession ToSession(SessionRecord record, string? workspaceId) => new()
+    private static ChatSession ToSession(SessionRecord record, string? workspaceId)
     {
-        Id = record.Id,
-        Title = record.Title,
-        Meta = record.Meta,
-        WorkspaceId = workspaceId ?? record.WorkspaceId,
-        IsPinned = record.IsPinned,
-        UpdatedAt = record.UpdatedAt,
-        OriginMountId = record.OriginMountId,
-        ActiveMountId = record.ActiveMountId,
-        LastPluginId = record.LastPluginId,
-        PluginMemory = DeserializePluginMemory(record.PluginMemoryJson),
-        Messages = record.Messages
-            .OrderBy(message => message.Order)
-            .Select(message => new ChatMessage(message.Role, message.Content)
-            {
-                Id = message.Id,
-                Reasoning = message.Reasoning,
-                Attachments = DeserializeAttachments(message.AttachmentsJson),
-                CreatedAt = message.CreatedAt ?? record.UpdatedAt,
-                DurationMs = message.DurationMs,
-                InputTokens = message.InputTokens,
-                OutputTokens = message.OutputTokens,
-                ToolCalls = DeserializeToolCalls(message.ToolCallsJson),
-                Plugin = DeserializePlugin(message.PluginJson),
-                Derived = DeserializeDerived(message.DerivedJson),
-                ToolTrace = DeserializeToolTrace(message.ToolTraceJson),
-                IsPinned = message.IsPinned
-            })
-            .ToList()
-    };
+        var session = new ChatSession
+        {
+            Id = record.Id,
+            Title = record.Title,
+            Meta = record.Meta,
+            WorkspaceId = workspaceId ?? record.WorkspaceId,
+            IsPinned = record.IsPinned,
+            UpdatedAt = record.UpdatedAt,
+            OriginMountId = record.OriginMountId,
+            ActiveMountId = record.ActiveMountId,
+            LastPluginId = record.LastPluginId,
+            PluginMemory = DeserializePluginMemory(record.PluginMemoryJson),
+            Summary = record.Summary,
+            SummaryThroughOrder = record.SummaryThroughOrder,
+            SummaryUpdatedAt = record.SummaryUpdatedAt,
+            SummaryTokens = record.SummaryTokens,
+            SummaryIsFallback = SummaryFormat.IsFallback(record.Summary),
+            Messages = record.Messages
+                .OrderBy(message => message.Order)
+                .Select(message => new ChatMessage(message.Role, message.Content)
+                {
+                    Id = message.Id,
+                    Reasoning = message.Reasoning,
+                    Attachments = DeserializeAttachments(message.AttachmentsJson),
+                    CreatedAt = message.CreatedAt ?? record.UpdatedAt,
+                    DurationMs = message.DurationMs,
+                    InputTokens = message.InputTokens,
+                    OutputTokens = message.OutputTokens,
+                    ToolCalls = DeserializeToolCalls(message.ToolCallsJson),
+                    Plugin = DeserializePlugin(message.PluginJson),
+                    Derived = DeserializeDerived(message.DerivedJson),
+                    ToolTrace = DeserializeToolTrace(message.ToolTraceJson),
+                    IsPinned = message.IsPinned
+                })
+                .ToList()
+        };
+
+        // 库被手工改过 / 消息被删过：摘要覆盖范围大于消息数时视为无效，清空后下次重算。
+        if (session.SummaryThroughOrder < 0 || session.SummaryThroughOrder > session.Messages.Count)
+        {
+            session.Summary = null;
+            session.SummaryThroughOrder = 0;
+            session.SummaryTokens = 0;
+            session.SummaryUpdatedAt = null;
+            session.SummaryIsFallback = false;
+        }
+
+        return session;
+    }
 }

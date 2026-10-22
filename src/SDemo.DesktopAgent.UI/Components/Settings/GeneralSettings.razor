@@ -1,9 +1,8 @@
 @inject IThemeService ThemeService
 @inject ISettingsService Settings
 @inject IAppEnvironmentService Environment
-@inject TokenCalibrationStore Calibration
 
-@* 通用设置：外观 / 语言 / 版本信息 *@
+@* 通用设置：外观 / 语言 / 版本信息。上下文相关设置已移到「上下文」分区（P2）。 *@
 <div class="settings-pane">
     <section class="settings-section">
         <h2 class="settings-section-title">外观</h2>
@@ -41,63 +40,6 @@
     </section>
 
     <section class="settings-section">
-        <h2 class="settings-section-title">上下文</h2>
-        <p class="settings-section-hint">
-            每次请求都会先估算 token 并按预算裁剪；原始消息不会被删除，只是不发送。
-            这里只展示当前生效的参数，细项在 docs/context-budget.md 中有说明。
-        </p>
-
-        <label class="settings-row settings-row--toggle">
-            <span class="settings-row-text">
-                <span class="settings-row-title">启用上下文预算</span>
-                <span class="settings-row-hint">关闭后等价于旧行为（直通），仍会记录报告。</span>
-            </span>
-            <input type="checkbox" class="switch" checked="@Context.Enabled" @onchange="ToggleEnabled" />
-        </label>
-
-        <label class="settings-row settings-row--toggle">
-            <span class="settings-row-text">
-                <span class="settings-row-title">显示占用环</span>
-                <span class="settings-row-hint">输入框右下角的估算 token 占用；点开可看分段明细。</span>
-            </span>
-            <input type="checkbox" class="switch" checked="@Context.ShowContextMeter" @onchange="ToggleMeter" />
-        </label>
-
-        <dl class="info-list">
-            <div class="info-row">
-                <dt>预算占窗口</dt>
-                <dd>@($"{Context.BudgetRatio:P0}")</dd>
-            </div>
-            <div class="info-row">
-                <dt>保留最近轮次</dt>
-                <dd>@Context.KeepRecentTurns 轮（小模型 @Context.SmallModelKeepRecentTurns 轮）</dd>
-            </div>
-            <div class="info-row">
-                <dt>工具轨迹预算</dt>
-                <dd>@Context.ToolTraceTokenBudget token / 条消息</dd>
-            </div>
-            <div class="info-row">
-                <dt>附件内联上限</dt>
-                <dd>@Context.AttachmentInlineTokens token（超出只留文件名与路径）</dd>
-            </div>
-            <div class="info-row">
-                <dt>校准条目</dt>
-                <dd>@_calibrationCount 个模型已学习过估算系数</dd>
-            </div>
-        </dl>
-
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">重置 token 校准</span>
-                <span class="settings-row-hint">
-                    用服务端返回的 usage 修正估算系数；怀疑偏差过大或换了模型时可重置。
-                </span>
-            </span>
-            <button type="button" class="ghost-button" @onclick="ResetCalibration">重置校准</button>
-        </div>
-    </section>
-
-    <section class="settings-section">
         <h2 class="settings-section-title">版本信息</h2>
         <p class="settings-section-hint">排查问题时把这几项一起发过来即可。</p>
 
@@ -128,9 +70,6 @@
 
 @code {
     private string _language = "zh-CN";
-    private int _calibrationCount;
-
-    private ContextSettings Context => Settings.Current.Context;
 
     private static readonly (ThemePreference Value, string Key, string Label, string Description)[] ThemeOptions =
     [
@@ -142,25 +81,6 @@
     protected override void OnInitialized()
     {
         _language = Settings.Current.Language;
-        _calibrationCount = Calibration.Snapshot().Count;
-    }
-
-    private void ToggleEnabled(ChangeEventArgs args)
-    {
-        Context.Enabled = args.Value is true;
-        Settings.Save();
-    }
-
-    private void ToggleMeter(ChangeEventArgs args)
-    {
-        Context.ShowContextMeter = args.Value is true;
-        Settings.Save();
-    }
-
-    private void ResetCalibration()
-    {
-        Calibration.ResetAll();
-        _calibrationCount = 0;
     }
 
     private void HandleLanguageChanged(ChangeEventArgs args)

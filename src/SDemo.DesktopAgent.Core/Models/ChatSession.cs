@@ -42,6 +42,28 @@ public sealed class ChatSession
 
     public List<ChatMessage> Messages { get; init; } = [];
 
+    /// <summary>
+    /// 滚动摘要正文：覆盖序号小于 <see cref="SummaryThroughOrder"/> 的消息。
+    /// 原文仍完整保留在 <see cref="Messages"/> 与数据库里，摘要只影响「这次发什么」。
+    /// </summary>
+    public string? Summary { get; set; }
+
+    /// <summary>摘要覆盖到哪条消息的序号（不含）；0 表示还没有摘要。单调不减。</summary>
+    public int SummaryThroughOrder { get; set; }
+
+    /// <summary>摘要最后一次更新时间。</summary>
+    public DateTime? SummaryUpdatedAt { get; set; }
+
+    /// <summary>摘要正文的 token 估算（已按 SummaryMaxTokens 截断）。</summary>
+    public int SummaryTokens { get; set; }
+
+    /// <summary>摘要是否由确定性兜底生成（UI 上标注「自动摘要」）。</summary>
+    public bool SummaryIsFallback { get; set; }
+
+    /// <summary>是否有可用的滚动摘要。</summary>
+    public bool HasSummary =>
+        SummaryThroughOrder > 0 && !string.IsNullOrWhiteSpace(Summary);
+
     public bool IsEmpty => Messages.Count == 0;
 
     /// <summary>新建的空聊天室。首次发送消息后才写入数据库 / 历史列表。</summary>
