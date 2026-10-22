@@ -246,6 +246,7 @@ public sealed class PdfToolPackTests
         Assert.Equal("pdf", pack.Descriptor.Id);
         Assert.True(pack.Descriptor.WindowsOnly);
         Assert.True(pack.Descriptor.DefaultEnabled);
+        Assert.True(pack.Descriptor.BuiltIn);
         Assert.Equal(AgentToolRisk.Low, pack.Descriptor.Risk);
         Assert.Equal(2, pack.Descriptor.Functions.Count);
         Assert.All(pack.Descriptor.Functions, function => Assert.False(function.RequiresApproval));

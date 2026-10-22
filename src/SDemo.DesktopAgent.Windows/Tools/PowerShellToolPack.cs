@@ -31,7 +31,7 @@ public sealed class PowerShellToolPack : IAgentToolPack
         Glyph: ">_",
         Risk: AgentToolRisk.High,
         Order: 30,
-        DefaultEnabled: false,
+        DefaultEnabled: true,
         WindowsOnly: true,
         Functions:
         [
@@ -40,7 +40,8 @@ public sealed class PowerShellToolPack : IAgentToolPack
                 "运行 PowerShell",
                 AgentToolRisk.High,
                 RequiresApproval: true)
-        ]);
+        ],
+        BuiltIn: true);
 
     public IReadOnlyList<AITool> Create(ToolContext context)
     {
