@@ -18,8 +18,10 @@ public sealed record AgentToolFunctionDescriptor(
     bool RequiresApproval = false);
 
 /// <summary>
-/// 工具包描述：输入框 chip、设置页开关与“本轮是否给模型”都由它驱动。
+/// 工具包描述：设置页开关、输入框 chip 与“本轮是否给模型”都由它驱动。
 /// <see cref="DefaultEnabled"/> 只是新用户的默认值，实际状态存在 <c>AppSettings.Tools</c>。
+/// <see cref="BuiltIn"/> 为 true 的包不再出现在输入框 chip 里，模型在需要时自行调用；
+/// 用户仍可在设置页全局关闭它。
 /// </summary>
 public sealed record AgentToolPackDescriptor(
     string Id,
@@ -30,7 +32,8 @@ public sealed record AgentToolPackDescriptor(
     int Order,
     bool DefaultEnabled,
     bool WindowsOnly,
-    IReadOnlyList<AgentToolFunctionDescriptor> Functions);
+    IReadOnlyList<AgentToolFunctionDescriptor> Functions,
+    bool BuiltIn = false);
 
 /// <summary>
 /// 一次生成绑定的工具上下文。每次 Run 新建一份，避免单例工具包持有上一个会话的会话 / 工作区。

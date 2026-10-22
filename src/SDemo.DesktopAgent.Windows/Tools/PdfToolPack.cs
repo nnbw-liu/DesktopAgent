@@ -32,7 +32,8 @@ public sealed class PdfToolPack : IAgentToolPack
         [
             new AgentToolFunctionDescriptor(InfoFunctionId, "PDF 信息"),
             new AgentToolFunctionDescriptor(ReadFunctionId, "读取 PDF")
-        ]);
+        ],
+        BuiltIn: true);
 
     public IReadOnlyList<AITool> Create(ToolContext context)
     {

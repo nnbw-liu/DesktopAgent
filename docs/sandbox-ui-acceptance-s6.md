@@ -160,7 +160,20 @@ Error 0x80080008. 当 OLE 服务与对象服务器通讯时，后者已经停止
 - 长期运行（不重启应用）时 Janitor 不会周期性清理；本次只验证启动清理与手动清理。
 - 审计 10MB 轮转只在单测覆盖，未在 UI 里生成 10MB 日志。
 
-## 6. 复现 P0 / P1
+## 6. 验收后的产品调整（2026-10-22）
+
+按后续需求，文件读写 / PDF / PowerShell 改为**内置能力**（`AgentToolPackDescriptor.BuiltIn`）：
+
+- 输入框不再显示这三个 chip，只保留联网搜索这类可选外部工具。
+- 文件 / PDF / PowerShell 默认开启；PowerShell 的 `DefaultEnabled` 从 false 改为 true。
+- 每轮生成时 ChatRoom 自动把可用内置包加入工具列表，由模型自行决定是否调用；
+  用户仍可在设置页全局关闭某个内置工具。
+- 实测（同一套真实 UI）：输入框只剩「联网搜索」；新会话直接说“列出当前工作区文件”，
+  模型自动调用 `list_files` 并返回 `hello.txt`；直接说“用 PowerShell 运行 Get-Location”，
+  无需 chip 即弹出 PowerShell 审批框。
+- 内置包可用性仍受设置 / 沙箱状态约束：沙箱不可用时不会把 PowerShell / PDF 交给模型。
+
+## 7. 复现 P0 / P1
 
 P0：
 

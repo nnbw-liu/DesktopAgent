@@ -208,7 +208,7 @@
         </div>
 
         <div class="composer-actions">
-            @* 工具 chip 全部由工具包注册表驱动；不可用的包（未在设置启用 / 沙箱不可用）显示为禁用。 *@
+            @* 只有可选的外部工具（例如联网搜索）需要 chip；文件 / PDF / PowerShell 由模型自行决定是否调用。 *@
             @foreach (var pack in ToolPacks)
             {
                 <button type="button"
@@ -293,11 +293,11 @@
     [Parameter]
     public EventCallback<string?> OnSelectSkill { get; set; }
 
-    /// <summary>输入框里可用的工具包 chip（ChatRoom 按平台 / 沙箱 / 设置算好）。</summary>
+    /// <summary>输入框里可选的外部工具 chip（内置能力不在这里显示）。</summary>
     [Parameter]
     public IReadOnlyList<ToolPackChip> ToolPacks { get; set; } = [];
 
-    /// <summary>开关一个工具包（只切换本轮是否交给模型）。</summary>
+    /// <summary>开关一个可选工具包（只切换本轮是否交给模型）。</summary>
     [Parameter]
     public EventCallback<string> OnToggleToolPack { get; set; }
 

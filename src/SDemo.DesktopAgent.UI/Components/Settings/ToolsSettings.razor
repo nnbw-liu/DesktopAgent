@@ -108,10 +108,10 @@
 
         <label class="settings-row settings-row--toggle">
             <span class="settings-row-text">
-                <span class="settings-row-title">启用 PowerShell 工具（默认关闭）</span>
+                <span class="settings-row-title">允许模型使用 PowerShell（默认开启）</span>
                 <span class="settings-row-hint">
                     @(PowerShellAvailable
-                        ? "启用后还需要在输入框里打开工具 chip 才会交给模型。"
+                        ? "内置能力：不需要在输入框里选 chip，模型需要时会自行调用；每次执行仍需审批。"
                         : PowerShellUnavailableReason)
                 </span>
             </span>
@@ -213,10 +213,10 @@
 
             <label class="settings-row settings-row--toggle">
                 <span class="settings-row-text">
-                    <span class="settings-row-title">启用 PDF 工具（默认开启）</span>
+                    <span class="settings-row-title">允许模型使用 PDF（默认开启）</span>
                     <span class="settings-row-hint">
                         @(PdfAvailable
-                            ? "启用后还需要在输入框里打开 PDF chip 才会交给模型。"
+                            ? "内置能力：不需要在输入框里选 chip，模型需要时会自行调用 pdf_read / pdf_info。"
                             : PdfUnavailableReason)
                     </span>
                 </span>

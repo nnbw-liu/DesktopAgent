@@ -520,51 +520,21 @@
     }
 
     /// <summary>
-    /// 按注册表 + 设置 + 沙箱可用性重建 chip。PowerShell 需要 <c>Available &amp;&amp; Verified</c>：
-    /// 只有 cmd 能跑不算可用，否则模型会拿到一个必然失败的工具。
+    /// 重建输入框里的外部工具 chip。文件 / PDF / PowerShell 是内置能力（<c>BuiltIn</c>），
+    /// 不出现在 chip 里，由模型按需调用；只有搜索这类可选工具需要用户逐轮选择。
     /// </summary>
     private void RefreshToolPacks()
     {
-        var settings = Settings.Current;
         var chips = new List<ToolPackChip>();
 
         foreach (var descriptor in ToolRegistry.Descriptors)
         {
-            var masterEnabled = settings.Tools.IsPackEnabled(descriptor.Id, descriptor.DefaultEnabled);
-            string? unavailableReason = null;
-
-            if (!masterEnabled)
+            if (descriptor.BuiltIn)
             {
-                unavailableReason = "在「设置 → 工具设置」中启用";
-            }
-            else if (descriptor.Id == "powershell")
-            {
-                if (!settings.Sandbox.Enabled)
-                {
-                    unavailableReason = "执行沙箱已在设置中关闭";
-                }
-                else if (_sandboxAvailability is not { Available: true, Verified: true })
-                {
-                    unavailableReason = _toolPackAvailabilityLoading
-                        ? "正在检测沙箱…"
-                        : _sandboxAvailability?.Reason ?? "沙箱不可用或未验证";
-                }
-            }
-            else if (descriptor.Id == "pdf")
-            {
-                // PDF helper 只在 AppContainer 里跑；不要求 PowerShell 的 Verified。
-                if (!settings.Sandbox.Enabled)
-                {
-                    unavailableReason = "执行沙箱已在设置中关闭";
-                }
-                else if (_appContainerAvailability is not { Available: true })
-                {
-                    unavailableReason = _toolPackAvailabilityLoading
-                        ? "正在检测沙箱…"
-                        : _appContainerAvailability?.Reason ?? "AppContainer 沙箱不可用";
-                }
+                continue;
             }
 
+            var unavailableReason = GetUnavailableReason(descriptor);
             var available = unavailableReason is null;
 
             chips.Add(new ToolPackChip(
@@ -581,6 +551,52 @@
 
         // 包在设置里被关掉 / 沙箱失效时，把本轮的选择也清掉，避免继续传给模型。
         _enabledToolPacks.RemoveWhere(id => chips.FirstOrDefault(chip => chip.Id == id) is not { Available: true });
+    }
+
+    /// <summary>
+    /// 某个工具包本轮为什么不能交给模型；null 表示可用。
+    /// 内置包同样走这套判断，只是不渲染 chip。
+    /// </summary>
+    private string? GetUnavailableReason(AgentToolPackDescriptor descriptor)
+    {
+        var settings = Settings.Current;
+
+        if (!settings.Tools.IsPackEnabled(descriptor.Id, descriptor.DefaultEnabled))
+        {
+            return "在「设置 → 工具设置」中启用";
+        }
+
+        if (descriptor.Id == "powershell")
+        {
+            if (!settings.Sandbox.Enabled)
+            {
+                return "执行沙箱已在设置中关闭";
+            }
+
+            if (_sandboxAvailability is not { Available: true, Verified: true })
+            {
+                return _toolPackAvailabilityLoading
+                    ? "正在检测沙箱…"
+                    : _sandboxAvailability?.Reason ?? "沙箱不可用或未验证";
+            }
+        }
+        else if (descriptor.Id == "pdf")
+        {
+            // PDF helper 只在 AppContainer 里跑；不要求 PowerShell 的 Verified。
+            if (!settings.Sandbox.Enabled)
+            {
+                return "执行沙箱已在设置中关闭";
+            }
+
+            if (_appContainerAvailability is not { Available: true })
+            {
+                return _toolPackAvailabilityLoading
+                    ? "正在检测沙箱…"
+                    : _appContainerAvailability?.Reason ?? "AppContainer 沙箱不可用";
+            }
+        }
+
+        return null;
     }
 
     private async Task RefreshSandboxAvailabilityAsync()
@@ -933,8 +949,15 @@
         _openReasoning.Add(reply.Id);
         StateHasChanged();
 
-        // 工具是多选的：把所有勾选的工具包一起传给模型。
+        // 搜索等外部工具按用户选择；文件 / PDF / PowerShell 是内置能力，自动交给模型。
         var enabledPacks = new HashSet<string>(_enabledToolPacks, StringComparer.Ordinal);
+        foreach (var descriptor in ToolRegistry.Descriptors.Where(descriptor => descriptor.BuiltIn))
+        {
+            if (GetUnavailableReason(descriptor) is null)
+            {
+                enabledPacks.Add(descriptor.Id);
+            }
+        }
         var metrics = new AgentRunMetrics();
         var startedAt = Stopwatch.GetTimestamp();
 

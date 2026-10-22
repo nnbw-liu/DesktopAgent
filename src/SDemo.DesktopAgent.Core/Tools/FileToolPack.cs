@@ -35,7 +35,8 @@ public sealed class FileToolPack : IAgentToolPack
                 AgentToolRisk.Medium,
                 RequiresApproval: true),
             new AgentToolFunctionDescriptor("workspace_info", "工作区信息")
-        ]);
+        ],
+        BuiltIn: true);
 
     public IReadOnlyList<AITool> Create(ToolContext context)
     {
