@@ -352,6 +352,7 @@ version: 1.0
 PowerShell 与 PDF 解析都在沙箱里运行；沙箱不可用时直接拒绝执行，**不会**退回主进程直跑。
 完整开发手册见 [docs/sandbox-development-manual.md](docs/sandbox-development-manual.md)，
 S6 验收与偏差见 [docs/sandbox-s6-report.md](docs/sandbox-s6-report.md)，
+UI 逐项验收记录见 [docs/sandbox-ui-acceptance-s6.md](docs/sandbox-ui-acceptance-s6.md)，
 常见问题见 [docs/sandbox-troubleshooting.md](docs/sandbox-troubleshooting.md)。
 
 | 阶段 | 状态 | 能力 |

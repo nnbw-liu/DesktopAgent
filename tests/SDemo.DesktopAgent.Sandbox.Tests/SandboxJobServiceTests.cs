@@ -108,6 +108,47 @@ public sealed class SandboxJobServiceTests
         }
     }
 
+    /// <summary>
+    /// P1 回归位：AppContainer 内 PowerShell 当前目录是 SDEMO: PSDrive，
+    /// Remove-Item 相对路径会 Access denied；修复 provider / 位置后再启用。
+    /// 详见 docs/sandbox-ui-acceptance-s6.md。
+    /// </summary>
+    [Fact(Skip = "P1：SDEMO PSDrive 下 Remove-Item 失败，待修复后启用")]
+    public async Task AppContainer作业删除文件产生Deleted变更()
+    {
+        using var host = new SandboxTestHost();
+        var workspace = Path.Combine(Path.GetTempPath(), "sdemo-job-workspace", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(workspace);
+        File.WriteAllText(Path.Combine(workspace, "doomed.txt"), "delete me\n");
+
+        try
+        {
+            host.Workspace.RootPath = workspace;
+
+            var outcome = await host.Jobs.RunPowerShellAsync(
+                "session-1",
+                "Remove-Item -LiteralPath 'doomed.txt' -Force\nWrite-Output 'deleted'",
+                workingDirectory: ".",
+                timeoutSeconds: 30);
+
+            Assert.DoesNotContain("Access is denied", outcome.Result.StdErr);
+            Assert.Contains("deleted", outcome.Result.StdOut);
+            var change = Assert.Single(outcome.Changes);
+            Assert.Equal(SandboxChangeKind.Deleted, change.Kind);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(workspace, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // 清理失败不影响测试结论。
+            }
+        }
+    }
+
     [Fact]
     public async Task 相对子目录作为工作目录且变更仍按工作区根计算()
     {
