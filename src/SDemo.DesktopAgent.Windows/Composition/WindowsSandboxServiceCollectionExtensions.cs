@@ -43,6 +43,7 @@ public static class WindowsSandboxServiceCollectionExtensions
         services.AddSingleton<ISandboxJobService>(sp => sp.GetRequiredService<SandboxJobService>());
 
         services.AddSingleton<SandboxJanitor>();
+        services.AddSingleton<ISandboxMaintenance>(sp => sp.GetRequiredService<SandboxJanitor>());
 
         // S3：PowerShell 工具包。只有 Windows 宿主注册；Android 连这个工程都不引用。
         services.AddSingleton<IAgentToolPack, PowerShellToolPack>();

@@ -12,6 +12,9 @@ public static class SandboxProtocol
     public const string PdfResultFileName = "pdf.json";
     public const string ManifestFileName = "manifest.json";
 
+    /// <summary>已处理（应用或忽略）的变更路径：Janitor 用它判断 job 里是否还有未确认的 diff。</summary>
+    public const string AppliedChangesFileName = "applied.json";
+
     /// <summary>PDF 作业固定复制到 <c>input/document.pdf</c>：不接受用户路径，避免路径注入。</summary>
     public const string PdfInputFileName = "document.pdf";
 }

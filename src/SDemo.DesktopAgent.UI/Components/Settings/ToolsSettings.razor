@@ -3,6 +3,9 @@
 @inject ISettingsService Settings
 @inject ISearchService Search
 @inject ISandboxJobService Sandbox
+@inject ISandboxMaintenance Maintenance
+@inject IAppEnvironmentService Environment
+@inject IAppPaths Paths
 @inject AgentToolRegistry ToolRegistry
 
 @* 工具设置：联网搜索后端 + 文件写入确认 *@
@@ -378,6 +381,83 @@
             </div>
         }
     </section>
+
+    <section class="settings-section">
+        <h2 class="settings-section-title">审计与数据</h2>
+        <p class="settings-section-hint">
+            工具审计日志每天一个 JSONL 文件，只记录工具、job、沙箱类型、脚本 hash / 长度、退出码与审批结果；
+            默认不写脚本正文，也不写 stdout / stderr 内容。
+        </p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">在审计日志中保留脚本正文（前 4KB）</span>
+                <span class="settings-row-hint">默认关闭；打开后脚本内容会落盘，敏感脚本请勿开启。</span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@Settings.Current.Sandbox.RetainScriptsInAuditLog"
+                   @onchange="ToggleRetainScripts" />
+        </label>
+
+        <div class="settings-grid">
+            <label class="field">
+                <span class="field-label">审计日志保留天数</span>
+                <input class="field-input"
+                       type="number"
+                       min="1"
+                       max="365"
+                       value="@Settings.Current.Sandbox.AuditRetentionDays"
+                       @onchange="ChangeAuditRetention" />
+                <span class="field-hint">默认 7 天；下次启动写日志时清理更早的文件，单文件超过 10MB 会轮转。</span>
+            </label>
+        </div>
+
+        <div class="editor-footer">
+            <button type="button" class="ghost-button" @onclick="OpenAuditFolder">打开日志目录</button>
+        </div>
+        <p class="settings-message">@AuditDirectory</p>
+
+        <div class="settings-subsection">
+            <span class="field-label">沙箱数据</span>
+            <span class="field-hint">
+                启动时自动清理超过 24 小时的作业、残留 <code>*.tmp</code> / <code>*.wsb</code> 与 7 天前的回收站条目；
+                有未应用变更的作业会保留，等你确认后再清。
+            </span>
+            <div class="editor-footer">
+                <button type="button" class="ghost-button" disabled="@_isMaintaining" @onclick="RunCleanupAsync">
+                    @(_isMaintaining ? "清理中…" : "清理过期数据")
+                </button>
+                @if (!_confirmingPurge)
+                {
+                    <button type="button" class="ghost-button" disabled="@_isMaintaining" @onclick="() => _confirmingPurge = true">
+                        清理沙箱数据…
+                    </button>
+                }
+            </div>
+
+            @if (_confirmingPurge)
+            {
+                <p class="settings-message is-danger">
+                    确定清空所有沙箱作业与回收站，并删除 AppContainer profile？未应用的变更也会丢失；
+                    host 程序会保留，下次使用沙箱时重新创建 profile。
+                </p>
+                <div class="editor-footer">
+                    <button type="button" class="ghost-button" disabled="@_isMaintaining" @onclick="() => _confirmingPurge = false">
+                        取消
+                    </button>
+                    <button type="button" class="ghost-button" disabled="@_isMaintaining" @onclick="PurgeAsync">
+                        @(_isMaintaining ? "清理中…" : "确认清理")
+                    </button>
+                </div>
+            }
+
+            @if (_maintenanceMessage is not null)
+            {
+                <p class="settings-message">@_maintenanceMessage</p>
+            }
+        </div>
+    </section>
 </div>
 
 @code {
@@ -396,11 +476,25 @@
     private WindowsSandboxSelfTestReport? _windowsSandboxReport;
     private string? _windowsSandboxMessage;
     private bool _isWindowsSandboxTesting;
+    private bool _isMaintaining;
+    private bool _confirmingPurge;
+    private string? _maintenanceMessage;
+
+    private string AuditDirectory => Path.Combine(Paths.DataRoot, "logs");
 
     protected override async Task OnInitializedAsync()
     {
         _endpoint = Settings.Current.Search.Endpoint;
         _apiKey = Settings.Current.Search.ApiKey;
+
+        // 启动清理是后台任务；如果它已经跳过某些 job，这里直接把“待处理”展示出来。
+        if (Maintenance.LastReport is { PendingJobs: > 0 } report)
+        {
+            _maintenanceMessage =
+                $"启动清理跳过了 {report.PendingJobs} 个作业（还有未应用的变更）："
+                + string.Join("、", report.PendingJobIds) + "。";
+        }
+
         await RefreshAvailabilityAsync();
     }
 
@@ -655,5 +749,83 @@
     {
         Settings.Current.ConfirmFileWrite = args.Value is true;
         Settings.Save();
+    }
+
+    private void ToggleRetainScripts(ChangeEventArgs args)
+    {
+        Settings.Current.Sandbox.RetainScriptsInAuditLog = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ChangeAuditRetention(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var days))
+        {
+            Settings.Current.Sandbox.AuditRetentionDays = Math.Clamp(days, 1, 365);
+            Settings.Save();
+        }
+    }
+
+    private void OpenAuditFolder()
+    {
+        try
+        {
+            Environment.OpenFolder(AuditDirectory);
+            _maintenanceMessage = null;
+        }
+        catch (Exception ex)
+        {
+            _maintenanceMessage = $"打开日志目录失败：{ex.Message}";
+        }
+    }
+
+    private async Task RunCleanupAsync()
+    {
+        _isMaintaining = true;
+        _maintenanceMessage = null;
+
+        try
+        {
+            var report = await Maintenance.CleanupAsync();
+            _maintenanceMessage = $"已清理 {report.DeletedJobs} 个过期作业、{report.DeletedTrashEntries} 个回收站条目、"
+                                  + $"{report.DeletedTempFiles} 个临时文件。"
+                                  + (report.PendingJobs > 0
+                                      ? $" 有 {report.PendingJobs} 个作业还有未应用的变更，已跳过：{string.Join("、", report.PendingJobIds)}。"
+                                      : string.Empty);
+        }
+        catch (Exception ex)
+        {
+            _maintenanceMessage = $"清理失败：{ex.Message}";
+        }
+        finally
+        {
+            _isMaintaining = false;
+        }
+    }
+
+    private async Task PurgeAsync()
+    {
+        _isMaintaining = true;
+        _maintenanceMessage = null;
+
+        try
+        {
+            var report = await Maintenance.PurgeAsync();
+            _confirmingPurge = false;
+            _maintenanceMessage = $"已清空沙箱数据：{report.DeletedJobs} 个作业、{report.DeletedTrashEntries} 个回收站条目、"
+                                  + $"{report.DeletedTempFiles} 个临时文件；"
+                                  + (report.ProfileDeleted == false
+                                      ? "AppContainer profile 删除失败（可能被占用），下次使用会自动重建。"
+                                      : "AppContainer profile 已删除。");
+            await RefreshAvailabilityAsync();
+        }
+        catch (Exception ex)
+        {
+            _maintenanceMessage = $"清理沙箱数据失败：{ex.Message}";
+        }
+        finally
+        {
+            _isMaintaining = false;
+        }
     }
 }
