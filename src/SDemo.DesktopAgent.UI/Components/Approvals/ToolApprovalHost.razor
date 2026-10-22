@@ -15,7 +15,19 @@
                 <span class="modal-path">@request.Summary</span>
             </div>
 
-            <pre class="modal-preview modal-preview--script">@DetailText(request)</pre>
+            @if (request.Kind == ToolApprovalKind.FileEdit)
+            {
+                <div class="modal-preview approval-diff" role="group" aria-label="补丁预览">
+                    @foreach (var line in DiffLines(request.Detail))
+                    {
+                        <div class="diff-line @DiffClass(line)">@line</div>
+                    }
+                </div>
+            }
+            else
+            {
+                <pre class="modal-preview modal-preview--script">@DetailText(request)</pre>
+            }
 
             <div class="modal-actions">
                 <button type="button" class="ghost-button" @onclick="() => Resolve(ToolApprovalDecision.Deny)">
@@ -51,6 +63,7 @@
     private static string KindHint(ToolApprovalKind kind) => kind switch
     {
         ToolApprovalKind.FileWrite => "模型请求写入文件，确认后才会落盘。",
+        ToolApprovalKind.FileEdit => "模型请求修改工作区文件；下方是统一 diff，确认后才会落盘。",
         ToolApprovalKind.ProcessExecution =>
             "脚本将在一个没有网络、只能访问工作区副本的沙箱中运行。请确认脚本内容与实际执行一致。",
         ToolApprovalKind.ApplyChanges => "将把沙箱内的改动写回真实工作区。",
@@ -70,6 +83,42 @@
         AgentToolRisk.Medium => "medium",
         _ => "low"
     };
+
+    /// <summary>
+    /// diff 只显示前 200 行，但实际应用的是完整补丁；文件头 / hunk 头单独着色。
+    /// </summary>
+    private static IReadOnlyList<string> DiffLines(string detail)
+    {
+        var lines = detail.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        if (lines.Length <= 200)
+        {
+            return lines;
+        }
+
+        var shown = lines.Take(200).ToList();
+        shown.Add($"…（共 {lines.Length} 行，已截断显示；实际应用完整补丁）");
+        return shown;
+    }
+
+    private static string DiffClass(string line)
+    {
+        if (line.StartsWith("+++", StringComparison.Ordinal) || line.StartsWith("---", StringComparison.Ordinal))
+        {
+            return "diff-file";
+        }
+
+        if (line.StartsWith("@@", StringComparison.Ordinal))
+        {
+            return "diff-hunk";
+        }
+
+        if (line.StartsWith("+", StringComparison.Ordinal))
+        {
+            return "diff-add";
+        }
+
+        return line.StartsWith("-", StringComparison.Ordinal) ? "diff-del" : string.Empty;
+    }
 
     /// <summary>
     /// 脚本完整展示（工具层已把上限压到 64KB）；文件内容可能很大，界面只截断显示，

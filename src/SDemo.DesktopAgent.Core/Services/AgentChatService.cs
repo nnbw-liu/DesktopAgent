@@ -9,6 +9,7 @@ using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Chat;
 using SDemo.DesktopAgent.Context;
+using SDemo.DesktopAgent.Editing;
 using SDemo.DesktopAgent.Models;
 
 namespace SDemo.DesktopAgent.Services;
@@ -48,6 +49,10 @@ public sealed class AgentChatService : IAgentChatService
         @"exit(?: code)?\s*[:=]?\s*(?<code>\d+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    private static readonly Regex EditLinePattern = new(
+        @"^\[EDIT\]\s+(?<path>.+?)\s+\+(?<added>\d+)\s+-(?<removed>\d+)\s*$",
+        RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.CultureInvariant);
+
     private readonly AgentToolRegistry _tools;
     private readonly WorkspaceContext _workspace;
     private readonly ISettingsService _settings;
@@ -55,6 +60,7 @@ public sealed class AgentChatService : IAgentChatService
     private readonly ISandboxJobService _sandbox;
     private readonly IToolAuditLog _audit;
     private readonly IAppPaths _paths;
+    private readonly IFileReadRegistry _reads;
 
     public AgentChatService(
         AgentToolRegistry tools,
@@ -63,7 +69,8 @@ public sealed class AgentChatService : IAgentChatService
         IToolApprovalService approvals,
         ISandboxJobService sandbox,
         IToolAuditLog audit,
-        IAppPaths paths)
+        IAppPaths paths,
+        IFileReadRegistry reads)
     {
         _tools = tools;
         _workspace = workspace;
@@ -72,6 +79,7 @@ public sealed class AgentChatService : IAgentChatService
         _sandbox = sandbox;
         _audit = audit;
         _paths = paths;
+        _reads = reads;
     }
 
     public async IAsyncEnumerable<AgentDelta> RunAsync(
@@ -90,7 +98,9 @@ public sealed class AgentChatService : IAgentChatService
             _settings,
             _approvals,
             _sandbox,
-            _audit);
+            _audit,
+            _reads,
+            plan.Metrics);
 
         var tools = _tools.Create(context, plan.ToolPacks, plan.Metrics);
         var agent = CreateAgent(plan.Provider, plan.ModelId, tools, plan.Context, telemetry);
@@ -190,7 +200,31 @@ public sealed class AgentChatService : IAgentChatService
             digest,
             Summarize(text),
             text?.Length ?? 0,
-            DateTime.Now);
+            DateTime.Now,
+            ParseEdits(text));
+    }
+
+    /// <summary>从工具结果末尾的 <c>[EDIT] 路径 +N -M</c> 行汇总本次改动，供消息下方展示。</summary>
+    internal static IReadOnlyList<EditedFile>? ParseEdits(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text) || !text.Contains("[EDIT]", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var edits = new List<EditedFile>();
+        foreach (Match match in EditLinePattern.Matches(text))
+        {
+            if (!int.TryParse(match.Groups["added"].Value, out var added)
+                || !int.TryParse(match.Groups["removed"].Value, out var removed))
+            {
+                continue;
+            }
+
+            edits.Add(new EditedFile(match.Groups["path"].Value.Trim(), added, removed));
+        }
+
+        return edits.Count == 0 ? null : edits;
     }
 
     /// <summary>

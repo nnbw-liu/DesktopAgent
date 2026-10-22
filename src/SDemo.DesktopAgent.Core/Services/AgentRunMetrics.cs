@@ -18,7 +18,10 @@ public sealed class AgentRunMetrics
 
     public IReadOnlyDictionary<string, int> ToolCalls => _toolCalls;
 
-    /// <summary>本次生成的工具轨迹（最多 <see cref="ToolTraceFormatter.MaxEntriesPerMessage"/> 条）。</summary>
+    /// <summary>一次生成最多保留的轨迹条数；只影响持久化 / 编辑摘要，不影响模型可见的最近 20 条。</summary>
+    public const int MaxStoredEntries = 100;
+
+    /// <summary>本次生成的工具轨迹（最多 <see cref="MaxStoredEntries"/> 条）。</summary>
     public IReadOnlyList<ToolTraceEntry> ToolTrace => _toolTrace;
 
     public void RecordToolCall(string? name)
@@ -34,7 +37,7 @@ public sealed class AgentRunMetrics
     /// <summary>追加一条轨迹；超过上限的静默丢弃（只保留最近的部分，前面已有汇总）。</summary>
     public void RecordToolTrace(ToolTraceEntry entry)
     {
-        if (_toolTrace.Count >= ToolTraceFormatter.MaxEntriesPerMessage)
+        if (_toolTrace.Count >= MaxStoredEntries)
         {
             return;
         }

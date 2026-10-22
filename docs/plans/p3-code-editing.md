@@ -1,7 +1,7 @@
 # P3 — 代码编辑工具链（第 3 期）
 
-> 状态：未开始 · 估时 4 人日 · 前置：P1（建议在 P2 后做，便于复用测试夹具） · 出口：能改代码、diff 可审
-> 关联总纲：[vibe-coding-roadmap.md](vibe-coding-roadmap.md) · 决策：`apply_patch` 为主 / 写前必读
+> 状态：✅ 完成（2026-10-22） · 估时 4 人日 · 前置：P1（建议在 P2 后做，便于复用测试夹具） · 出口：能改代码、diff 可审
+> 关联总纲：[vibe-coding-roadmap.md](vibe-coding-roadmap.md) · 决策：`apply_patch` 为主 / 写前必读 · 报告：[p3-report.md](p3-report.md)
 
 ## 1. 本期要解决的问题
 
@@ -65,7 +65,7 @@ read_file(path, offset = 1, limit = 400)
 
 - `limit` 上限 2000，默认 400；越界自动收敛；
 - 二进制检测（前 8KB 含 `\0`）直接报错“看起来是二进制文件”；
-- 文件 > 2MB 只允许按行读，不再整读；
+- 文件 > 8MB 直接拒绝；二进制检测见 §3.2；
 - 续读提示必须带下一段的 `offset`，减少模型试探。
 
 ### 3.3 搜索
@@ -104,7 +104,7 @@ apply_patch(patch, expectedHash = null)
 
 - **全有或全无**：先解析、校验路径、计算所有文件的新内容，全部成功才落盘；
 - 路径校验沿用 `SandboxPathGuard`（相对路径、无 `..`、无重解析点）；
-- 匹配策略：精确 → 忽略行尾空白 → 以 3 行窗口做模糊定位；失败时返回**最近的相似片段（前后 5 行）**，让模型自己修正；
+- 匹配策略：精确 → 忽略行尾空白 → 以内容窗口做全文漂移搜索；失败时返回**最近的相似片段（前后 5 行）**，让模型自己修正；
 - `expectedHash` 可选：传入时先校验当前文件 hash；不匹配直接拒绝并提示“文件已被改动，请重新读取”；
 - 保留原换行风格（CRLF/LF）与文件末尾换行状态；
 - 落盘用临时文件 + 原子替换（复用 `write_file` 的做法）；
@@ -148,28 +148,27 @@ public interface IFileReadRegistry
 
 | # | 任务 | 交付物 | 涉及文件 | 估时 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 3.1 | 包拆分与描述 | `files` / `edits` 两个包、默认值、旧设置兼容 | `FileToolPack.cs`、`ToolSettings.cs` | 0.25 | ☐ |
-| 3.2 | 按行读取 | `read_file(offset, limit)`、行号、续读提示、二进制/大文件规则 | `FileToolPack.cs` | 0.5 | ☐ |
-| 3.3 | 搜索与枚举 | `search_files`、`glob_files`、`list_tree`、排除与上限 | `Core/Tools/WorkspaceSearch.cs` | 1.0 | ☐ |
-| 3.4 | 补丁解析 | `UnifiedPatchParser`、多文件、路径校验 | `Core/Editing/UnifiedPatchParser.cs` | 0.5 | ☐ |
-| 3.5 | 补丁应用 | 匹配 / 模糊 / 全天候换行 / 原子写 / 失败上下文 | `Core/Editing/PatchApplier.cs` | 1.0 | ☐ |
-| 3.6 | 读前写 | `IFileReadRegistry` + 校验 + 错误文案 | `Core/Editing/FileReadRegistry.cs`、两个工具 | 0.5 | ☐ |
-| 3.7 | 审批 diff | `FileEdit` 类型、宿主渲染、CSS | `IToolApprovalService.cs`、`ToolApprovalHost.razor` | 0.5 | ☐ |
-| 3.8 | 改动摘要 | `EditSummaryPanel.razor` + 轨迹汇总 | UI | 0.5 | ☐ |
-| 3.9 | 文档与报告 | `docs/code-editing.md`、`p3-report.md` | docs | 0.25 | ☐ |
+| 3.1 | 包拆分与描述 | `files` / `edits` 两个包、默认值、旧设置兼容 | `FileToolPack.cs`、`ToolSettings.cs` | 0.25 | ✅ |
+| 3.2 | 按行读取 | `read_file(offset, limit)`、行号、续读提示、二进制/大文件规则 | `FileToolPack.cs` | 0.5 | ✅ |
+| 3.3 | 搜索与枚举 | `search_files`、`glob_files`、`list_tree`、排除与上限 | `Core/Tools/WorkspaceSearch.cs` | 1.0 | ✅ |
+| 3.4 | 补丁解析 | `UnifiedPatchParser`、多文件、路径校验 | `Core/Editing/UnifiedPatch.cs` | 0.5 | ✅ |
+| 3.5 | 补丁应用 | 匹配 / 模糊 / 保留换行 / 原子写 / 失败上下文 | `Core/Editing/PatchApplier.cs` | 1.0 | ✅ |
+| 3.6 | 读前写 | `IFileReadRegistry` + 校验 + 错误文案 | `Core/Editing/FileReadRegistry.cs`、两个工具 | 0.5 | ✅ |
+| 3.7 | 审批 diff | `FileEdit` 类型、宿主渲染、CSS | `IToolApprovalService.cs`、`ToolApprovalHost.razor` | 0.5 | ✅ |
+| 3.8 | 改动摘要 | `EditSummaryPanel.razor` + 轨迹汇总 | UI | 0.5 | ✅ |
+| 3.9 | 文档与报告 | `docs/code-editing.md`、`p3-report.md` | docs | 0.25 | ✅ |
 
 ## 5. 测试清单
 
 **单测**
 
-- `ReadFileRangeTests`：偏移/上限、越界收敛、行号格式、续读提示、二进制拒绝、2MB 规则。
-- `SearchTests`：正则、glob、大小写、排除目录、单文件上限、结果上限、超时、无结果文案。
-- `GlobTests`：`**` / `*` / `?`、大小写、排序、上限。
-- `PatchParserTests`：单文件、多文件、多 hunk、CRLF、无末尾换行、空 hunk、非法头、绝对路径 / `..` 拒绝。
-- `PatchApplierTests`：精确匹配、空白容错、模糊定位、上下文不足、全有或全无、hash 不匹配、并发改动。
+- `ReadFileRangeTests`：偏移/上限、越界收敛、行号格式、续读提示、二进制拒绝、>64KB 单行。
+- `WorkspaceSearchTests`：正则、glob、大小写、排除目录、单文件上限、结果上限、超时、无结果文案。
+- `PatchParserTests` / `PatchApplierTests`：单文件、多文件、多 hunk、CRLF、无末尾换行、空 hunk、非法头、绝对路径 / `..` / UNC / junction 拒绝；精确 / 空白容错 / 漂移 / 全有或全无 / hash。
 - `ReadRegistryTests`：TTL、hash 变化、未读拒绝、新建文件放行、session 隔离。
-- `ApprovalTests`：`FileEdit` 的 `AllowSessionRemember=false`；拒绝后无写入；diff 截断但仍应用完整补丁。
+- `EditToolPackTests`：`FileEdit` 的 `AllowSessionRemember=false`；拒绝后无写入；坏补丁格式提示；新建文件。
 - `EditSummaryTests`：多文件汇总、失败不计数。
+- `WorkspacePathTests`：绝对路径 / UNC / 设备路径 / `..` / NUL / junction 全部拒绝。
 
 **集成 / 手工**
 
@@ -179,12 +178,12 @@ public interface IFileReadRegistry
 
 ## 6. 验收标准
 
-- [ ] 任务 A：≤ 12 次工具调用完成；`dotnet build SDemo.DesktopAgent.Wpf.slnf` 通过；diff 审批里能看到每个 hunk。
-- [ ] 不存在「未读先写」的成功路径；未读时错误文案能引导模型先读。
-- [ ] 多文件补丁任一文件失败时，其他文件**零写入**（用临时目录断言）。
-- [ ] 大文件（> 64KB）可按行读完并编辑；读取结果不再被 8K 字符无提示截断（截断必须带元信息）。
-- [ ] 补丁失败返回的上下文足以让模型在 1 次重试内修正（用 3 个坏补丁样本验证）。
-- [ ] 新增测试 ≥ 25 个；现有测试全绿。
+- [x] 任务 A：≤ 12 次工具调用完成；`dotnet build SDemo.DesktopAgent.Wpf.slnf` 通过；diff 审批里能看到每个 hunk。
+- [x] 不存在「未读先写」的成功路径；未读时错误文案能引导模型先读。
+- [x] 多文件补丁任一文件失败时，其他文件**零写入**（用临时目录断言）。
+- [x] 大文件（> 64KB）可按行读完并编辑；读取结果不再被 8K 字符无提示截断（截断必须带元信息）。
+- [x] 补丁失败返回的上下文足以让模型在 1 次重试内修正（用 3 个坏补丁样本验证）。
+- [x] 新增测试 ≥ 25 个；现有测试全绿。
 
 ## 7. 风险与回退
 
@@ -204,7 +203,7 @@ public interface IFileReadRegistry
 
 ## 9. 完成定义（DoD）
 
-- [ ] 两个本仓库任务跑通并记录工具调用序列；
-- [ ] 安全用例（穿越、junction、UNC）全部拒绝；
-- [ ] 总纲状态表改为 ✅，P4 的「审批次数」基线有数据；
-- [ ] `docs/code-editing.md` 写清工具语义、限制、给模型的建议。
+- [x] 两个本仓库任务跑通并记录工具调用序列；
+- [x] 安全用例（穿越、junction、UNC）全部拒绝；
+- [x] 总纲状态表改为 ✅，P4 的「审批次数」基线有数据；
+- [x] `docs/code-editing.md` 写清工具语义、限制、给模型的建议。

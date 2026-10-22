@@ -145,6 +145,11 @@
                             </div>
                         }
 
+                        @if (!isUser && message.ToolTrace.Count > 0)
+                        {
+                            <EditSummaryPanel Trace="message.ToolTrace" />
+                        }
+
                         <div class="msg-meta">
                             <span class="msg-time">@message.CreatedAt.ToString("HH:mm")</span>
 

@@ -1,0 +1,39 @@
+@using SDemo.DesktopAgent.Context
+
+@* P3：本次生成的文件改动，来自工具轨迹里的 [EDIT] 行，不额外扫描磁盘。 *@
+@if (!_summary.IsEmpty)
+{
+    <details class="edit-summary">
+        <summary class="edit-summary-head">
+            <span class="edit-summary-title">本次改动 @_summary.Files.Count 个文件</span>
+            <span class="edit-summary-diff">
+                <span class="edit-added">+@_summary.TotalAdded</span>
+                <span class="edit-removed">−@_summary.TotalRemoved</span>
+            </span>
+        </summary>
+
+        <div class="edit-summary-list">
+            @foreach (var file in _summary.Files)
+            {
+                <div class="edit-summary-row">
+                    <span class="edit-summary-path">@file.Path</span>
+                    <span class="edit-summary-counts">
+                        <span class="edit-added">+@file.Added</span>
+                        <span class="edit-removed">−@file.Removed</span>
+                    </span>
+                </div>
+            }
+        </div>
+    </details>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<ToolTraceEntry> Trace { get; set; } = [];
+
+    private EditSummary _summary = new([]);
+
+    protected override void OnParametersSet()
+    {
+        _summary = EditSummary.FromTrace(Trace);
+    }
+}

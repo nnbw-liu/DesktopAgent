@@ -13,13 +13,17 @@ public sealed record ToolTraceEntry(
     string? ArgsDigest,
     string? Summary,
     int OutputChars,
-    DateTime At)
+    DateTime At,
+    IReadOnlyList<EditedFile>? Edits = null)
 {
     public const string StatusOk = "ok";
     public const string StatusError = "error";
     public const string StatusDenied = "denied";
     public const string StatusCanceled = "canceled";
 }
+
+/// <summary>工具轨迹里的一次文件改动（供「本次改动」面板汇总；不额外扫描磁盘）。</summary>
+public sealed record EditedFile(string Path, int Added, int Removed);
 
 /// <summary>工具轨迹的回放：紧凑行、受 token 预算约束。</summary>
 public static class ToolTraceFormatter

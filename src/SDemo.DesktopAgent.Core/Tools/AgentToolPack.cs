@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using SDemo.DesktopAgent.Editing;
 
 namespace SDemo.DesktopAgent.Services;
 
@@ -45,7 +46,9 @@ public sealed record ToolContext(
     ISettingsService Settings,
     IToolApprovalService Approvals,
     ISandboxJobService SandboxJobs,
-    IToolAuditLog Audit);
+    IToolAuditLog Audit,
+    IFileReadRegistry? Reads = null,
+    AgentRunMetrics? Metrics = null);
 
 /// <summary>
 /// 工具包：搜索 / 文件 / PowerShell 都从这里进工具链。

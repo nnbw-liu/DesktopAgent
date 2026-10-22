@@ -4251,3 +4251,77 @@ a {
     flex: 1 1 auto;
     min-width: 0;
 }
+
+/* P3：补丁审批与改动摘要 */
+.approval-diff {
+    max-height: 46vh;
+    overflow: auto;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-elevated, rgba(255, 255, 255, .02));
+    font-family: "Cascadia Mono", "Consolas", monospace;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.diff-line {
+    min-height: 1.55em;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.diff-add { color: #2f9e44; }
+.diff-del { color: #d64545; }
+.diff-hunk { color: var(--accent-text); }
+.diff-file { color: var(--text-muted); font-weight: 600; }
+
+.edit-summary {
+    margin: 8px 0 2px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--accent-soft);
+    font-size: 12px;
+}
+
+.edit-summary-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    color: var(--text-muted);
+    list-style: none;
+}
+
+.edit-summary-head::-webkit-details-marker { display: none; }
+
+.edit-summary-title { font-weight: 600; }
+
+.edit-summary-diff,
+.edit-summary-counts {
+    display: inline-flex;
+    gap: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+.edit-added { color: #2f9e44; }
+.edit-removed { color: #d64545; }
+
+.edit-summary-list {
+    border-top: 1px solid var(--border);
+    padding: 4px 10px 8px;
+}
+
+.edit-summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 0;
+}
+
+.edit-summary-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

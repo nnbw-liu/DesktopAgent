@@ -4,6 +4,7 @@ namespace SDemo.DesktopAgent.Services;
 public enum ToolApprovalKind
 {
     FileWrite,
+    FileEdit,
     ProcessExecution,
     ApplyChanges
 }

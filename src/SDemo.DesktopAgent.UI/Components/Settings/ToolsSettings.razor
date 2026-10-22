@@ -81,6 +81,36 @@
     </section>
 
     <section class="settings-section">
+        <h2 class="settings-section-title">代码编辑</h2>
+        <p class="settings-section-hint">
+            文件工具拆成只读与写入两个包。只读包提供按行读取、搜索、glob 与目录树；
+            写入包提供 apply_patch 与 write_file。写入前默认需要确认。
+        </p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">文件读取与搜索（默认开启）</span>
+                <span class="settings-row-hint">read_file / search_files / glob_files / list_tree / list_files。</span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@IsPackEnabled("files")"
+                   @onchange="ToggleFiles" />
+        </label>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">代码编辑（默认开启）</span>
+                <span class="settings-row-hint">apply_patch / write_file；改已有文件前必须先读。</span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@IsPackEnabled("edits")"
+                   @onchange="ToggleEdits" />
+        </label>
+    </section>
+
+    <section class="settings-section">
         <h2 class="settings-section-title">文件写入</h2>
         <p class="settings-section-hint">工作区里的文件由模型读写；写入前可以要求确认。</p>
 
@@ -587,6 +617,21 @@
         Settings.Current.Tools.SetPackEnabled("pdf", args.Value is true);
         Settings.Save();
     }
+
+    private bool IsPackEnabled(string packId) =>
+        Settings.Current.Tools.IsPackEnabled(
+            packId,
+            ToolRegistry.Find(packId)?.DefaultEnabled ?? true);
+
+    private void TogglePack(string packId, ChangeEventArgs args)
+    {
+        Settings.Current.Tools.SetPackEnabled(packId, args.Value is true);
+        Settings.Save();
+    }
+
+    private void ToggleFiles(ChangeEventArgs args) => TogglePack("files", args);
+
+    private void ToggleEdits(ChangeEventArgs args) => TogglePack("edits", args);
 
     private void TogglePdfAutoExtract(ChangeEventArgs args)
     {

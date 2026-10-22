@@ -2,71 +2,84 @@ using System.ComponentModel;
 using System.IO;
 using System.Text;
 using Microsoft.Extensions.AI;
+using SDemo.DesktopAgent.Editing;
 using SDemo.DesktopAgent.Sandbox.Protocol;
 
 namespace SDemo.DesktopAgent.Services;
 
 /// <summary>
-/// 工作区文件读写工具包。文件工具不是进程执行，不进沙箱，靠“路径 jail + 写入审批”控制：
-/// 显式拒绝绝对路径 / UNC / 设备路径 / <c>..</c> / 重解析点（符号链接、junction），
-/// 写文件时先临时文件再原子替换，并且每次都走通用审批。
+/// 只读文件工具包：按行读取、目录列表 / 目录树、正则搜索、glob。
+/// 所有路径都过 <see cref="WorkspacePath"/>（拒绝绝对路径 / UNC / <c>..</c> / 重解析点），
+/// 不写盘；写入在 <see cref="EditToolPack"/>。
 /// </summary>
 public sealed class FileToolPack : IAgentToolPack
 {
-    private const int MaxReadBytes = 64 * 1024;
-    private const int MaxResultChars = 8000;
+    public const int DefaultReadLimit = 400;
+    public const int MaxReadLimit = 2000;
+    public const int MaxResultChars = 30_000;
+    public const long MaxReadFileBytes = 8L * 1024 * 1024;
+
+    private readonly WorkspaceSearch _search = new();
 
     public AgentToolPackDescriptor Descriptor { get; } = new(
         Id: "files",
-        Name: "文件",
-        Description: "读写当前工作区的文本文件；引用工作区外的路径会被拒绝，写入需要确认。",
+        Name: "文件（只读）",
+        Description: "按行读取、搜索和枚举当前工作区；引用工作区外的路径会被拒绝。",
         Glyph: "▤",
-        Risk: AgentToolRisk.Medium,
+        Risk: AgentToolRisk.Low,
         Order: 20,
         DefaultEnabled: true,
         WindowsOnly: false,
         Functions:
         [
-            new AgentToolFunctionDescriptor("list_files", "列出文件"),
-            new AgentToolFunctionDescriptor("read_file", "读取文件"),
-            new AgentToolFunctionDescriptor(
-                "write_file",
-                "写入文件",
-                AgentToolRisk.Medium,
-                RequiresApproval: true),
+            new AgentToolFunctionDescriptor("list_files", "列出目录"),
+            new AgentToolFunctionDescriptor("list_tree", "目录树"),
+            new AgentToolFunctionDescriptor("read_file", "按行读取"),
+            new AgentToolFunctionDescriptor("search_files", "正则搜索"),
+            new AgentToolFunctionDescriptor("glob_files", "路径匹配"),
             new AgentToolFunctionDescriptor("workspace_info", "工作区信息")
         ],
         BuiltIn: true);
 
     public IReadOnlyList<AITool> Create(ToolContext context)
     {
-        var functions = new FileFunctions(context);
+        var functions = new FileFunctions(context, _search);
 
         return
         [
             AIFunctionFactory.Create(
                 functions.ListFiles,
                 name: "list_files",
-                description: $"列出工作区（{context.WorkspaceRoot}）内的文件，path 为相对路径，默认当前目录。"),
+                description: $"列出工作区（{context.WorkspaceRoot}）某个目录的直接子项，path 为相对路径。"),
+
+            AIFunctionFactory.Create(
+                functions.ListTree,
+                name: "list_tree",
+                description: "列出相对路径的目录树，depth 默认 2、最多 200 项。"),
 
             AIFunctionFactory.Create(
                 functions.ReadFile,
                 name: "read_file",
-                description: "读取工作区内的文本文件内容，path 为相对路径。"),
+                description: "按行读取工作区内的文本文件；offset 从 1 开始，limit 默认 400（最多 2000）。先读再改。"),
 
             AIFunctionFactory.Create(
-                functions.WriteFileAsync,
-                name: "write_file",
-                description: "把文本写入工作区内的文件（会覆盖同名文件），path 为相对路径，content 为完整内容。"),
+                functions.SearchFiles,
+                name: "search_files",
+                description: "按正则搜索工作区文本，返回 路径:行号: 内容；glob 可限定文件类型。"),
+
+            AIFunctionFactory.Create(
+                functions.GlobFiles,
+                name: "glob_files",
+                description: "按 glob（** / * / ?）返回匹配的文件路径，按路径排序。"),
 
             AIFunctionFactory.Create(
                 functions.WorkspaceInfo,
                 name: "workspace_info",
-                description: "获取工作区根目录路径，用于向用户说明文件保存位置。")
+                description: "获取工作区根目录路径，用于说明文件位置。")
         ];
     }
 
-    private sealed class FileFunctions(ToolContext context)
+    private sealed class FileFunctions(ToolContext context, WorkspaceSearch search)
     {
         public string WorkspaceInfo() => $"工作区根目录：{context.WorkspaceRoot}";
 
@@ -98,8 +111,19 @@ public sealed class FileToolPack : IAgentToolPack
             return entries.Count == 0 ? "（空目录）" : string.Join('\n', entries);
         }
 
+        public string ListTree(
+            [Description("相对工作区的目录路径，默认当前目录。")] string path = ".",
+            [Description("展开深度，默认 2。")] int depth = 2,
+            [Description("最多显示多少项，默认 200。")] int maxEntries = 200)
+        {
+            ResolveReadPath(path);
+            return search.ListTree(context.WorkspaceRoot, path, depth, maxEntries);
+        }
+
         public string ReadFile(
-            [Description("相对工作区的文件路径。")] string path)
+            [Description("相对工作区的文件路径。")] string path,
+            [Description("起始行号，从 1 开始；默认 1。")] int offset = 1,
+            [Description("本次最多读取多少行，默认 400，最多 2000。")] int limit = DefaultReadLimit)
         {
             var file = ResolveReadPath(path);
             if (!File.Exists(file))
@@ -108,55 +132,139 @@ public sealed class FileToolPack : IAgentToolPack
             }
 
             var info = new FileInfo(file);
-            if (info.Length > MaxReadBytes)
+            if (info.Length > MaxReadFileBytes)
             {
-                return $"文件过大（{info.Length} 字节），只支持读取 64KB 以内的文本文件。";
+                return $"文件过大（{info.Length} 字节），读取上限为 {MaxReadFileBytes / 1024 / 1024}MB。";
             }
 
-            return Trim(File.ReadAllText(file));
+            if (WorkspacePath.LooksBinary(file))
+            {
+                return "看起来是二进制文件，不做文本读取。";
+            }
+
+            string text;
+            try
+            {
+                text = File.ReadAllText(file);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return $"读取失败：{ex.Message}";
+            }
+
+            var all = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            var lineCount = all.Length > 0 && all[^1].Length == 0 ? all.Length - 1 : all.Length;
+            if (lineCount == 0)
+            {
+                RecordRead(file);
+                return $"# {WorkspacePath.NormalizeRelative(path)} · 空文件";
+            }
+
+            var start = Math.Clamp(offset, 1, lineCount);
+            var count = Math.Clamp(limit, 1, MaxReadLimit);
+            var end = Math.Min(lineCount, start + count - 1);
+
+            var builder = new StringBuilder();
+            builder.Append("# ")
+                .Append(WorkspacePath.NormalizeRelative(path))
+                .Append(" · 共 ")
+                .Append(lineCount)
+                .Append(" 行 · 本次 ")
+                .Append(start)
+                .Append('–')
+                .Append(end);
+
+            if (end < lineCount)
+            {
+                builder.Append(" · 接续用 offset=").Append(end + 1);
+            }
+
+            var chars = 0;
+            var last = end;
+
+            for (var index = start; index <= end; index++)
+            {
+                var line = all[index - 1];
+                if (line.Length > 500)
+                {
+                    line = string.Concat(line.AsSpan(0, 500), "…");
+                }
+
+                var rendered = $"{index.ToString().PadLeft(4)}| {line}";
+                if (chars + rendered.Length + 1 > MaxResultChars)
+                {
+                    last = index - 1;
+                    builder.Append("\n…（本次结果超过 ")
+                        .Append(MaxResultChars)
+                        .Append(" 字符，已截断；接续用 offset=")
+                        .Append(index)
+                        .Append('）');
+                    break;
+                }
+
+                builder.Append('\n').Append(rendered);
+                chars += rendered.Length + 1;
+            }
+
+            if (last < start)
+            {
+                last = start;
+            }
+
+            if (last < lineCount && builder.ToString().Contains("接续用 offset=", StringComparison.Ordinal) == false)
+            {
+                builder.Append("\n…（接续用 offset=").Append(last + 1).Append('）');
+            }
+
+            RecordRead(file);
+            return builder.ToString();
         }
 
-        public async Task<string> WriteFileAsync(
-            [Description("相对工作区的文件路径；父目录不存在时会自动创建。")] string path,
-            [Description("要写入的完整文本内容。")] string content,
-            CancellationToken cancellationToken)
+        public string SearchFiles(
+            [Description("正则表达式。")] string pattern,
+            [Description("文件 glob，默认 **/*。")] string glob = "**/*",
+            [Description("最多返回多少条，默认 80。")] int maxResults = WorkspaceSearch.MaxResultLines,
+            [Description("命中行前后各带几行上下文，默认 0。")] int contextLines = 0,
+            [Description("是否区分大小写，默认 false。")] bool caseSensitive = false)
         {
-            var file = ResolveWorkspacePath(path, allowRoot: false);
+            var result = search.Search(context.WorkspaceRoot, pattern, glob, maxResults, contextLines, caseSensitive);
 
-            // 写文件有副作用：默认先请用户确认（可在「设置 → 工具设置」里关掉）。
-            if (context.Settings.Current.ConfirmFileWrite)
+            foreach (var relative in result.MatchedPaths)
             {
-                var decision = await context.Approvals.RequestAsync(
-                    new ToolApprovalRequest(
-                        ToolId: "write_file",
-                        Kind: ToolApprovalKind.FileWrite,
-                        Title: "允许写入这个文件吗？",
-                        Summary: $"路径：{NormalizeRelative(path)}",
-                        Detail: content,
-                        Risk: AgentToolRisk.Medium,
-                        AllowSessionRemember: false,
-                        SessionKey: null),
-                    cancellationToken).ConfigureAwait(false);
-
-                if (decision == ToolApprovalDecision.Deny)
+                var full = WorkspacePath.Resolve(context.WorkspaceRoot, relative, allowRoot: false);
+                var hash = FileReadRegistry.HashFile(full);
+                if (hash is not null)
                 {
-                    return "用户拒绝了这次文件写入，未做任何修改。";
+                    context.Reads?.RecordRead(context.SessionId, relative, hash);
                 }
             }
 
-            var directory = Path.GetDirectoryName(file);
-            if (!string.IsNullOrEmpty(directory))
+            return result.Text;
+        }
+
+        public string GlobFiles(
+            [Description("glob，例如 **/*.cs。")] string pattern,
+            [Description("最多返回多少条，默认 200。")] int maxResults = 200)
+        {
+            var paths = search.Glob(context.WorkspaceRoot, pattern, maxResults);
+            return paths.Count == 0
+                ? "未找到匹配的路径；建议放宽 glob。"
+                : string.Join('\n', paths);
+        }
+
+        private void RecordRead(string fullPath)
+        {
+            if (context.Reads is null || !SandboxPathGuard.IsUnder(context.WorkspaceRoot, fullPath))
             {
-                Directory.CreateDirectory(directory);
+                return;
             }
 
-            // 同目录临时文件再原子替换：中途失败不会留下半截内容。
-            var temporary = $"{file}.tmp-{Guid.NewGuid():N}";
-            await File.WriteAllTextAsync(temporary, content, Encoding.UTF8, cancellationToken)
-                .ConfigureAwait(false);
-            File.Move(temporary, file, overwrite: true);
-
-            return $"已写入 {NormalizeRelative(path)}（{content.Length} 字符）。";
+            var relative = WorkspacePath.Relative(context.WorkspaceRoot, fullPath);
+            var hash = FileReadRegistry.HashFile(fullPath);
+            if (hash is not null)
+            {
+                context.Reads.RecordRead(context.SessionId, relative, hash);
+            }
         }
 
         private string ResolveReadPath(string relative)
@@ -170,7 +278,7 @@ public sealed class FileToolPack : IAgentToolPack
             {
                 try
                 {
-                    var candidate = ResolveUnder(root, relative, allowRoot: true);
+                    var candidate = WorkspacePath.Resolve(root, relative, allowRoot: true);
                     if (File.Exists(candidate) || Directory.Exists(candidate))
                     {
                         return candidate;
@@ -186,90 +294,5 @@ public sealed class FileToolPack : IAgentToolPack
                 ? throw last
                 : throw new InvalidOperationException($"路径不在允许的工作区内：{relative}");
         }
-
-        private string ResolveWorkspacePath(string relative, bool allowRoot) =>
-            ResolveUnder(context.WorkspaceRoot, relative, allowRoot);
-
-        private static string ResolveUnder(string root, string? relative, bool allowRoot)
-        {
-            var normalizedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
-            var value = string.IsNullOrWhiteSpace(relative) ? "." : relative.Trim();
-
-            if (value.Contains('\0'))
-            {
-                throw new InvalidOperationException("路径包含非法字符。");
-            }
-
-            if (value.StartsWith(@"\\", StringComparison.Ordinal)
-                || value.StartsWith("//", StringComparison.Ordinal)
-                || value.StartsWith(@"\\.\", StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException($"拒绝 UNC / 设备路径：{relative}");
-            }
-
-            if (Path.IsPathRooted(value))
-            {
-                throw new InvalidOperationException($"拒绝绝对路径：{relative}");
-            }
-
-            var segments = value
-                .Replace('\\', '/')
-                .Split('/', StringSplitOptions.RemoveEmptyEntries)
-                .Where(segment => segment != ".")
-                .ToArray();
-
-            if (segments.Any(segment => segment == ".."))
-            {
-                throw new InvalidOperationException($"拒绝包含 .. 的路径：{relative}");
-            }
-
-            if (!allowRoot && segments.Length == 0)
-            {
-                throw new InvalidOperationException("必须指定具体文件路径，不能是工作区根目录。");
-            }
-
-            var full = Path.GetFullPath(
-                Path.Combine(normalizedRoot, string.Join(Path.DirectorySeparatorChar, segments)));
-
-            if (!SandboxPathGuard.IsUnder(normalizedRoot, full))
-            {
-                throw new InvalidOperationException($"路径超出工作区范围：{relative}");
-            }
-
-            EnsureNoReparsePoint(normalizedRoot, segments);
-            return full;
-        }
-
-        /// <summary>
-        /// 逐段检查重解析点：符号链接 / junction 可能把真实目标指到工作区外，
-        /// 只用字符串前缀判断不够（§3.8）。
-        /// </summary>
-        private static void EnsureNoReparsePoint(string normalizedRoot, IReadOnlyList<string> segments)
-        {
-            var current = normalizedRoot;
-
-            foreach (var segment in segments)
-            {
-                current = Path.Combine(current, segment);
-
-                if (!File.Exists(current) && !Directory.Exists(current))
-                {
-                    // 后面不存在的目录 / 文件由调用方处理；已存在的部分都已经检查过。
-                    return;
-                }
-
-                var attributes = File.GetAttributes(current);
-                if ((attributes & FileAttributes.ReparsePoint) != 0)
-                {
-                    throw new InvalidOperationException("路径包含符号链接或 junction，已拒绝。");
-                }
-            }
-        }
-
-        private static string NormalizeRelative(string path) =>
-            path.Replace('\\', '/').TrimStart('/');
-
-        private static string Trim(string text, int max = MaxResultChars) =>
-            text.Length <= max ? text : string.Concat(text.AsSpan(0, max), "\n…（已截断）");
     }
 }
