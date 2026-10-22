@@ -189,6 +189,19 @@ public sealed class PdfExtractTests
     }
 
     [Fact]
+    public async Task Ocr请求被明确拒绝而不是静默忽略()
+    {
+        using var job = new PdfJob(PdfFixture.Create("x"));
+        job.WriteJobJson(pages: "1", ocr: true);
+
+        var run = await RunAsync(job);
+
+        Assert.Equal(0, run.ExitCode);
+        Assert.Contains("OCR", ReadResult(job).Error);
+        Assert.False(File.Exists(Path.Combine(job.Output, SandboxProtocol.PdfResultFileName)));
+    }
+
+    [Fact]
     public async Task 缺少inputFile时按协议错误拒绝()
     {
         using var job = new PdfJob(PdfFixture.Create("x"));
@@ -290,7 +303,8 @@ public sealed class PdfExtractTests
             SandboxJobMode mode = SandboxJobMode.PdfExtract,
             string? inputFile = "input/document.pdf",
             string? pages = "1",
-            int maxChars = 20_000)
+            int maxChars = 20_000,
+            bool ocr = false)
         {
             var document = new SandboxJobDocument
             {
@@ -299,6 +313,7 @@ public sealed class PdfExtractTests
                 InputFile = inputFile,
                 Pages = pages,
                 MaxChars = maxChars,
+                Ocr = ocr,
                 WorkingDirectory = "work",
                 TimeoutSeconds = 30,
                 MaxOutputBytes = 1024 * 1024

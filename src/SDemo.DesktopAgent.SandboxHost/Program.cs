@@ -114,6 +114,14 @@ internal static class Program
         {
             throw new SandboxProtocolException("PDF 模式缺少 inputFile。");
         }
+
+        // OCR 是预留能力：目前没有任何实现，显式请求必须失败，不能悄悄退化成“只读文本层”。
+        if (job.Ocr)
+        {
+            throw job.Mode is SandboxJobMode.PdfExtract or SandboxJobMode.PdfInfo
+                ? new SandboxProtocolException("OCR 尚未实现（ocr=true 暂不支持）。")
+                : new SandboxProtocolException("ocr 只适用于 PDF 模式。");
+        }
     }
 
     private static async Task<SandboxResultDocument> ExecuteAsync(SandboxJobDocument job, string jobRoot) =>

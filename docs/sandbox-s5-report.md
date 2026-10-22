@@ -26,6 +26,9 @@
 - 结果原子写 `output/pdf.json`（`.tmp` + `File.Move(overwrite: true)`），同时写 `result.json` 报告执行状态；
 - `ResultWriter.WriteAtomic<T>` 泛型化，PDF / 脚本共用。
 
+`job.json` 预留 `ocr` 字段：S5 没有任何 OCR 实现，显式 `ocr=true` 会被 host 按协议错误拒绝
+（`OCR 尚未实现（ocr=true 暂不支持）。`），而不是悄悄退化成“只读文本层”。
+
 `Program.Validate` 对 PDF 模式要求 `inputFile`，并按 `PdfExtract` / `PdfInfo` 分发。
 依赖锁定 `PdfPig` 0.1.16（见 §3 偏差 1）。
 
@@ -123,9 +126,9 @@ S5 给 host 新增了 PdfPig 依赖，S4 留下的旧安装会缺 DLL，导致�
   - `PdfSidecarTests`：路径约定、UTF-8 无 BOM、目标目录不存在时返回 `null`；
   - `AgentAttachmentRootsTests`：合法 session 目录、目录不存在、非法 session id（`..` / 分隔符 / 空串）；
   - `SandboxSettingsTests`：默认 `PdfAutoExtract = true`。
-- `SDemo.DesktopAgent.Sandbox.Tests`：**192 通过**（S4 为 139，新增 53）：
-  - `PdfExtractTests`（18）：直接运行 `SandboxHost`，覆盖页范围、默认 5 页、字符截断、空白页 / 无文本层、
-    损坏 / 加密、`PdfInfo`、`inputFile` 逃逸与缺失、文件不存在、`pdf.json` 原子写；
+- `SDemo.DesktopAgent.Sandbox.Tests`：**193 通过**（S4 为 139，新增 54）：
+  - `PdfExtractTests`（19）：直接运行 `SandboxHost`，覆盖页范围、默认 5 页、字符截断、空白页 / 无文本层、
+    损坏 / 加密、`PdfInfo`、`inputFile` 逃逸与缺失、文件不存在、`pdf.json` 原子写、OCR 预留位显式拒绝；
   - `PdfJobServiceTests`（7）：真实 AppContainer 端到端，覆盖指定页 / 默认页数 / 越界 / 加密 / 损坏 /
     沙箱关闭 / 非 PDF 与不存在文件，并断言 job 目录无残留；
   - `PdfToolPackTests`（16）：工作区与附件根、绝对路径允许根内、越界 / `..` / UNC 拒绝、扩展名、空文件、
@@ -176,9 +179,16 @@ S5 给 host 新增了 PdfPig 依赖，S4 留下的旧安装会缺 DLL，导致�
    默认开启以便开箱即用，用户可在设置中关闭。
 10. **聊天指令**：新增 PDF 相关一句，手册未要求，属于提示词加固。
 
+以上第 1–4 项（绝对路径允许根内放开、PDF 默认启用、`pdf_info` 不读元数据、job 目录即时删除）
+已在评审中与用户确认保留；OCR 相关见 §5。
+
 ## 5. 已知限制 / 后续
 
-- 无 OCR：扫描件只能明确提示“无文本层”。
+- **OCR 预留、尚未实现**：
+  - 协议层已在 `job.json` 保留 `ocr` 字段，`SandboxHost` 对 `ocr=true` 明确拒绝，避免静默忽略；
+  - 后续接入时只需在 `PdfCommand` 内按 `ocr` 分支调用 OCR 引擎（建议仍在 helper 进程内运行，保持崩溃隔离与无网络），
+    在 `pdf.json` 增加 `ocrUsed` / 引擎标识，并在设置页加“启用 OCR”开关与相应文案；
+  - 当前扫描件只能明确提示“无文本层”，不会假装读到了内容。
 - 加密 PDF 不支持密码；后续可让用户输入密码，经宿主内存传给 helper（不要写进 `job.json`）。
 - `page.Text` 是 PdfPig 的阅读顺序近似，复杂多栏排版可能串行；S6 之后再考虑 `ContentOrderTextExtractor`。
 - 附件固定提取前 3 页 / 16K，暂不可配置。

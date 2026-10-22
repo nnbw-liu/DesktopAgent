@@ -34,6 +34,14 @@ public sealed record SandboxJobDocument
     public string? InputFile { get; init; }
     public string? Pages { get; init; }
     public int MaxChars { get; init; } = 20_000;
+
+    /// <summary>
+    /// 预留给 OCR（S5 未实现）：显式 <c>true</c> 会被 SandboxHost 按协议错误拒绝，
+    /// 避免“宿主以为要求了 / helper 静默忽略”的不一致。后续接入 OCR 时在
+    /// <c>PdfCommand</c> 里按这个字段分流，并在 <c>pdf.json</c> 增加 <c>ocrUsed</c> 等字段。
+    /// </summary>
+    public bool Ocr { get; init; }
+
     public string WorkingDirectory { get; init; } = "work";
     public int TimeoutSeconds { get; init; } = 30;
     public int MaxOutputBytes { get; init; } = 8 * 1024 * 1024;
