@@ -330,6 +330,10 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 
 多步任务可以用 `todo_write` 维护计划（整体替换、会话级持久化、标题下面板展开）；有编辑但之后没有成功 build/test 时会显示「未验证改动」徽标，可手动运行验证。每次编辑前会创建 checkpoint，`EditSummaryPanel` 可「撤销最近一次改动」，冲突（检查点后又被外部修改）会先要求确认。同一工具调用连续 3 次会收到宿主提示，单轮超过 8 次会被阻断并要求用文本总结。详见 [docs/task-loop.md](docs/task-loop.md)。
 
+## 小模型模式（P6）
+
+8K / 无工具 / 名称含 `3b`、`4b`、`7b` 等模型自动进入 Compact：短系统提示（≤250 token）、技能 ≤600 token、最多 4 个工具、关键词路由、最大 6 次工具调用；可手动切回完整模式。提供 `code_edit` 单工具模式（read/search/patch 三合一）与工具参数修复函数。实测 `qwen3-4b-thinking-2507` 在 8K/Compact 下无法完成工具任务（思考 token 占满输出），不建议把 4B thinking 模型用于工具任务；详见 [small-model-mode.md](docs/small-model-mode.md)。
+
 ## 技能与工具
 输入框底部现在是「上传文件 + 常用技能」和右侧的「工具 + 模型 + 发送」：
 
@@ -467,7 +471,7 @@ S6 行为要点：
 
 使用方式：侧栏「新建聊天室」下方有「翻译」入口，点一下就是预选翻译的空会话；输入框底部的「翻译」chip 选中后发送走插件 Run；任意助手消息底部（时间右侧）的插件图标点一下，无参数直接跑、有参数弹出语言面板，产物是挂在原消息下的卡片，重启仍在、也不会进入下一轮上下文。`segments` 能力的卡片与消息都带「对照 / 译文」开关，切换只是重新渲染、不重新请求；呈现方式按会话记忆，新会话默认值在「设置 → 插件」。想关掉或调整上限也在「设置 → 插件」。
 
-**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（Core 当前 506 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 214 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令、构建 / 测试解析、todo / 验证门 / checkpoint / 循环保护、插件、沙箱与路径安全等。
+**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（Core 当前 532 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 214 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令、构建 / 测试解析、todo / 验证门 / checkpoint / 循环保护、小模型模式 / 路由 / 工具修复、插件、沙箱与路径安全等。
 
 ## 主题实现
 

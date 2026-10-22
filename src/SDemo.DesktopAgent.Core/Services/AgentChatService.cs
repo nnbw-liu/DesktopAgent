@@ -106,6 +106,29 @@ public sealed class AgentChatService : IAgentChatService
             plan.Metrics?.RunId);
 
         var tools = _tools.Create(context, plan.ToolPacks, plan.Metrics);
+        var agentMode = Context.AgentModeResolver.Resolve(
+            plan.Context.Profile,
+            plan.ModelId,
+            _settings.Current.Agent.Mode);
+
+        if (agentMode == Context.AgentMode.Compact)
+        {
+            if (plan.Metrics is not null)
+            {
+                plan.Metrics.Guard.Limit = Math.Clamp(_settings.Current.Agent.CompactMaxToolCalls, 1, 12);
+            }
+
+            var available = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
+            var userInput = plan.Context.Messages
+                .LastOrDefault(message => message.Role == ChatRole.User)?.Text ?? string.Empty;
+            var recent = plan.Metrics?.ToolTrace.Select(entry => entry.ToolId).TakeLast(6).ToArray() ?? [];
+            var selected = ToolRouter.Select(
+                new ToolSelectionContext(userInput, recent, available, agentMode),
+                _settings.Current.Agent.CompactMaxTools);
+
+            tools = tools.Where(tool => selected.Contains(tool.Name, StringComparer.Ordinal)).ToList();
+        }
+
         var agent = CreateAgent(plan.Provider, plan.ModelId, tools, plan.Context, telemetry);
 
         var pendingCalls = new Dictionary<string, (string Name, string? Digest)>(StringComparer.Ordinal);
@@ -174,7 +197,8 @@ public sealed class AgentChatService : IAgentChatService
             Counter: new HeuristicTokenCounter(),
             CalibrationFactor: plan.Report.CalibrationFactor,
             KeepRecentTurns: settings.KeepRecentTurns,
-            ToolResultChars: settings.MidTurnToolResultChars);
+            ToolResultChars: settings.MidTurnToolResultChars,
+            MaxOutputTokens: Math.Clamp(plan.Profile.MaxOutputTokens, 128, 8192));
 
         // AsIChatClient() 是 OpenAI ChatClient → IChatClient 的桥；装饰器加在 AsAIAgent 之前，
         // 保证 FICC 在它外层（见 MidTurnPipelineSpikeTests）。

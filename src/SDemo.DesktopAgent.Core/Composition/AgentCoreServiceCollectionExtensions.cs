@@ -26,6 +26,7 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<IAgentToolPack, FileToolPack>();
         services.AddSingleton<IAgentToolPack, EditToolPack>();
         services.AddSingleton<IAgentToolPack, TodoToolPack>();
+        services.AddSingleton<IAgentToolPack, CodeEditToolPack>();
 
         // P3：读前写注册表（按会话 + 2 小时 TTL）。
         services.AddSingleton<IFileReadRegistry, FileReadRegistry>();

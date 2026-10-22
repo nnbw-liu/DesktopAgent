@@ -57,7 +57,7 @@ internal static class Program
             DisplayName = source.DisplayName,
             BaseUrl = source.BaseUrl,
             ApiKey = source.ApiKey,
-            Models = [new ModelEntry { Id = modelId, Profile = ModelProfilePresets.FromPreset("32K") }]
+            Models = [new ModelEntry { Id = modelId, Profile = BuildProfile() }]
         };
 
         var settings = new StubSettings();
@@ -67,7 +67,7 @@ internal static class Program
             DirectRunEnabled = true,
             BuildTimeoutSeconds = 600
         };
-        settings.Current.Tools.SetPackEnabled("command", true);
+        settings.Current.Tools.SetPackEnabled("command", true); var mode = Environment.GetEnvironmentVariable("P5_MODE") ?? "Auto"; settings.Current.Agent.Mode = Enum.TryParse<SDemo.DesktopAgent.Context.AgentModePreference>(mode, true, out var parsedMode) ? parsedMode : SDemo.DesktopAgent.Context.AgentModePreference.Auto;
         settings.Current.Workspaces.Add(new Workspace
         {
             Id = "bench",
@@ -274,6 +274,16 @@ internal static class Program
             用 apply_patch 修改，不要运行构建。最多 6 次工具调用。
             """)
     ];
+
+    private static ModelProfile BuildProfile()
+    {
+        var profile = ModelProfilePresets.FromPreset(
+            Environment.GetEnvironmentVariable("P5_PROFILE") ?? "32K") ?? ModelProfile.Unknown;
+
+        return int.TryParse(Environment.GetEnvironmentVariable("P5_MAX_OUTPUT"), out var max) && max > 0
+            ? profile with { MaxOutputTokens = max }
+            : profile;
+    }
 
     private static AppSettings LoadSettings(string path)
     {

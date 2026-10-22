@@ -52,4 +52,7 @@ public sealed class AppSettings
 
     /// <summary>编辑检查点（P5）。</summary>
     public SDemo.DesktopAgent.Execution.CheckpointSettings Checkpoints { get; set; } = new();
+
+    /// <summary>小模型 / 工具面（P6）。</summary>
+    public AgentSettings Agent { get; set; } = new();
 }

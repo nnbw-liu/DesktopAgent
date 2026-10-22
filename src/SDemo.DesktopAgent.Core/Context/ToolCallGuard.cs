@@ -16,6 +16,9 @@ public sealed class ToolCallGuard
     public const int MaxCalls = 8;
     public const int RepeatWarningAt = 3;
 
+    /// <summary>本轮的调用上限；P6 Compact 可降到 6。</summary>
+    public int Limit { get; set; } = MaxCalls;
+
     private string? _lastKey;
     private int _repeats;
 
@@ -30,12 +33,12 @@ public sealed class ToolCallGuard
         _lastKey = key;
         TotalCalls++;
 
-        if (TotalCalls > MaxCalls)
+        if (TotalCalls > Math.Max(1, Limit))
         {
             LoopsPrevented++;
             return new ToolCallGuardDecision(
                 false,
-                $"本轮工具调用已达 {MaxCalls} 次上限，禁止继续调用；请立即用文本总结当前进展、未完成项与风险。",
+                $"本轮工具调用已达 {Limit} 次上限，禁止继续调用；请立即用文本总结当前进展、未完成项与风险。",
                 TotalCalls,
                 _repeats);
         }

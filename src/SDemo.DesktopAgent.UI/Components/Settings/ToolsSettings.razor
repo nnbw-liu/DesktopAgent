@@ -134,6 +134,16 @@
                    @onchange="ToggleDirectRun" />
         </label>
 
+        <label class="field">
+            <span class="field-label">小模型模式</span>
+            <select class="field-input" value="@Settings.Current.Agent.Mode" @onchange="ChangeAgentMode">
+                <option value="Auto">自动（按窗口 / 模型名判断）</option>
+                <option value="Full">完整</option>
+                <option value="Compact">精简（≤4 个工具、短提示）</option>
+            </select>
+            <span class="field-hint">8K / 无工具 / 名称含 3b、4b、7b 等默认走精简；手动覆盖优先。</span>
+        </label>
+
         <div class="field field--wide">
             <span class="field-label">白名单（逗号分隔）</span>
             <input class="field-input" @bind="_allowlistText" @bind:event="oninput" />
@@ -825,8 +835,17 @@
         _executionMessage = "直跑设置已保存。";
     }
 
-    private void ToggleAutoVerify(ChangeEventArgs args)
+    private void ChangeAgentMode(ChangeEventArgs args)
     {
+        if (Enum.TryParse<SDemo.DesktopAgent.Context.AgentModePreference>(
+                args.Value?.ToString(), true, out var mode))
+        {
+            Settings.Current.Agent.Mode = mode;
+            Settings.Save();
+        }
+    }
+
+    private void ToggleAutoVerify(ChangeEventArgs args)    {
         Settings.Current.Verification.AutoVerifyAfterEdit = args.Value is true;
         Settings.Save();
     }

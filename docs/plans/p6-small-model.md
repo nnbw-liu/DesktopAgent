@@ -1,7 +1,7 @@
 # P6 — 小模型适配（第 6 期）
 
-> 状态：未开始 · 估时 4 人日 · 前置：P4（与 P5 可并行） · 出口：8K 模型也能完成简单任务
-> 关联总纲：[vibe-coding-roadmap.md](vibe-coding-roadmap.md) · 决策：双模（共享同一套上下文策略）
+> 状态：🚧 实现完成，本地 8K 验证未达标（4B 0/2）
+> 关联总纲：[vibe-coding-roadmap.md](vibe-coding-roadmap.md) · 报告：[p6-report.md](p6-report.md)
 
 ## 1. 本期要解决的问题
 
@@ -160,14 +160,14 @@ dotnet run --project tools/AgentEval -- --config eval/compact.json --task T01 --
 
 | # | 任务 | 交付物 | 涉及文件 | 估时 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 6.1 | 模式判定 | `AgentMode`、自动规则、会话覆盖、设置项 | `Core/Context/AgentModeResolver.cs` | 0.5 | ☐ |
-| 6.2 | 短提示词 | `SystemPrompts`、技能截断、模式接线 | `AgentChatService.cs` | 0.5 | ☐ |
-| 6.3 | 工具路由 | `IToolRouter`、意图规则、上限、报告字段 | `Core/Tools/ToolRouter.cs` | 1.0 | ☐ |
-| 6.4 | 单工具模式 | `code_edit` 复合工具、开关、行为一致性测试 | `Core/Tools/CodeEditTool.cs` | 0.5 | ☐ |
-| 6.5 | 调用修复 | 去围栏/抽 JSON/类型纠正/错误回传/统计 | `Core/Context/ResilientChatClient.cs` | 1.0 | ☐ |
-| 6.6 | 评测运行器 | `tools/AgentEval`、任务格式、结果 JSON | `tools/AgentEval/*` | 1.0 | ☐ |
-| 6.7 | 矩阵运行 | 至少 2 个模型 × 2 模式 × 5 任务，结果归档 | `docs/plans/eval-matrix.md` | 1.0 | ☐ |
-| 6.8 | 文档与报告 | `docs/small-model-mode.md`、`p6-report.md` | docs | 0.5 | ☐ |
+| 6.1 | 模式判定 | `AgentMode`、自动规则、会话覆盖、设置项 | `Core/Context/AgentModeResolver.cs` | 0.5 | ✅ |
+| 6.2 | 短提示词 | `SystemPrompts`、技能截断、模式接线 | `AgentChatService.cs` | 0.5 | ✅ |
+| 6.3 | 工具路由 | `IToolRouter`、意图规则、上限、报告字段 | `Core/Tools/ToolRouter.cs` | 1.0 | ✅ |
+| 6.4 | 单工具模式 | `code_edit` 复合工具、开关、行为一致性测试 | `Core/Tools/CodeEditTool.cs` | 0.5 | ✅ |
+| 6.5 | 调用修复 | 去围栏/抽 JSON/类型纠正/错误回传/统计 | `Core/Context/ResilientChatClient.cs` | 1.0 | ⚠ 纯函数，未接流 |
+| 6.6 | 评测运行器 | `tools/AgentEval`、任务格式、结果 JSON | `tools/AgentEval/*` | 1.0 | ⚠ 复用 P5Bench |
+| 6.7 | 矩阵运行 | 至少 2 个模型 × 2 模式 × 5 任务，结果归档 | `docs/plans/eval-matrix.md` | 1.0 | ❌ 本地 4B 0/2 |
+| 6.8 | 文档与报告 | `docs/small-model-mode.md`、`p6-report.md` | docs | 0.5 | ✅ |
 
 ## 5. 测试清单
 
@@ -188,12 +188,12 @@ dotnet run --project tools/AgentEval -- --config eval/compact.json --task T01 --
 
 ## 6. 验收标准
 
-- [ ] Compact 模式下系统提示 ≤ 250 token、工具 ≤ 4 个、技能 ≤ 600 token。
-- [ ] 8K 7B 模型 ≥ 3/5 任务成功；3B ≥ 2/5；32K ≥ 4/5（按评测矩阵）。
+- [x] Compact 模式下系统提示 ≤ 250 token、工具 ≤ 4 个、技能 ≤ 600 token。
+- [ ] 8K 7B 模型 ≥ 3/5 任务成功；3B ≥ 2/5；32K ≥ 4/5（按评测矩阵）。本地 4B 8K 实测 0/2。
 - [ ] 工具调用解析失败率 ≤ 10%；修复后成功率提升有数据。
 - [ ] 单工具模式与多工具模式的对比结论写进报告（默认值据此确定）。
-- [ ] 大模型模式无回归（P1–P5 的验收用例重跑通过）。
-- [ ] 新增测试 ≥ 20 个；现有测试全绿。
+- [x] 大模型模式无回归（P1–P5 的验收用例重跑通过）。
+- [x] 新增测试 ≥ 20 个；现有测试全绿。
 
 ## 7. 风险与回退
 
@@ -215,7 +215,7 @@ dotnet run --project tools/AgentEval -- --config eval/compact.json --task T01 --
 
 ## 9. 完成定义（DoD）
 
-- [ ] 评测矩阵可复现（给出命令与配置）；
-- [ ] 结论明确：哪些模型/模式推荐，哪些不推荐；
-- [ ] 总纲状态表改为 ✅，P7 直接使用该运行器；
-- [ ] `docs/small-model-mode.md` 写清降级策略与已知失败模式。
+- [ ] 评测矩阵可复现（给出命令与配置）；本地 4B 数据已记录，完整矩阵未跑。
+- [ ] 结论明确：哪些模型/模式推荐，哪些不推荐（4B 不推荐，7B+ 待测）。
+- [x] 总纲状态表改为 🚧（实现完成，矩阵未达标），P7 可直接使用该运行器。
+- [x] `docs/small-model-mode.md` 写清降级策略与已知失败模式。
