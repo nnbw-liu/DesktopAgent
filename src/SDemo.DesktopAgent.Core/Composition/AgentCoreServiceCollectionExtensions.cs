@@ -28,6 +28,9 @@ public static class AgentCoreServiceCollectionExtensions
 
         // P3：读前写注册表（按会话 + 2 小时 TTL）。
         services.AddSingleton<IFileReadRegistry, FileReadRegistry>();
+        services.AddSingleton<SDemo.DesktopAgent.Execution.SessionGrantStore>();
+        services.AddSingleton<SDemo.DesktopAgent.Execution.IWorkspaceWarmupService,
+            SDemo.DesktopAgent.Execution.UnavailableWorkspaceWarmupService>();
         services.AddSingleton<WorkspaceContext>();
         services.AddSingleton<ChangeApplier>();
         services.AddSingleton<ChatStore>();

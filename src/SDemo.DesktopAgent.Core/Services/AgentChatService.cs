@@ -27,7 +27,8 @@ public sealed record AgentRunPlan(
     ContextPlan Context,
     IReadOnlySet<string> ToolPacks,
     string SessionId = "",
-    AgentRunMetrics? Metrics = null);
+    AgentRunMetrics? Metrics = null,
+    ChatSession? Session = null);
 
 /// <summary>
 /// 通过 Microsoft Agent Framework 调用模型。只负责传输、流式解析与工具轨迹采集；
@@ -100,7 +101,8 @@ public sealed class AgentChatService : IAgentChatService
             _sandbox,
             _audit,
             _reads,
-            plan.Metrics);
+            plan.Metrics,
+            plan.Session);
 
         var tools = _tools.Create(context, plan.ToolPacks, plan.Metrics);
         var agent = CreateAgent(plan.Provider, plan.ModelId, tools, plan.Context, telemetry);

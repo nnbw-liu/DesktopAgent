@@ -48,7 +48,8 @@ public sealed record ToolContext(
     ISandboxJobService SandboxJobs,
     IToolAuditLog Audit,
     IFileReadRegistry? Reads = null,
-    AgentRunMetrics? Metrics = null);
+    AgentRunMetrics? Metrics = null,
+    SDemo.DesktopAgent.Models.ChatSession? Session = null);
 
 /// <summary>
 /// 工具包：搜索 / 文件 / PowerShell 都从这里进工具链。

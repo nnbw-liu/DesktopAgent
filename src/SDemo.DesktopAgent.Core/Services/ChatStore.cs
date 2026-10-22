@@ -6,6 +6,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Data;
+using SDemo.DesktopAgent.Execution;
 using SDemo.DesktopAgent.Models;
 
 namespace SDemo.DesktopAgent.Services;
@@ -255,6 +256,9 @@ public sealed class ChatStore
         record.SummaryThroughOrder = session.HasSummary ? session.SummaryThroughOrder : 0;
         record.SummaryTokens = session.HasSummary ? session.SummaryTokens : 0;
         record.SummaryUpdatedAt = session.HasSummary ? session.SummaryUpdatedAt : null;
+        record.LastVerificationJson = session.LastVerification is null
+            ? null
+            : JsonSerializer.Serialize(session.LastVerification, JsonOptions);
 
         var existing = record.Messages.ToDictionary(message => message.Id, StringComparer.Ordinal);
         var keep = new HashSet<string>(StringComparer.Ordinal);
@@ -372,7 +376,8 @@ public sealed class ChatStore
             ("Summary", "TEXT NULL"),
             ("SummaryThroughOrder", "INTEGER NOT NULL DEFAULT 0"),
             ("SummaryUpdatedAt", "TEXT NULL"),
-            ("SummaryTokens", "INTEGER NOT NULL DEFAULT 0")
+            ("SummaryTokens", "INTEGER NOT NULL DEFAULT 0"),
+            ("LastVerificationJson", "TEXT NULL")
         ]),
         ("messages",
         [
@@ -584,12 +589,30 @@ public sealed class ChatStore
 
             return entries
                 .Where(entry => !string.IsNullOrWhiteSpace(entry.ToolId))
-                .TakeLast(ToolTraceFormatter.MaxEntriesPerMessage)
+                .TakeLast(AgentRunMetrics.MaxStoredEntries)
                 .ToList();
         }
         catch (JsonException)
         {
             return [];
+        }
+    }
+
+    /// <summary>最近一次验证结果；坏数据降级为 null。</summary>
+    private static VerificationRecord? DeserializeVerification(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<VerificationRecord>(json, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 
@@ -612,6 +635,7 @@ public sealed class ChatStore
             SummaryUpdatedAt = record.SummaryUpdatedAt,
             SummaryTokens = record.SummaryTokens,
             SummaryIsFallback = SummaryFormat.IsFallback(record.Summary),
+            LastVerification = DeserializeVerification(record.LastVerificationJson),
             Messages = record.Messages
                 .OrderBy(message => message.Order)
                 .Select(message => new ChatMessage(message.Role, message.Content)

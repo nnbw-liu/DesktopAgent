@@ -45,6 +45,36 @@ public sealed class ToolPackCompatibilityTests
     }
 
     [Fact]
+    public async Task 工作区信息带构建与测试命令()
+    {
+        using var temp = new TempDirectory();
+        var settings = new StubSettingsService();
+        settings.Current.Workspaces.Add(new Workspace
+        {
+            Id = "w1",
+            Name = "Demo",
+            Path = temp.Root,
+            BuildCommand = "dotnet build Demo.sln -v minimal",
+            TestCommand = "dotnet test Demo.sln --no-build"
+        });
+        var context = new ToolContext(
+            "session",
+            temp.Root,
+            [],
+            settings,
+            new ToolApprovalService(),
+            new StubSandboxJobService(),
+            new NullAuditLog());
+
+        var tool = Assert.IsAssignableFrom<AIFunction>(
+            new FileToolPack().Create(context).Single(function => function.Name == "workspace_info"));
+        var result = await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>()));
+
+        Assert.Contains("构建命令：dotnet build Demo.sln -v minimal", result?.ToString());
+        Assert.Contains("测试命令：dotnet test Demo.sln --no-build", result?.ToString());
+    }
+
+    [Fact]
     public async Task 搜索命中会登记读前写记录()
     {
         using var temp = new TempDirectory();

@@ -40,4 +40,10 @@ public sealed class AppSettings
 
     /// <summary>上下文预算与裁剪（P1 起；旧文件没有该节点时按默认值）。</summary>
     public ContextSettings Context { get; set; } = new();
+
+    /// <summary>直跑与命令白名单（P4 起；默认关闭）。</summary>
+    public ExecutionSettings Execution { get; set; } = new();
+
+    /// <summary>热工作区（P4 可选；默认关闭）。</summary>
+    public WarmWorkspaceSettings WarmWorkspace { get; set; } = new();
 }

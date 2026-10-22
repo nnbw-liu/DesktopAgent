@@ -8,7 +8,7 @@
     <div class="modal-backdrop">
         <div class="modal modal--approval" role="dialog" aria-modal="true" aria-labelledby="approval-title">
             <h2 class="modal-title" id="approval-title">@request.Title</h2>
-            <p class="modal-sub">@KindHint(request.Kind)</p>
+            <p class="modal-sub">@KindHint(request)</p>
 
             <div class="approval-meta">
                 <span class="approval-risk approval-risk--@RiskClass(request.Risk)">风险：@RiskText(request.Risk)</span>
@@ -60,10 +60,12 @@
 
     private void Resolve(ToolApprovalDecision decision) => Approvals.Resolve(decision);
 
-    private static string KindHint(ToolApprovalKind kind) => kind switch
+    private static string KindHint(ToolApprovalRequest request) => request.Kind switch
     {
         ToolApprovalKind.FileWrite => "模型请求写入文件，确认后才会落盘。",
         ToolApprovalKind.FileEdit => "模型请求修改工作区文件；下方是统一 diff，确认后才会落盘。",
+        ToolApprovalKind.ProcessExecution when request.ToolId == "run_command" =>
+            "模型请求在宿主直跑这条命令：不受沙箱网络隔离，可访问真实工作区；参数不经过 shell。",
         ToolApprovalKind.ProcessExecution =>
             "脚本将在一个没有网络、只能访问工作区副本的沙箱中运行。请确认脚本内容与实际执行一致。",
         ToolApprovalKind.ApplyChanges => "将把沙箱内的改动写回真实工作区。",

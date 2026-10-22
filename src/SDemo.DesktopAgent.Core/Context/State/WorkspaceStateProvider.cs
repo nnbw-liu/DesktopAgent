@@ -74,7 +74,7 @@ public sealed class WorkspaceStateProvider
             tree,
             edits,
             actions,
-            LastVerification: null,
+            LastVerification: session?.LastVerification?.Format(),
             PinnedCount: session?.Messages.Count(message => message.IsPinned) ?? 0);
     }
 

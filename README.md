@@ -322,8 +322,11 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 - **UI**：输入框右下角是占用环（估算 / 输入预算），>80% 变黄、>95% 变红；点开看系统提示词 / 技能 / 历史 / 附件 / 轨迹 / 摘要 / 状态包 / pin 的分段明细。被压缩的位置有分隔线，点开可只读查看原文、单条 pin；会话 `⋯` 菜单有「压缩现在 / 清空摘要」。宿主提示（溢出重试、需压缩、自动摘要）显示在消息区末尾，不会进入上下文。
 - **模型窗口**：模型编辑器里每个模型可单独选「自动 / 8K / 32K / 128K / 200K」，自动档按模型名与家族推断，拿不准就选 8K（只会更保守）。
 
-## 技能与工具
+## 内循环（P4）
 
+构建 / 测试默认进沙箱；在「设置 → 工具设置 → 内循环」显式打开直跑后，`run_command` 可以跳过沙箱复制的等待。直跑只放行白名单可执行文件，参数不经过 shell，每次执行写审计；安全命令可「本会话允许」，高风险命令永不提供。默认关闭，关闭时 `run_powershell` 与沙箱行为不变。构建 / 测试结果会解析成验证记录，落库并进入状态包。详见 [docs/inner-loop.md](docs/inner-loop.md)。
+
+## 技能与工具
 输入框底部现在是「上传文件 + 常用技能」和右侧的「工具 + 模型 + 发送」：
 
 - **＋ 上传文件**：多选，附件显示在 Header（新聊天室在工作区选择器下面），发送后随消息落库。
@@ -335,6 +338,7 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 | 联网搜索 | `web_search` | 默认 Bing RSS；可在「设置 → 工具设置」换成自定义搜索 API（地址 + Key） |
 | `files`（只读，内置） | `list_files` / `list_tree` / `read_file` / `search_files` / `glob_files` / `workspace_info` | 按行读带行号与续读；搜索 / glob 纯 .NET；排除 `bin` / `obj` / `.git` 等；路径限制在工作区内 |
 | `edits`（写入，内置） | `apply_patch` / `write_file` | `apply_patch` 应用 unified diff（多文件、全有或全无）；写已有文件前必须先 `read_file`，且审批框显示 diff |
+| `command`（直跑，默认关闭） | `run_command` | 白名单命令（dotnet build / test 等）在宿主直跑；参数不经过 shell、每次审计、可本会话授权；`run_powershell` 仍在沙箱 |
 
 ### 技能格式
 
@@ -459,7 +463,7 @@ S6 行为要点：
 
 使用方式：侧栏「新建聊天室」下方有「翻译」入口，点一下就是预选翻译的空会话；输入框底部的「翻译」chip 选中后发送走插件 Run；任意助手消息底部（时间右侧）的插件图标点一下，无参数直接跑、有参数弹出语言面板，产物是挂在原消息下的卡片，重启仍在、也不会进入下一轮上下文。`segments` 能力的卡片与消息都带「对照 / 译文」开关，切换只是重新渲染、不重新请求；呈现方式按会话记忆，新会话默认值在「设置 → 插件」。想关掉或调整上限也在「设置 → 插件」。
 
-**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（当前全量 433 个用例，覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、插件、沙箱与路径安全等）。
+**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（Core 当前 479 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 214 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令、构建 / 测试解析、插件、沙箱与路径安全等。
 
 ## 主题实现
 
