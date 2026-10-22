@@ -482,24 +482,217 @@ public sealed class SandboxJobService : ISandboxJobService
         int maxChars,
         CancellationToken cancellationToken = default)
     {
-        var availability = await GetAvailabilityAsync(cancellationToken).ConfigureAwait(false);
-        var reason = availability.Reason ?? "沙箱不可用。";
+        var settings = _settings.Current.Sandbox;
 
-        if (!availability.Available || !availability.Verified)
+        if (!settings.Enabled)
         {
-            return new PdfExtraction(
-                Ok: false,
-                PageCount: 0,
-                Encrypted: false,
-                HasTextLayer: false,
-                Pages: [],
-                Truncated: false,
-                Message: reason);
+            return PdfFailure("执行沙箱已在设置中关闭。");
         }
 
-        // S5 实现：把 PDF 复制到 input、由 SandboxHost 解析、读回 pdf.json。
-        throw new NotSupportedException("沙箱 PDF 解析在 S5 阶段实现。");
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return PdfFailure("PDF 路径为空。");
+        }
+
+        string fullPath;
+        try
+        {
+            fullPath = Path.GetFullPath(path);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return PdfFailure($"PDF 路径无效：{path}");
+        }
+
+        if (SandboxPathGuard.IsUnder(_directory.Root, fullPath))
+        {
+            return PdfFailure("PDF 不能位于沙箱目录内。");
+        }
+
+        if (!File.Exists(fullPath))
+        {
+            return PdfFailure("PDF 文件不存在。");
+        }
+
+        if (!string.Equals(Path.GetExtension(fullPath), ".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return PdfFailure("只支持 .pdf 文件。");
+        }
+
+        var fileLength = new FileInfo(fullPath).Length;
+        if (fileLength <= 0)
+        {
+            return PdfFailure("PDF 文件为空。");
+        }
+
+        if (fileLength > PdfLimits.MaxToolFileBytes)
+        {
+            return PdfFailure(
+                $"PDF 过大（{fileLength / 1024 / 1024} MB），上限 {PdfLimits.MaxToolFileBytes / 1024 / 1024} MB。");
+        }
+
+        // 页范围先做语法 / 上限校验；真实页数由 SandboxHost 打开文档后再验证。
+        if (!string.IsNullOrWhiteSpace(pages) && !PdfPageRange.TryValidateSyntax(pages, out var pageError))
+        {
+            return PdfFailure(pageError ?? "页范围格式不正确。");
+        }
+
+        // PDF 只走 AppContainer（手册 §8.6）：Windows Sandbox 不提供 PDF helper，
+        // 因此这里不看首选沙箱，也不会因为首选是 WSB 就拒绝 —— 但绝不退回无沙箱解析。
+        var runner = _runners.FirstOrDefault(candidate => candidate.Kind == SandboxKind.AppContainer);
+        if (runner is null)
+        {
+            return PdfFailure("当前平台没有 AppContainer 沙箱，PDF 解析不可用。");
+        }
+
+        var availability = await runner.ProbeAsync(cancellationToken).ConfigureAwait(false);
+        if (!availability.Available)
+        {
+            return PdfFailure(availability.Reason ?? "AppContainer 沙箱不可用。");
+        }
+
+        // PDF 只需要“能启动进程”，不要求 PowerShell 的 Verified：helper 本身不依赖 PowerShell。
+        var profile = _profiles.TryGet(out var profileReason);
+        if (profile is null)
+        {
+            return PdfFailure(profileReason ?? "AppContainer profile 不可用。");
+        }
+
+        var jobId = NewJobId();
+        var timeout = Math.Clamp(
+            settings.TimeoutSeconds <= 0 ? 30 : settings.TimeoutSeconds,
+            1,
+            120);
+        var effectiveMaxChars = Math.Clamp(
+            maxChars <= 0 ? PdfLimits.DefaultChars : maxChars,
+            1,
+            PdfLimits.MaxChars);
+
+        SandboxJobLayout layout;
+        try
+        {
+            _directory.EnsureRoot(profile.Sid);
+            layout = _directory.EnsureJob(jobId, profile.Sid);
+
+            File.Copy(
+                fullPath,
+                Path.Combine(layout.InputDirectory, SandboxProtocol.PdfInputFileName),
+                overwrite: true);
+
+            var job = new SandboxJobDocument
+            {
+                JobId = jobId,
+                Mode = SandboxJobMode.PdfExtract,
+                InputFile = "input/" + SandboxProtocol.PdfInputFileName,
+                Pages = string.IsNullOrWhiteSpace(pages) ? null : pages.Trim(),
+                MaxChars = effectiveMaxChars,
+                WorkingDirectory = "work",
+                TimeoutSeconds = timeout,
+                MaxOutputBytes = HostConsoleOutputBytes
+            };
+            WriteJsonAtomic(Path.Combine(layout.InputDirectory, SandboxProtocol.JobFileName), job);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SystemException)
+        {
+            _directory.DeleteJob(jobId);
+            return PdfFailure($"准备 PDF 沙箱目录失败：{ex.Message}");
+        }
+
+        try
+        {
+            var request = await CreateAppContainerRequestAsync(
+                    jobId, layout, timeout, settings, cancellationToken)
+                .ConfigureAwait(false);
+
+            var run = await runner.RunAsync(request, cancellationToken).ConfigureAwait(false);
+            return ReadPdfResult(layout, jobId, run);
+        }
+        catch (OperationCanceledException)
+        {
+            return PdfFailure("PDF 解析已取消。");
+        }
+        catch (SandboxProtocolException ex)
+        {
+            return PdfFailure($"PDF 解析协议错误：{ex.Message}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return PdfFailure($"PDF 解析执行失败：{ex.Message}");
+        }
+        finally
+        {
+            // PDF 不产生变更集，不需要保留 job 目录；同时避免把用户文档留在沙箱目录里。
+            _directory.DeleteJob(jobId);
+        }
     }
+
+    /// <summary>
+    /// 读取 SandboxHost 写出的 <c>pdf.json</c>。缺失时按执行状态区分：
+    /// 超时 / 取消 / 启动失败 / helper 崩溃，避免全部显示成“解析失败”。
+    /// </summary>
+    private static PdfExtraction ReadPdfResult(SandboxJobLayout layout, string jobId, SandboxResult run)
+    {
+        if (run.TimedOut)
+        {
+            return PdfFailure("PDF 解析超时，已终止。");
+        }
+
+        if (run.Canceled)
+        {
+            return PdfFailure("PDF 解析已取消。");
+        }
+
+        var pdfResultPath = Path.Combine(layout.OutputDirectory, SandboxProtocol.PdfResultFileName);
+        if (!File.Exists(pdfResultPath))
+        {
+            return PdfFailure(run.Failure switch
+            {
+                SandboxFailureCode.NotAvailable => run.Message ?? "沙箱不可用。",
+                SandboxFailureCode.LaunchFailed => $"沙箱启动失败：{run.Message ?? "未知原因"}",
+                SandboxFailureCode.ProtocolError => "ERROR: 沙箱返回了无效结果。",
+                _ => "PDF 解析进程异常退出，已隔离；请更换文件或页范围重试。"
+            });
+        }
+
+        try
+        {
+            var json = File.ReadAllText(pdfResultPath);
+            var document = JsonSerializer.Deserialize<PdfResultDocument>(json, SandboxJson.Options);
+            if (document is null
+                || document.ProtocolVersion != SandboxProtocol.Version
+                || !string.Equals(document.JobId, jobId, StringComparison.OrdinalIgnoreCase))
+            {
+                return PdfFailure("ERROR: 沙箱返回了无效结果。");
+            }
+
+            return new PdfExtraction(
+                Ok: document.Ok,
+                PageCount: document.PageCount,
+                Encrypted: document.Encrypted,
+                HasTextLayer: document.HasTextLayer,
+                Pages: document.Pages,
+                Truncated: document.Truncated,
+                Message: document.Message);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return PdfFailure($"ERROR: 沙箱返回了无效结果。（{ex.Message}）");
+        }
+    }
+
+    /// <summary>
+    /// 基础设施类失败（沙箱关闭 / 启动失败 / 超时 / 协议错误）统一加 <c>ERROR:</c> 前缀，
+    /// 让模型能区分“这次没执行”和“PDF 本身没有文本”。解析失败 / 加密属于文件结果，不加前缀。
+    /// </summary>
+    private static PdfExtraction PdfFailure(string message) =>
+        new(
+            Ok: false,
+            PageCount: 0,
+            Encrypted: false,
+            HasTextLayer: false,
+            Pages: [],
+            Truncated: false,
+            Message: message.StartsWith("ERROR:", StringComparison.Ordinal) ? message : $"ERROR: {message}");
 
     private string? ResolveWorkspaceRoot(string? workspaceRoot)
     {

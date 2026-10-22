@@ -11,6 +11,9 @@ public static class SandboxProtocol
     public const string ResultFileName = "result.json";
     public const string PdfResultFileName = "pdf.json";
     public const string ManifestFileName = "manifest.json";
+
+    /// <summary>PDF 作业固定复制到 <c>input/document.pdf</c>：不接受用户路径，避免路径注入。</summary>
+    public const string PdfInputFileName = "document.pdf";
 }
 
 /// <summary>job.json 里声明的作业模式。序列化为字符串，禁止写出数字。</summary>

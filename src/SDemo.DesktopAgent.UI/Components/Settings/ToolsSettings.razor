@@ -199,6 +199,58 @@
         </section>
     }
 
+    @if (PdfDescriptor is not null)
+    {
+        <section class="settings-section">
+            <h2 class="settings-section-title">PDF</h2>
+            <p class="settings-section-hint">
+                PDF 在沙箱里解析（固定 AppContainer，不开虚拟机）：不能联网，只能读工作区和当前会话的附件。
+                解析器崩溃只影响沙箱内的 helper 进程，不会拖垮应用；加密文件、扫描件会明确告诉你原因。
+            </p>
+
+            <label class="settings-row settings-row--toggle">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">启用 PDF 工具（默认开启）</span>
+                    <span class="settings-row-hint">
+                        @(PdfAvailable
+                            ? "启用后还需要在输入框里打开 PDF chip 才会交给模型。"
+                            : PdfUnavailableReason)
+                    </span>
+                </span>
+                <input type="checkbox"
+                       class="switch"
+                       checked="@PdfEnabled"
+                       disabled="@(!PdfAvailable)"
+                       @onchange="TogglePdf" />
+            </label>
+
+            <label class="settings-row settings-row--toggle">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">上传 PDF 时自动提取前 3 页</span>
+                    <span class="settings-row-hint">
+                        提取结果只用于聊天上下文；关闭后附件仍可用 pdf_read 按需读取。
+                    </span>
+                </span>
+                <input type="checkbox"
+                       class="switch"
+                       checked="@Settings.Current.Sandbox.PdfAutoExtract"
+                       disabled="@(!Settings.Current.Sandbox.Enabled)"
+                       @onchange="TogglePdfAutoExtract" />
+            </label>
+
+            <ul class="sandbox-checks">
+                <li class="@KindClass(_appContainerAvailability)">
+                    PDF 解析沙箱（AppContainer）：@KindText(_appContainerAvailability)
+                </li>
+            </ul>
+
+            <p class="settings-message">
+                上限：单次 50 页 / 40,000 字符；工作区文件 50MB，上传附件 25MB。
+                扫描件没有文本层，当前不启用 OCR。
+            </p>
+        </section>
+    }
+
     <section class="settings-section">
         <h2 class="settings-section-title">执行沙箱</h2>
         <p class="settings-section-hint">
@@ -415,6 +467,38 @@
 
     private bool IsSandboxMode(SandboxRequirement requirement) =>
         Settings.Current.Sandbox.Enabled && Settings.Current.Sandbox.Requirement == requirement;
+
+    private AgentToolPackDescriptor? PdfDescriptor => ToolRegistry.Find("pdf");
+
+    /// <summary>PDF 工具包的用户开关；没有记录时按描述里的默认值（开启，只读）。</summary>
+    private bool PdfEnabled => Settings.Current.Tools.IsPackEnabled(
+        "pdf",
+        PdfDescriptor?.DefaultEnabled ?? true);
+
+    /// <summary>PDF 解析固定在 AppContainer：只要它能启动进程即可，不要求 PowerShell 自检通过。</summary>
+    private bool PdfAvailable =>
+        Settings.Current.Sandbox.Enabled && _appContainerAvailability is { Available: true };
+
+    private string PdfUnavailableReason => !Settings.Current.Sandbox.Enabled
+        ? "执行沙箱已在设置中关闭。"
+        : _appContainerAvailability switch
+        {
+            null => "正在检测沙箱…",
+            { Available: false } => _appContainerAvailability.Reason ?? "AppContainer 沙箱不可用。",
+            _ => "沙箱可用。"
+        };
+
+    private void TogglePdf(ChangeEventArgs args)
+    {
+        Settings.Current.Tools.SetPackEnabled("pdf", args.Value is true);
+        Settings.Save();
+    }
+
+    private void TogglePdfAutoExtract(ChangeEventArgs args)
+    {
+        Settings.Current.Sandbox.PdfAutoExtract = args.Value is true;
+        Settings.Save();
+    }
 
 #if DEBUG
     private const bool IsDebugBuild = true;

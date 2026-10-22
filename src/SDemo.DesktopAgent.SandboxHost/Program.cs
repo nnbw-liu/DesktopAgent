@@ -108,18 +108,19 @@ internal static class Program
         {
             throw new SandboxProtocolException("PowerShell 模式缺少 scriptFile。");
         }
+
+        if (job.Mode is SandboxJobMode.PdfExtract or SandboxJobMode.PdfInfo
+            && string.IsNullOrWhiteSpace(job.InputFile))
+        {
+            throw new SandboxProtocolException("PDF 模式缺少 inputFile。");
+        }
     }
 
     private static async Task<SandboxResultDocument> ExecuteAsync(SandboxJobDocument job, string jobRoot) =>
         job.Mode switch
         {
             SandboxJobMode.PowerShell => await PowerShellRunner.RunAsync(job, jobRoot).ConfigureAwait(false),
-            SandboxJobMode.PdfExtract or SandboxJobMode.PdfInfo => new SandboxResultDocument
-            {
-                JobId = job.JobId,
-                ExitCode = -1,
-                Error = "PDF 模式在 S5 实现。"
-            },
+            SandboxJobMode.PdfExtract or SandboxJobMode.PdfInfo => PdfCommand.Run(job, jobRoot),
             _ => new SandboxResultDocument
             {
                 JobId = job.JobId,

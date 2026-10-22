@@ -89,6 +89,10 @@
                                         </svg>
                                         <span class="attachment-name">@attachment.FileName</span>
                                         <span class="attachment-size">@AttachmentStore.FormatSize(attachment.Size)</span>
+                                        @if (attachment.PageCount is int pageCount)
+                                        {
+                                            <span class="attachment-size" title="PDF 页数">@pageCount 页</span>
+                                        }
                                     </span>
                                 }
                             </div>
@@ -354,6 +358,9 @@
     /// <summary>最近一次沙箱可用性（异步探测 + 设置变更后刷新）。</summary>
     private SandboxAvailability? _sandboxAvailability;
 
+    /// <summary>AppContainer 单独的可用性：PDF 解析固定在 AppContainer 里跑，和首选沙箱无关。</summary>
+    private SandboxAvailability? _appContainerAvailability;
+
     private bool _toolPackAvailabilityLoading;
 
     /// <summary>输入框可用的插件入口（composer 界面、可用且 show）。</summary>
@@ -543,6 +550,20 @@
                         : _sandboxAvailability?.Reason ?? "沙箱不可用或未验证";
                 }
             }
+            else if (descriptor.Id == "pdf")
+            {
+                // PDF helper 只在 AppContainer 里跑；不要求 PowerShell 的 Verified。
+                if (!settings.Sandbox.Enabled)
+                {
+                    unavailableReason = "执行沙箱已在设置中关闭";
+                }
+                else if (_appContainerAvailability is not { Available: true })
+                {
+                    unavailableReason = _toolPackAvailabilityLoading
+                        ? "正在检测沙箱…"
+                        : _appContainerAvailability?.Reason ?? "AppContainer 沙箱不可用";
+                }
+            }
 
             var available = unavailableReason is null;
 
@@ -573,16 +594,20 @@
 
         try
         {
+            // 两个查询分开：PowerShell 看策略选出的沙箱，PDF 固定看 AppContainer。
             _sandboxAvailability = await Sandbox.GetAvailabilityAsync();
+            _appContainerAvailability = await Sandbox.GetAvailabilityAsync(SandboxKind.AppContainer);
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or SystemException)
         {
-            _sandboxAvailability = new SandboxAvailability(
+            var failure = new SandboxAvailability(
                 SandboxKind.None,
                 Available: false,
                 Verified: false,
                 $"沙箱状态检测失败：{ex.Message}",
                 Detail: null);
+            _sandboxAvailability = failure;
+            _appContainerAvailability = failure;
         }
         finally
         {
