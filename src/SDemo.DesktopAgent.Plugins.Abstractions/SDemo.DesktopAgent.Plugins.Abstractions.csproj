@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 插件契约：描述符模型、宿主版本、内容源接口。
+         不依赖运行时、不依赖任何 AI / UI 包；插件类库只引用本工程。 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SDemo.DesktopAgent</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent.Plugins.Abstractions</AssemblyName>
+  </PropertyGroup>
+
+</Project>

@@ -66,15 +66,6 @@
     <ProjectReference Include="..\SDemo.DesktopAgent.Windows\SDemo.DesktopAgent.Windows.csproj" />
   </ItemGroup>
 
-  <!-- 内置插件：Windows 目标与 WPF 端一致，复制到输出目录的 plugins\ 下。
-       Android 的输出目录不是可读的应用数据目录，内置插件要等 M5 之后再改成 MauiAsset 方案。 -->
-  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
-    <None Include="..\..\plugins\**\*"
-          Link="plugins\%(RecursiveDir)%(Filename)%(Extension)"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest" />
-  </ItemGroup>
-
   <!-- SandboxHost 完整 payload（含 managed dll）必须出现在输出目录的 sandbox-host\ 下。 -->
   <Import Project="..\SDemo.DesktopAgent.SandboxHost\SandboxHostPayload.targets"
           Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />

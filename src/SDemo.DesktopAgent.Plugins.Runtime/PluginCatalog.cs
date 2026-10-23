@@ -1,41 +1,70 @@
 using System.IO;
+using System.Text;
 using SDemo.DesktopAgent.Services;
 
 namespace SDemo.DesktopAgent.Plugins;
 
 /// <summary>
-/// 插件目录扫描器：先扫内置目录，再扫用户目录，然后在内存里排序、去重、
-/// 让本地插件覆盖同 id 的内置插件。任何解析异常都在这里被吃掉，
-/// 绝不让一个坏插件把异常抛到 UI 线程（一个坏插件只能降级它自己）。
+/// 插件目录扫描器：内置插件包（编译进类库的嵌入资源）在前，用户目录在后，
+/// 然后在内存里排序、去重、让本地插件覆盖同 id 的内置插件。
+/// 任何解析异常都在这里被吃掉，绝不让一个坏插件把异常抛到 UI 线程（一个坏插件只能降级它自己）。
 /// </summary>
 public sealed class PluginCatalog
 {
     private readonly object _gate = new();
     private readonly PluginValidator _validator;
+    private readonly IReadOnlyList<IPluginPackage> _builtinPackages;
     private PluginLoadResult? _result;
 
-    public PluginCatalog(IAppPaths paths)
-        : this(DefaultBuiltinRoot(), paths.PluginsRoot)
+    /// <summary>应用默认构造：内置插件来自 DI 注册的包，本地插件来自用户目录。</summary>
+    public PluginCatalog(IAppPaths paths, IEnumerable<IPluginPackage> builtinPackages)
+        : this(paths, builtinPackages, PluginHostVersion.Current)
     {
     }
 
+    public PluginCatalog(IAppPaths paths, IEnumerable<IPluginPackage> builtinPackages, PluginHostVersion hostVersion)
+        : this(builtinPackages.ToArray(), paths.PluginsRoot, hostVersion)
+    {
+    }
+
+    /// <summary>目录形式的内置根：兼容旧布局与测试夹具。</summary>
     public PluginCatalog(string builtinRoot, string localRoot)
         : this(builtinRoot, localRoot, PluginHostVersion.Current)
     {
     }
 
     public PluginCatalog(string builtinRoot, string localRoot, PluginHostVersion hostVersion)
+        : this([], localRoot, hostVersion)
     {
         BuiltinRoot = builtinRoot;
+    }
+
+    /// <summary>直接给内置插件包（测试与自定义组合用）。</summary>
+    public PluginCatalog(IEnumerable<IPluginPackage> builtinPackages, string localRoot)
+        : this(builtinPackages, localRoot, PluginHostVersion.Current)
+    {
+    }
+
+    public PluginCatalog(IEnumerable<IPluginPackage> builtinPackages, string localRoot, PluginHostVersion hostVersion)
+        : this(builtinPackages.ToArray(), localRoot, hostVersion)
+    {
+    }
+
+    private PluginCatalog(IReadOnlyList<IPluginPackage> builtinPackages, string localRoot, PluginHostVersion hostVersion)
+    {
+        _builtinPackages = builtinPackages;
         LocalRoot = localRoot;
         _validator = new PluginValidator(hostVersion);
     }
 
-    /// <summary>内置插件目录（随应用发布，只读）。</summary>
-    public string BuiltinRoot { get; }
+    /// <summary>目录形式的内置插件根（仅在兼容布局时存在；默认内置走嵌入资源，为 null）。</summary>
+    public string? BuiltinRoot { get; }
 
     /// <summary>用户插件目录。</summary>
     public string LocalRoot { get; }
+
+    /// <summary>编译进应用的内置插件包数量（设置页展示用）。</summary>
+    public int BuiltinPackageCount => _builtinPackages.Count;
 
     /// <summary>扫描结果变化时触发（重新扫描、或首次扫描完成）。</summary>
     public event EventHandler? Changed;
@@ -71,24 +100,43 @@ public sealed class PluginCatalog
     {
         lock (_gate)
         {
-            if (_result is not null)
-            {
-                return;
-            }
-
-            _result = ScanCore();
+            _result ??= ScanCore();
         }
     }
-
-    /// <summary>内置插件默认放在 exe 同级的 <c>plugins</c> 目录（构建时从仓库复制）。</summary>
-    public static string DefaultBuiltinRoot() => Path.Combine(AppContext.BaseDirectory, "plugins");
 
     private PluginLoadResult ScanCore()
     {
         var failures = new List<PluginFailure>();
-        var builtin = ScanRoot(BuiltinRoot, PluginSource.Builtin, failures);
+        var builtin = ScanPackages(failures);
+
+        if (BuiltinRoot is { Length: > 0 } builtinRoot)
+        {
+            builtin.AddRange(ScanRoot(builtinRoot, PluginSource.Builtin, failures));
+        }
+
         var local = ScanRoot(LocalRoot, PluginSource.Local, failures);
         return Merge(builtin, local, failures, DateTimeOffset.Now);
+    }
+
+    private List<PluginDescriptor> ScanPackages(List<PluginFailure> failures)
+    {
+        var plugins = new List<PluginDescriptor>(_builtinPackages.Count);
+
+        foreach (var package in _builtinPackages)
+        {
+            var (plugin, failure) = LoadPackage(package);
+            if (plugin is not null)
+            {
+                plugins.Add(plugin);
+            }
+
+            if (failure is not null)
+            {
+                failures.Add(failure);
+            }
+        }
+
+        return plugins;
     }
 
     private List<PluginDescriptor> ScanRoot(string root, PluginSource source, List<PluginFailure> failures)
@@ -141,6 +189,46 @@ public sealed class PluginCatalog
         return plugins;
     }
 
+    private (PluginDescriptor? Plugin, PluginFailure? Failure) LoadPackage(IPluginPackage package)
+    {
+        var displayPath = package.Content.DisplayPath;
+
+        try
+        {
+            if (Encoding.UTF8.GetByteCount(package.ManifestJson) > PluginManifestJson.MaxBytes)
+            {
+                return (null, Fail(displayPath, PluginSource.Builtin, package.Id,
+                    $"plugin.json 超过 {PluginManifestJson.MaxBytes / 1024} KB 上限"));
+            }
+
+            var parse = PluginManifestJson.Parse(package.ManifestJson);
+            if (!parse.Success)
+            {
+                return (null, Fail(displayPath, PluginSource.Builtin, null, parse.Issues));
+            }
+
+            var unknownMembers = PluginManifestJson.FindUnknownMembers(package.ManifestJson);
+            var validation = _validator.Build(parse.Manifest!, package.Content, PluginSource.Builtin);
+            if (!validation.Success)
+            {
+                return (null, Fail(displayPath, PluginSource.Builtin, parse.Manifest!.Id, validation.FatalIssues));
+            }
+
+            var plugin = validation.Plugin!;
+            if (unknownMembers.Count > 0)
+            {
+                plugin = plugin with { Issues = [.. plugin.Issues, .. unknownMembers] };
+            }
+
+            return (plugin, null);
+        }
+        catch (Exception ex)
+        {
+            // 兜底：任何没预料到的异常也只影响这一个插件。
+            return (null, Fail(displayPath, PluginSource.Builtin, package.Id, $"插件加载失败：{ex.Message}"));
+        }
+    }
+
     private (PluginDescriptor? Plugin, PluginFailure? Failure) LoadOne(string directory, PluginSource source)
     {
         var manifestPath = Path.Combine(directory, PluginManifestJson.FileName);
@@ -165,7 +253,10 @@ public sealed class PluginCatalog
             // 未知字段只记警告，不阻断加载。
             var unknownMembers = PluginManifestJson.FindUnknownMembers(json);
 
-            var validation = _validator.Build(parse.Manifest!, directory, source);
+            var validation = _validator.Build(
+                parse.Manifest!,
+                new DirectoryPluginContent(directory),
+                source);
             if (!validation.Success)
             {
                 return (null, Fail(directory, source, parse.Manifest!.Id, validation.FatalIssues));
@@ -238,7 +329,15 @@ public sealed class PluginCatalog
             .ThenBy(plugin => plugin.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        return new PluginLoadResult(sorted, failures, scannedAt, [BuiltinRoot, LocalRoot]);
+        var roots = new List<string>();
+        if (BuiltinRoot is { Length: > 0 } root)
+        {
+            roots.Add(root);
+        }
+
+        roots.Add(LocalRoot);
+
+        return new PluginLoadResult(sorted, failures, scannedAt, roots);
     }
 
     private static PluginFailure Fail(string directory, PluginSource source, string? pluginId, params string[] messages) =>

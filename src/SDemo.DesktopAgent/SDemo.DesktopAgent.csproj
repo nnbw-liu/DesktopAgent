@@ -42,15 +42,6 @@
     <ProjectReference Include="..\SDemo.DesktopAgent.UI\SDemo.DesktopAgent.UI.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- 内置插件：仓库根 plugins/ 随构建复制到输出目录的同级 plugins\ 下，
-         运行时由 PluginCatalog 从 AppContext.BaseDirectory\plugins 只读加载。 -->
-    <None Include="..\..\plugins\**\*"
-          Link="plugins\%(RecursiveDir)%(Filename)%(Extension)"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest" />
-  </ItemGroup>
-
   <!-- SandboxHost 完整 payload（含 managed dll）必须出现在输出目录的 sandbox-host\ 下。 -->
   <Import Project="..\SDemo.DesktopAgent.SandboxHost\SandboxHostPayload.targets" />
 

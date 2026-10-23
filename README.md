@@ -4,7 +4,14 @@ Blazor Hybrid 多宿主应用：**一套 Razor 组件 + 一套业务服务**，�
 
 | 工程 | 目标框架 | 作用 |
 | --- | --- | --- |
-| `SDemo.DesktopAgent.Core` | `net10.0` | 模型、服务、平台接口；不含任何 UI / 平台 API |
+| `SDemo.DesktopAgent.Sandbox.Contracts` | `net10.0` | 沙箱协议 / record / enum，零依赖 |
+| `SDemo.DesktopAgent.Contracts` | `net10.0` | 模型、设置 DTO、跨模块接口（不含实现） |
+| `SDemo.DesktopAgent.Agents` | `net10.0` | MAF / OpenAI 的唯一出入口（`IAgentRuntime`） |
+| `SDemo.DesktopAgent.Plugins.Abstractions` | `net10.0` | 插件描述符、内容源、`IPluginPackage` |
+| `SDemo.DesktopAgent.Plugins.Runtime` | `net10.0` | 插件扫描 / 校验 / 注册表 / 提示词组装 |
+| `SDemo.DesktopAgent.Plugin.Translate` | `net10.0` | 内置翻译插件（清单与技能为嵌入资源） |
+| `SDemo.DesktopAgent.Plugin.Summarize` | `net10.0` | 内置总结插件（清单与技能为嵌入资源） |
+| `SDemo.DesktopAgent.Core` | `net10.0` | 应用编排与组合根；不含 AI SDK / 插件实现 |
 | `SDemo.DesktopAgent.UI` | `net10.0`（Razor 类库） | 所有 `.razor` 组件 + `wwwroot`（css / js） |
 | `SDemo.DesktopAgent` | `net10.0-windows10.0.19041.0` | WPF 宿主：自绘标题栏、托盘、DPAPI、注册表主题 |
 | `SDemo.DesktopAgent.Maui` | `net10.0-windows10.0.19041.0`（默认）/ `net10.0-android`（`EnableAndroidTarget=true` 时） | MAUI 宿主：Windows 与 Android 共用同一套界面 |
@@ -47,12 +54,27 @@ DesktopAgent/
 ├─ SDemo.DesktopAgent.sln
 ├─ SDemo.DesktopAgent.Wpf.slnf          # 只含桌面端三个工程，没装 MAUI workload 也能构建
 └─ src/
-   ├─ SDemo.DesktopAgent.Core/                   # 平台无关：模型 + 服务 + 接口
+   ├─ SDemo.DesktopAgent.Sandbox.Contracts/      # 沙箱协议（零依赖）
+   ├─ SDemo.DesktopAgent.Contracts/              # 模型 / 设置 DTO / 跨模块接口
    │  ├─ Models/                                 # 会话 / 消息 / 附件 / 设置 / 工作区
+   │  ├─ Abstractions/                           # IAppPaths / ISecureStore / 沙箱 / 审批接口
+   │  ├─ Services/                               # ISettingsService / IModelCatalogService…
+   │  ├─ Context/                                # ISummaryChatTransport / AgentMode / 工具轨迹 DTO
+   │  └─ Execution/                              # VerificationRecord / 验证与 checkpoint 设置
+   ├─ SDemo.DesktopAgent.Agents/                 # MAF + OpenAI 唯一出入口
+   │  ├─ AgentRuntime.cs                         # IAgentRuntime / AgentInvocation / 流式事件
+   │  ├─ MafAgentRuntime.cs                      # OpenAI → 裁剪装饰器 → FICC → AsAIAgent
+   │  ├─ OpenAiSummaryChatTransport.cs           # 摘要的非流式调用
+   │  └─ ModelCatalogService.cs                  # GET /models
+   ├─ SDemo.DesktopAgent.Plugins.Abstractions/   # 插件描述符 / IPluginPackage / 内容源
+   ├─ SDemo.DesktopAgent.Plugins.Runtime/        # 扫描 / 校验 / 注册表 / 提示词 / 分段解析
+   ├─ SDemo.DesktopAgent.Plugin.Translate/       # 内置翻译（plugin.json + skills 为嵌入资源）
+   ├─ SDemo.DesktopAgent.Plugin.Summarize/       # 内置总结（同上）
+   ├─ SDemo.DesktopAgent.Core/                   # 应用编排 + 组合根
    │  ├─ Data/ChatDbContext.cs                   # SQLite + EF Core：sessions / messages
-   │  ├─ Abstractions/                           # IAppPaths / ISecureStore / ISystemThemeProvider / IFolderPickerService
    │  ├─ Services/                               # ChatStore、SettingsService、SkillCatalog、AgentChatService…
-   │  │  └─ ByteSize.cs                          # 文件大小文案（Core 与 UI 共用）
+   │  ├─ Context/                                # 预算 / 裁剪 / 压缩 / 状态包
+   │  ├─ Plugins/PluginRunner.cs                 # 插件 Run 的编排（依赖 IAgentChatService）
    │  └─ Composition/AgentCoreServiceCollectionExtensions.cs   # AddDesktopAgentCore()
    ├─ SDemo.DesktopAgent.UI/                     # Razor 类库：两个宿主共用的界面
    │  ├─ _Imports.razor
@@ -433,7 +455,9 @@ S6 行为要点：
 | 来源 | 位置 | 说明 |
 | --- | --- | --- |
 | 本地 | `%APPDATA%\SDemo\DesktopAgent\plugins\<目录>\` | 用户自制；同 `id` 时覆盖内置插件 |
-| 内置 | `<exe 目录>\plugins\<目录>\` | 随应用发布，仓库里是根目录的 `plugins/`，构建时复制 |
+| 内置 | 编译进 `SDemo.DesktopAgent.Plugin.*` 类库 | 清单与技能是嵌入资源，不落盘、不需要复制目录；Android 与 Windows 一致 |
+
+每个内置插件是一个独立类库：`plugin.json` / `skills/*.md` 通过 `EmbeddedResource LogicalName` 固定为插件内相对路径，类里只需一行继承 `EmbeddedPluginPackage`。新增内置插件 = 新建类库 + 在 `AddDesktopAgentCore()` 里注册 `IPluginPackage`。
 
 当前进度：**M0–M6 全部完成**（加载器、输入框、侧栏、气泡、设置、内置翻译、双语对照）。
 
@@ -444,20 +468,21 @@ S6 行为要点：
 | M2 侧栏 | ✅ | 「新建聊天室」下方的插件入口区，点入口新建预选该插件的空会话（`OriginMountId = ActiveMountId`） |
 | M3 气泡 | ✅ | 助手消息底部的插件按钮 → 派生卡片（复制 / 重试 / 删除）；会话图标跟随 `LastPluginId`，普通推理后复位；派生内容不进上下文 |
 | M4 设置 | ✅ | 「设置 → 插件」：总开关、输入框/侧栏上限、参数记忆、默认呈现、每个插件的启用/输入框/侧栏/气泡/顺序、打开目录、重新扫描；改动即时生效。侧栏依赖输入框（关掉输入框后侧栏入口一并隐藏） |
-| M5 内置翻译 | ✅ | `plugins/translate/`（三条入口都可用） |
+| M5 内置翻译 | ✅ | `SDemo.DesktopAgent.Plugin.Translate`（三条入口都可用） |
 | M6 双语对照 | ✅ | 宿主追加格式契约、`<s>/<t>` 解析、宽屏两列 / 窄屏上下、对照 ↔ 纯译文纯渲染切换（零请求）、模型不按格式返回时降级并提示 |
 
 已实现的接缝：
 
-- `Core/Plugins/PluginCatalog.cs`：扫内置 + 本地两个目录，**吞掉所有解析异常**（坏插件只降级自己），本地覆盖同 `id` 的内置插件，结果缓存并支持 `Scan()` 重新扫描。
-- `Core/Plugins/PluginManifest.cs`：清单 DTO 与反序列化选项（允许 `//` 注释、尾逗号、大小写不敏感、UTF-8 BOM），未知字段按 JSON 路径记警告。
-- `Core/Plugins/PluginValidator.cs`：id 格式与唯一性、skill 路径越界（`Path.GetFullPath` + 前缀比较，必须 `.md`）、占位符必须有参数定义、参数 `kind` / `options`、`minHostVersion`、`plugin.json` 512 KB 与 skill 256 KB 上限、图标只收 SVG `path` 数据。
-- `Core/Plugins/PluginModels.cs`：`PluginDescriptor` / `Capability` / `Mount` / `Parameter` 描述符，入口组合键 `<pluginId>/<mountId>`。
-- `Core/Plugins/PluginRegistry.cs`：把目录结果与用户设置合并成「有效视图」——总开关、插件启用、输入框 / 侧栏 / 气泡开关、顺序、显示上限；设置或重新扫描后立即刷新，UI 只从这里取入口。**侧栏依赖输入框**：关掉输入框入口后侧栏入口也隐藏（侧栏本来就只是进入预选插件的会话）。
-- `Core/Models/PluginPreferences.cs`：`settings.json` 的 `plugins` 节点（含每个插件的 `enabled` / `inComposer` / `inSidebar` / `inMessage` / `order` 与隐私确认列表）。旧设置文件没有该节点时用默认值，不写迁移。
-- `Core/Plugins/PluginParameterResolver.cs`：会话记忆 → `default` → `defaultFrom`（`system-language` / `system-locale`）→ `fallback` → 第一个 option；无效记忆值不会把会话卡死。
-- `Core/Plugins/PluginPromptComposer.cs`：skill 去 frontmatter、替换 `{{key}}` / `{{key.label}}`；用户输入单独成条并包进 `<待处理文本>`，`<` 全角转义；`output = segments` 的能力由宿主追加 `<s>/<t>` 格式契约。
-- `Core/Plugins/SegmentedOutputParser.cs`：解析 `<s>原文</s><t>译文</t>`（流式中丢弃未闭合尾标签、数量不等以少为准、多出来的译文并入最后一段）；一条完整配对都没有时降级为纯译文。附带流式累积器 `SegmentedOutputAccumulator`。
+- `Plugins.Runtime/PluginCatalog.cs`：内置包 + 本地目录两种来源，**吞掉所有解析异常**（坏插件只降级自己），本地覆盖同 `id` 的内置插件，结果缓存并支持 `Scan()` 重新扫描。
+- `Plugins.Abstractions/IPluginPackage.cs`：`IPluginPackage` / `IPluginContentSource` / `EmbeddedPluginPackage`；目录源与嵌入资源源共用同一套校验。
+- `Plugins.Runtime/PluginManifest.cs`：清单 DTO 与反序列化选项（允许 `//` 注释、尾逗号、大小写不敏感、UTF-8 BOM），未知字段按 JSON 路径记警告。
+- `Plugins.Runtime/PluginValidator.cs`：id 格式与唯一性、skill 路径越界（相对路径 + 全路径前缀比较，必须 `.md`）、占位符必须有参数定义、参数 `kind` / `options`、`minHostVersion`、`plugin.json` 512 KB 与 skill 256 KB 上限、图标只收 SVG `path` 数据。
+- `Plugins.Abstractions/PluginModels.cs`：`PluginDescriptor` / `Capability` / `Mount` / `Parameter` 描述符，入口组合键 `<pluginId>/<mountId>`。
+- `Plugins.Runtime/PluginRegistry.cs`：把扫描结果与用户设置合并成「有效视图」——总开关、插件启用、输入框 / 侧栏 / 气泡开关、顺序、显示上限；设置或重新扫描后立即刷新，UI 只从这里取入口。**侧栏依赖输入框**：关掉输入框入口后侧栏入口也隐藏（侧栏本来就只是进入预选插件的会话）。
+- `Contracts/Models/PluginPreferences.cs`：`settings.json` 的 `plugins` 节点（含每个插件的 `enabled` / `inComposer` / `inSidebar` / `inMessage` / `order` 与隐私确认列表）。旧设置文件没有该节点时用默认值，不写迁移。
+- `Plugins.Runtime/PluginParameterResolver.cs`：会话记忆 → `default` → `defaultFrom`（`system-language` / `system-locale`）→ `fallback` → 第一个 option；无效记忆值不会把会话卡死。
+- `Plugins.Runtime/PluginPromptComposer.cs`：skill 去 frontmatter、替换 `{{key}}` / `{{key.label}}`；用户输入单独成条并包进 `<待处理文本>`，`<` 全角转义；`output = segments` 的能力由宿主追加 `<s>/<t>` 格式契约。
+- `Plugins.Runtime/SegmentedOutputParser.cs`：解析 `<s>原文</s><t>译文</t>`（流式中丢弃未闭合尾标签、数量不等以少为准、多出来的译文并入最后一段）；一条完整配对都没有时降级为纯译文。附带流式累积器 `SegmentedOutputAccumulator`。
 - `Core/Plugins/PluginRunner.cs`：单轮、无历史（除非能力打开 `allowHistory`）、无工具；超 60,000 字符直接报错而不是发出去。
 - `Core/Services/AgentChatService.cs`：抽出 `RunAsync(AgentRunPlan)`，普通对话与插件 Run 共用同一条请求组装。
 - `Core/Services/ChatStore.cs`：`sessions` 四个插件列 + `messages.PluginJson` / `DerivedJson`；`UpgradeSchemaAsync` **两张表各扫一遍**，老库升级不报 `no such column`；加载时把上次没跑完的 `Running` 卡片收尾成 `Failed`。

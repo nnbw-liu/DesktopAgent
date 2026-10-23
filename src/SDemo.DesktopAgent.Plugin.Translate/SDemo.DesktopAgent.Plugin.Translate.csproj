@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 内置插件：翻译（双语对照）。清单与技能作为嵌入资源随程序集发布。 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SDemo.DesktopAgent.Plugins.Translate</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent.Plugin.Translate</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SDemo.DesktopAgent.Plugins.Abstractions\SDemo.DesktopAgent.Plugins.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 逻辑名 = 插件内相对路径，运行时不依赖输出目录里的 plugins\ 文件夹。 -->
+    <EmbeddedResource Include="plugin.json" LogicalName="plugin.json" />
+    <EmbeddedResource Include="skills\*.md" LogicalName="skills/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

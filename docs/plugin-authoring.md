@@ -91,7 +91,7 @@ version: 1.0
 | 来源 | 位置 | 说明 |
 | --- | --- | --- |
 | 本地 | `%APPDATA%\SDemo\DesktopAgent\plugins\<目录>\` | 用户自制；Android 是 `<AppDataDirectory>/plugins` |
-| 内置 | `<exe 目录>\plugins\<目录>\` | 随应用发布；仓库里的 `plugins/` 构建时复制过去 |
+| 内置 | `src/SDemo.DesktopAgent.Plugin.<名字>/`（编译进类库） | 清单与技能是嵌入资源；同 `id` 的本地插件仍可覆盖 |
 
 加载规则：
 

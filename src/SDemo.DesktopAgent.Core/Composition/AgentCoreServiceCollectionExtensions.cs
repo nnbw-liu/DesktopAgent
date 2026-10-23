@@ -3,6 +3,8 @@ using SDemo.DesktopAgent.Agents;
 using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Editing;
 using SDemo.DesktopAgent.Plugins;
+using SDemo.DesktopAgent.Plugins.Summarize;
+using SDemo.DesktopAgent.Plugins.Translate;
 using SDemo.DesktopAgent.Sandbox;
 
 namespace SDemo.DesktopAgent.Services;
@@ -60,7 +62,13 @@ public static class AgentCoreServiceCollectionExtensions
             (session, cancellationToken) =>
                 sp.GetRequiredService<ChatStore>().SaveSessionAsync(session, cancellationToken)));
 
-        services.AddSingleton<PluginCatalog>();
+        // 内置插件：每个插件一个类库，清单与技能作为嵌入资源随程序集发布；
+        // 本地插件仍是 %APPDATA%\...\plugins 下的目录，同 id 覆盖内置。
+        services.AddSingleton<IPluginPackage, TranslatePlugin>();
+        services.AddSingleton<IPluginPackage, SummarizePlugin>();
+        services.AddSingleton(sp => new PluginCatalog(
+            sp.GetRequiredService<IAppPaths>(),
+            sp.GetServices<IPluginPackage>()));
         services.AddSingleton<PluginRegistry>();
         services.AddSingleton<PluginPromptComposer>();
         services.AddSingleton<PluginParameterResolver>();

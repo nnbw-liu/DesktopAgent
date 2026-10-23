@@ -27,10 +27,13 @@ public sealed class CompositionTests
         Assert.NotNull(provider.GetRequiredService<ChangeApplier>());
 
         Assert.Equal(Path.Combine(temp.Root, "plugins"), catalog.LocalRoot);
-        Assert.Equal(Path.Combine(AppContext.BaseDirectory, "plugins"), catalog.BuiltinRoot);
+        // 内置插件随程序集发布，不再有输出目录下的 plugins\；
+        // 本地目录为空时，仍能扫描到两个内置插件。
+        Assert.Null(catalog.BuiltinRoot);
+        Assert.Equal(2, catalog.BuiltinPackageCount);
         Assert.Equal(Path.Combine(temp.Root, "plugins"), paths.PluginsRoot);
-        Assert.True(catalog.Result.IsEmpty);
-        Assert.Empty(catalog.Result.Usable);
+        Assert.False(catalog.Result.IsEmpty);
+        Assert.Equal(["summarize", "translate"], catalog.Result.Usable.Select(plugin => plugin.Id).Order().ToArray());
     }
 
     [Fact]

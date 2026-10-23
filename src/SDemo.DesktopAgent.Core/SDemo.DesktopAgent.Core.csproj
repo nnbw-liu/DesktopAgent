@@ -25,6 +25,11 @@
     <ProjectReference Include="..\SDemo.DesktopAgent.Agents\SDemo.DesktopAgent.Agents.csproj" />
     <!-- 契约层：模型 / 设置 DTO / 跨模块接口（不含任何实现）。 -->
     <ProjectReference Include="..\SDemo.DesktopAgent.Contracts\SDemo.DesktopAgent.Contracts.csproj" />
+    <!-- 插件：契约 + 运行时 + 内置插件包（每个内置插件一个类库）。 -->
+    <ProjectReference Include="..\SDemo.DesktopAgent.Plugins.Abstractions\SDemo.DesktopAgent.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\SDemo.DesktopAgent.Plugins.Runtime\SDemo.DesktopAgent.Plugins.Runtime.csproj" />
+    <ProjectReference Include="..\SDemo.DesktopAgent.Plugin.Summarize\SDemo.DesktopAgent.Plugin.Summarize.csproj" />
+    <ProjectReference Include="..\SDemo.DesktopAgent.Plugin.Translate\SDemo.DesktopAgent.Plugin.Translate.csproj" />
     <!-- 沙箱契约：纯 record / enum / 协议常量，无平台 API。 -->
     <ProjectReference Include="..\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
   </ItemGroup>

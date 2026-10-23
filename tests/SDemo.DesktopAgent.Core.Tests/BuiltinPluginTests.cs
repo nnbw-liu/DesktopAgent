@@ -1,5 +1,7 @@
 using System.IO;
 using SDemo.DesktopAgent.Plugins;
+using SDemo.DesktopAgent.Plugins.Summarize;
+using SDemo.DesktopAgent.Plugins.Translate;
 using Xunit;
 
 namespace SDemo.DesktopAgent.Core.Tests;
@@ -10,11 +12,7 @@ public sealed class BuiltinPluginTests
     [Fact]
     public void 内置translate插件可加载且三个入口都可用()
     {
-        var repositoryRoot = FindRepositoryRoot();
-        var builtinRoot = Path.Combine(repositoryRoot, "plugins");
-        var localRoot = Path.Combine(repositoryRoot, "plugins", "__not-a-plugin-root__");
-
-        var result = new PluginCatalog(builtinRoot, localRoot).Scan();
+        var result = ScanBuiltins();
 
         Assert.Empty(result.Failures);
         var translate = Assert.Single(result.Usable, plugin => plugin.Id == "translate");
@@ -51,11 +49,7 @@ public sealed class BuiltinPluginTests
     [Fact]
     public void 内置summarize插件可加载且三个入口都可用()
     {
-        var repositoryRoot = FindRepositoryRoot();
-        var builtinRoot = Path.Combine(repositoryRoot, "plugins");
-        var localRoot = Path.Combine(repositoryRoot, "plugins", "__not-a-plugin-root__");
-
-        var result = new PluginCatalog(builtinRoot, localRoot).Scan();
+        var result = ScanBuiltins();
 
         Assert.Empty(result.Failures);
         var summarize = Assert.Single(result.Usable, plugin => plugin.Id == "summarize");
@@ -87,12 +81,7 @@ public sealed class BuiltinPluginTests
     [Fact]
     public void 内置translate插件的system提示词已渲染()
     {
-        var repositoryRoot = FindRepositoryRoot();
-        var result = new PluginCatalog(
-            Path.Combine(repositoryRoot, "plugins"),
-            Path.Combine(repositoryRoot, "plugins", "__not-a-plugin-root__")).Scan();
-
-        var translate = result.Find("translate");
+        var translate = ScanBuiltins().Find("translate");
         Assert.NotNull(translate);
 
         var capability = Assert.Single(translate!.Capabilities);
@@ -107,12 +96,7 @@ public sealed class BuiltinPluginTests
     [Fact]
     public void 内置summarize插件的system提示词已渲染()
     {
-        var repositoryRoot = FindRepositoryRoot();
-        var result = new PluginCatalog(
-            Path.Combine(repositoryRoot, "plugins"),
-            Path.Combine(repositoryRoot, "plugins", "__not-a-plugin-root__")).Scan();
-
-        var summarize = result.Find("summarize");
+        var summarize = ScanBuiltins().Find("summarize");
         Assert.NotNull(summarize);
 
         var capability = Assert.Single(summarize!.Capabilities);
@@ -127,16 +111,9 @@ public sealed class BuiltinPluginTests
         Assert.DoesNotContain("先原文后译文", prompt);
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null &&
-               !File.Exists(Path.Combine(directory.FullName, "SDemo.DesktopAgent.sln")))
-        {
-            directory = directory.Parent;
-        }
-
-        Assert.NotNull(directory);
-        return directory!.FullName;
-    }
+    /// <summary>内置插件来自类库的嵌入资源，不再依赖输出目录里的 plugins\。</summary>
+    private static PluginLoadResult ScanBuiltins() =>
+        new PluginCatalog(
+            [new TranslatePlugin(), new SummarizePlugin()],
+            Path.Combine(Path.GetTempPath(), "__sdemo-no-local-plugins__")).Scan();
 }

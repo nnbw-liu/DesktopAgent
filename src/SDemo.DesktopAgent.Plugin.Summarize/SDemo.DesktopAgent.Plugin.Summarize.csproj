@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 内置插件：总结。清单与技能作为嵌入资源随程序集发布。 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SDemo.DesktopAgent.Plugins.Summarize</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent.Plugin.Summarize</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SDemo.DesktopAgent.Plugins.Abstractions\SDemo.DesktopAgent.Plugins.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="plugin.json" LogicalName="plugin.json" />
+    <EmbeddedResource Include="skills\*.md" LogicalName="skills/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

@@ -55,9 +55,6 @@ public sealed class PluginValidator
         @"\{\{[^{}]*\}\}",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    private static readonly StringComparison PathComparison =
-        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-
     private readonly PluginHostVersion _hostVersion;
 
     public PluginValidator()
@@ -71,7 +68,7 @@ public sealed class PluginValidator
     /// 把清单转成领域模型，并把所有问题收集到结果里。
     /// 只由 <see cref="PluginCatalog"/> 调用；外部想按目录校验请直接用 Catalog（它会同时处理体积、编码与异常）。
     /// </summary>
-    internal PluginValidationResult Build(PluginManifestDto manifest, string pluginRoot, PluginSource source)
+    internal PluginValidationResult Build(PluginManifestDto manifest, IPluginContentSource content, PluginSource source)
     {
         var fatal = new List<PluginIssue>();
         var pluginIssues = new List<PluginIssue>();
@@ -168,7 +165,7 @@ public sealed class PluginValidator
         var capabilities = new List<PluginCapability>(capabilityDtos.Count);
         for (var index = 0; index < capabilityDtos.Count; index++)
         {
-            capabilities.Add(BuildCapability(capabilityDtos[index]!, index, pluginRoot));
+            capabilities.Add(BuildCapability(capabilityDtos[index]!, index, content));
         }
 
         var mounts = new List<PluginMount>(mountDtos.Count);
@@ -188,7 +185,7 @@ public sealed class PluginValidator
             Capabilities = capabilities,
             Mounts = mounts,
             Source = source,
-            RootPath = Path.GetFullPath(pluginRoot),
+            RootPath = content.DisplayPath,
             State = state,
             DisabledReason = disabledReason,
             Issues = pluginIssues
@@ -197,7 +194,7 @@ public sealed class PluginValidator
         return new PluginValidationResult(descriptor, []);
     }
 
-    private PluginCapability BuildCapability(PluginCapabilityDto dto, int index, string pluginRoot)
+    private PluginCapability BuildCapability(PluginCapabilityDto dto, int index, IPluginContentSource content)
     {
         var issues = new List<PluginIssue>();
         var path = $"capabilities[{index}]";
@@ -224,15 +221,15 @@ public sealed class PluginValidator
         var parameterKeys = parameters.Select(parameter => parameter.Key).ToHashSet(StringComparer.Ordinal);
 
         string? skillContent = null;
-        string skillRelative = dto.Skill?.Trim() ?? string.Empty;
-        var skillIssue = TryLoadSkill(pluginRoot, dto.Skill, out var fullSkillPath, out skillContent);
+        var skillRelative = dto.Skill?.Trim().Replace('\\', '/') ?? string.Empty;
+        var skillIssue = TryLoadSkill(content, dto.Skill, out var resolvedSkillPath, out skillContent);
         if (skillIssue is not null)
         {
             issues.Add(skillIssue);
         }
-        else if (fullSkillPath is not null)
+        else
         {
-            skillRelative = Path.GetRelativePath(pluginRoot, fullSkillPath).Replace('\\', '/');
+            skillRelative = resolvedSkillPath;
             ValidatePlaceholders(skillContent!, skillRelative, parameterKeys, issues);
         }
 
@@ -569,13 +566,13 @@ public sealed class PluginValidator
 
     /// <summary>解析并读取 skill；返回的 issue 不为 null 表示这份技能不能用。</summary>
     private static PluginIssue? TryLoadSkill(
-        string pluginRoot,
+        IPluginContentSource content,
         string? skill,
-        out string? fullPath,
-        out string? content)
+        out string relativePath,
+        out string? text)
     {
-        fullPath = null;
-        content = null;
+        relativePath = string.Empty;
+        text = null;
 
         if (string.IsNullOrWhiteSpace(skill))
         {
@@ -598,47 +595,19 @@ public sealed class PluginValidator
             return Error("skill 必须是 .md 文件", "skill");
         }
 
-        var root = Path.GetFullPath(pluginRoot);
-        var rootPrefix = root.EndsWith(Path.DirectorySeparatorChar)
-            ? root
-            : root + Path.DirectorySeparatorChar;
-
-        string candidate;
-        try
+        if (!content.TryRead(normalized, out var loaded, out var byteLength, out var error))
         {
-            candidate = Path.GetFullPath(Path.Combine(root, normalized));
-        }
-        catch (ArgumentException)
-        {
-            return Error("skill 路径非法", "skill");
+            return Error($"skill {error}", "skill");
         }
 
-        if (!candidate.StartsWith(rootPrefix, PathComparison))
+        if (byteLength > MaxSkillBytes)
         {
-            return Error("skill 路径越界：必须位于插件目录内", "skill");
+            return Error($"skill 超过 {MaxSkillBytes / 1024} KB 上限", "skill");
         }
 
-        if (!File.Exists(candidate))
-        {
-            return Error($"skill 文件不存在：{normalized}", "skill");
-        }
-
-        try
-        {
-            var info = new FileInfo(candidate);
-            if (info.Length > MaxSkillBytes)
-            {
-                return Error($"skill 超过 {MaxSkillBytes / 1024} KB 上限", "skill");
-            }
-
-            content = File.ReadAllText(candidate);
-            fullPath = candidate;
-            return null;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return Error($"skill 读取失败：{ex.Message}", "skill");
-        }
+        relativePath = normalized;
+        text = loaded;
+        return null;
     }
 
     /// <summary>占位符必须都能在参数里找到定义；否则能力不可用，避免运行时空值。</summary>
