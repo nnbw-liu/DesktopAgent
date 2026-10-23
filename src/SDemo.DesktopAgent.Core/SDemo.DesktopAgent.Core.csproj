@@ -30,6 +30,14 @@
     <ProjectReference Include="..\SDemo.DesktopAgent.Plugins.Runtime\SDemo.DesktopAgent.Plugins.Runtime.csproj" />
     <ProjectReference Include="..\SDemo.DesktopAgent.Plugin.Summarize\SDemo.DesktopAgent.Plugin.Summarize.csproj" />
     <ProjectReference Include="..\SDemo.DesktopAgent.Plugin.Translate\SDemo.DesktopAgent.Plugin.Translate.csproj" />
+    <!-- 编辑引擎：路径守卫 / 补丁 / checkpoint。 -->
+    <ProjectReference Include="..\SDemo.DesktopAgent.Editing\SDemo.DesktopAgent.Editing.csproj" />
+    <!-- 工具：契约 + 各内置工具包。 -->
+    <ProjectReference Include="..\SDemo.DesktopAgent.Tools.Abstractions\SDemo.DesktopAgent.Tools.Abstractions.csproj" />
+    <ProjectReference Include="..\SDemo.DesktopAgent.Tools.Edits\SDemo.DesktopAgent.Tools.Edits.csproj" />
+    <ProjectReference Include="..\SDemo.DesktopAgent.Tools.Files\SDemo.DesktopAgent.Tools.Files.csproj" />
+    <ProjectReference Include="..\SDemo.DesktopAgent.Tools.Search\SDemo.DesktopAgent.Tools.Search.csproj" />
+    <ProjectReference Include="..\SDemo.DesktopAgent.Tools.Todo\SDemo.DesktopAgent.Tools.Todo.csproj" />
     <!-- 沙箱契约：纯 record / enum / 协议常量，无平台 API。 -->
     <ProjectReference Include="..\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
   </ItemGroup>

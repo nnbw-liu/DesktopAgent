@@ -149,11 +149,7 @@ public sealed class AgentChatService : IAgentChatService
             switch (evt)
             {
                 case AgentStreamEvent.Usage usage:
-                    plan.Metrics?.AddUsage(new UsageDetails
-                    {
-                        InputTokenCount = usage.InputTokens,
-                        OutputTokenCount = usage.OutputTokens
-                    });
+                    plan.Metrics?.AddUsage(usage.InputTokens, usage.OutputTokens);
                     break;
 
                 case AgentStreamEvent.Reasoning delta:

@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SDemo.DesktopAgent.Core\SDemo.DesktopAgent.Core.csproj" />
+    <!-- Windows 专属工具包（PowerShell / PDF / 直跑命令）实现 IAgentToolPack。 -->
+    <ProjectReference Include="..\SDemo.DesktopAgent.Tools.Abstractions\SDemo.DesktopAgent.Tools.Abstractions.csproj" />
     <ProjectReference Include="..\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
     <ProjectReference Include="..\SDemo.DesktopAgent.SandboxHost\SDemo.DesktopAgent.SandboxHost.csproj"
                       ReferenceOutputAssembly="false" />

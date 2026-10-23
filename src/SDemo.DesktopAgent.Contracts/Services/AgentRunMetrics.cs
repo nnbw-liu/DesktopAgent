@@ -1,4 +1,3 @@
-using Microsoft.Extensions.AI;
 using SDemo.DesktopAgent.Context;
 
 namespace SDemo.DesktopAgent.Services;
@@ -51,14 +50,9 @@ public sealed class AgentRunMetrics
         _toolTrace.Add(entry);
     }
 
-    public void AddUsage(UsageDetails? usage)
+    public void AddUsage(int inputTokens, int outputTokens)
     {
-        if (usage is null)
-        {
-            return;
-        }
-
-        InputTokens += (int)(usage.InputTokenCount ?? 0);
-        OutputTokens += (int)(usage.OutputTokenCount ?? 0);
+        InputTokens += inputTokens;
+        OutputTokens += outputTokens;
     }
 }

@@ -24,12 +24,13 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<ISearchService, SearchService>();
         services.AddSingleton<IToolApprovalService, ToolApprovalService>();
         services.AddSingleton<IToolAuditLog, JsonlToolAuditLog>();
-        services.AddSingleton<AgentToolRegistry>();
-        services.AddSingleton<IAgentToolPack, SearchToolPack>();
-        services.AddSingleton<IAgentToolPack, FileToolPack>();
-        services.AddSingleton<IAgentToolPack, EditToolPack>();
-        services.AddSingleton<IAgentToolPack, TodoToolPack>();
-        services.AddSingleton<IAgentToolPack, CodeEditToolPack>();
+
+        // 工具层：注册表 + 各内置工具包（每个包一个模块，按需引用）。
+        services.AddAgentTooling();
+        services.AddSearchTools();
+        services.AddFileTools();
+        services.AddEditTools();
+        services.AddTodoTools();
 
         // P3：读前写注册表（按会话 + 2 小时 TTL）。
         services.AddSingleton<IFileReadRegistry, FileReadRegistry>();

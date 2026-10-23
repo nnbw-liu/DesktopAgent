@@ -147,7 +147,7 @@ public sealed class AgentSessionRunnerTests
         await foreach (var delta in runner.StreamAsync(Request(metrics: metrics), telemetry))
         {
             // 假模型在吐字前写入 usage，模拟服务端返回。
-            metrics.AddUsage(new UsageDetails { InputTokenCount = (int)(telemetry.Report!.Estimated * 1.5) });
+            metrics.AddUsage((int)(telemetry.Report!.Estimated * 1.5), 0);
         }
 
         Assert.True(telemetry.Report!.ActualInputTokens > 0);
