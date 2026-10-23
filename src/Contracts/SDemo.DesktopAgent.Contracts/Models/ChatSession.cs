@@ -19,6 +19,12 @@ public sealed class ChatSession
     /// <summary>是否置顶（置顶后排在最前，取消置顶按钮常亮）。</summary>
     public bool IsPinned { get; set; }
 
+    /// <summary>
+    /// 是否已归档（M3）：归档会话从侧栏隐藏，并进入当前工作区的知识库索引。
+    /// 只允许归属于工作区的会话归档。
+    /// </summary>
+    public bool IsArchived { get; set; }
+
     /// <summary>最后更新时间，列表排序用（置顶优先，其次按它倒序）。</summary>
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 

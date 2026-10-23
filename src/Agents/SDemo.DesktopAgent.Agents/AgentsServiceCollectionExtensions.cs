@@ -12,6 +12,8 @@ public static class AgentsServiceCollectionExtensions
         services.AddSingleton<IAgentRuntime, MafAgentRuntime>();
         // 摘要与模型目录也走 OpenAI 兼容协议，和主链路共享同一层依赖。
         services.AddSingleton<ISummaryChatTransport, OpenAiSummaryChatTransport>();
+        // M4：小模型路由单独一条传输，失败不影响摘要与主对话。
+        services.AddSingleton<IRoutingChatTransport, OpenAiRoutingChatTransport>();
         services.AddSingleton<IModelCatalogService, ModelCatalogService>();
         return services;
     }

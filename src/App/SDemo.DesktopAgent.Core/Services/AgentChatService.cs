@@ -60,6 +60,8 @@ public sealed class AgentChatService : IAgentChatService
     private readonly IAppPaths _paths;
     private readonly IFileReadRegistry _reads;
     private readonly IAgentRuntime _runtime;
+    private readonly ISkillLibrary? _skills;
+    private readonly IWorkspaceMemory? _memory;
 
     public AgentChatService(
         AgentToolRegistry tools,
@@ -70,7 +72,9 @@ public sealed class AgentChatService : IAgentChatService
         IToolAuditLog audit,
         IAppPaths paths,
         IFileReadRegistry reads,
-        IAgentRuntime runtime)
+        IAgentRuntime runtime,
+        ISkillLibrary? skills = null,
+        IWorkspaceMemory? memory = null)
     {
         _tools = tools;
         _workspace = workspace;
@@ -81,6 +85,8 @@ public sealed class AgentChatService : IAgentChatService
         _paths = paths;
         _reads = reads;
         _runtime = runtime;
+        _skills = skills;
+        _memory = memory;
     }
 
     public async IAsyncEnumerable<AgentDelta> RunAsync(
@@ -103,35 +109,37 @@ public sealed class AgentChatService : IAgentChatService
             _reads,
             plan.Metrics,
             plan.Session,
-            plan.Metrics?.RunId);
+            plan.Metrics?.RunId,
+            _skills,
+            plan.Session?.WorkspaceId,
+            _memory);
 
-        var tools = _tools.Create(context, plan.ToolPacks, plan.Metrics);
+        var agentSettings = _settings.Current.Agent ?? new AgentSettings();
+        var available = _tools.ToolNames(plan.ToolPacks);
         var agentMode = Context.AgentModeResolver.Resolve(
             plan.Context.Profile,
             plan.ModelId,
-            _settings.Current.Agent.Mode);
+            agentSettings.Mode);
+        var decision = plan.Context.Report.Routing ?? ResolveRouting(plan, available, agentSettings, agentMode);
 
-        if (agentMode == Context.AgentMode.Compact)
+        // M1：每轮只路由一次；工具集合 = 核心集 + 选中包（+ 兜底入口），不再全量灌给模型。
+        var (tools, measuredSchemaTokens) = CreateExposedTools(context, plan, decision);
+
+        // M4：把本轮路由记进 metrics，流结束后可算「暴露 N 个 / 实际调用 M 个 / 未用 K 个」。
+        plan.Metrics?.RecordRouting(decision);
+
+        // 宿主侧量出真实 schema 后回填报告，UI 的分段明细与预算账本用的是同一次路由。
+        telemetry.Report = (telemetry.Report ?? plan.Context.Report)
+            .WithRouting(measuredSchemaTokens, decision with { EstimatedSchemaTokens = measuredSchemaTokens });
+
+        if (agentMode == Context.AgentMode.Compact && plan.Metrics is not null)
         {
-            if (plan.Metrics is not null)
-            {
-                plan.Metrics.Guard.Limit = Math.Clamp(_settings.Current.Agent.CompactMaxToolCalls, 1, 16);
-            }
-
-            var available = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
-            var userInput = plan.Context.Messages
-                .LastOrDefault(message => message.Role == ChatRole.User)?.Text ?? string.Empty;
-            var recent = plan.Metrics?.ToolTrace.Select(entry => entry.ToolId).TakeLast(6).ToArray() ?? [];
-            var selected = ToolRouter.Select(
-                new ToolSelectionContext(userInput, recent, available, agentMode),
-                _settings.Current.Agent.CompactMaxTools);
-
-            tools = tools.Where(tool => selected.Contains(tool.Name, StringComparer.Ordinal)).ToList();
+            plan.Metrics.Guard.Limit = Math.Clamp(agentSettings.CompactMaxToolCalls, 1, 16);
         }
 
         var toolCallLimit = agentMode == Context.AgentMode.Compact
-            ? Math.Clamp(_settings.Current.Agent.CompactMaxToolCalls, 1, 16)
-            : Math.Clamp(_settings.Current.Agent.FullMaxToolCalls, 1, 16);
+            ? Math.Clamp(agentSettings.CompactMaxToolCalls, 1, 16)
+            : Math.Clamp(agentSettings.FullMaxToolCalls, 1, 16);
 
         if (plan.Metrics is not null)
         {
@@ -176,6 +184,89 @@ public sealed class AgentChatService : IAgentChatService
                 reasoning.Clear();
             }
         }
+    }
+
+    /// <summary>
+    /// 插件 Run 等直接构造 <see cref="AgentRunPlan"/> 的路径不会经过 Runner 的路由，
+    /// 这里补一次同规则的判定，保证「每轮只路由一次」在两条路径上都成立。
+    /// </summary>
+    private RoutingDecision ResolveRouting(
+        AgentRunPlan plan,
+        IReadOnlyList<string> available,
+        AgentSettings agentSettings,
+        Context.AgentMode mode)
+    {
+        if (available.Count == 0)
+        {
+            return RoutingDecision.Empty;
+        }
+
+        var userInput = plan.Context.Messages
+            .LastOrDefault(message => message.Role == ChatRole.User)?.Text ?? string.Empty;
+        var recent = plan.Metrics?.ToolTrace.Select(entry => entry.ToolId).TakeLast(6).ToArray() ?? [];
+
+        return CapabilityRouter.Route(new CapabilityRoutingInput(
+            userInput,
+            recent,
+            available,
+            mode,
+            agentSettings.ResolveMaxExposedTools(plan.Context.Profile.ContextWindow, mode),
+            agentSettings.SearchCapabilitiesEnabled,
+            agentSettings.ExposeAllTools));
+    }
+
+    /// <summary>
+    /// 按路由结果生成工具，并在宿主侧量出真实 schema token。
+    /// 超出窗口预算（8K 1.5K / 32K 3K）时从路由尾部丢弃，兜底入口最后才丢。
+    /// </summary>
+    private (IReadOnlyList<AITool> Tools, int SchemaTokens) CreateExposedTools(
+        ToolContext context,
+        AgentRunPlan plan,
+        RoutingDecision decision)
+    {
+        if (decision.Count == 0)
+        {
+            return ([], 0);
+        }
+
+        var exposed = new HashSet<string>(decision.ExposedTools, StringComparer.Ordinal);
+        var tools = _tools
+            .CreateExposed(context, plan.ToolPacks, exposed, plan.Metrics, decision.EscapeHatch)
+            .ToList();
+
+        var counter = new HeuristicTokenCounter();
+        var limit = Math.Min(plan.Context.Budget.ToolSchemaLimit, plan.Context.Budget.Total);
+        var tokens = MeasureToolSchema(tools, counter);
+
+        while (tokens > limit && tools.Count > 1)
+        {
+            var index = tools.FindLastIndex(tool =>
+                !string.Equals(tool.Name, CapabilityRouter.EscapeHatchTool, StringComparison.Ordinal));
+
+            if (index < 0)
+            {
+                break;
+            }
+
+            tools.RemoveAt(index);
+            tokens = MeasureToolSchema(tools, counter);
+        }
+
+        return (tools, tokens);
+    }
+
+    /// <summary>工具 schema 的实测成本：名称 + 描述 + 参数 JSON，走与其他上下文相同的估算器。</summary>
+    private static int MeasureToolSchema(IReadOnlyList<AITool> tools, ITokenCounter counter)
+    {
+        var total = 0;
+
+        foreach (var tool in tools)
+        {
+            var schema = tool is AIFunction function ? function.JsonSchema.GetRawText() : string.Empty;
+            total += counter.CountMessage("tool", $"{tool.Name}\n{tool.Description}\n{schema}");
+        }
+
+        return total;
     }
 
     /// <summary>

@@ -53,6 +53,16 @@
     {
         <p class="context-note">工作区状态包约 @ContextMeter.Format(Report.StatePackTokens) token</p>
     }
+    @if (Report.Routing is { Count: > 0 } routing)
+    {
+        <p class="context-note">
+            工具路由（@FormatSource(routing.Source)）：暴露 @routing.Count 个（上限 @FormatLimit(routing.MaxExposedTools)）· @routing.Reason
+            @if (routing.EscapeHatch)
+            {
+                <text> · 含兜底 search_capabilities</text>
+            }
+        </p>
+    }
     @if (Report.OmittedMessages > 0)
     {
         <p class="context-note">已省略 @Report.OmittedMessages 条较早消息（约 @ContextMeter.Format(Report.OmittedTokens) token）</p>
@@ -128,6 +138,10 @@
 
         yield return ("系统提示词", segments.System, "seg-system", string.Empty);
         yield return ("技能", segments.Skills, "seg-skills", string.Empty);
+        yield return ("工具 schema", segments.ToolSchema, "seg-tools",
+            Report.Routing is { Count: > 0 } routing ? $"{routing.Count} 个" : string.Empty);
+        yield return ("工作区知识库", segments.Knowledge, "seg-knowledge",
+            segments.Knowledge > 0 ? "索引行" : string.Empty);
         yield return ("历史对话", segments.Turns, "seg-turns",
             Report.TotalTurns > Report.KeptTurns ? $"{Report.KeptTurns}/{Report.TotalTurns} 轮" : string.Empty);
         yield return ("已压缩摘要", segments.Summary, "seg-summary",
@@ -151,6 +165,8 @@
         yield return ("seg-system", Percent(segments.System));
         yield return ("seg-skills", Percent(segments.Skills));
         yield return ("seg-turns", Percent(segments.Turns));
+        yield return ("seg-tools", Percent(segments.ToolSchema));
+        yield return ("seg-knowledge", Percent(segments.Knowledge));
         yield return ("seg-summary", Percent(segments.Summary));
         yield return ("seg-state", Percent(segments.StatePack));
         yield return ("seg-attachments", Percent(segments.Attachments));
@@ -159,4 +175,11 @@
 
         double Percent(int tokens) => Math.Clamp(tokens / total * 100, 0, 100);
     }
+
+    private static string FormatLimit(int limit) => limit <= 0 || limit == int.MaxValue ? "不限" : limit.ToString();
+
+    private static string FormatSource(string? source) =>
+        string.Equals(source, SDemo.DesktopAgent.Context.RoutingDecision.SmallModelSource, StringComparison.Ordinal)
+            ? "小模型"
+            : "规则";
 }

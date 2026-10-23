@@ -31,6 +31,8 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddFileTools();
         services.AddEditTools();
         services.AddTodoTools();
+        services.AddSkillTools();
+        services.AddMemoryTools();
 
         // P3：读前写注册表（按会话 + 2 小时 TTL）。
         services.AddSingleton<IFileReadRegistry, FileReadRegistry>();
@@ -44,11 +46,20 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<ChangeApplier>();
         services.AddSingleton<ChatStore>();
         services.AddSingleton<SkillCatalog>();
+        // M2：技能库的契约视图，供工具包（load_skill）与上下文层共用。
+        services.AddSingleton<ISkillLibrary>(sp => sp.GetRequiredService<SkillCatalog>());
+
+        // M3：工作区知识库索引 + 归档编排（索引落在各工作区 DB 的 FTS5 表里）。
+        services.AddSingleton<IWorkspaceMemory>(sp =>
+            new WorkspaceMemoryIndex(sp.GetRequiredService<ChatStore>()));
+        services.AddSingleton<SessionArchiveService>();
 
         // P1 上下文层：单一入口 + 计量 + 校准 + 溢出自愈。
         services.AddSingleton<ITokenCounter, HeuristicTokenCounter>();
         services.AddSingleton<TokenCalibrationStore>();
         services.AddSingleton<ContextBuilder>();
+        // M4：规则不确定时的小模型路由；失败自动回落规则。
+        services.AddSingleton<IRoutingAdvisor, SmallModelRoutingAdvisor>();
         services.AddSingleton<IAgentSessionRunner, AgentSessionRunner>();
 
         // P2 压缩与工作记忆：摘要（模型 + 兜底）、压缩编排、状态包。

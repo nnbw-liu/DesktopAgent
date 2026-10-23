@@ -10,6 +10,7 @@ public sealed class AgentRunMetrics
 {
     private readonly Dictionary<string, int> _toolCalls = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ToolTraceEntry> _toolTrace = [];
+    private readonly List<MemoryCitation> _citations = [];
 
     /// <summary>本次生成（turn）的 id；checkpoint 按它聚合一次生成里的多次编辑。</summary>
     public string RunId { get; } = Guid.NewGuid().ToString("N");
@@ -28,6 +29,57 @@ public sealed class AgentRunMetrics
 
     /// <summary>本次生成的工具轨迹（最多 <see cref="MaxStoredEntries"/> 条）。</summary>
     public IReadOnlyList<ToolTraceEntry> ToolTrace => _toolTrace;
+
+    /// <summary>一次生成最多保留的引用条数。</summary>
+    public const int MaxCitations = 10;
+
+    /// <summary>M3：本轮命中的归档会话引用（按出现顺序去重）。</summary>
+    public IReadOnlyList<MemoryCitation> Citations => _citations;
+
+    /// <summary>M4：本轮采用的能力路由（暴露集合 / 上限 / 来源）。插件等未路由的路径为 null。</summary>
+    public Context.RoutingDecision? Routing { get; private set; }
+
+    /// <summary>记录本轮路由；实际调用统计仍由 <see cref="RecordToolCall"/> 记录。</summary>
+    public void RecordRouting(Context.RoutingDecision decision) => Routing = decision;
+
+    /// <summary>本轮暴露给模型的工具数（没有路由时为 0）。</summary>
+    public int ExposedToolCount => Routing?.Count ?? 0;
+
+    /// <summary>本轮实际调用过的工具数（去重）。</summary>
+    public int CalledToolCount => _toolCalls.Count;
+
+    /// <summary>暴露了但一次都没调用的工具（用于评估路由是否过度暴露）。</summary>
+    public IReadOnlyList<string> UnusedExposedTools =>
+        Routing is null
+            ? []
+            : Routing.ExposedTools
+                .Where(name => !_toolCalls.ContainsKey(name))
+                .ToArray();
+
+    /// <summary>
+    /// 实际调用了、但不在本轮暴露集合里的工具。正常应为空；出现时说明有路径绕过了路由，
+    /// 保留成显式指标而不是静默忽略。
+    /// </summary>
+    public IReadOnlyList<string> CalledUnexposedTools =>
+        Routing is null
+            ? []
+            : _toolCalls.Keys
+                .Where(name => !Routing.Exposes(name))
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray();
+
+    /// <summary>记录一条知识库引用；同一会话只保留第一次出现。</summary>
+    public void RecordCitation(MemoryCitation citation)
+    {
+        if (string.IsNullOrWhiteSpace(citation.SessionId)
+            || _citations.Count >= MaxCitations
+            || _citations.Any(item => string.Equals(item.SessionId, citation.SessionId, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        _citations.Add(citation);
+    }
 
     public void RecordToolCall(string? name)
     {

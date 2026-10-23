@@ -89,10 +89,44 @@ public sealed class ChatStoreContextTests : IDisposable
         Assert.Contains("SummaryTokens", sessionColumns);
         Assert.Contains("LastVerificationJson", sessionColumns);
         Assert.Contains("TodosJson", sessionColumns);
+        Assert.Contains("IsArchived", sessionColumns);
 
         var messageColumns = ReadColumns(connection, "messages");
         Assert.Contains("ToolTraceJson", messageColumns);
+        Assert.Contains("MemoryCitationsJson", messageColumns);
         Assert.Contains("IsPinned", messageColumns);
+    }
+
+    [Fact]
+    public async Task 归档状态与知识库引用落库后能读回()
+    {
+        var store = new ChatStore(_root);
+        var session = new ChatSession
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = "已归档的会话",
+            WorkspaceId = "w1",
+            IsArchived = true,
+            UpdatedAt = DateTime.Now
+        };
+
+        session.Messages.Add(new ChatMessage(ChatMessageRole.User, "上次沙箱 ACL 的结论"));
+        session.Messages.Add(new ChatMessage(ChatMessageRole.Assistant, "结论见原会话")
+        {
+            MemoryCitations =
+            [
+                new SDemo.DesktopAgent.Context.MemoryCitation("old-session", "沙箱隔离复盘", new DateTime(2026, 10, 20))
+            ]
+        });
+
+        await store.SaveSessionAsync(session);
+
+        var loaded = Assert.Single(await store.LoadAllAsync([new Workspace { Id = "w1", Name = "w", Path = _root }]));
+
+        Assert.True(loaded.IsArchived);
+        var citation = Assert.Single(loaded.Messages[1].MemoryCitations);
+        Assert.Equal("old-session", citation.SessionId);
+        Assert.Equal("沙箱隔离复盘", citation.Title);
     }
 
     private static void CreateLegacyDatabase(string path)

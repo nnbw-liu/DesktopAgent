@@ -148,6 +148,9 @@ public sealed class ChatStore
             foreach (var session in sessions)
             {
                 session.WorkspaceId = null;
+                // M3：移到历史聊天后不再属于任何工作区知识库，归档状态必须清掉，
+                // 否则会话会从侧栏消失又没有工作区可以取消归档。
+                session.IsArchived = false;
                 await SaveCoreAsync(session, cancellationToken);
             }
 
@@ -237,6 +240,8 @@ public sealed class ChatStore
         record.Meta = session.Meta;
         record.WorkspaceId = session.WorkspaceId;
         record.IsPinned = session.IsPinned;
+        // M3：归档状态随会话落库；知识库索引由 SessionArchiveService 单独维护。
+        record.IsArchived = session.IsArchived;
         record.UpdatedAt = session.UpdatedAt;
         record.OriginMountId = session.OriginMountId;
         record.ActiveMountId = session.ActiveMountId;
@@ -306,6 +311,9 @@ public sealed class ChatStore
             messageRecord.ToolTraceJson = message.ToolTrace.Count == 0
                 ? null
                 : JsonSerializer.Serialize(message.ToolTrace, JsonOptions);
+            messageRecord.MemoryCitationsJson = message.MemoryCitations.Count == 0
+                ? null
+                : JsonSerializer.Serialize(message.MemoryCitations, JsonOptions);
             messageRecord.IsPinned = message.IsPinned;
             keep.Add(message.Id);
         }
@@ -384,7 +392,9 @@ public sealed class ChatStore
             ("SummaryUpdatedAt", "TEXT NULL"),
             ("SummaryTokens", "INTEGER NOT NULL DEFAULT 0"),
             ("LastVerificationJson", "TEXT NULL"),
-            ("TodosJson", "TEXT NULL")
+            ("TodosJson", "TEXT NULL"),
+            // M3：归档状态（工作区知识库只索引 IsArchived = 1 的会话）。
+            ("IsArchived", "INTEGER NOT NULL DEFAULT 0")
         ]),
         ("messages",
         [
@@ -397,6 +407,8 @@ public sealed class ChatStore
             ("PluginJson", "TEXT NULL"),
             ("DerivedJson", "TEXT NULL"),
             ("ToolTraceJson", "TEXT NULL"),
+            // M3：知识库引用（只用于界面跳转，不进入上下文）。
+            ("MemoryCitationsJson", "TEXT NULL"),
             ("IsPinned", "INTEGER NOT NULL DEFAULT 0")
         ])
     ];
@@ -411,6 +423,13 @@ public sealed class ChatStore
             foreach (var (table, columns) in RequiredColumns)
             {
                 await EnsureColumnsAsync(connection, table, columns, cancellationToken);
+            }
+
+            // M3：知识库 FTS5 表不参与 EF 模型；老库升级到这里时一并补建。
+            if (connection is SqliteConnection sqlite
+                && !ArchiveSchema.TableExists(sqlite, ArchiveSchema.FtsTable))
+            {
+                ArchiveSchema.TryEnsure(sqlite);
             }
         }
         finally
@@ -643,6 +662,24 @@ public sealed class ChatStore
         }
     }
 
+    /// <summary>知识库引用；坏数据降级为空列表（M3）。</summary>
+    private static List<Context.MemoryCitation> DeserializeCitations(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<Context.MemoryCitation>>(json, JsonOptions) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
     private static ChatSession ToSession(SessionRecord record, string? workspaceId)
     {
         var session = new ChatSession
@@ -652,6 +689,7 @@ public sealed class ChatStore
             Meta = record.Meta,
             WorkspaceId = workspaceId ?? record.WorkspaceId,
             IsPinned = record.IsPinned,
+            IsArchived = record.IsArchived,
             UpdatedAt = record.UpdatedAt,
             OriginMountId = record.OriginMountId,
             ActiveMountId = record.ActiveMountId,
@@ -679,6 +717,7 @@ public sealed class ChatStore
                     Plugin = DeserializePlugin(message.PluginJson),
                     Derived = DeserializeDerived(message.DerivedJson),
                     ToolTrace = DeserializeToolTrace(message.ToolTraceJson),
+                    MemoryCitations = DeserializeCitations(message.MemoryCitationsJson),
                     IsPinned = message.IsPinned
                 })
                 .ToList()
