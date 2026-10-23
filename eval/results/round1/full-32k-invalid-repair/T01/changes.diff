@@ -1,0 +1,24 @@
+diff --git a/src/CommandLine/ParserSettings.cs b/src/CommandLine/ParserSettings.cs
+index 5ed73f3..63e9fae 100644
+--- a/src/CommandLine/ParserSettings.cs
++++ b/src/CommandLine/ParserSettings.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Globalization;
+@@ -180,7 +180,12 @@ namespace CommandLine
+         public int MaximumDisplayWidth
+         {
+             get { return maximumDisplayWidth; }
+-            set { maximumDisplayWidth = value; }
++             set
++            {
++                if (value < 1)
++                    throw new ArgumentOutOfRangeException("value", "MaximumDisplayWidth must be at least 1.");
++                maximumDisplayWidth = value;
++            }
+         }
+ 
+         /// <summary>

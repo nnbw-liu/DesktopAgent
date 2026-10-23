@@ -12,6 +12,12 @@ public sealed class AgentRunMetrics
     private readonly Dictionary<string, int> _toolCalls = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ToolTraceEntry> _toolTrace = [];
 
+    /// <summary>本次生成（turn）的 id；checkpoint 按它聚合一次生成里的多次编辑。</summary>
+    public string RunId { get; } = Guid.NewGuid().ToString("N");
+
+    /// <summary>本轮工具循环保护（P5）。</summary>
+    public Context.ToolCallGuard Guard { get; } = new();
+
     public int InputTokens { get; private set; }
 
     public int OutputTokens { get; private set; }

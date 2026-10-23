@@ -1,0 +1,81 @@
+diff --git a/UnParserSettings.cs b/UnParserSettings.cs
+new file mode 100644
+index 0000000..b346d4c
+--- /dev/null
++++ b/UnParserSettings.cs
+@@ -0,0 +1,40 @@
++using System;
++using System.Collections.Generic;
++using System.Linq;
++
++namespace Unparser
++{
++    public class UnParserSettings
++    {
++        private bool _groupSwitchesOnly = false;
++        private bool _useEqualTokenOnly = false;
++        private bool _skipDefault = true; // 默认跳过默认值
++
++        public bool GroupSwitchesOnly => _groupSwitchesOnly;
++        public bool UseEqualTokenOnly => _useEqualTokenOnly;
++        public bool SkipDefault => !_skipDefault; // 当 skipDefault 为 false 时，才不跳过默认值
++
++        private UnParserSettings() { }
++
++        public static UnParserSettings WithGroupSwitchesOnly()
++        {
++            var settings = new UnParserSettings();
++            settings._groupSwitchesOnly = true;
++            return settings;
++        }
++
++        public static UnParserSettings WithUseEqualTokenOnly()
++        {
++            var settings = new UnParserSettings();
++            settings._useEqualTokenOnly = true;
++            return settings;
++        }
++
++        public static UnParserSettings WithSkipDefaultOnly()
++        {
++            var settings = new UnParserSettings();
++            settings._skipDefault = false; // 设置 skipDefault 为 false，表示不跳过默认值
++            return settings;
++        }
++    }
++}
+diff --git a/UnParserSettingsTests.cs b/UnParserSettingsTests.cs
+new file mode 100644
+index 0000000..6c9ac6b
+--- /dev/null
++++ b/UnParserSettingsTests.cs
+@@ -0,0 +1,29 @@
++using System;
++using Xunit;
++
++namespace Unparser.Tests
++{
++    public class UnParserSettingsTests
++    {
++        [Fact]
++        public void WithSkipDefaultOnly_ShouldSetSkipDefaultToTrue()
++        {
++            var settings = UnParserSettings.WithSkipDefaultOnly();
++            Assert.True(settings.SkipDefault); // 当 skipDefault 为 false 时，SkipDefault 属性应为 true
++        }
++
++        [Fact]
++        public void WithSkipDefaultOnly_ShouldNotSetGroupSwitchesOnly()
++        {
++            var settings = UnParserSettings.WithSkipDefaultOnly();
++            Assert.False(settings.GroupSwitchesOnly); // 不应设置 groupSwitchesOnly
++        }
++
++        [Fact]
++        public void WithSkipDefaultOnly_ShouldNotSetUseEqualTokenOnly()
++        {
++            var settings = UnParserSettings.WithSkipDefaultOnly();
++            Assert.False(settings.UseEqualTokenOnly); // 不应设置 useEqualTokenOnly
++        }
++    }
++}

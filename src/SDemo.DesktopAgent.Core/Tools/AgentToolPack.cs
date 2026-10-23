@@ -49,7 +49,8 @@ public sealed record ToolContext(
     IToolAuditLog Audit,
     IFileReadRegistry? Reads = null,
     AgentRunMetrics? Metrics = null,
-    SDemo.DesktopAgent.Models.ChatSession? Session = null);
+    SDemo.DesktopAgent.Models.ChatSession? Session = null,
+    string? TurnId = null);
 
 /// <summary>
 /// 工具包：搜索 / 文件 / PowerShell 都从这里进工具链。

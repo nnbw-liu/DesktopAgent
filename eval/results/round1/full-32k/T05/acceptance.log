@@ -1,0 +1,29 @@
+> dotnet build CommandLine.sln -v minimal
+Active code page: 65001
+  正在确定要还原的项目…
+  所有项目均是最新的，无法还原。
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\src\CommandLine\bin\Debug\net45\CommandLine.dll
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\src\CommandLine\bin\Debug\net461\CommandLine.dll
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\src\CommandLine\bin\Debug\netstandard2.0\CommandLine.dll
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\src\CommandLine\bin\Debug\net40\CommandLine.dll
+C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs(5,9): error CS0106: 修饰符“public”对该项无效 [C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs(14,9): error CS0106: 修饰符“public”对该项无效 [C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs(23,9): error CS0106: 修饰符“public”对该项无效 [C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs(5,9): error CS0106: 修饰符“public”对该项无效 [C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs(14,9): error CS0106: 修饰符“public”对该项无效 [C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs(23,9): error CS0106: 修饰符“public”对该项无效 [C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+
+生成失败。
+
+C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs(5,9): error CS0106: 修饰符“public”对该项无效 [C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs(14,9): error CS0106: 修饰符“public”对该项无效 [C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs(23,9): error CS0106: 修饰符“public”对该项无效 [C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs(5,9): error CS0106: 修饰符“public”对该项无效 [C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs(14,9): error CS0106: 修饰符“public”对该项无效 [C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs(23,9): error CS0106: 修饰符“public”对该项无效 [C:\Users\12105\AppData\Local\Temp\agent-eval\full-32k-20261023-093056\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+    0 个警告
+    6 个错误
+
+已用时间 00:00:02.80
+
+[exit 1]

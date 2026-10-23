@@ -138,7 +138,12 @@ public static class UnifiedPatchParser
                     var kind = line[0];
                     if (kind is not (' ' or '+' or '-' or '\\'))
                     {
-                        break;
+                        // 小模型常把上下文行写成不带前导空格的原样代码。宽容处理：
+                        // 仍按上下文行收下，让后续「按内容定位」决定能不能应用；
+                        // 格式错误会在应用阶段以「hunk 未匹配」回给模型，而不是解析阶段直接报废。
+                        hunkLines.Add(new PatchLine(' ', line));
+                        index++;
+                        continue;
                     }
 
                     if (kind == '\\')

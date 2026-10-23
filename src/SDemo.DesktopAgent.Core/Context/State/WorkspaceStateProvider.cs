@@ -75,7 +75,8 @@ public sealed class WorkspaceStateProvider
             edits,
             actions,
             LastVerification: session?.LastVerification?.Format(),
-            PinnedCount: session?.Messages.Count(message => message.IsPinned) ?? 0);
+            PinnedCount: session?.Messages.Count(message => message.IsPinned) ?? 0,
+            Todos: session?.Todos);
     }
 
     private IReadOnlyList<string> GetTree(string root)

@@ -1,0 +1,26 @@
+diff --git a/src/CommandLine/UnParserExtensions.cs b/src/CommandLine/UnParserExtensions.cs
+index e823a7f..65afe52 100644
+--- a/src/CommandLine/UnParserExtensions.cs
++++ b/src/CommandLine/UnParserExtensions.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections;
+@@ -83,6 +83,15 @@ namespace CommandLine
+             return new UnParserSettings { UseEqualToken = true };
+         }
+ 
++        /// <summary>
++        /// Factory method that creates an instance of <see cref="CommandLine.UnParserSettings"/> with SkipDefault set to true.
++        /// </summary>
++        /// <returns>A properly initalized <see cref="CommandLine.UnParserSettings"/> instance.</returns>
++        public static UnParserSettings WithSkipDefaultOnly()
++        {
++            return new UnParserSettings { SkipDefault = true };
++        }
++
+         internal bool Consumed { get; set; }
+     }
+ 

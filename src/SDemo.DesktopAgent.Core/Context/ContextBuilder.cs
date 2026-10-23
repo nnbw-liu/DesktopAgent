@@ -41,6 +41,10 @@ public sealed class ContextBuilder
     {
         var settings = _settings.Current.Context ?? new ContextSettings();
         var profile = ResolveProfile(request);
+        var mode = AgentModeResolver.Resolve(
+            profile,
+            request.ModelId,
+            request.ModeOverride ?? _settings.Current.Agent.Mode);
         var policy = new ContextPolicy(profile, settings);
         var budget = Math.Abs(request.BudgetScale - 1.0) > 1e-9 && request.BudgetScale > 0
             ? policy.Budget.Scale(request.BudgetScale)
@@ -49,7 +53,7 @@ public sealed class ContextBuilder
         var calibrationFactor = _calibration?.GetFactor(request.Provider.Id, request.ModelId) ?? 1.0;
 
         var (instructions, systemTokens, skillTokens, skillTruncated) =
-            BuildInstructions(request, budget, calibrationFactor);
+            BuildInstructions(request, budget, calibrationFactor, mode);
 
         // 插件 Run：不做预算裁剪（输入上限由 PluginRunner 单独把关），但同样经过这里，
         // 保证「所有请求只从 ContextBuilder 出去」且报告口径一致。
@@ -234,9 +238,14 @@ public sealed class ContextBuilder
     /// 而不是让请求失败；系统提示词本身不截断（它是行为契约）。
     /// </summary>
     private (string Instructions, int SystemTokens, int SkillTokens, bool SkillTruncated)
-        BuildInstructions(ContextBuildRequest request, ContextBudget budget, double calibrationFactor)
+        BuildInstructions(
+            ContextBuildRequest request,
+            ContextBudget budget,
+            double calibrationFactor,
+            AgentMode mode)
     {
-        var baseInstructions = request.InstructionsOverride ?? AgentInstructions.Default;
+        var baseInstructions = request.InstructionsOverride
+                               ?? (mode == AgentMode.Compact ? SystemPrompts.Compact : SystemPrompts.Full);
         var systemTokens = _counter.CountMessage("system", baseInstructions);
 
         if (string.IsNullOrWhiteSpace(request.SkillText))
@@ -251,6 +260,11 @@ public sealed class ContextBuilder
         // 允许技能占满固定块剩余额度（按校准后的预算换算回原始估算）。
         var factor = calibrationFactor <= 0 ? 1.0 : calibrationFactor;
         var skillBudgetRaw = (int)Math.Floor(Math.Max(0, budget.FixedCap - systemTokens) / factor);
+        if (mode == AgentMode.Compact)
+        {
+            skillBudgetRaw = Math.Min(skillBudgetRaw, 600);
+        }
+
         var headerTokens = _counter.Count(header);
 
         for (var attempt = 0; attempt < 6; attempt++)

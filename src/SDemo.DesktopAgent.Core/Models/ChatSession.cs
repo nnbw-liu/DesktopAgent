@@ -63,6 +63,9 @@ public sealed class ChatSession
     /// <summary>最近一次构建 / 测试验证结果（P4；重启后从 LastVerificationJson 恢复）。</summary>
     public SDemo.DesktopAgent.Execution.VerificationRecord? LastVerification { get; set; }
 
+    /// <summary>当前任务计划（P5；整体替换，最多 20 项）。</summary>
+    public List<TodoItem> Todos { get; set; } = [];
+
     /// <summary>是否有可用的滚动摘要。</summary>
     public bool HasSummary =>
         SummaryThroughOrder > 0 && !string.IsNullOrWhiteSpace(Summary);

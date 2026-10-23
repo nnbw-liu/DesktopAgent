@@ -23,7 +23,10 @@ public sealed class ChatStore
     private readonly string _root;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
 
     public ChatStore(IAppPaths paths)
         : this(paths.ChatsRoot)
@@ -259,6 +262,9 @@ public sealed class ChatStore
         record.LastVerificationJson = session.LastVerification is null
             ? null
             : JsonSerializer.Serialize(session.LastVerification, JsonOptions);
+        record.TodosJson = session.Todos.Count == 0
+            ? null
+            : JsonSerializer.Serialize(session.Todos, JsonOptions);
 
         var existing = record.Messages.ToDictionary(message => message.Id, StringComparer.Ordinal);
         var keep = new HashSet<string>(StringComparer.Ordinal);
@@ -377,7 +383,8 @@ public sealed class ChatStore
             ("SummaryThroughOrder", "INTEGER NOT NULL DEFAULT 0"),
             ("SummaryUpdatedAt", "TEXT NULL"),
             ("SummaryTokens", "INTEGER NOT NULL DEFAULT 0"),
-            ("LastVerificationJson", "TEXT NULL")
+            ("LastVerificationJson", "TEXT NULL"),
+            ("TodosJson", "TEXT NULL")
         ]),
         ("messages",
         [
@@ -599,6 +606,26 @@ public sealed class ChatStore
     }
 
     /// <summary>最近一次验证结果；坏数据降级为 null。</summary>
+    private static List<TodoItem> DeserializeTodos(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<TodoItem>>(json, JsonOptions)?
+                .Where(item => !string.IsNullOrWhiteSpace(item.Content))
+                .Take(TodoToolPack.MaxItems)
+                .ToList() ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
     private static VerificationRecord? DeserializeVerification(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -636,6 +663,7 @@ public sealed class ChatStore
             SummaryTokens = record.SummaryTokens,
             SummaryIsFallback = SummaryFormat.IsFallback(record.Summary),
             LastVerification = DeserializeVerification(record.LastVerificationJson),
+            Todos = DeserializeTodos(record.TodosJson),
             Messages = record.Messages
                 .OrderBy(message => message.Order)
                 .Select(message => new ChatMessage(message.Role, message.Content)

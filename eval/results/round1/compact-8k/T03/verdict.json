@@ -1,0 +1,214 @@
+{
+  "id": "T03",
+  "type": "bugfix",
+  "title": "\u62D2\u7EDD\u975E\u6B63\u7684 HelpText \u663E\u793A\u5BBD\u5EA6",
+  "success": false,
+  "steps": 33,
+  "turns": 2,
+  "seconds": 40.6,
+  "error": null,
+  "acceptanceExit": 1,
+  "acceptanceOutput": "Active code page: 65001\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-094311\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll (.NETCoreApp,Version=v3.1)\u7684\u6D4B\u8BD5\u8FD0\u884C\r\n\u603B\u5171 1 \u4E2A\u6D4B\u8BD5\u6587\u4EF6\u4E0E\u6307\u5B9A\u6A21\u5F0F\u76F8\u5339\u914D\u3002\r\n[xUnit.net 00:00:01.00]     CommandLine.Tests.Unit.AgentEval.T03Tests.HelpText_width_rejects_non_positive_values [FAIL]\r\n  \u5931\u8D25 CommandLine.Tests.Unit.AgentEval.T03Tests.HelpText_width_rejects_non_positive_values [5 ms]\r\n  \u9519\u8BEF\u6D88\u606F:\r\n   Assert.Throws() Failure\r\nExpected: typeof(System.ArgumentOutOfRangeException)\r\nActual:   (No exception was thrown)\r\n  \u5806\u6808\u8DDF\u8E2A:\r\n     at CommandLine.Tests.Unit.AgentEval.T03Tests.HelpText_width_rejects_non_positive_values() in C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-094311\\tests\\CommandLine.Tests\\Unit\\AgentEval\\T03_T03Tests.cs:line 14\r\n\r\n\u5931\u8D25!  - \u5931\u8D25:     1\uFF0C\u901A\u8FC7:   684\uFF0C\u5DF2\u8DF3\u8FC7:     0\uFF0C\u603B\u8BA1:   685\uFF0C\u6301\u7EED\u65F6\u95F4: 274 ms - CommandLine.Tests.dll (netcoreapp3.1)\r\n",
+  "checkFailure": null,
+  "failureClass": "F6 \u5FAA\u73AF",
+  "trace": [
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AHelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AHelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AHelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AHelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AHelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AHelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AHelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AHelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/HelpText.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/HelpText.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    }
+  ]
+}

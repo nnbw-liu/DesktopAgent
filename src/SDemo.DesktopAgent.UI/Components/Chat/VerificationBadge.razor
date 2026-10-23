@@ -1,0 +1,75 @@
+@using SDemo.DesktopAgent.Execution
+@using SDemo.DesktopAgent.Models
+@inject IVerificationRunner Runner
+@inject WorkspaceContext Workspace
+@inject ChatStore Store
+
+@* P5 验证门：有编辑但之后没有成功验证时显示；用户可手动触发已保存的构建 / 测试命令。 *@
+@if (State.Dirty)
+{
+    <div class="verification-badge @(State.LastVerificationFailed ? "verification-badge--fail" : null)">
+        <span class="verification-badge-text">
+            @if (State.LastVerificationFailed)
+            {
+                <text>验证失败：</text>
+                @State.LastVerification!.TopIssues.FirstOrDefault()
+            }
+            else
+            {
+                <text>未验证改动：@State.ChangedFiles 个文件</text>
+                @if (State.LastVerification is { } last)
+                {
+                    <text> · 最近验证 @last.At.ToString("HH:mm")</text>
+                }
+            }
+        </span>
+
+        @if (!string.IsNullOrEmpty(_message))
+        {
+            <span class="verification-badge-note">@_message</span>
+        }
+
+        <button type="button" class="ghost-button" disabled="@_running" @onclick="RunAsync">
+            @(_running ? "验证中…" : "运行验证")
+        </button>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public ChatSession Session { get; set; } = null!;
+
+    private VerificationGateState State => VerificationGate.Evaluate(Session);
+    private bool _running;
+    private string? _message;
+
+    private async Task RunAsync()
+    {
+        _running = true;
+        _message = null;
+        StateHasChanged();
+
+        try
+        {
+            var record = await Runner.RunAsync(Session, Workspace.RootPath);
+            _message = record is null
+                ? "没有可用的构建 / 测试命令，请先在设置里配置。"
+                : record.Success
+                    ? "验证通过。"
+                    : "验证失败，模型可继续修复。";
+
+            if (record is not null)
+            {
+                await Store.SaveSessionAsync(Session);
+            }
+        }
+        catch (Exception ex)
+        {
+            _message = $"验证执行失败：{ex.Message}";
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+}

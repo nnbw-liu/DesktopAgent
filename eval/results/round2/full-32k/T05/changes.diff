@@ -1,0 +1,43 @@
+diff --git a/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs b/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
+index 7e878f3..e9979c7 100644
+--- a/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
++++ b/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections.Generic;
+@@ -26,7 +26,31 @@ namespace CommandLine.Tests.Unit
+ 
+         [Theory]
+         [MemberData(nameof(UnParseData))]
+-        public static void UnParsing_instance_with_splitArgs_returns_same_option_class(Simple_Options options, string result)
++        public static void UnParsing_instance_with_splitArgs_returns_same_option_class(Simple_Options o
++
++        [Fact]
++        public void AgentEval_PreferShortName_UsesShortWhenAvailable()
++        {
++            var settings = new UnParserSettings { PreferShortName = true };
++            var result = UnParser.UnParse(new OptionSpecification("option", "short"), settings);
++            result.Should().Be("--short");
++        }
++
++        [Fact]
++        public void AgentEval_PreferShortName_FallsBackToLong()
++        {
++            var settings = new UnParserSettings { PreferShortName = true };
++            var result = UnParser.UnParse(new OptionSpecification("option", "short"), settings);
++            result.Should().Be("--option");
++        }
++
++        [Fact]
++        public void AgentEval_PreferShortName_DoesNotAffectSwitches()
++        {
++            var settings = new UnParserSettings { PreferShortName = true };
++            var result = UnParser.UnParse(new OptionSpecification("option", "short"), settings);
++            result.Should().Be("--option");
++        }ptions, string result)
+         {
+            new Parser()
+             .FormatCommandLineArgs(options)

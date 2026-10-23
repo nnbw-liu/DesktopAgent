@@ -29,7 +29,9 @@ public sealed class ToolPackCompatibilityTests
         var descriptor = new EditToolPack().Descriptor;
 
         Assert.Equal("edits", descriptor.Id);
-        Assert.Equal(["apply_patch", "write_file"], descriptor.Functions.Select(function => function.Id));
+        Assert.Equal(
+            ["replace_text", "apply_patch", "write_file"],
+            descriptor.Functions.Select(function => function.Id));
         Assert.All(descriptor.Functions, function => Assert.True(function.RequiresApproval));
         Assert.Equal(AgentToolRisk.Medium, descriptor.Risk);
     }
