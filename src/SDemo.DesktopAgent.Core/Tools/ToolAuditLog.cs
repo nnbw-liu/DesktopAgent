@@ -40,8 +40,17 @@ public sealed record ToolAuditEntry
     /// <summary>变更明细：只记类型与路径 hash，不记路径原文或文件内容。</summary>
     public IReadOnlyList<ToolAuditChange>? Changes { get; init; }
 
-    /// <summary>审批结果：<c>ApproveOnce</c> / <c>Deny</c> / <c>NotRequired</c>。</summary>
+    /// <summary>审批结果：<c>ApproveOnce</c> / <c>SessionGrant</c> / <c>Deny</c> / <c>NotRequired</c>。</summary>
     public string Approval { get; init; } = "NotRequired";
+
+    /// <summary>执行模式（P4）：<c>sandbox</c> / <c>direct</c>；非执行类工具为 null。</summary>
+    public string? Mode { get; init; }
+
+    /// <summary>整条命令（含参数）的 SHA-256，避免审计日志记录命令正文。</summary>
+    public string? CommandSha256 { get; init; }
+
+    /// <summary>直跑工作目录（相对工作区）。</summary>
+    public string? WorkingDirectory { get; init; }
 
     public string? Error { get; init; }
 }
@@ -120,6 +129,9 @@ public sealed class JsonlToolAuditLog : IToolAuditLog
                     changeCount = payload.ChangeCount,
                     changes = payload.Changes,
                     approval = payload.Approval,
+                    mode = payload.Mode,
+                    commandSha256 = payload.CommandSha256,
+                    workingDirectory = payload.WorkingDirectory,
                     error = payload.Error
                 },
                 Options);

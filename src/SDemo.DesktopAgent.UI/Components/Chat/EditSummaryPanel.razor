@@ -1,0 +1,110 @@
+@using SDemo.DesktopAgent.Context
+@using SDemo.DesktopAgent.Editing
+@inject CheckpointStore Checkpoints
+@inject WorkspaceContext Workspace
+
+@* P3：本次生成的文件改动，来自工具轨迹里的 [EDIT] 行，不额外扫描磁盘。 *@
+@if (!_summary.IsEmpty)
+{
+    <details class="edit-summary">
+        <summary class="edit-summary-head">
+            <span class="edit-summary-title">本次改动 @_summary.Files.Count 个文件</span>
+            <span class="edit-summary-diff">
+                <span class="edit-added">+@_summary.TotalAdded</span>
+                <span class="edit-removed">−@_summary.TotalRemoved</span>
+            </span>
+        </summary>
+
+        <div class="edit-summary-list">
+            @foreach (var file in _summary.Files)
+            {
+                <div class="edit-summary-row">
+                    <span class="edit-summary-path">@file.Path</span>
+                    <span class="edit-summary-counts">
+                        <span class="edit-added">+@file.Added</span>
+                        <span class="edit-removed">−@file.Removed</span>
+                    </span>
+                </div>
+            }
+        </div>
+
+        @if (_checkpoint is not null)
+        {
+            <div class="edit-summary-actions">
+                @if (!_confirming)
+                {
+                    <button type="button" class="ghost-button" @onclick="TryRestore">
+                        撤销最近一次改动
+                    </button>
+                }
+                else
+                {
+                    <span class="edit-summary-conflict">
+                        以下文件在检查点后又被修改，仍要覆盖吗？@string.Join("、", _conflicts)
+                    </span>
+                    <button type="button" class="ghost-button" @onclick="CancelRestore">取消</button>
+                    <button type="button" class="primary-button" @onclick="ForceRestore">确认覆盖</button>
+                }
+
+                @if (_message is not null)
+                {
+                    <span class="edit-summary-note">@_message</span>
+                }
+            </div>
+        }
+    </details>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<ToolTraceEntry> Trace { get; set; } = [];
+
+    [Parameter] public string SessionId { get; set; } = string.Empty;
+
+    private EditSummary _summary = new([]);
+    private CheckpointManifest? _checkpoint;
+    private bool _confirming;
+    private IReadOnlyList<string> _conflicts = [];
+    private string? _message;
+
+    protected override void OnParametersSet()
+    {
+        _summary = EditSummary.FromTrace(Trace);
+        _checkpoint = string.IsNullOrWhiteSpace(SessionId) ? null : Checkpoints.Latest(SessionId);
+    }
+
+    private void TryRestore()
+    {
+        if (_checkpoint is null)
+        {
+            return;
+        }
+
+        var result = Checkpoints.RestoreLatest(SessionId, Workspace.RootPath);
+        if (result.HasConflicts)
+        {
+            _conflicts = result.Conflicts;
+            _confirming = true;
+            _message = null;
+            return;
+        }
+
+        _message = result.Success ? $"已恢复 {result.Restored.Count} 个文件。" : result.Conflicts.FirstOrDefault();
+        _checkpoint = null;
+    }
+
+    private void CancelRestore()
+    {
+        _confirming = false;
+        _conflicts = [];
+        _message = "已取消撤销。";
+    }
+
+    private void ForceRestore()
+    {
+        var result = Checkpoints.RestoreLatest(SessionId, Workspace.RootPath, force: true);
+        _message = result.Success ? $"已强制恢复 {result.Restored.Count} 个文件。" : "撤销失败。";
+        _confirming = false;
+        _conflicts = [];
+        _checkpoint = null;
+    }
+}

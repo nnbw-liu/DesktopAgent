@@ -4,7 +4,9 @@ using System.IO;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Data;
+using SDemo.DesktopAgent.Execution;
 using SDemo.DesktopAgent.Models;
 
 namespace SDemo.DesktopAgent.Services;
@@ -21,7 +23,10 @@ public sealed class ChatStore
     private readonly string _root;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
 
     public ChatStore(IAppPaths paths)
         : this(paths.ChatsRoot)
@@ -240,6 +245,27 @@ public sealed class ChatStore
             ? null
             : JsonSerializer.Serialize(session.PluginMemory, JsonOptions);
 
+        // 摘要覆盖范围超出当前消息数（删过消息 / 手工改库）：视为过期，归零后下次重算。
+        if (session.SummaryThroughOrder < 0 || session.SummaryThroughOrder > session.Messages.Count)
+        {
+            session.SummaryThroughOrder = 0;
+            session.Summary = null;
+            session.SummaryTokens = 0;
+            session.SummaryUpdatedAt = null;
+            session.SummaryIsFallback = false;
+        }
+
+        record.Summary = session.HasSummary ? session.Summary : null;
+        record.SummaryThroughOrder = session.HasSummary ? session.SummaryThroughOrder : 0;
+        record.SummaryTokens = session.HasSummary ? session.SummaryTokens : 0;
+        record.SummaryUpdatedAt = session.HasSummary ? session.SummaryUpdatedAt : null;
+        record.LastVerificationJson = session.LastVerification is null
+            ? null
+            : JsonSerializer.Serialize(session.LastVerification, JsonOptions);
+        record.TodosJson = session.Todos.Count == 0
+            ? null
+            : JsonSerializer.Serialize(session.Todos, JsonOptions);
+
         var existing = record.Messages.ToDictionary(message => message.Id, StringComparer.Ordinal);
         var keep = new HashSet<string>(StringComparer.Ordinal);
         var order = 0;
@@ -277,6 +303,10 @@ public sealed class ChatStore
             messageRecord.DerivedJson = message.Derived.Count == 0
                 ? null
                 : JsonSerializer.Serialize(message.Derived, JsonOptions);
+            messageRecord.ToolTraceJson = message.ToolTrace.Count == 0
+                ? null
+                : JsonSerializer.Serialize(message.ToolTrace, JsonOptions);
+            messageRecord.IsPinned = message.IsPinned;
             keep.Add(message.Id);
         }
 
@@ -347,7 +377,14 @@ public sealed class ChatStore
             ("OriginMountId", "TEXT NULL"),
             ("ActiveMountId", "TEXT NULL"),
             ("LastPluginId", "TEXT NULL"),
-            ("PluginMemoryJson", "TEXT NULL")
+            ("PluginMemoryJson", "TEXT NULL"),
+            // P1 建列、P2 写入；提前建好可以避免两期各改一次迁移。
+            ("Summary", "TEXT NULL"),
+            ("SummaryThroughOrder", "INTEGER NOT NULL DEFAULT 0"),
+            ("SummaryUpdatedAt", "TEXT NULL"),
+            ("SummaryTokens", "INTEGER NOT NULL DEFAULT 0"),
+            ("LastVerificationJson", "TEXT NULL"),
+            ("TodosJson", "TEXT NULL")
         ]),
         ("messages",
         [
@@ -358,7 +395,9 @@ public sealed class ChatStore
             ("OutputTokens", "INTEGER NOT NULL DEFAULT 0"),
             ("ToolCallsJson", "TEXT NULL"),
             ("PluginJson", "TEXT NULL"),
-            ("DerivedJson", "TEXT NULL")
+            ("DerivedJson", "TEXT NULL"),
+            ("ToolTraceJson", "TEXT NULL"),
+            ("IsPinned", "INTEGER NOT NULL DEFAULT 0")
         ])
     ];
 
@@ -539,33 +578,122 @@ public sealed class ChatStore
         }
     }
 
-    private static ChatSession ToSession(SessionRecord record, string? workspaceId) => new()
+    /// <summary>工具轨迹：坏数据降级成空列表；超过上限的只保留最近的部分。</summary>
+    private static List<ToolTraceEntry> DeserializeToolTrace(string? json)
     {
-        Id = record.Id,
-        Title = record.Title,
-        Meta = record.Meta,
-        WorkspaceId = workspaceId ?? record.WorkspaceId,
-        IsPinned = record.IsPinned,
-        UpdatedAt = record.UpdatedAt,
-        OriginMountId = record.OriginMountId,
-        ActiveMountId = record.ActiveMountId,
-        LastPluginId = record.LastPluginId,
-        PluginMemory = DeserializePluginMemory(record.PluginMemoryJson),
-        Messages = record.Messages
-            .OrderBy(message => message.Order)
-            .Select(message => new ChatMessage(message.Role, message.Content)
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            var entries = JsonSerializer.Deserialize<List<ToolTraceEntry>>(json, JsonOptions);
+            if (entries is null)
             {
-                Id = message.Id,
-                Reasoning = message.Reasoning,
-                Attachments = DeserializeAttachments(message.AttachmentsJson),
-                CreatedAt = message.CreatedAt ?? record.UpdatedAt,
-                DurationMs = message.DurationMs,
-                InputTokens = message.InputTokens,
-                OutputTokens = message.OutputTokens,
-                ToolCalls = DeserializeToolCalls(message.ToolCallsJson),
-                Plugin = DeserializePlugin(message.PluginJson),
-                Derived = DeserializeDerived(message.DerivedJson)
-            })
-            .ToList()
-    };
+                return [];
+            }
+
+            return entries
+                .Where(entry => !string.IsNullOrWhiteSpace(entry.ToolId))
+                .TakeLast(AgentRunMetrics.MaxStoredEntries)
+                .ToList();
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>最近一次验证结果；坏数据降级为 null。</summary>
+    private static List<TodoItem> DeserializeTodos(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<TodoItem>>(json, JsonOptions)?
+                .Where(item => !string.IsNullOrWhiteSpace(item.Content))
+                .Take(TodoToolPack.MaxItems)
+                .ToList() ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static VerificationRecord? DeserializeVerification(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<VerificationRecord>(json, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static ChatSession ToSession(SessionRecord record, string? workspaceId)
+    {
+        var session = new ChatSession
+        {
+            Id = record.Id,
+            Title = record.Title,
+            Meta = record.Meta,
+            WorkspaceId = workspaceId ?? record.WorkspaceId,
+            IsPinned = record.IsPinned,
+            UpdatedAt = record.UpdatedAt,
+            OriginMountId = record.OriginMountId,
+            ActiveMountId = record.ActiveMountId,
+            LastPluginId = record.LastPluginId,
+            PluginMemory = DeserializePluginMemory(record.PluginMemoryJson),
+            Summary = record.Summary,
+            SummaryThroughOrder = record.SummaryThroughOrder,
+            SummaryUpdatedAt = record.SummaryUpdatedAt,
+            SummaryTokens = record.SummaryTokens,
+            SummaryIsFallback = SummaryFormat.IsFallback(record.Summary),
+            LastVerification = DeserializeVerification(record.LastVerificationJson),
+            Todos = DeserializeTodos(record.TodosJson),
+            Messages = record.Messages
+                .OrderBy(message => message.Order)
+                .Select(message => new ChatMessage(message.Role, message.Content)
+                {
+                    Id = message.Id,
+                    Reasoning = message.Reasoning,
+                    Attachments = DeserializeAttachments(message.AttachmentsJson),
+                    CreatedAt = message.CreatedAt ?? record.UpdatedAt,
+                    DurationMs = message.DurationMs,
+                    InputTokens = message.InputTokens,
+                    OutputTokens = message.OutputTokens,
+                    ToolCalls = DeserializeToolCalls(message.ToolCallsJson),
+                    Plugin = DeserializePlugin(message.PluginJson),
+                    Derived = DeserializeDerived(message.DerivedJson),
+                    ToolTrace = DeserializeToolTrace(message.ToolTraceJson),
+                    IsPinned = message.IsPinned
+                })
+                .ToList()
+        };
+
+        // 库被手工改过 / 消息被删过：摘要覆盖范围大于消息数时视为无效，清空后下次重算。
+        if (session.SummaryThroughOrder < 0 || session.SummaryThroughOrder > session.Messages.Count)
+        {
+            session.Summary = null;
+            session.SummaryThroughOrder = 0;
+            session.SummaryTokens = 0;
+            session.SummaryUpdatedAt = null;
+            session.SummaryIsFallback = false;
+        }
+
+        return session;
+    }
 }

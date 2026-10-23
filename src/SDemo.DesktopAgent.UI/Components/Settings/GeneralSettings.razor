@@ -2,7 +2,7 @@
 @inject ISettingsService Settings
 @inject IAppEnvironmentService Environment
 
-@* 通用设置：外观 / 语言 / 版本信息 *@
+@* 通用设置：外观 / 语言 / 版本信息。上下文相关设置已移到「上下文」分区（P2）。 *@
 <div class="settings-pane">
     <section class="settings-section">
         <h2 class="settings-section-title">外观</h2>
@@ -78,7 +78,10 @@
         (ThemePreference.Dark, "dark", "深色", "始终使用深色")
     ];
 
-    protected override void OnInitialized() => _language = Settings.Current.Language;
+    protected override void OnInitialized()
+    {
+        _language = Settings.Current.Language;
+    }
 
     private void HandleLanguageChanged(ChangeEventArgs args)
     {

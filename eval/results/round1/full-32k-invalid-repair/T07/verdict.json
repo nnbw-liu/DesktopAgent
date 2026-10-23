@@ -1,0 +1,208 @@
+{
+  "id": "T07",
+  "type": "refactor",
+  "title": "\u62BD\u53D6\u5F15\u53F7\u5224\u65AD\u903B\u8F91\u4E14\u4E0D\u6539\u53D8\u884C\u4E3A",
+  "success": false,
+  "steps": 32,
+  "turns": 2,
+  "seconds": 152.5,
+  "error": null,
+  "acceptanceExit": 1,
+  "acceptanceOutput": "Active code page: 65001\r\n  \u6B63\u5728\u786E\u5B9A\u8981\u8FD8\u539F\u7684\u9879\u76EE\u2026\r\n  \u6240\u6709\u9879\u76EE\u5747\u662F\u6700\u65B0\u7684\uFF0C\u65E0\u6CD5\u8FD8\u539F\u3002\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\UnParserExtensions.cs(1,3): error CS1024: \u5E94\u8F93\u5165\u9884\u5904\u7406\u5668\u6307\u4EE4 [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net45]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\UnParserExtensions.cs(31,37): error CS1002: \u5E94\u8F93\u5165 ; [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net45]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\UnParserExtensions.cs(32,1): error CS1056: \u610F\u5916\u7684\u5B57\u7B26\u201C\u2026\u201D [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net45]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\UnParserExtensions.cs(32,2): error CS1056: \u610F\u5916\u7684\u5B57\u7B26\u201C\uFF08\u201D [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net45]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\UnParserExtensions.cs(32,9): error CS1002: \u5E94\u8F93\u5165 ; [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net45]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\UnParserExtensions.cs(32,9): error CS1056: \u610F\u5916\u7684\u5B57\u7B26\u201C\uFF0C\u201D [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net45]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\UnParserExtensions.cs(32,14): error CS1002: \u5E94\u8F93\u5165 ; [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net45]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\UnParserExtensions.cs(32,20): error CS1002: \u5E94\u8F93\u5165 ; [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net45]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\UnParserExtensions.cs(32,22): error CS1002: \u5E94\u8F93\u5165 ; [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net45]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\UnParserExtensions.cs(32,22): error CS1056: \u610F\u5916\u7684\u5B57\u7B26\u201C\uFF09\u201D [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net45]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\UnParserExtensions.cs(36,9): error CS1028: \u610F\u5916\u7684\u9884\u5904\u7406\u5668\u6307\u4EE4 [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\CommandLine.csproj::TargetFramework\u2026",
+  "checkFailure": "\u6587\u4EF6 src/CommandLine/UnParserExtensions.cs \u672A\u5305\u542B\u9A8C\u6536\u6A21\u5F0F\uFF1ANeedsQuotes",
+  "failureClass": "F6 \u5FAA\u73AF",
+  "trace": [
+    {
+      "toolId": "todo_write",
+      "status": "ok",
+      "argsDigest": "sha256:a66d7466\uFF08411 \u5B57\u7B26\uFF09",
+      "summary": "[TOOL_RESULT_BEGIN:todo_write]\n\u5DF2\u66F4\u65B0\u8BA1\u5212\uFF1A0/2 \u5B8C\u6210\r\n\u2610 \u5728 FormatWithQuotesIfString \u65B9\u6CD5\u4E2D\u63D0\u53D6\u51FA\u79C1\u6709\u9759\u6001\u65B9\u6CD5 NeedsQuotes\uFF0C\u5E76\u786E\u4FDD\u539F\u6709\u903B\u8F91\u4FDD\u6301\u4E0D\u53D8\u3002\r\n\u2610 \u9A8C\u8BC1\u6240\u6709\u6D4B\u8BD5\u7528\u4F8B\u662F\u5426\u4ECD\u7136\u901A\u8FC7\uFF0C\u786E\u4FDD\u884C\u4E3A\u672A\u6539\u53D8\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "list_files",
+      "status": "ok",
+      "argsDigest": "./src",
+      "summary": "[TOOL_RESULT_BEGIN:list_files]\n[\u76EE\u5F55] CommandLine\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "list_tree",
+      "status": "ok",
+      "argsDigest": "./src/CommandLine",
+      "summary": "[TOOL_RESULT_BEGIN:list_tree]\nsrc/CommandLine/Core/\n  src/CommandLine/Core/ArgumentsExtensions.cs\n  src/CommandLine/Core/GetoptTokenizer.cs\n  src/CommandLine/Core/InstanceBuilder.cs\n  src/CommandLine/ \u2026 /CommandLine/ParserResultExtensionsAsync.cs\nsrc/CommandLine/ParserSettings.cs\nsrc/CommandLine/UnParserExtensions.cs\nsrc/CommandLine/ValueAttribute.cs\nsrc/CommandLine/VerbAttribute.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "FormatWithQuotesIfString",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 3 \u6761\u5339\u914D\uFF081 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\nsrc/CommandLine/UnParserExtensions.cs:222:                     builder.Append(FormatWithQuotesIfString(value));\nsrc/CommandLine/UnParserExt \u2026                       =\u003E sep == \u0027 \u0027 ? FormatWithQuotesIfString(v) : v;\nsrc/CommandLine/UnParserExtensions.cs:237:         private static object FormatWithQuotesIfString(object value)\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 1\u2013340\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in th \u2026 im(\u0027\u0022\u0027))\n 333|                 .Where(x =\u003E !string.IsNullOrWhiteSpace(x))\n 334|                 .ToArray();\n 335|         }\n 336| \n 337|         #endregion\n 338| \n 339|     }\n 340| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "todo_write",
+      "status": "ok",
+      "argsDigest": "sha256:d42c48f5\uFF08432 \u5B57\u7B26\uFF09",
+      "summary": "[TOOL_RESULT_BEGIN:todo_write]\n\u5DF2\u66F4\u65B0\u8BA1\u5212\uFF1A0/2 \u5B8C\u6210\r\n\u25D0 \u5728 UnParserExtensions.cs \u4E2D\u63D0\u53D6 FormatWithQuotesIfString \u65B9\u6CD5\u4E2D\u7684\u903B\u8F91\u5230\u79C1\u6709\u9759\u6001\u65B9\u6CD5 NeedsQuotes\uFF0C\u5E76\u66F4\u65B0\u8C03\u7528\u70B9\u3002\r\n\u2610 \u9A8C\u8BC1\u6240\u6709\u6D4B\u8BD5\u7528\u4F8B\u662F\u5426\u4ECD\u7136\u901A\u8FC7\uFF0C\u786E\u4FDD\u884C\u4E3A\u672A\u6539\u53D8\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\n\u672A\u66FF\u6362\u4EFB\u4F55\u5185\u5BB9\uFF1A\u5728 src/CommandLine/UnParserExtensions.cs \u4E2D\u627E\u4E0D\u5230 old_text\u3002\u8BF7\u91CD\u65B0 read_file\uFF0C\u5E76\u4FDD\u8BC1 old_text \u4E0E\u6587\u4EF6\u5185\u5BB9\u9010\u5B57\u7B26\u4E00\u81F4\uFF08\u542B\u7F29\u8FDB\u548C\u7A7A\u884C\uFF09\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 1\u2013340\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in th \u2026 im(\u0027\u0022\u0027))\n 333|                 .Where(x =\u003E !string.IsNullOrWhiteSpace(x))\n 334|                 .ToArray();\n 335|         }\n 336| \n 337|         #endregion\n 338| \n 339|     }\n 340| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\n\u672A\u66FF\u6362\u4EFB\u4F55\u5185\u5BB9\uFF1A\u5728 src/CommandLine/UnParserExtensions.cs \u4E2D\u627E\u4E0D\u5230 old_text\u3002\u8BF7\u91CD\u65B0 read_file\uFF0C\u5E76\u4FDD\u8BC1 old_text \u4E0E\u6587\u4EF6\u5185\u5BB9\u9010\u5B57\u7B26\u4E00\u81F4\uFF08\u542B\u7F29\u8FDB\u548C\u7A7A\u884C\uFF09\u3002\n[\u5BBF\u4E3B\u63D0\u793A] \u5DF2\u8FDE\u7EED\u5931\u8D25 2 \u6B21\u3002\u4E0D\u8981\u518D\u8C03\u7528\u672C\u5DE5\u5177\uFF1B\u8BF7\u6539\u7528 replace_text \u7CBE\u786E\u66FF\u6362\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 1\u2013340\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in th \u2026 im(\u0027\u0022\u0027))\n 333|                 .Where(x =\u003E !string.IsNullOrWhiteSpace(x))\n 334|                 .ToArray();\n 335|         }\n 336| \n 337|         #endregion\n 338| \n 339|     }\n 340| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\nreplace_text \u5DF2\u5728\u672C\u6B21\u751F\u6210\u4E2D\u8FDE\u7EED\u5931\u8D25 2 \u6B21\uFF0C\u672C\u8F6E\u7981\u7528\uFF1B\u8BF7\u6539\u7528 apply_patch\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\uFF1B\u4E5F\u53EF\u4EE5\u5148\u7528\u6587\u672C\u8BF4\u660E\u5361\u5728\u54EA\u91CC\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "FormatWithQuotesIfString",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 26 \u6761\u5339\u914D\uFF081 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\nsrc/CommandLine/UnParserExtensions.cs:217:         {\nsrc/CommandLine/UnParserExtensions.cs:218:             var builder = new StringBuilde \u2026 ng.IsNullOrEmpty(s) \u0026\u0026 !s.Contains(\u0022\\\u0022\u0022) \u0026\u0026 s.Contains(\u0022 \u0022))\nsrc/CommandLine/UnParserExtensions.cs:241:                 return $\u0022\\\u0022{s}\\\u0022\u0022;\nsrc/CommandLine/UnParserExtensions.cs:242: \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\nreplace_text \u5DF2\u5728\u672C\u6B21\u751F\u6210\u4E2D\u8FDE\u7EED\u5931\u8D25 2 \u6B21\uFF0C\u672C\u8F6E\u7981\u7528\uFF1B\u8BF7\u6539\u7528 apply_patch\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\uFF1B\u4E5F\u53EF\u4EE5\u5148\u7528\u6587\u672C\u8BF4\u660E\u5361\u5728\u54EA\u91CC\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1Asrc/CommandLine/UnParserExtensions.cs (\u002B40 -341)\n[EDIT] src/CommandLine/UnParserExtensions.cs \u002B40 -341\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "todo_write",
+      "status": "ok",
+      "argsDigest": "sha256:0ea4b51a\uFF08434 \u5B57\u7B26\uFF09",
+      "summary": "[TOOL_RESULT_BEGIN:todo_write]\n\u5DF2\u66F4\u65B0\u8BA1\u5212\uFF1A1/2 \u5B8C\u6210\r\n\u2611 \u5728 UnParserExtensions.cs \u4E2D\u63D0\u53D6 FormatWithQuotesIfString \u65B9\u6CD5\u4E2D\u7684\u903B\u8F91\u5230\u79C1\u6709\u9759\u6001\u65B9\u6CD5 NeedsQuotes\uFF0C\u5E76\u66F4\u65B0\u8C03\u7528\u70B9\u3002\r\n\u25D0 \u9A8C\u8BC1\u6240\u6709\u6D4B\u8BD5\u7528\u4F8B\u662F\u5426\u4ECD\u7136\u901A\u8FC7\uFF0C\u786E\u4FDD\u884C\u4E3A\u672A\u6539\u53D8\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "NeedsQuotes",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 1\u201339\n   1| # src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C\n   2| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 C \u2026   30|         {\n  31|             get { return preferShort\n  32| \u2026\uFF08\u5DE5\u5177\u7ED3\u679C\u8FC7\u957F\uFF0C\u5DF2\u7701\u7565 15478 \u5B57\u7B26\uFF09\n  33|             }\n  34|         }\n  35| \n  36|         #endregion\n  37| \n  38|     }\n  39| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 1\u201320 \u00B7 \u63A5\u7EED\u7528 offset=21\n   1| # src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C\n   2| // Copyright 2005-2015 Giacomo St \u2026 or when formatting command line from an options instance../\u003E.\n  17|     /// \u003C/summary\u003E\n  18|     public class UnParserSettings\n  19|     {\n  20|         private bool preferShortName;\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 21\u201339\n  21|         private bool groupSwitches;\n  22|         private bool useEqualToken;\n  23|         private bool \u2026   30|         {\n  31|             get { return preferShort\n  32| \u2026\uFF08\u5DE5\u5177\u7ED3\u679C\u8FC7\u957F\uFF0C\u5DF2\u7701\u7565 15478 \u5B57\u7B26\uFF09\n  33|             }\n  34|         }\n  35| \n  36|         #endregion\n  37| \n  38|     }\n  39| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 31\u201339\n  31|             get { return preferShort\n  32| \u2026\uFF08\u5DE5\u5177\u7ED3\u679C\u8FC7\u957F\uFF0C\u5DF2\u7701\u7565 15478 \u5B57\u7B26\uFF09\n  33|             }\n  34|         }\n  35| \n  36|         #endregion\n  37| \n  38|     }\n  39| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 1\u201320 \u00B7 \u63A5\u7EED\u7528 offset=21\n   1| # src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C\n   2| // Copyright 2005-2015 Giacomo St \u2026 or when formatting command line from an options instance../\u003E.\n  17|     /// \u003C/summary\u003E\n  18|     public class UnParserSettings\n  19|     {\n  20|         private bool preferShortName;\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 31\u201339\n  31|             get { return preferShort\n  32| \u2026\uFF08\u5DE5\u5177\u7ED3\u679C\u8FC7\u957F\uFF0C\u5DF2\u7701\u7565 15478 \u5B57\u7B26\uFF09\n  33|             }\n  34|         }\n  35| \n  36|         #endregion\n  37| \n  38|     }\n  39| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 1\u201320 \u00B7 \u63A5\u7EED\u7528 offset=21\n   1| # src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C\n   2| // Copyright 2005-2015 Giacomo St \u2026 or when formatting command line from an options instance../\u003E.\n  17|     /// \u003C/summary\u003E\n  18|     public class UnParserSettings\n  19|     {\n  20|         private bool preferShortName;\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 31\u201339\n  31|             get { return preferShort\n  32| \u2026\uFF08\u5DE5\u5177\u7ED3\u679C\u8FC7\u957F\uFF0C\u5DF2\u7701\u7565 15478 \u5B57\u7B26\uFF09\n  33|             }\n  34|         }\n  35| \n  36|         #endregion\n  37| \n  38|     }\n  39| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 1\u201320 \u00B7 \u63A5\u7EED\u7528 offset=21\n   1| # src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C\n   2| // Copyright 2005-2015 Giacomo St \u2026 or when formatting command line from an options instance../\u003E.\n  17|     /// \u003C/summary\u003E\n  18|     public class UnParserSettings\n  19|     {\n  20|         private bool preferShortName;\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 31\u201339\n  31|             get { return preferShort\n  32| \u2026\uFF08\u5DE5\u5177\u7ED3\u679C\u8FC7\u957F\uFF0C\u5DF2\u7701\u7565 15478 \u5B57\u7B26\uFF09\n  33|             }\n  34|         }\n  35| \n  36|         #endregion\n  37| \n  38|     }\n  39| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 1\u201320 \u00B7 \u63A5\u7EED\u7528 offset=21\n   1| # src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C\n   2| // Copyright 2005-2015 Giacomo St \u2026 or when formatting command line from an options instance../\u003E.\n  17|     /// \u003C/summary\u003E\n  18|     public class UnParserSettings\n  19|     {\n  20|         private bool preferShortName;\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 31\u201339\n  31|             get { return preferShort\n  32| \u2026\uFF08\u5DE5\u5177\u7ED3\u679C\u8FC7\u957F\uFF0C\u5DF2\u7701\u7565 15478 \u5B57\u7B26\uFF09\n  33|             }\n  34|         }\n  35| \n  36|         #endregion\n  37| \n  38|     }\n  39| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 1\u201320 \u00B7 \u63A5\u7EED\u7528 offset=21\n   1| # src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C\n   2| // Copyright 2005-2015 Giacomo St \u2026 or when formatting command line from an options instance../\u003E.\n  17|     /// \u003C/summary\u003E\n  18|     public class UnParserSettings\n  19|     {\n  20|         private bool preferShortName;\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 31\u201339\n  31|             get { return preferShort\n  32| \u2026\uFF08\u5DE5\u5177\u7ED3\u679C\u8FC7\u957F\uFF0C\u5DF2\u7701\u7565 15478 \u5B57\u7B26\uFF09\n  33|             }\n  34|         }\n  35| \n  36|         #endregion\n  37| \n  38|     }\n  39| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 39 \u884C \u00B7 \u672C\u6B21 1\u201320 \u00B7 \u63A5\u7EED\u7528 offset=21\n   1| # src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C\n   2| // Copyright 2005-2015 Giacomo St \u2026 or when formatting command line from an options instance../\u003E.\n  17|     /// \u003C/summary\u003E\n  18|     public class UnParserSettings\n  19|     {\n  20|         private bool preferShortName;\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    }
+  ]
+}

@@ -1,0 +1,162 @@
+@using SDemo.DesktopAgent.Context
+@* 分段明细：条形图 + 数字，且各段之和 = Report.Estimated（±1 取整误差），
+   与占用环显示的数字一致，满足「UI 与报告 ±5%」的验收项。 *@
+
+@if (Report is null)
+{
+    return;
+}
+
+<div class="context-breakdown">
+    <div class="context-bar" aria-hidden="true">
+        @foreach (var band in Bands())
+        {
+            <span class="context-bar-part @band.Class" style="width: @($"{band.Percent:F1}%")"></span>
+        }
+    </div>
+
+    @foreach (var row in Rows())
+    {
+        <div class="context-row">
+            <span class="context-row-dot @row.Class" aria-hidden="true"></span>
+            <span class="context-row-label">@row.Label</span>
+            @if (!string.IsNullOrEmpty(row.Hint))
+            {
+                <span class="context-row-hint">@row.Hint</span>
+            }
+            <span class="context-row-value">@ContextMeter.Format(row.Tokens)</span>
+        </div>
+    }
+
+    <div class="context-divider"></div>
+
+    <div class="context-row is-muted">
+        <span class="context-row-label">输出预留</span>
+        <span class="context-row-value">@ContextMeter.Format(Report.ReservedOutput)</span>
+    </div>
+    <div class="context-row is-muted">
+        <span class="context-row-label">安全余量</span>
+        <span class="context-row-value">@ContextMeter.Format(Report.Safety)</span>
+    </div>
+    <div class="context-row is-strong">
+        <span class="context-row-label">模型窗口</span>
+        <span class="context-row-value">@ContextMeter.Format(Report.ContextWindow)</span>
+    </div>
+
+    @if (Report.SummaryUsed)
+    {
+        <p class="context-note">
+            已压缩 @Report.CompactedMessages 条历史（摘要约 @ContextMeter.Format(Report.SummaryTokens) token）@(Report.SummaryFallback ? " · 自动摘要" : string.Empty)
+        </p>
+    }
+    @if (Report.StatePackUsed)
+    {
+        <p class="context-note">工作区状态包约 @ContextMeter.Format(Report.StatePackTokens) token</p>
+    }
+    @if (Report.OmittedMessages > 0)
+    {
+        <p class="context-note">已省略 @Report.OmittedMessages 条较早消息（约 @ContextMeter.Format(Report.OmittedTokens) token）</p>
+    }
+    @if (Report.AttachmentsStubbed)
+    {
+        <p class="context-note">部分附件只保留文件名 / 路径（正文可按需读取）</p>
+    }
+    @if (Report.PinnedTruncated)
+    {
+        <p class="context-note">部分 pin 消息已截断</p>
+    }
+
+    <div class="context-flags">
+        @if (Report.Passthrough)
+        {
+            <span class="context-flag">直通</span>
+        }
+        @if (Report.SummaryUsed)
+        {
+            <span class="context-flag">已压缩</span>
+        }
+        @if (Report.SummaryFallback)
+        {
+            <span class="context-flag is-warn">自动摘要</span>
+        }
+        @if (Report.StatePackUsed)
+        {
+            <span class="context-flag">状态包</span>
+        }
+        @if (Report.Trimmed)
+        {
+            <span class="context-flag">已裁剪</span>
+        }
+        @if (Report.MidTurnTrimmed)
+        {
+            <span class="context-flag">中途裁剪</span>
+        }
+        @if (Report.OverflowRetried)
+        {
+            <span class="context-flag is-warn">溢出重试</span>
+        }
+        @if (Report.LearnedWindow is int learned)
+        {
+            <span class="context-flag">窗口学习为 @ContextMeter.Format(learned)</span>
+        }
+    </div>
+
+    <div class="context-meta">
+        @if (Report.ActualInputTokens > 0)
+        {
+            <span>实际输入 @ContextMeter.Format(Report.ActualInputTokens.Value)</span>
+            <span>校准 ×@Report.CalibrationFactor.ToString("F2")</span>
+        }
+        else
+        {
+            <span>估算模式（服务端未返回 usage）</span>
+        }
+        @if (Report.TotalTurns > 0)
+        {
+            <span>保留 @Report.KeptTurns / @Report.TotalTurns 轮</span>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public ContextReport? Report { get; set; }
+
+    private IEnumerable<(string Label, int Tokens, string Class, string Hint)> Rows()
+    {
+        var segments = Report!.Segments;
+
+        yield return ("系统提示词", segments.System, "seg-system", string.Empty);
+        yield return ("技能", segments.Skills, "seg-skills", string.Empty);
+        yield return ("历史对话", segments.Turns, "seg-turns",
+            Report.TotalTurns > Report.KeptTurns ? $"{Report.KeptTurns}/{Report.TotalTurns} 轮" : string.Empty);
+        yield return ("已压缩摘要", segments.Summary, "seg-summary",
+            Report.CompactedMessages > 0 ? $"{Report.CompactedMessages} 条" : string.Empty);
+        yield return ("工作区状态", segments.StatePack, "seg-state", string.Empty);
+        yield return ("附件", segments.Attachments, "seg-attachments", string.Empty);
+        yield return ("工具轨迹", segments.ToolTrace, "seg-trace", string.Empty);
+        yield return ("Pin 消息", segments.Pinned, "seg-pinned", string.Empty);
+    }
+
+    private IEnumerable<(string Class, double Percent)> Bands()
+    {
+        if (Report is null || Report.Estimated <= 0)
+        {
+            yield break;
+        }
+
+        var total = (double)Report.Estimated;
+        var segments = Report.Segments;
+
+        yield return ("seg-system", Percent(segments.System));
+        yield return ("seg-skills", Percent(segments.Skills));
+        yield return ("seg-turns", Percent(segments.Turns));
+        yield return ("seg-summary", Percent(segments.Summary));
+        yield return ("seg-state", Percent(segments.StatePack));
+        yield return ("seg-attachments", Percent(segments.Attachments));
+        yield return ("seg-trace", Percent(segments.ToolTrace));
+        yield return ("seg-pinned", Percent(segments.Pinned));
+
+        double Percent(int tokens) => Math.Clamp(tokens / total * 100, 0, 100);
+    }
+}

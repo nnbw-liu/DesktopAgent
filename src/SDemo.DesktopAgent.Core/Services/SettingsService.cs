@@ -87,6 +87,9 @@ public sealed class SettingsService : ISettingsService
                     settings.Tools ??= new ToolSettings();
                     settings.Tools.EnabledPacks ??= [];
 
+                    // 旧 settings.json 没有 context 节点时按默认预算处理，零迁移。
+                    settings.Context ??= new ContextSettings();
+
                     foreach (var provider in settings.Providers)
                     {
                         provider.ApiKey = !string.IsNullOrEmpty(provider.ApiKeyProtected)

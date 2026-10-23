@@ -1,0 +1,121 @@
+diff --git a/src/CommandLine/ParserResult.cs b/src/CommandLine/ParserResult.cs
+index c7c9c83..7b93fac 100644
+--- a/src/CommandLine/ParserResult.cs
++++ b/src/CommandLine/ParserResult.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections.Generic;
+@@ -80,6 +80,14 @@ namespace CommandLine
+             Errors = new Error[0];
+         }
+ 
++        /// <summary>
++        /// Indicates whether the parser has successfully parsed the input.
++        /// </summary>
++        public bool IsParsed
++        {
++            get { return this.tag == ParserResultType.Parsed; }
++        }
++
+         /// <summary>
+         /// Parser result type discriminator, defined as <see cref="CommandLine.ParserResultType"/> enumeration.
+         /// </summary>
+diff --git a/src/ParseArguments.cs b/src/ParseArguments.cs
+new file mode 100644
+index 0000000..f122416
+--- /dev/null
++++ b/src/ParseArguments.cs
+@@ -0,0 +1,90 @@
++using System;
++using System.Collections.Generic;
++using System.Linq;
++
++namespace ParseArgs
++{
++    public static class Tag
++    {
++        public const string String = "string";
++        public const int Int32 = 1;
++        public const int Int64 = 2;
++        public const float Float32 = 3;
++        public const double Float64 = 4;
++        public const byte Byte = 5;
++        public const short Short = 6;
++        public const ushort UShort = 7;
++        public const uint UInt = 8;
++        public const ulong Long = 9;
++    }
++
++    public static class Value
++    {
++        private static readonly Dictionary<int, Func<string, object>> _parsers = new Dictionary<int, Func<string, object>>();
++
++        static Value()
++        {
++            _parsers[Tag.Int32] = s => int.Parse(s);
++            _parsers[Tag.Int64] = s => long.Parse(s);
++            _parsers[Tag.Float32] = s => float.Parse(s);
++            _parsers[Tag.Float64] = s => double.Parse(s);
++            _parsers[Tag.Byte] = s => byte.Parse(s);
++            _parsers[Tag.Short] = s => short.Parse(s);
++            _parsers[Tag.UShort] = s => ushort.Parse(s);
++            _parsers[Tag.UInt] = s => uint.Parse(s);
++            _parsers[Tag.Long] = s => long.Parse(s);
++        }
++
++        public static object Parse(string value, int tag)
++        {
++            if (!_parsers.ContainsKey(tag))
++                throw new ArgumentException("Unsupported tag");
++
++            return _parsers[tag](value);
++        }
++    }
++
++    public class Errors
++    {
++        private readonly List<string> _errors = new();
++
++        public void Add(string error) => _errors.Add(error);
++
++        public bool HasErrors() => _errors.Count > 0;
++
++        public string ToString() => string.Join("\n", _errors);
++    }
++
++    public class ParseArguments<T>
++    {
++        private readonly List<string> _args = new();
++        private readonly Errors _errors = new();
++        private T? _result;
++
++        public ParseArguments(string[] args)
++        {
++            foreach (var arg in args)
++                _args.Add(arg);
++        }
++
++        public bool IsParsed => _result != null;
++
++        public T Result => _result!;
++
++        public Errors Errors => _errors;
++
++        private void ParseValue(string value, Func<string, T> parser)
++        {
++            try
++            {
++                _result = parser(value);
++            }
++            catch (Exception ex)
++            {
++                _errors.Add(ex.Message);
++            }
++        }
++
++        public bool ParseString() => ParseValue(_args[0], s => (T)(object)s);
++    }
++}

@@ -1,0 +1,31 @@
+@* P2 压缩分隔线：标出「从这里往上的历史已由摘要代表」。
+   原文仍在会话与数据库里，点「查看原文」可只读展开；不影响「只隐藏不删除」的不变量。 *@
+
+<div class="compaction-divider" role="note" aria-label="已压缩的历史">
+    <span class="compaction-line" aria-hidden="true"></span>
+
+    <button type="button" class="compaction-label" @onclick="() => OnOpen.InvokeAsync()">
+        <span class="compaction-title">已压缩 @Count 条历史（约 @ContextMeter.Format(Tokens) token）@(IsFallback ? " · 自动摘要" : string.Empty)</span>
+        <span class="compaction-hint">模型不再看到原文，点击查看</span>
+    </button>
+
+    <span class="compaction-line" aria-hidden="true"></span>
+</div>
+
+@code {
+    /// <summary>被摘要覆盖的消息条数。</summary>
+    [Parameter]
+    public int Count { get; set; }
+
+    /// <summary>摘要正文的 token 估算。</summary>
+    [Parameter]
+    public int Tokens { get; set; }
+
+    /// <summary>是否由确定性兜底生成。</summary>
+    [Parameter]
+    public bool IsFallback { get; set; }
+
+    /// <summary>点击后打开只读原文弹层。</summary>
+    [Parameter]
+    public EventCallback OnOpen { get; set; }
+}

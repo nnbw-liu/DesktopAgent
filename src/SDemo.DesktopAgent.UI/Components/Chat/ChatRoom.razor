@@ -1,11 +1,13 @@
 @using System.Diagnostics
 @using System.IO
+@using SDemo.DesktopAgent.Context
+@using SDemo.DesktopAgent.Execution
 @using SDemo.DesktopAgent.Models
 @using SDemo.DesktopAgent.Sandbox
 @using Microsoft.AspNetCore.Components
 @inject IJSRuntime Js
 @inject ISettingsService Settings
-@inject IAgentChatService Agent
+@inject IAgentSessionRunner Runner
 @inject IToolApprovalService Approvals
 @inject AgentToolRegistry ToolRegistry
 @inject ISandboxJobService Sandbox
@@ -13,6 +15,7 @@
 @inject PluginRegistry Registry
 @inject PluginParameterResolver ParameterResolver
 @inject IPluginRunner PluginRunner
+@inject WorkspaceContext WorkspaceContext
 @implements IDisposable
 
 @* 聊天室：空会话（欢迎语 + 输入框，垂直居中）与有记录会话（标题 / 消息区 / 输入框）共用本组件 *@
@@ -28,13 +31,62 @@
     {
         <header class="chat-header">
             <h1 class="chat-title">@Session.Title</h1>
+
+            @* P2：会话菜单（压缩现在 / 清空摘要）+ 摘要状态。 *@
+            <div class="chat-header-actions">
+                @if (Session.HasSummary)
+                {
+                    <span class="chat-summary-badge" title="较早的历史已压缩为摘要；原文仍保留，可点击分隔线查看">
+                        已压缩 @Session.SummaryThroughOrder 条
+                        @if (Session.SummaryIsFallback)
+                        {
+                            <span class="chat-summary-badge-note">自动摘要</span>
+                        }
+                    </span>
+                }
+
+                <div class="chat-menu-wrap">
+                    <button type="button" class="chat-menu-button" title="会话操作" aria-haspopup="true" aria-expanded="@_sessionMenuOpen"
+                            @onclick="ToggleSessionMenu">
+                        ⋯
+                    </button>
+
+                    @if (_sessionMenuOpen)
+                    {
+                        <div class="item-menu chat-menu" role="menu">
+                            <button type="button" class="item-menu-entry" role="menuitem"
+                                    @onclick="CompactNowAsync">
+                                压缩现在
+                            </button>
+                            <button type="button" class="item-menu-entry" role="menuitem"
+                                    disabled="@(!Session.HasSummary)"
+                                    @onclick="ClearSummaryAsync">
+                                清空摘要
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
         </header>
+
+        <TodosPanel Todos="Session.Todos" />
+        <VerificationBadge Session="Session" />
 
         <div class="chat-scroll" @ref="_scrollElement">
             <div class="chat-messages">
-                @foreach (var message in Session.Messages)
+                @for (var messageIndex = 0; messageIndex < Session.Messages.Count; messageIndex++)
                 {
+                    var message = Session.Messages[messageIndex];
                     var isUser = message.Role == ChatMessageRole.User;
+
+                    @* 摘要覆盖到这条消息之前：插入「已压缩」分隔线（P2 §3.4）。 *@
+                    @if (Session.HasSummary && messageIndex == Session.SummaryThroughOrder)
+                    {
+                        <CompactionDivider Count="@Session.SummaryThroughOrder"
+                                           Tokens="@Session.SummaryTokens"
+                                           IsFallback="@Session.SummaryIsFallback"
+                                           OnOpen="OpenCompactedHistory" />
+                    }
 
                     <article class="msg @(isUser ? "msg--user" : "msg--assistant")">
                         <span class="msg-role">@RoleLabel(message)</span>
@@ -98,6 +150,11 @@
                             </div>
                         }
 
+                        @if (!isUser && message.ToolTrace.Count > 0)
+                        {
+                            <EditSummaryPanel Trace="message.ToolTrace" SessionId="Session.Id" />
+                        }
+
                         <div class="msg-meta">
                             <span class="msg-time">@message.CreatedAt.ToString("HH:mm")</span>
 
@@ -143,6 +200,22 @@
                                                  RunningMountKey="_runningMountKey"
                                                  OnRun="@(entry => RunArtifactAsync(message, entry))" />
                             }
+
+                            @* P2：pin 后永不被淘汰 / 压缩；数量上限见设置。 *@
+                            <button type="button"
+                                    class="msg-action msg-action--pin @(message.IsPinned ? "is-on" : null)"
+                                    title="@(message.IsPinned ? "取消 pin" : "pin（永不淘汰）")"
+                                    aria-pressed="@(message.IsPinned ? "true" : "false")"
+                                    @onclick="() => TogglePinAsync(message)"
+                                    @onclick:stopPropagation="true">
+                                <svg class="msg-action-icon pin-glyph" viewBox="0 0 16 16" aria-hidden="true">
+                                    <g transform="rotate(45 8 8)">
+                                        <path d="M5.1 2.4h5.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                                        <path d="M6.1 3.4h3.8l-1.15 3.9H7.25z" fill="currentColor" />
+                                        <path d="M8 7.3v5.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                                    </g>
+                                </svg>
+                            </button>
 
                             <button type="button"
                                     class="msg-action"
@@ -202,6 +275,24 @@
                             </div>
                         }
                     </article>
+                }
+
+                @* 全部消息都被摘要覆盖（边界情况）：分隔线放在末尾。 *@
+                @if (Session.HasSummary && Session.SummaryThroughOrder >= Session.Messages.Count)
+                {
+                    <CompactionDivider Count="@Session.SummaryThroughOrder"
+                                       Tokens="@Session.SummaryTokens"
+                                       IsFallback="@Session.SummaryIsFallback"
+                                       OnOpen="OpenCompactedHistory" />
+                }
+
+                @* 宿主提示：不是模型输出，也不进入下一次请求的上下文（P1 §6：溢出 / 中途裁剪）。 *@
+                @if (!string.IsNullOrWhiteSpace(_contextNotice))
+                {
+                    <div class="context-notice">
+                        <span class="context-notice-text">@_contextNotice</span>
+                        <button type="button" class="context-notice-close" title="关闭提示" @onclick="DismissContextNotice">✕</button>
+                    </div>
                 }
             </div>
         </div>
@@ -265,11 +356,66 @@
                         未配置模型 · 去设置
                     </button>
                 }
+
+                @* P1：上下文占用环 + 分段明细；关闭 showContextMeter 后不渲染。 *@
+                @if (Settings.Current.Context.ShowContextMeter)
+                {
+                    <ContextMeter Report="_contextPreview" />
+                }
             </FooterContent>
         </ChatComposer>
     </div>
 
     @* 文件写入 / PowerShell 执行的确认框已移到 AppShell 顶层的 ToolApprovalHost，切换会话不会消失。 *@
+
+    @* 已压缩原文：只读弹层；可单条 pin（pin 的消息会重新出现在后续请求里）。 *@
+    @if (_showCompacted)
+    {
+        <div class="modal-backdrop">
+            <div class="modal modal--compacted" role="dialog" aria-modal="true" aria-label="已压缩的历史">
+                <h2 class="modal-title">已压缩的历史</h2>
+                <p class="modal-sub">
+                    这些消息仍完整保存在本机会话里；模型从摘要了解它们，不再看到原文。
+                    需要保留某条时点图钉，它会重新进入后续请求（总数上限见设置）。
+                </p>
+
+                <div class="compacted-list">
+                    @foreach (var item in CompactedMessages())
+                    {
+                        <div class="compacted-row">
+                            <div class="compacted-head">
+                                <span class="compacted-role">@(item.Message.Role == ChatMessageRole.User ? "你" : "SDemo")</span>
+                                <span class="compacted-time">@item.Message.CreatedAt.ToString("HH:mm")</span>
+
+                                <button type="button"
+                                        class="msg-action msg-action--pin @(item.Message.IsPinned ? "is-on" : null)"
+                                        title="@(item.Message.IsPinned ? "取消 pin" : "pin（永不淘汰）")"
+                                        @onclick="() => TogglePinAsync(item.Message)">
+                                    <svg class="msg-action-icon pin-glyph" viewBox="0 0 16 16" aria-hidden="true">
+                                        <g transform="rotate(45 8 8)">
+                                            <path d="M5.1 2.4h5.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                                            <path d="M6.1 3.4h3.8l-1.15 3.9H7.25z" fill="currentColor" />
+                                            <path d="M8 7.3v5.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                                        </g>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <p class="compacted-text">@Preview(item.Message)</p>
+                            @if (item.Message.IsPinned)
+                            {
+                                <p class="compacted-pinned-note">已 pin：下一轮会重新发送这条原文</p>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="primary-button" @onclick="CloseCompactedHistory">关闭</button>
+                </div>
+            </div>
+        </div>
+    }
 
     @* 隐私提示：privacy.sendsText 的插件首次使用确认一次 *@
     @if (_privacyPlugin is { } privacyPlugin)
@@ -342,6 +488,19 @@
     private List<ModelOption> _modelOptions = [];
     private string? _selectedKey;
     private CancellationTokenSource? _cts;
+    private bool _autoContinued;
+
+    /// <summary>最近一次算出的上下文报告（预览或真实请求），驱动占用环与明细。</summary>
+    private ContextReport? _contextPreview;
+
+    /// <summary>宿主提示（溢出重试 / 需压缩 / 压缩结果）；不渲染进对话正文，也不进入后续上下文。</summary>
+    private string? _contextNotice;
+
+    /// <summary>会话菜单（压缩现在 / 清空摘要）是否展开。</summary>
+    private bool _sessionMenuOpen;
+
+    /// <summary>「查看已压缩原文」弹层是否打开。</summary>
+    private bool _showCompacted;
 
     /// <summary>常用技能（本地技能库）。</summary>
     private IReadOnlyList<SkillInfo> _skills = [];
@@ -413,6 +572,7 @@
 
         // 沙箱探测可能要启动一次进程：先按“未验证”渲染 chip，后台刷新后再更新。
         _ = RefreshSandboxAvailabilityAsync();
+        RefreshContextPreview();
     }
 
     protected override void OnParametersSet()
@@ -429,6 +589,10 @@
             _isGenerating = false;
             ApplyActiveMount(Session.ActiveMountId);
             RefreshToolPacks();
+            _contextNotice = null;
+            _sessionMenuOpen = false;
+            _showCompacted = false;
+            RefreshContextPreview();
         }
     }
 
@@ -446,6 +610,7 @@
         {
             RefreshModelOptions();
             RefreshToolPacks();
+            RefreshContextPreview();
             _ = RefreshSandboxAvailabilityAsync();
             StateHasChanged();
         });
@@ -497,10 +662,174 @@
     {
         _selectedKey = args.Value?.ToString();
         RememberSelection();
+        _contextNotice = null;
+        RefreshContextPreview();
     }
 
     /// <summary>选择技能：再次点击同一个则取消。</summary>
-    private void SelectSkill(string? name) => _selectedSkill = name;
+    private void SelectSkill(string? name)
+    {
+        _selectedSkill = name;
+        RefreshContextPreview();
+    }
+
+    /// <summary>
+    /// 重新估算「下一次请求」的上下文占用；只读、不发请求。
+    /// 预算超限时把错误报告留在 <see cref="_contextPreview"/>，让占用环仍然显示真实数值。
+    /// </summary>
+    private void RefreshContextPreview()
+    {
+        var option = CurrentModelOption();
+
+        if (option is null || Session.Messages.Count == 0)
+        {
+            _contextPreview = null;
+            return;
+        }
+
+        try
+        {
+            _contextPreview = Runner.Preview(new AgentRunRequest(
+                Session.Messages.ToList(),
+                option.Provider,
+                option.ModelId,
+                new HashSet<string>(_enabledToolPacks, StringComparer.Ordinal),
+                _selectedSkill,
+                Session.Id,
+                Session: Session)).Report;
+        }
+        catch (ContextBudgetException ex)
+        {
+            _contextPreview = ex.Report;
+        }
+        catch (Exception)
+        {
+            // 预览失败不影响发送：设置页可能刚被改坏，真正发送时还会再报一次。
+            _contextPreview = null;
+        }
+    }
+
+    private ModelOption? CurrentModelOption() =>
+        _modelOptions.FirstOrDefault(option => string.Equals(option.Key, _selectedKey, StringComparison.Ordinal));
+
+    private void DismissContextNotice() => _contextNotice = null;
+
+    private void ToggleSessionMenu() => _sessionMenuOpen = !_sessionMenuOpen;
+
+    /// <summary>只读查看被摘要覆盖的原文（不改变摘要、不影响发送）。</summary>
+    private void OpenCompactedHistory()
+    {
+        _sessionMenuOpen = false;
+        _showCompacted = true;
+    }
+
+    private void CloseCompactedHistory() => _showCompacted = false;
+
+    private IEnumerable<(ChatMessage Message, int Index)> CompactedMessages()
+    {
+        var count = Math.Min(Session.SummaryThroughOrder, Session.Messages.Count);
+
+        for (var index = 0; index < count; index++)
+        {
+            yield return (Session.Messages[index], index);
+        }
+    }
+
+    private static string Preview(ChatMessage message)
+    {
+        var text = message.Content?.Trim() ?? string.Empty;
+
+        if (text.Length == 0)
+        {
+            return message.Attachments.Count > 0
+                ? $"[附件] {string.Join("、", message.Attachments.Select(attachment => attachment.FileName))}"
+                : "（无正文）";
+        }
+
+        return text.Length <= 400 ? text : string.Concat(text.AsSpan(0, 400), "…");
+    }
+
+    /// <summary>手动压缩：走与自动压缩相同的增量逻辑，失败走兜底并提示。</summary>
+    private async Task CompactNowAsync()
+    {
+        _sessionMenuOpen = false;
+
+        if (_isGenerating)
+        {
+            return;
+        }
+
+        var option = CurrentModelOption();
+        if (option is null)
+        {
+            _contextNotice = "还没有可用模型，无法压缩。";
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            var outcome = await Runner.CompactAsync(new AgentCompactRequest(
+                Session,
+                option.Provider,
+                option.ModelId,
+                Session.Id));
+
+            _contextNotice = outcome.Message;
+
+            if (outcome.Compacted)
+            {
+                RefreshContextPreview();
+                await NotifySessionChangedAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _contextNotice = $"压缩失败：{ex.Message}";
+        }
+
+        StateHasChanged();
+    }
+
+    /// <summary>清空摘要：下一轮超预算时重新生成；原文与 pin 不受影响。</summary>
+    private async Task ClearSummaryAsync()
+    {
+        _sessionMenuOpen = false;
+
+        if (_isGenerating)
+        {
+            return;
+        }
+
+        Session.Summary = null;
+        Session.SummaryThroughOrder = 0;
+        Session.SummaryTokens = 0;
+        Session.SummaryUpdatedAt = null;
+        Session.SummaryIsFallback = false;
+
+        _contextNotice = "已清空摘要；下一轮超预算时会重新生成。";
+        RefreshContextPreview();
+        await NotifySessionChangedAsync();
+        StateHasChanged();
+    }
+
+    /// <summary>切换一条消息的 pin；上限由 Core 的 PinPolicy 判定（便于单测）。</summary>
+    private async Task TogglePinAsync(ChatMessage message)
+    {
+        var limit = Settings.Current.Context.MaxPinnedMessages;
+        var result = PinPolicy.Toggle(Session, message, limit);
+
+        if (!result.Changed)
+        {
+            _contextNotice = result.Message;
+            StateHasChanged();
+            return;
+        }
+
+        await NotifySessionChangedAsync();
+        RefreshContextPreview();
+        StateHasChanged();
+    }
 
     /// <summary>开关一个工具包（只有可用时才允许；不可用的 chip 在 UI 上已禁用）。</summary>
     private void ToggleToolPack(string packId)
@@ -928,8 +1257,13 @@
     }
 
     /// <summary>用 Agent Framework 流式生成回复，边生成边写入会话。</summary>
-    private async Task GenerateAsync(ModelOption option)
+    private async Task GenerateAsync(ModelOption option, bool isAutoContinue = false)
     {
+        if (!isAutoContinue)
+        {
+            _autoContinued = false;
+        }
+
         _isGenerating = true;
         await SetGeneratingAsync(true);
 
@@ -960,30 +1294,68 @@
         }
         var metrics = new AgentRunMetrics();
         var startedAt = Stopwatch.GetTimestamp();
+        var telemetry = new ContextRunTelemetry();
+        _contextNotice = null;
 
         try
         {
             await ConsumeAsync(
                 reply,
-                Agent.StreamAsync(
-                    option.Provider,
-                    option.ModelId,
-                    history,
-                    enabledPacks,
-                    Session.Id,
-                    _selectedSkill,
-                    metrics,
-                    cts.Token));
+                Runner.StreamAsync(
+                    new AgentRunRequest(
+                        history,
+                        option.Provider,
+                        option.ModelId,
+                        enabledPacks,
+                        _selectedSkill,
+                        Session.Id,
+                        metrics),
+                    telemetry,
+                    cts.Token),
+                telemetry);
+
+            var auto = BuildAutoContinueDecision();
+            if (auto.Continue && !_autoContinued && auto.Prompt is not null)
+            {
+                _autoContinued = true;
+                Session.Messages.Add(new ChatMessage(ChatMessageRole.User, auto.Prompt));
+                StateHasChanged();
+                await NotifySessionChangedAsync();
+                await GenerateAsync(option, isAutoContinue: true);
+            }
         }
         finally
         {
             ApplyMetrics(reply, metrics, startedAt);
             _isGenerating = false;
             _cts = null;
+            _contextPreview = telemetry.Report ?? _contextPreview;
+            _contextNotice = telemetry.ContextNotice;
             await SetGeneratingAsync(false);
             StateHasChanged();
             await NotifySessionChangedAsync();
         }
+    }
+
+    private AutoContinueDecision BuildAutoContinueDecision()
+    {
+        var workspace = Settings.Current.Workspaces.FirstOrDefault(item =>
+            !string.IsNullOrWhiteSpace(item.Path)
+            && string.Equals(
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(item.Path)),
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(WorkspaceContext.RootPath)),
+                StringComparison.OrdinalIgnoreCase));
+
+        var suggestion = WorkspaceCommandDetector.Detect(WorkspaceContext.RootPath);
+        var build = workspace?.BuildCommand ?? suggestion.BuildCommand;
+        var test = workspace?.TestCommand ?? suggestion.TestCommand;
+
+        return AutoContinuePolicy.Decide(
+            Session,
+            build,
+            test,
+            Settings.Current.Verification,
+            _autoContinued ? 1 : 0);
     }
 
     /// <summary>插件 Run：单轮、默认无历史、无全局技能；产物是一条带 Plugin 归属的普通助手消息。</summary>
@@ -1163,7 +1535,10 @@
     }
 
     /// <summary>普通对话的流式累积：正文原样追加，出错追加可读提示。</summary>
-    private async Task ConsumeAsync(ChatMessage reply, IAsyncEnumerable<AgentDelta> stream)
+    private async Task ConsumeAsync(
+        ChatMessage reply,
+        IAsyncEnumerable<AgentDelta> stream,
+        ContextRunTelemetry telemetry)
     {
         try
         {
@@ -1179,12 +1554,28 @@
                     reply.Reasoning += delta.Reasoning;
                 }
 
+                // 中途裁剪 / 中途提示需要让用户看到，但仍不进模型上下文。
+                if (!string.IsNullOrWhiteSpace(telemetry.ContextNotice))
+                {
+                    _contextNotice = telemetry.ContextNotice;
+                }
+
                 StateHasChanged();
             }
         }
         catch (OperationCanceledException)
         {
             // 用户点了停止。
+        }
+        catch (ContextBudgetException ex)
+        {
+            // 发送前的预算拦截：只给宿主提示，不在气泡里伪造一段「模型回复」。
+            _contextPreview = ex.Report ?? _contextPreview;
+            _contextNotice = ex.Message;
+            if (string.IsNullOrWhiteSpace(reply.Content))
+            {
+                Session.Messages.Remove(reply);
+            }
         }
         catch (Exception ex)
         {
@@ -1202,6 +1593,11 @@
         foreach (var pair in metrics.ToolCalls)
         {
             reply.ToolCalls[pair.Key] = pair.Value;
+        }
+
+        if (metrics.ToolTrace.Count > 0)
+        {
+            reply.ToolTrace.AddRange(metrics.ToolTrace);
         }
     }
 

@@ -63,6 +63,8 @@ public sealed class AgentToolRegistry
 
     private sealed class InstrumentedAIFunction(AIFunction inner, AgentRunMetrics? metrics) : AIFunction
     {
+        private int _failedEdits;
+
         public override string Name => inner.Name;
 
         public override string Description => inner.Description;
@@ -77,12 +79,84 @@ public sealed class AgentToolRegistry
         {
             metrics?.RecordToolCall(inner.Name);
 
-            var result = await inner.InvokeAsync(arguments, cancellationToken).ConfigureAwait(false);
+            var digest = string.Join(
+                ";",
+                arguments.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => $"{pair.Key}={pair.Value}"));
 
-            // 工具结果定界：内容里即使出现像指令的句子，也只能落在标记内部。
-            return result is string text
-                ? $"[TOOL_RESULT_BEGIN:{inner.Name}]\n{text}\n[TOOL_RESULT_END]"
-                : result;
+            var guard = metrics?.Guard.Check(inner.Name, digest);
+
+            if (guard is { Allowed: false })
+            {
+                return $"[TOOL_RESULT_BEGIN:{inner.Name}]\n{guard.Message}\n[TOOL_RESULT_END]";
+            }
+
+            // P6：小模型会反复提交同一种坏补丁。连续两次写不进去就禁用本工具，
+            // 强迫它换策略（例如改用 write_file 整文件重写），而不是在同一处绕圈。
+            if (_failedEdits >= 2 && IsEditTool(inner.Name))
+            {
+                var alternative = inner.Name switch
+                {
+                    "apply_patch" => "请改用 replace_text 精确替换，或 write_file 重写整个文件；也可以先用文本说明卡在哪里。",
+                    "replace_text" => "请改用 apply_patch，或 write_file 重写整个文件；也可以先用文本说明卡在哪里。",
+                    _ => "请改用 replace_text 或 apply_patch，或先用文本说明卡在哪里。"
+                };
+                return $"[TOOL_RESULT_BEGIN:{inner.Name}]\n"
+                    + $"{inner.Name} 已在本次生成中连续失败 2 次，本轮禁用；{alternative}\n[TOOL_RESULT_END]";
+            }
+
+            string text;
+            try
+            {
+                var result = await inner.InvokeAsync(arguments, cancellationToken).ConfigureAwait(false);
+                text = result is string value ? value : result?.ToString() ?? string.Empty;
+            }
+            catch (ArgumentException ex)
+            {
+                // 小模型经常漏必填参数（例如只发 expectedHash 不发 patch）。
+                // 直接抛异常只会得到 "Error: Function failed."，模型无法自我修复；
+                // 这里把 schema 和收到的参数一起回传，让它按 schema 重试。
+                var provided = string.Join(", ", arguments.Keys.OrderBy(key => key, StringComparer.Ordinal));
+                text = $"{{\"error\":\"missing or invalid argument\",\"tool\":\"{inner.Name}\","
+                    + $"\"provided\":\"{provided}\",\"message\":\"{Escape(ex.Message)}\","
+                    + $"\"schema\":{inner.JsonSchema.GetRawText()}}}";
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                text = $"工具执行失败（未修改文件）：{ex.GetType().Name}: {ex.Message}";
+            }
+
+            if (guard?.Message is { Length: > 0 } warning)
+            {
+                text = $"[宿主提示] {warning}\n{text}";
+            }
+
+            if (IsEditTool(inner.Name)
+                && (text.StartsWith("未写入任何文件", StringComparison.Ordinal)
+                    || text.StartsWith("未替换任何内容", StringComparison.Ordinal)))
+            {
+                _failedEdits++;
+
+                if (_failedEdits >= 2)
+                {
+                    text += "\n[宿主提示] 已连续失败 2 次。不要再调用本工具；请改用 replace_text 精确替换，或 write_file 重写整个文件。";
+                }
+            }
+            else if (IsEditTool(inner.Name) && !text.StartsWith("未写入", StringComparison.Ordinal))
+            {
+                _failedEdits = 0;
+            }
+
+            return $"[TOOL_RESULT_BEGIN:{inner.Name}]\n{text}\n[TOOL_RESULT_END]";
         }
+
+        private static bool IsEditTool(string name) =>
+            name is "apply_patch" or "write_file" or "replace_text";
+
+        private static string Escape(string value) =>
+            value.Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("\"", "\\\"", StringComparison.Ordinal)
+                .Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
     }
 }

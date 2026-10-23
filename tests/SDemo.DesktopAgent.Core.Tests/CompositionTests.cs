@@ -53,10 +53,11 @@ public sealed class CompositionTests
         Assert.NotNull(provider.GetRequiredService<IToolAuditLog>());
 
         var registry = provider.GetRequiredService<AgentToolRegistry>();
-        Assert.Equal(["search", "files"], registry.Descriptors.Select(descriptor => descriptor.Id));
+        Assert.Equal(["todo", "search", "files", "edits", "code_edit"], registry.Descriptors.Select(descriptor => descriptor.Id));
 
         // 文件读写是内置能力：不再依赖输入框 chip；搜索仍由用户逐轮选择。
         Assert.True(registry.Find("files")!.BuiltIn);
+        Assert.True(registry.Find("edits")!.BuiltIn);
         Assert.False(registry.Find("search")!.BuiltIn);
 
         // 校验 PowerShell 之外的核心包都有工具；PowerShell 由 Windows 宿主单独注册。

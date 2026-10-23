@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Models;
 using SDemo.DesktopAgent.Services;
 using ChatMessageModel = SDemo.DesktopAgent.Models.ChatMessage;
@@ -48,11 +49,16 @@ public sealed class PluginRunner : IPluginRunner
 
     private readonly IAgentChatService _chat;
     private readonly PluginPromptComposer _composer;
+    private readonly ContextBuilder _contextBuilder;
 
-    public PluginRunner(IAgentChatService chat, PluginPromptComposer composer)
+    public PluginRunner(
+        IAgentChatService chat,
+        PluginPromptComposer composer,
+        ContextBuilder contextBuilder)
     {
         _chat = chat;
         _composer = composer;
+        _contextBuilder = contextBuilder;
     }
 
     public IAsyncEnumerable<AgentDelta> RunComposerAsync(
@@ -91,16 +97,24 @@ public sealed class PluginRunner : IPluginRunner
             ChatRoleModel.User,
             _composer.WrapUserInput(request.InputText)));
 
+        // 插件也走唯一的上下文入口：只是以 passthrough 模式跳过预算裁剪，
+        // 输入上限仍由 MaxInputChars 单独把关。
+        var context = _contextBuilder.Build(new ContextBuildRequest(
+            request.Provider,
+            request.ModelId,
+            messages,
+            InstructionsOverride: instructions,
+            Passthrough: true));
+
         var plan = new AgentRunPlan(
             request.Provider,
             request.ModelId,
-            instructions,
-            messages,
+            context,
             NoTools,
             SessionId: string.Empty,
             request.Metrics);
 
-        await foreach (var delta in _chat.RunAsync(plan, cancellationToken))
+        await foreach (var delta in _chat.RunAsync(plan, cancellationToken: cancellationToken))
         {
             yield return delta;
         }

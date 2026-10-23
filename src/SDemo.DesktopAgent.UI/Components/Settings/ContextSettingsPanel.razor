@@ -1,0 +1,310 @@
+@inject ISettingsService Settings
+@inject TokenCalibrationStore Calibration
+
+@* P2 §3.4 设置 → 上下文：预算、保留轮次、自动压缩、摘要模型、状态包、校准。 *@
+<div class="settings-pane">
+    <section class="settings-section">
+        <h2 class="settings-section-title">预算与裁剪</h2>
+        <p class="settings-section-hint">
+            每次请求都会先估算 token 并按预算裁剪；原始消息不会被删除，只是不发送。
+        </p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">启用上下文预算</span>
+                <span class="settings-row-hint">关闭后等价于旧行为（直通），仍会记录报告。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@Context.Enabled" @onchange="ToggleEnabled" />
+        </label>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">显示占用环</span>
+                <span class="settings-row-hint">输入框右下角的估算 token 占用；点开可看分段明细。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@Context.ShowContextMeter" @onchange="ToggleMeter" />
+        </label>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">预算占窗口比例</span>
+                <span class="settings-row-hint">0.1 – 0.95；默认 0.85，越大越激进。</span>
+            </span>
+            <input type="number" class="field-input field-input--number" step="0.01" min="0.1" max="0.95"
+                   @bind="Context.BudgetRatio" @bind:after="SaveSettings" />
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">保留最近轮次</span>
+                <span class="settings-row-hint">普通模型 / ≤8K 小模型分别设置；其余历史交给摘要。</span>
+            </span>
+            <span class="settings-inline-fields">
+                <input type="number" class="field-input field-input--number" min="1" max="50"
+                       @bind="Context.KeepRecentTurns" @bind:after="SaveSettings" />
+                <span class="settings-inline-sep">/</span>
+                <input type="number" class="field-input field-input--number" min="1" max="50"
+                       @bind="Context.SmallModelKeepRecentTurns" @bind:after="SaveSettings" />
+            </span>
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">工具轨迹回放预算</span>
+                <span class="settings-row-hint">每条助手消息最多回放多少 token 的工具轨迹。</span>
+            </span>
+            <input type="number" class="field-input field-input--number" min="0" max="2000"
+                   @bind="Context.ToolTraceTokenBudget" @bind:after="SaveSettings" />
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">附件内联上限</span>
+                <span class="settings-row-hint">当前轮附件最多内联多少 token；超出只留文件名与路径。</span>
+            </span>
+            <input type="number" class="field-input field-input--number" min="0" max="16384"
+                   @bind="Context.AttachmentInlineTokens" @bind:after="SaveSettings" />
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">pin 数量上限</span>
+                <span class="settings-row-hint">pin 的消息永不淘汰 / 压缩；默认 20 条。</span>
+            </span>
+            <input type="number" class="field-input field-input--number" min="0" max="200"
+                   @bind="Context.MaxPinnedMessages" @bind:after="SaveSettings" />
+        </div>
+    </section>
+
+    <section class="settings-section">
+        <h2 class="settings-section-title">压缩与摘要</h2>
+        <p class="settings-section-hint">
+            超预算时先把较早历史压成摘要，再按预算裁剪。摘要失败会自动退回确定性摘要，不会阻塞回答。
+        </p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">自动压缩</span>
+                <span class="settings-row-hint">超预算时增量生成摘要；关闭后只做硬裁剪。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@Context.AutoCompact" @onchange="ToggleAutoCompact" />
+        </label>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">摘要模型</span>
+                <span class="settings-row-hint">@_summaryHint</span>
+            </span>
+            <select class="field-input field-input--select" value="@_summaryKey" @onchange="HandleSummaryModelChanged">
+                <option value="">当前会话模型（默认）</option>
+                @foreach (var option in SummaryOptions())
+                {
+                    <option value="@option.Key">@option.Text</option>
+                }
+            </select>
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">摘要上限</span>
+                <span class="settings-row-hint">摘要正文 token 上限；默认 800。</span>
+            </span>
+            <input type="number" class="field-input field-input--number" min="128" max="4096"
+                   @bind="Context.SummaryMaxTokens" @bind:after="SaveSettings" />
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">单次摘要输入上限</span>
+                <span class="settings-row-hint">超过就分块增量摘要；默认 6000 token。</span>
+            </span>
+            <input type="number" class="field-input field-input--number" min="512" max="24000"
+                   @bind="Context.SummaryInputMaxTokens" @bind:after="SaveSettings" />
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">摘要超时</span>
+                <span class="settings-row-hint">秒；超时 / 5xx / 格式不符都会走确定性兜底。</span>
+            </span>
+            <input type="number" class="field-input field-input--number" min="1" max="300"
+                   @bind="Context.SummaryTimeoutSeconds" @bind:after="SaveSettings" />
+        </div>
+    </section>
+
+    <section class="settings-section">
+        <h2 class="settings-section-title">工作记忆状态包</h2>
+        <p class="settings-section-hint">
+            每轮把「工作区结构、最近改动、最近工具动作、验证状态」放进系统块；由宿主生成，不调用模型。
+        </p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">启用状态包</span>
+                <span class="settings-row-hint">关闭后模型只能靠历史与工具重新读取文件。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@Context.StatePackEnabled" @onchange="ToggleStatePack" />
+        </label>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">状态包上限</span>
+                <span class="settings-row-hint">普通模型 / ≤8K 小模型（默认 800 / 500 token）。</span>
+            </span>
+            <span class="settings-inline-fields">
+                <input type="number" class="field-input field-input--number" min="64" max="2048"
+                       @bind="Context.StatePackTokenBudget" @bind:after="SaveSettings" />
+                <span class="settings-inline-sep">/</span>
+                <input type="number" class="field-input field-input--number" min="64" max="2048"
+                       @bind="Context.StatePackSmallModelTokenBudget" @bind:after="SaveSettings" />
+            </span>
+        </div>
+    </section>
+
+    <section class="settings-section">
+        <h2 class="settings-section-title">高级</h2>
+        <p class="settings-section-hint">排查预算异常时再动这里；默认值适合大多数情况。</p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">工具循环中途裁剪</span>
+                <span class="settings-row-hint">工具结果回灌时也做预算裁剪，避免单轮爆窗。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@Context.MidTurnTrim" @onchange="ToggleMidTurnTrim" />
+        </label>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">400 溢出自动重试</span>
+                <span class="settings-row-hint">识别上下文超限后按半预算重试一次。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@Context.OverflowRetry" @onchange="ToggleOverflowRetry" />
+        </label>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">单条工具结果上限</span>
+                <span class="settings-row-hint">工具循环内单条结果保留的字符数。</span>
+            </span>
+            <input type="number" class="field-input field-input--number" min="200" max="20000"
+                   @bind="Context.MidTurnToolResultChars" @bind:after="SaveSettings" />
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">重置 token 校准</span>
+                <span class="settings-row-hint">
+                    @_calibrationCount 个模型已学习过估算系数；怀疑偏差过大或换模型时可重置。
+                </span>
+            </span>
+            <button type="button" class="ghost-button" @onclick="ResetCalibration">重置校准</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    private int _calibrationCount;
+    private string _summaryKey = string.Empty;
+    private string _summaryHint = string.Empty;
+
+    private ContextSettings Context => Settings.Current.Context;
+
+    protected override void OnInitialized()
+    {
+        _calibrationCount = Calibration.Snapshot().Count;
+        RefreshSummaryKey();
+    }
+
+    private void SaveSettings() => Settings.Save();
+
+    private void ToggleEnabled(ChangeEventArgs args)
+    {
+        Context.Enabled = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleMeter(ChangeEventArgs args)
+    {
+        Context.ShowContextMeter = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleAutoCompact(ChangeEventArgs args)
+    {
+        Context.AutoCompact = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleStatePack(ChangeEventArgs args)
+    {
+        Context.StatePackEnabled = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleMidTurnTrim(ChangeEventArgs args)
+    {
+        Context.MidTurnTrim = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleOverflowRetry(ChangeEventArgs args)
+    {
+        Context.OverflowRetry = args.Value is true;
+        Settings.Save();
+    }
+
+    private IEnumerable<(string Key, string Text)> SummaryOptions() =>
+        Settings.Current.Providers
+            .SelectMany(provider => provider.Models.Select(model => new
+            {
+                Key = $"{provider.Id}|{model.Id}",
+                Text = $"{provider.Name} · {model.Name}"
+            }))
+            .Select(option => (option.Key, option.Text));
+
+    private void RefreshSummaryKey()
+    {
+        if (string.IsNullOrWhiteSpace(Context.SummaryProviderId) || string.IsNullOrWhiteSpace(Context.SummaryModelId))
+        {
+            _summaryKey = string.Empty;
+            _summaryHint = "默认使用当前会话模型；可指定更便宜的模型。";
+            return;
+        }
+
+        _summaryKey = $"{Context.SummaryProviderId}|{Context.SummaryModelId}";
+
+        var provider = Settings.Current.Providers.FirstOrDefault(item => item.Id == Context.SummaryProviderId);
+        var valid = provider?.Models.Any(model => model.Id == Context.SummaryModelId) == true;
+
+        _summaryHint = valid
+            ? "摘要请求不写会话消息，token 消耗只进报告与日志。"
+            : "配置的摘要模型已不可用，将回退当前会话模型。";
+    }
+
+    private void HandleSummaryModelChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? string.Empty;
+        var parts = value.Split('|', 2);
+
+        if (parts.Length != 2
+            || Settings.Current.Providers.All(provider => provider.Id != parts[0]))
+        {
+            Context.SummaryProviderId = null;
+            Context.SummaryModelId = null;
+        }
+        else
+        {
+            Context.SummaryProviderId = parts[0];
+            Context.SummaryModelId = parts[1];
+        }
+
+        RefreshSummaryKey();
+        Settings.Save();
+    }
+
+    private void ResetCalibration()
+    {
+        Calibration.ResetAll();
+        _calibrationCount = 0;
+    }
+}

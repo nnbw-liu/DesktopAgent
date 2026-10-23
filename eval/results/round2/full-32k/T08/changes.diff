@@ -1,0 +1,25 @@
+diff --git a/src/CommandLine/UnParserExtensions.cs b/src/CommandLine/UnParserExtensions.cs
+index e823a7f..fc10178 100644
+--- a/src/CommandLine/UnParserExtensions.cs
++++ b/src/CommandLine/UnParserExtensions.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections;
+@@ -22,6 +22,14 @@ namespace CommandLine
+         private bool showHidden;
+         private bool skipDefault;
+ 
++        /// <summary>
++        /// Gets or sets a value indicating whether unparsing process shall only skip default values.
++        /// </summary>
++        public static UnParserSettings WithSkipDefaultOnly()
++        {
++            return new UnParserSettings { skipDefault = true };
++        }
++
+         /// <summary>
+         /// Gets or sets a value indicating whether unparsing process shall prefer short or long names.
+         /// </summary>

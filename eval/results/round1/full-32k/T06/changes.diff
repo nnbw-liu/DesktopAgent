@@ -1,0 +1,42 @@
+diff --git a/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs b/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
+index 7e878f3..1a0894f 100644
+--- a/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
++++ b/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections.Generic;
+@@ -26,7 +26,30 @@ namespace CommandLine.Tests.Unit
+ 
+         [Theory]
+         [MemberData(nameof(UnParseData))]
+-        public static void UnParsing_instance_with_splitArgs_returns_same_option_class(Simple_Options options, string result)
++        public static void UnParsing_instance_with_splitArgs_returns_same_option_class(Simple_Options o
++
++        [Fact]
++        public void AgentEval_SplitArgs_EmptyInput()
++        {
++            var args = string.Empty.SplitArgs();
++            args.Should().BeEquivalentTo(new[] { });
++        }
++
++        [Theory]
++        [InlineData("""a b""", new[] { "a b" })]
++        public void AgentEval_SplitArgs_KeepsQuotedSpace(string input, string[] expected)
++        {
++            var args = input.SplitArgs();
++            args.Should().BeEquivalentTo(expected);
++        }
++
++        [Theory]
++        [InlineData("""a b""", new[] { "a b" })]
++        public void AgentEval_SplitArgs_KeepQuote(string input, string[] expected)
++        {
++            var args = input.SplitArgs(true);
++            args.Should().BeEquivalentTo(expected);
++        }ptions, string result)
+         {
+            new Parser()
+             .FormatCommandLineArgs(options)
