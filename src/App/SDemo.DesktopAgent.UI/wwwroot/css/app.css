@@ -804,6 +804,24 @@ a {
     padding: 0;
 }
 
+/* 输入框下方：上下文用量（只有已有对话时才渲染） */
+.composer-usage {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: 100%;
+    max-width: 760px;
+    margin: 6px auto 0;
+    padding: 0 11px;
+}
+
+/* 移到输入框外侧后收一点，不抢输入框内部的高度 */
+.composer-usage .context-meter {
+    height: 24px;
+    padding: 0 6px 0 4px;
+    font-size: 10.5px;
+}
+
 /* ---------- 多功能组合输入框 ---------- */
 
 .composer {
@@ -1099,10 +1117,18 @@ a {
 }
 
 .composer-tool-glyph {
+    display: grid;
+    place-items: center;
     font-family: "Cascadia Mono", Consolas, monospace;
     font-size: 11px;
     font-weight: 600;
     line-height: 1;
+}
+
+/* 有 SVG 图标的工具（联网搜索等）比字形大一档，避免看起来太小 */
+.composer-tool-glyph .composer-tool-svg {
+    width: 17px;
+    height: 17px;
 }
 
 .composer-tool-name {
@@ -2983,8 +3009,9 @@ a {
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    padding: 6px 8px;
+    gap: 2px;
+    /* 左边距比普通列表深一点：入口从图标开始，不贴着侧栏边缘 */
+    padding: 7px 12px 9px 18px;
 
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
@@ -2993,6 +3020,12 @@ a {
 /* 有入口区时，内容区不再重复一条分割线 */
 .plugin-rail + .sidebar-content {
     border-top: 0;
+}
+
+/* 条目比普通列表紧凑：图标和名称算一组，行高更矮 */
+.plugin-rail .sidebar-item {
+    gap: 9px;
+    padding: 7px 9px;
 }
 
 .plugin-rail .item-icon {
@@ -3017,6 +3050,8 @@ a {
 }
 
 .plugin-rail-more .item-main {
+    gap: 9px;
+    padding: 7px 9px;
     border-radius: 8px;
     color: var(--text-dim);
 }
@@ -3744,7 +3779,7 @@ a {
     }
 }
 
-/* ---------- P1 上下文占用（输入框右下角） ---------- */
+/* ---------- P1 上下文占用（输入框下方） ---------- */
 
 .context-meter-wrap {
     position: relative;

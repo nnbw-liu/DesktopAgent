@@ -43,7 +43,9 @@ public sealed class BuiltinPluginTests
         Assert.Contains(target.Options, option => option.Value == "ja" && option.Label == "日本語");
 
         Assert.NotNull(translate.Icon);
-        Assert.Equal(2, translate.Icon!.Paths.Count);
+        // 自左向右的「文 A」：4 条笔划 + 字母 A 的两笔；图标铺满 24px 画布。
+        Assert.Equal(6, translate.Icon!.Paths.Count);
+        Assert.Contains(translate.Icon.Paths, path => path.Contains("M2 5h12", StringComparison.Ordinal));
     }
 
     [Fact]

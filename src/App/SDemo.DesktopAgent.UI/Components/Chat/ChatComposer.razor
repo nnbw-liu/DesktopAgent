@@ -217,7 +217,22 @@
                         aria-pressed="@(pack.Enabled ? "true" : "false")"
                         disabled="@(!pack.Available)"
                         @onclick="() => OnToggleToolPack.InvokeAsync(pack.Id)">
-                    <span class="composer-tool-glyph" aria-hidden="true">@pack.Glyph</span>
+                    <span class="composer-tool-glyph" aria-hidden="true">
+                        @if (IsSearchPack(pack))
+                        {
+                            @* 搜索字形「⌕」在小字号下太细，改用和输入框同一套线条的放大镜 *@
+                            <svg class="composer-tool-svg" viewBox="0 0 24 24" aria-hidden="true">
+                                <circle cx="10.5" cy="10.5" r="6.4"
+                                        fill="none" stroke="currentColor" stroke-width="1.8" />
+                                <path d="M15.3 15.3 20.8 20.8"
+                                      fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                            </svg>
+                        }
+                        else
+                        {
+                            @pack.Glyph
+                        }
+                    </span>
                     <span class="composer-tool-name">@pack.Name</span>
                 </button>
             }
@@ -511,6 +526,10 @@
 
     private PluginDescriptor? PluginFor(string pluginId) =>
         PluginById.TryGetValue(pluginId, out var plugin) ? plugin : null;
+
+    /// <summary>联网搜索在 UI 里用矢量放大镜；其它工具仍用工具包提供的字形。</summary>
+    private static bool IsSearchPack(ToolPackChip pack) =>
+        string.Equals(pack.Id, "search", StringComparison.Ordinal);
 
     /// <summary>已选技能的字形：优先用技能列表里的 icon；技能文件被删时退回名字首字。</summary>
     private string GlyphOf(string name) =>

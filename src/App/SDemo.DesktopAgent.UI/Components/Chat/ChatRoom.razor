@@ -356,14 +356,16 @@
                         未配置模型 · 去设置
                     </button>
                 }
-
-                @* P1：上下文占用环 + 分段明细；关闭 showContextMeter 后不渲染。 *@
-                @if (Settings.Current.Context.ShowContextMeter)
-                {
-                    <ContextMeter Report="_contextPreview" />
-                }
             </FooterContent>
         </ChatComposer>
+
+        @* P1：上下文占用环移到输入框下方；新聊天室还没有内容，不显示。 *@
+        @if (!IsEmpty && Settings.Current.Context.ShowContextMeter)
+        {
+            <div class="composer-usage">
+                <ContextMeter Report="_contextPreview" />
+            </div>
+        }
     </div>
 
     @* 文件写入 / PowerShell 执行的确认框已移到 AppShell 顶层的 ToolApprovalHost，切换会话不会消失。 *@
