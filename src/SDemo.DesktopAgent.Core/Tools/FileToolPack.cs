@@ -81,7 +81,59 @@ public sealed class FileToolPack : IAgentToolPack
 
     private sealed class FileFunctions(ToolContext context, WorkspaceSearch search)
     {
-        public string WorkspaceInfo() => $"工作区根目录：{context.WorkspaceRoot}";
+        public string WorkspaceInfo()
+        {
+            var builder = new StringBuilder();
+            builder.Append("工作区根目录：").Append(context.WorkspaceRoot);
+
+            var workspace = FindWorkspace();
+            if (workspace is not null)
+            {
+                if (!string.IsNullOrWhiteSpace(workspace.BuildCommand))
+                {
+                    builder.Append("\n构建命令：").Append(workspace.BuildCommand);
+                }
+
+                if (!string.IsNullOrWhiteSpace(workspace.TestCommand))
+                {
+                    builder.Append("\n测试命令：").Append(workspace.TestCommand);
+                }
+
+                if (!string.IsNullOrWhiteSpace(workspace.BuildCommand)
+                    || !string.IsNullOrWhiteSpace(workspace.TestCommand))
+                {
+                    builder.Append("\n（来自工作区设置，可直接用于 run_command）");
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private SDemo.DesktopAgent.Models.Workspace? FindWorkspace()
+        {
+            try
+            {
+                var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(context.WorkspaceRoot));
+                return context.Settings.Current.Workspaces.FirstOrDefault(workspace =>
+                {
+                    try
+                    {
+                        return string.Equals(
+                            Path.TrimEndingDirectorySeparator(Path.GetFullPath(workspace.Path)),
+                            root,
+                            StringComparison.OrdinalIgnoreCase);
+                    }
+                    catch (Exception ex) when (ex is IOException or ArgumentException or NotSupportedException)
+                    {
+                        return false;
+                    }
+                });
+            }
+            catch (Exception ex) when (ex is IOException or ArgumentException or NotSupportedException)
+            {
+                return null;
+            }
+        }
 
         public string ListFiles(
             [Description("相对工作区的目录路径，默认当前目录。")] string path = ".")

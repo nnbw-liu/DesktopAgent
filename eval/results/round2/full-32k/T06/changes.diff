@@ -1,0 +1,37 @@
+diff --git a/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs b/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
+index 7e878f3..d8b5887 100644
+--- a/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
++++ b/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections.Generic;
+@@ -197,7 +197,25 @@ namespace CommandLine.Tests.Unit
+         }
+ 
+         [Fact]
+-        public static void UnParsing_instance_with_datetime_nullable()
++        public static void UnParsing_instance_with_datetime_nullabl
++
++        [Fact]
++        public void AgentEval_SplitArgs_EmptyInput()
++        {
++            "".SplitArgs().Should().BeEmpty();
++        }
++
++        [Fact]
++        public void AgentEval_SplitArgs_KeepsQuotedSpace()
++        {
++            ""a b" c".SplitArgs().Should().HaveCount(2);
++        }
++
++        [Fact]
++        public void AgentEval_SplitArgs_KeepQuote()
++        {
++            ""a b" c".SplitArgs(true).Should().HaveCount(3);
++        }e()
+         {
+             var date = new DateTime(2019, 5, 1);
+             var options = new Options_Date_Nullable { Start = date };

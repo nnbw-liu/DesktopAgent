@@ -89,4 +89,5 @@ public sealed record ContextBuildRequest(
     string? SummaryText = null,
     int SummaryThroughOrder = 0,
     string? StatePackText = null,
-    bool SummaryFallback = false);
+    bool SummaryFallback = false,
+    AgentModePreference? ModeOverride = null);

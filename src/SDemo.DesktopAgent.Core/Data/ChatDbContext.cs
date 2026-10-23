@@ -30,6 +30,8 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         session.Property(record => record.SummaryThroughOrder);
         session.Property(record => record.SummaryUpdatedAt);
         session.Property(record => record.SummaryTokens);
+        session.Property(record => record.LastVerificationJson);
+        session.Property(record => record.TodosJson);
         session.HasIndex(record => record.UpdatedAt);
         session.HasMany(record => record.Messages)
             .WithOne()
@@ -94,6 +96,12 @@ public sealed class SessionRecord
 
     /// <summary>摘要正文的 token 估算。</summary>
     public int SummaryTokens { get; set; }
+
+    /// <summary>最近一次验证结果（VerificationRecord）的 JSON。</summary>
+    public string? LastVerificationJson { get; set; }
+
+    /// <summary>当前任务计划（TodoItem[]）的 JSON。</summary>
+    public string? TodosJson { get; set; }
 
     public List<MessageRecord> Messages { get; set; } = [];
 }

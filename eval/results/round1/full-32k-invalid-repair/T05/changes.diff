@@ -1,0 +1,66 @@
+diff --git a/tests/CommandLine.Tests/Unit/Text/HelpTextTests.cs b/tests/CommandLine.Tests/Unit/Text/HelpTextTests.cs
+index 9811f7b..deebf6e 100644
+--- a/tests/CommandLine.Tests/Unit/Text/HelpTextTests.cs
++++ b/tests/CommandLine.Tests/Unit/Text/HelpTextTests.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections.Generic;
+@@ -26,6 +26,55 @@ namespace CommandLine.Tests.Unit.Text
+ 
+         [Fact]
+         public void Create_empty_instance()
++
++        [Theory]
++        [InlineData(true)]
++        [InlineData(false)]
++        public void AgentEval_PreferShortName_UsesShortWhenAvailable(bool preferShortName)
++        {
++            // Arrange
++            var option = new OptionSpecification("--long", "--short");
++            var parser = new UnParserSettings { PreferShortName = preferShortName };
++
++            // Act
++            var result = parser.ParseOption(option);
++
++            // Assert
++            result.Name.Should().Be(preferShortName ? "short" : "long");
++        }
++
++        [Theory]
++        [InlineData(true)]
++        [InlineData(false)]
++        public void AgentEval_PreferShortName_FallsBackToLong(bool preferShortName)
++        {
++            // Arrange
++            var option = new OptionSpecification("--long");
++            var parser = new UnParserSettings { PreferShortName = preferShortName };
++
++            // Act
++            var result = parser.ParseOption(option);
++
++            // Assert
++            result.Name.Should().Be("long");
++        }
++
++        [Theory]
++        [InlineData(true)]
++        [InlineData(false)]
++        public void AgentEval_PreferShortName_DoesNotAffectSwitches(bool preferShortName)
++        {
++            // Arrange
++            var option = new OptionSpecification("--switch", "--long");
++            var parser = new UnParserSettings { PreferShortName = preferShortName };
++
++            // Act
++            var result = parser.ParseOption(option);
++
++            // Assert
++            result.Name.Should().Be("switch");
++        }
++
+         {
+             string.Empty.Should().BeEquivalentTo(new HelpText().ToString());
+         }

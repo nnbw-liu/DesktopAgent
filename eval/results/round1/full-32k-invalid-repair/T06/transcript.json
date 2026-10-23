@@ -1,0 +1,26 @@
+{
+  "id": "T06",
+  "type": "tests",
+  "title": "\u8865\u9F50 SplitArgs \u8FB9\u754C\u6D4B\u8BD5",
+  "prompt": "## \u9700\u6C42\n\n\u0060SplitArgs\u0060 \u7684\u76F4\u63A5\u5355\u6D4B\u53EA\u8986\u76D6\u4E86\u4E24\u6761\u8DEF\u5F84\u3002\u8BF7\u5728\u73B0\u6709\u53CD\u89E3\u6790\u6D4B\u8BD5\u6587\u4EF6\u4E2D\u8865 3 \u4E2A xUnit \u6D4B\u8BD5\uFF1A\n\n1. \u7A7A\u5B57\u7B26\u4E32\u8FD4\u56DE\u7A7A\u6570\u7EC4\uFF08\u0060AgentEval_SplitArgs_EmptyInput\u0060\uFF09\u3002\n2. \u0060\u0022a b\u0022 c\u0060 \u8FD9\u7C7B\u5E26\u5F15\u53F7\u7A7A\u683C\u8F93\u5165\u53EA\u62C6\u6210\u4E24\u4E2A\u53C2\u6570\uFF08\u0060AgentEval_SplitArgs_KeepsQuotedSpace\u0060\uFF09\u3002\n3. \u0060keepQuote: true\u0060 \u65F6\u4FDD\u7559\u5F15\u53F7\u5B57\u7B26\uFF08\u0060AgentEval_SplitArgs_KeepQuote\u0060\uFF09\u3002\n\n\u4E0D\u8981\u4FEE\u6539\u751F\u4EA7\u4EE3\u7801\uFF0C\u4E0D\u8981\u6539\u52A8\u73B0\u6709\u6D4B\u8BD5\u3002\n\n## \u5B8C\u6210\u6807\u51C6\n\n- \u4E09\u4E2A\u6D4B\u8BD5\u90FD\u80FD\u7F16\u8BD1\u5E76\u901A\u8FC7\u3002\n- \u65E2\u6709\u6D4B\u8BD5\u4ECD\u5168\u90E8\u901A\u8FC7\u3002",
+  "model": "qwen/qwen3-8b",
+  "mode": "Full",
+  "contextWindow": 32768,
+  "output": "\u672A\u627E\u5230\u73B0\u6709\u53CD\u89E3\u6790\u6D4B\u8BD5\u6587\u4EF6\u3002\u8BF7\u63D0\u4F9B\u6D4B\u8BD5\u6587\u4EF6\u7684\u8DEF\u5F84\u6216\u786E\u8BA4\u6587\u4EF6\u540D\uFF0C\u4EE5\u4FBF\u6211\u8FDB\u884C\u540E\u7EED\u64CD\u4F5C\u3002",
+  "turns": 1,
+  "steps": 1,
+  "seconds": 4.4,
+  "error": null,
+  "acceptanceExit": 0,
+  "acceptanceOutput": "\u003E dotnet build CommandLine.sln -v minimal\r\nActive code page: 65001\r\n  \u6B63\u5728\u786E\u5B9A\u8981\u8FD8\u539F\u7684\u9879\u76EE\u2026\r\n  \u6240\u6709\u9879\u76EE\u5747\u662F\u6700\u65B0\u7684\uFF0C\u65E0\u6CD5\u8FD8\u539F\u3002\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\bin\\Debug\\net461\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\bin\\Debug\\net45\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\bin\\Debug\\netstandard2.0\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\src\\CommandLine\\bin\\Debug\\net40\\CommandLine.dll\r\n  CommandLine.Tests -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\tests\\CommandLine.Tests\\bin\\Debug\\net461\\CommandLine.Tests.dll\r\n  CommandLine.Tests -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll\r\n\r\n\u5DF2\u6210\u529F\u751F\u6210\u3002\r\n    0 \u4E2A\u8B66\u544A\r\n    0 \u4E2A\u9519\u8BEF\r\n\r\n\u5DF2\u7528\u65F6\u95F4 00:00:02.85\r\n\r\n[exit 0]\r\n\u003E dotnet test tests/CommandLine.Tests/CommandLine.Tests.csproj -f netcoreapp3.1 --no-build -v minimal\r\nActive code page: 65001\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-092107\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll (.NETCoreApp,Version=v3.1)\u7684\u6D4B\u8BD5\u8FD0\u884C\r\n\u603B\u5171 1 \u4E2A\u6D4B\u8BD5\u6587\u4EF6\u4E0E\u6307\u5B9A\u6A21\u5F0F\u76F8\u5339\u914D\u3002\r\n\r\n\u5DF2\u901A\u8FC7! - \u5931\u8D25:     0\uFF0C\u901A\u8FC7:   684\uFF0C\u5DF2\u8DF3\u8FC7:     0\uFF0C\u603B\u8BA1:   684\uFF0C\u6301\u7EED\u65F6\u95F4: 251 ms - CommandLine.Tests.dll (netcoreapp3.1)\r\n\r\n[exit 0]\r\n",
+  "checkFailure": "\u6587\u4EF6 tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u672A\u5305\u542B\u9A8C\u6536\u6A21\u5F0F\uFF1AAgentEval_SplitArgs_EmptyInput",
+  "failureClass": "F5 \u8FC7\u65E9\u7ED3\u675F",
+  "trace": [
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "AgentEval_SplitArgs_.*\\.cs",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u672A\u627E\u5230\u5339\u914D\uFF1B\u5EFA\u8BAE\u653E\u5BBD glob \u6216\u6362\u5173\u952E\u8BCD\u3002\n[TOOL_RESULT_END]"
+    }
+  ]
+}

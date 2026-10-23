@@ -1,0 +1,42 @@
+@using SDemo.DesktopAgent.Models
+
+@* P5：会话级 todo 面板；默认折叠，不打断聊天流。 *@
+@if (Todos.Count > 0)
+{
+    var completed = Todos.Count(item => item.Status == TodoStatus.Completed);
+
+    <div class="todo-panel">
+        <button type="button" class="todo-panel-toggle" aria-expanded="@_expanded" @onclick="() => _expanded = !_expanded">
+            <span class="todo-panel-checks">☑</span>
+            <span>任务计划 @completed/@Todos.Count</span>
+            <span class="todo-panel-chevron">@(_expanded ? "▾" : "▸")</span>
+        </button>
+
+        @if (_expanded)
+        {
+            <ol class="todo-list">
+                @foreach (var item in Todos)
+                {
+                    <li class="todo-item @TodoClass(item.Status)">
+                        <span class="todo-icon">@item.Icon</span>
+                        <span class="todo-content">@item.Content</span>
+                    </li>
+                }
+            </ol>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<TodoItem> Todos { get; set; } = [];
+
+    private bool _expanded;
+
+    private static string TodoClass(TodoStatus status) => status switch
+    {
+        TodoStatus.Completed => "todo-item--done",
+        TodoStatus.InProgress => "todo-item--active",
+        _ => string.Empty
+    };
+}

@@ -1,4 +1,5 @@
 @using SDemo.DesktopAgent.Models
+@using SDemo.DesktopAgent.Execution
 @using SDemo.DesktopAgent.Sandbox
 @inject ISettingsService Settings
 @inject ISearchService Search
@@ -7,6 +8,9 @@
 @inject IAppEnvironmentService Environment
 @inject IAppPaths Paths
 @inject AgentToolRegistry ToolRegistry
+@inject SessionGrantStore Grants
+@inject WorkspaceContext Workspace
+@inject SDemo.DesktopAgent.Execution.IWorkspaceWarmupService Warmup
 
 @* 工具设置：联网搜索后端 + 文件写入确认 *@
 <div class="settings-pane">
@@ -108,6 +112,134 @@
                    checked="@IsPackEnabled("edits")"
                    @onchange="ToggleEdits" />
         </label>
+    </section>
+
+    <section class="settings-section">
+        <h2 class="settings-section-title">内循环（直跑）</h2>
+        <p class="settings-section-hint">
+            构建 / 测试可以走宿主直跑，跳过沙箱复制的等待；参数不经过 shell，只放行白名单命令。
+        </p>
+        <p class="settings-message is-danger">
+            直跑不受沙箱网络隔离，可以访问网络与真实工作区。默认关闭；打开后每次仍先请求审批，安全命令可本会话授权。
+        </p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">启用直跑命令（run_command）</span>
+                <span class="settings-row-hint">dotnet build / dotnet test 等；run_powershell 始终留在沙箱。</span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@Settings.Current.Execution.DirectRunEnabled"
+                   @onchange="ToggleDirectRun" />
+        </label>
+
+        <label class="field">
+            <span class="field-label">小模型模式</span>
+            <select class="field-input" value="@Settings.Current.Agent.Mode" @onchange="ChangeAgentMode">
+                <option value="Auto">自动（按窗口 / 模型名判断）</option>
+                <option value="Full">完整</option>
+                <option value="Compact">精简（≤4 个工具、短提示）</option>
+            </select>
+            <span class="field-hint">8K / 无工具 / 名称含 3b、4b、7b 等默认走精简；手动覆盖优先。</span>
+        </label>
+
+        <div class="field field--wide">
+            <span class="field-label">白名单（逗号分隔）</span>
+            <input class="field-input" @bind="_allowlistText" @bind:event="oninput" />
+            <span class="field-hint">默认 dotnet / npm / pnpm / node / git / python / cargo / go；git 只允许只读子命令。</span>
+        </div>
+
+        <div class="settings-grid">
+            <label class="field">
+                <span class="field-label">默认超时（秒）</span>
+                <input class="field-input" type="number" min="1" max="600"
+                       value="@Settings.Current.Execution.DefaultTimeoutSeconds"
+                       @onchange="ChangeExecutionTimeout" />
+            </label>
+            <label class="field">
+                <span class="field-label">构建 / 测试超时（秒）</span>
+                <input class="field-input" type="number" min="1" max="900"
+                       value="@Settings.Current.Execution.BuildTimeoutSeconds"
+                       @onchange="ChangeBuildTimeout" />
+            </label>
+        </div>
+
+        <div class="editor-footer">
+            <button type="button" class="primary-button" @onclick="SaveExecutionPolicy">保存直跑设置</button>
+        </div>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">改动后自动提示验证（最多续跑 1 次）</span>
+                <span class="settings-row-hint">有编辑但没有成功验证时，宿主追加一条 user 提示；不会伪造 tool 消息。</span>
+            </span>
+            <input type="checkbox" class="switch"
+                   checked="@Settings.Current.Verification.AutoVerifyAfterEdit"
+                   @onchange="ToggleAutoVerify" />
+        </label>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">编辑前创建检查点（可撤销最近一次改动）</span>
+                <span class="settings-row-hint">每个 turn 一个 checkpoint，保留最近 20 个；撤销前会检查 hash 冲突。</span>
+            </span>
+            <input type="checkbox" class="switch"
+                   checked="@Settings.Current.Checkpoints.Enabled"
+                   @onchange="ToggleCheckpoints" />
+        </label>
+
+        <div class="settings-subsection">
+            <span class="field-label">当前工作区命令</span>
+            @if (CurrentWorkspace is null)
+            {
+                <span class="field-hint">当前会话没有归属工作区；先选择一个工作区再配置。</span>
+            }
+            else
+            {
+                <span class="field-hint">工作区：@CurrentWorkspace.Name（@CurrentWorkspace.Path）</span>
+                <div class="field field--wide">
+                    <span class="field-label">构建命令</span>
+                    <input class="field-input" @bind="_buildCommand" @bind:event="oninput" placeholder="dotnet build Demo.sln -v minimal" />
+                </div>
+                <div class="field field--wide">
+                    <span class="field-label">测试命令</span>
+                    <input class="field-input" @bind="_testCommand" @bind:event="oninput" placeholder="dotnet test Demo.sln --no-build" />
+                </div>
+                <div class="editor-footer">
+                    <button type="button" class="ghost-button" @onclick="DetectWorkspaceCommands">自动探测</button>
+                    <button type="button" class="primary-button" @onclick="SaveWorkspaceCommands">保存命令</button>
+                    <button type="button" class="ghost-button" disabled="@_isWarming" @onclick="WarmupWorkspaceAsync">
+                        @(_isWarming ? "restore 中…" : "预热包缓存（dotnet restore）")
+                    </button>
+                </div>
+                <span class="field-hint">预 restore 在宿主执行一次，之后沙箱里的 build 可加 --no-restore；不会开启直跑模式。</span>
+            }
+        </div>
+
+        @if (Grants.List().Count > 0)
+        {
+            <div class="settings-subsection">
+                <span class="field-label">已授权的直跑命令（重启失效）</span>
+                @foreach (var grant in Grants.List())
+                {
+                    <div class="settings-row">
+                        <span class="settings-row-text">
+                            <span class="settings-row-title">@grant.Prefix</span>
+                            <span class="settings-row-hint">会话 @grant.SessionId；@grant.GrantedAt.ToString("HH:mm")</span>
+                        </span>
+                        <button type="button" class="ghost-button" @onclick="() => RevokeGrant(grant)">
+                            撤销
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_executionMessage is not null)
+        {
+            <p class="settings-message">@_executionMessage</p>
+        }
     </section>
 
     <section class="settings-section">
@@ -509,6 +641,40 @@
     private bool _isMaintaining;
     private bool _confirmingPurge;
     private string? _maintenanceMessage;
+    private string _allowlistText = string.Empty;
+    private string _buildCommand = string.Empty;
+    private string _testCommand = string.Empty;
+    private string? _executionMessage;
+    private bool _isWarming;
+
+    private SDemo.DesktopAgent.Models.Workspace? CurrentWorkspace
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Workspace.RootPath))
+            {
+                return null;
+            }
+
+            var root = Path.GetFullPath(Workspace.RootPath);
+            return Settings.Current.Workspaces.FirstOrDefault(workspace => PathsEqual(workspace.Path, root));
+        }
+    }
+
+    private static bool PathsEqual(string left, string right)
+    {
+        try
+        {
+            return string.Equals(
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(left)),
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(right)),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or NotSupportedException)
+        {
+            return false;
+        }
+    }
 
     private string AuditDirectory => Path.Combine(Paths.DataRoot, "logs");
 
@@ -516,6 +682,8 @@
     {
         _endpoint = Settings.Current.Search.Endpoint;
         _apiKey = Settings.Current.Search.ApiKey;
+        _allowlistText = string.Join(", ", Settings.Current.Execution.Allowlist);
+        LoadWorkspaceCommands();
 
         // 启动清理是后台任务；如果它已经跳过某些 job，这里直接把“待处理”展示出来。
         if (Maintenance.LastReport is { PendingJobs: > 0 } report)
@@ -632,6 +800,153 @@
     private void ToggleFiles(ChangeEventArgs args) => TogglePack("files", args);
 
     private void ToggleEdits(ChangeEventArgs args) => TogglePack("edits", args);
+
+    private void ToggleDirectRun(ChangeEventArgs args)
+    {
+        var enabled = args.Value is true;
+        Settings.Current.Execution.DirectRunEnabled = enabled;
+        Settings.Current.Execution.Mode = enabled ? ExecutionMode.AllowlistDirect : ExecutionMode.SandboxFirst;
+
+        if (enabled)
+        {
+            Settings.Current.Tools.SetPackEnabled("command", true);
+        }
+
+        Settings.Save();
+        _executionMessage = enabled ? "直跑已开启；下次运行命令会请求审批。" : "直跑已关闭，命令回到沙箱。";
+    }
+
+    private void SaveExecutionPolicy()
+    {
+        var allowlist = _allowlistText
+            .Split([',', ';', ' ', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (allowlist.Count == 0)
+        {
+            _executionMessage = "白名单不能为空；至少保留 dotnet。";
+            return;
+        }
+
+        Settings.Current.Execution.Allowlist = allowlist;
+        Settings.Save();
+        _allowlistText = string.Join(", ", allowlist);
+        _executionMessage = "直跑设置已保存。";
+    }
+
+    private void ChangeAgentMode(ChangeEventArgs args)
+    {
+        if (Enum.TryParse<SDemo.DesktopAgent.Context.AgentModePreference>(
+                args.Value?.ToString(), true, out var mode))
+        {
+            Settings.Current.Agent.Mode = mode;
+            Settings.Save();
+        }
+    }
+
+    private void ToggleAutoVerify(ChangeEventArgs args)    {
+        Settings.Current.Verification.AutoVerifyAfterEdit = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleCheckpoints(ChangeEventArgs args)
+    {
+        Settings.Current.Checkpoints.Enabled = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ChangeExecutionTimeout(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var seconds))
+        {
+            Settings.Current.Execution.DefaultTimeoutSeconds = Math.Clamp(seconds, 1, 600);
+            Settings.Save();
+        }
+    }
+
+    private void ChangeBuildTimeout(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var seconds))
+        {
+            Settings.Current.Execution.BuildTimeoutSeconds = Math.Clamp(seconds, 1, 900);
+            Settings.Save();
+        }
+    }
+
+    private void LoadWorkspaceCommands()
+    {
+        if (CurrentWorkspace is not { } workspace)
+        {
+            _buildCommand = string.Empty;
+            _testCommand = string.Empty;
+            return;
+        }
+
+        _buildCommand = workspace.BuildCommand ?? string.Empty;
+        _testCommand = workspace.TestCommand ?? string.Empty;
+    }
+
+    private void DetectWorkspaceCommands()
+    {
+        if (CurrentWorkspace is not { } workspace)
+        {
+            return;
+        }
+
+        var suggestion = WorkspaceCommandDetector.Detect(workspace.Path);
+        _buildCommand = suggestion.BuildCommand ?? string.Empty;
+        _testCommand = suggestion.TestCommand ?? string.Empty;
+        _executionMessage = string.IsNullOrEmpty(_buildCommand)
+            ? "没有探测到 .sln / .csproj / package.json；请手动填写。"
+            : "已填入探测结果，确认后点「保存命令」。";
+    }
+
+    private void SaveWorkspaceCommands()
+    {
+        if (CurrentWorkspace is not { } workspace)
+        {
+            _executionMessage = "当前会话没有归属工作区。";
+            return;
+        }
+
+        workspace.BuildCommand = string.IsNullOrWhiteSpace(_buildCommand) ? null : _buildCommand.Trim();
+        workspace.TestCommand = string.IsNullOrWhiteSpace(_testCommand) ? null : _testCommand.Trim();
+        Settings.Save();
+        _executionMessage = "工作区构建 / 测试命令已保存。";
+    }
+
+    private void RevokeGrant(SessionGrant grant)
+    {
+        Grants.Revoke(grant.SessionId, grant.Prefix);
+        _executionMessage = $"已撤销：{grant.Prefix}";
+    }
+
+    private async Task WarmupWorkspaceAsync()
+    {
+        if (CurrentWorkspace is not { } workspace)
+        {
+            _executionMessage = "当前会话没有归属工作区。";
+            return;
+        }
+
+        _isWarming = true;
+        _executionMessage = "正在 restore…";
+
+        try
+        {
+            var result = await Warmup.RestoreAsync(workspace.Path);
+            _executionMessage = result.Message;
+        }
+        catch (Exception ex)
+        {
+            _executionMessage = $"restore 失败：{ex.Message}";
+        }
+        finally
+        {
+            _isWarming = false;
+        }
+    }
 
     private void TogglePdfAutoExtract(ChangeEventArgs args)
     {

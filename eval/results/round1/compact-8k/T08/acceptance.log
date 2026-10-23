@@ -1,0 +1,29 @@
+> dotnet build CommandLine.sln -v minimal
+Active code page: 65001
+  正在确定要还原的项目…
+  所有项目均是最新的，无法还原。
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\src\CommandLine\bin\Debug\net45\CommandLine.dll
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\src\CommandLine\bin\Debug\net461\CommandLine.dll
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\src\CommandLine\bin\Debug\netstandard2.0\CommandLine.dll
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\src\CommandLine\bin\Debug\net40\CommandLine.dll
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\AgentEval\T08_T08Tests.cs(11,45): error CS0117: “UnParserSettings”未包含“WithSkipDefaultOnly”的定义 [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\AgentEval\T08_T08Tests.cs(33,48): error CS0117: “UnParserSettings”未包含“WithSkipDefaultOnly”的定义 [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\Core\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\AgentEval\T08_T08Tests.cs(11,45): error CS0117: “UnParserSettings”未包含“WithSkipDefaultOnly”的定义 [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\AgentEval\T08_T08Tests.cs(33,48): error CS0117: “UnParserSettings”未包含“WithSkipDefaultOnly”的定义 [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\Core\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+
+生成失败。
+
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\Core\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\Core\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\AgentEval\T08_T08Tests.cs(11,45): error CS0117: “UnParserSettings”未包含“WithSkipDefaultOnly”的定义 [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\AgentEval\T08_T08Tests.cs(33,48): error CS0117: “UnParserSettings”未包含“WithSkipDefaultOnly”的定义 [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\AgentEval\T08_T08Tests.cs(11,45): error CS0117: “UnParserSettings”未包含“WithSkipDefaultOnly”的定义 [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\AgentEval\T08_T08Tests.cs(33,48): error CS0117: “UnParserSettings”未包含“WithSkipDefaultOnly”的定义 [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+    2 个警告
+    4 个错误
+
+已用时间 00:00:03.22
+
+[exit 1]

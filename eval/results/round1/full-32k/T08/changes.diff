@@ -1,0 +1,52 @@
+diff --git a/UnParserSettings.cs b/UnParserSettings.cs
+new file mode 100644
+index 0000000..021230c
+--- /dev/null
++++ b/UnParserSettings.cs
+@@ -0,0 +1,21 @@
++public class UnParserSettings
++{
++    public bool SkipDefault { get; set; }
++    public bool GroupSwitchesOnly { get; set; }
++    public bool UseEqualTokenOnly { get; set; }
++
++    public static UnParserSettings WithGroupSwitchesOnly()
++    {
++        return new UnParserSettings { GroupSwitchesOnly = true };
++    }
++
++    public static UnParserSettings WithUseEqualTokenOnly()
++    {
++        return new UnParserSettings { UseEqualTokenOnly = true };
++    }
++
++    public static UnParserSettings WithSkipDefaultOnly()
++    {
++        return new UnParserSettings { SkipDefault = true };
++    }
++}
+\ No newline at end of file
+diff --git a/UnParserSettingsTests.cs b/UnParserSettingsTests.cs
+new file mode 100644
+index 0000000..cd2422a
+--- /dev/null
++++ b/UnParserSettingsTests.cs
+@@ -0,0 +1,17 @@
++using Microsoft.VisualStudio.TestTools.UnitTesting;
++
++namespace UnParserTests
++{
++    [TestClass]
++    public class UnParserSettingsTests
++    {
++        [TestMethod]
++        public void WithSkipDefaultOnly_ShouldOnlySetSkipDefault()
++        {
++            var settings = UnParserSettings.WithSkipDefaultOnly();
++            Assert.IsTrue(settings.SkipDefault);
++            Assert.IsFalse(settings.GroupSwitchesOnly);
++            Assert.IsFalse(settings.UseEqualTokenOnly);
++        }
++    }
++}
+\ No newline at end of file

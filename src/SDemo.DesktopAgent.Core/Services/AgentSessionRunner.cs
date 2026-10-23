@@ -509,7 +509,8 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         context,
         request.ToolPacks,
         request.SessionId,
-        request.Metrics);
+        request.Metrics,
+        request.Session);
 
     /// <summary>成功收尾：写回实际 usage 并做校准（服务端不返回 usage 时自动跳过）。</summary>
     private void CompleteRun(AgentRunRequest request, ContextPlan plan, ContextRunTelemetry telemetry)

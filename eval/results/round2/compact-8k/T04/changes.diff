@@ -1,0 +1,113 @@
+diff --git a/src/CommandLine.cs b/src/CommandLine.cs
+new file mode 100644
+index 0000000..ce6bdab
+--- /dev/null
++++ b/src/CommandLine.cs
+@@ -0,0 +1,107 @@
++// 文件内容待读取，此处为占位符
++namespace CommandLine
++{
++    public static class CommandLineHelper
++    {
++        // FormatCommandLine: 将参数数组格式化为命令行字符串
++        public static string FormatCommandLine(string[] args)
++        {
++            var sb = new System.Text.StringBuilder();
++            foreach (var arg in args)
++            {
++                if (sb.Length > 0)
++                    sb.Append(' ');
++                
++                // 如果参数包含空格或双引号，则用双引号包裹
++                if (arg.Contains(' ') || arg.Contains('"'))
++                {
++                    sb.Append("\"");
++                    
++                    foreach (char c in arg)
++                    {
++                        if (c == '"')
++                            sb.Append("\\\"");
++                        else
++                            sb.Append(c);
++                    }
++                    
++                    // 将转义的双引号还原为普通双引号
++                    string escapedArg = sb.ToString();
++                    sb.Clear();
++                    foreach (char c in arg)
++                    {
++                        if (c == '"')
++                            sb.Append('"');
++                        else
++                            sb.Append(c);
++                    }
++                    
++                    sb.Append("\"");
++                }
++                else
++                {
++                    sb.Append(arg);
++                }
++            }
++            
++            return sb.ToString();
++        }
++        
++        // SplitArgs: 将命令行字符串拆分为参数数组
++        public static string[] SplitArgs(string commandLine)
++        {
++            var args = new System.Collections.Generic.List<string>();
++            var currentArg = new System.Text.StringBuilder();
++            bool inQuotes = false;
++            
++            for (int i = 0; i < commandLine.Length; i++)
++            {
++                char c = commandLine[i];
++                
++                // 处理转义字符（反斜杠）
++                if (c == '\\' && i + 1 < commandLine.Length)
++                {
++                    char nextChar = commandLine[i + 1];
++                    
++                    // 如果下一个字符是双引号，则将其视为普通字符而非边界
++                    if (nextChar == '"')
++                    {
++                        currentArg.Append('"');
++                        i++; // 跳过下一个字符
++                        continue;
++                    }
++                }
++                
++                // 处理引号
++                if (c == '"' && !inQuotes)
++                {
++                    inQuotes = true;
++                    continue;
++                }
++                else if (c == '"' && inQuotes)
++                {
++                    inQuotes = false;
++                    continue;
++                }
++                
++                // 处理空格（参数分隔符）
++                if (c == ' ')
++                {
++                    if (currentArg.Length > 0)
++                        args.Add(currentArg.ToString());
++                    currentArg.Clear();
++                    continue;
++                }
++                
++                // 其他字符加入当前参数
++                currentArg.Append(c);
++            }
++            
++            // 添加最后一个参数
++            if (currentArg.Length > 0 || commandLine.Length > 0)
++                args.Add(currentArg.ToString());
++            
++            return args.ToArray();
++        }
++    }
++}

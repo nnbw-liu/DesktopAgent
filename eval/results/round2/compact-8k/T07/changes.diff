@@ -1,0 +1,108 @@
+diff --git a/src/FormatWithQuotesIfString.cs b/src/FormatWithQuotesIfString.cs
+new file mode 100644
+index 0000000..fd0300d
+--- /dev/null
++++ b/src/FormatWithQuotesIfString.cs
+@@ -0,0 +1,101 @@
++using System;
++using System.Text;
++
++namespace Example
++{
++    public static class FormatWithQuotesIfString
++    {
++        /// <summary>
++        /// 格式化字符串，如果必要则添加引号。
++        /// </summary>
++        public static string FormatWithQuotesIfString(string value)
++        {
++            if (value == null || !NeedsQuotes(value))
++            {
++                return value;
++            }
++
++            StringBuilder sb = new StringBuilder();
++            
++            // 检查是否需要添加引号
++            bool needsSingleQuote = NeedsQuotes(value);
++            bool needsDoubleQuote = NeedsQuotes(value);
++            
++            if (needsSingleQuote && !needsDoubleQuote)
++            {
++                sb.Append('\'');
++                sb.Append(value);
++                sb.Append('\'');
++            }
++            else if (needsDoubleQuote && !needsSingleQuote)
++            {
++                sb.Append('"');
++                sb.Append(value);
++                sb.Append('"');
++            }
++            else
++            {
++                // 两个都需要，选择其中一个（这里选择单引号）
++                sb.Append('\'');
++                sb.Append(value);
++                sb.Append('\'');
++            }
++
++            return sb.ToString();
++        }
++
++        /// <summary>
++        /// 判断是否需要在字符串格式化时添加引号。
++        /// </summary>
++        private static bool NeedsQuotes(string value)
++        {
++            if (value == null || string.IsNullOrEmpty(value))
++            {
++                return false;
++            }
++
++            // 检查首尾是否有空格或引号
++            char firstChar = value[0];
++            char lastChar = value[value.Length - 1];
++
++            bool hasLeadingSpace = firstChar == ' ';
++            bool hasTrailingSpace = lastChar == ' ';
++            bool hasLeadingQuote = firstChar == '\'' || firstChar == '"';
++            bool hasTrailingQuote = lastChar == '\'' || lastChar == '"';
++
++            // 如果首尾都有空格或引号，则不需要额外添加引号
++            if (hasLeadingSpace && hasTrailingSpace)
++            {
++                return false;
++            }
++
++            if (hasLeadingQuote && hasTrailingQuote)
++            {
++                return false;
++            }
++
++            // 如果首尾有空格或引号，需要添加引号
++            if (hasLeadingSpace || hasTrailingSpace || hasLeadingQuote || hasTrailingQuote)
++            {
++                return true;
++            }
++
++            // 检查字符串内部是否包含空格或引号
++            for (int i = 1; i < value.Length - 1; i++)
++            {
++                char c = value[i];
++                if (c == ' ')
++                {
++                    return true;
++                }
++                if (c == '\'' || c == '"')
++                {
++                    return true;
++                }
++            }
++
++            // 默认需要添加引号
++            return true;
++        }
++    }
++}
+\ No newline at end of file

@@ -29,7 +29,9 @@ public sealed class ToolPackCompatibilityTests
         var descriptor = new EditToolPack().Descriptor;
 
         Assert.Equal("edits", descriptor.Id);
-        Assert.Equal(["apply_patch", "write_file"], descriptor.Functions.Select(function => function.Id));
+        Assert.Equal(
+            ["replace_text", "apply_patch", "write_file"],
+            descriptor.Functions.Select(function => function.Id));
         Assert.All(descriptor.Functions, function => Assert.True(function.RequiresApproval));
         Assert.Equal(AgentToolRisk.Medium, descriptor.Risk);
     }
@@ -42,6 +44,36 @@ public sealed class ToolPackCompatibilityTests
 
         Assert.True(settings.IsPackEnabled("files", defaultEnabled: true));
         Assert.True(settings.IsPackEnabled("edits", defaultEnabled: true));
+    }
+
+    [Fact]
+    public async Task 工作区信息带构建与测试命令()
+    {
+        using var temp = new TempDirectory();
+        var settings = new StubSettingsService();
+        settings.Current.Workspaces.Add(new Workspace
+        {
+            Id = "w1",
+            Name = "Demo",
+            Path = temp.Root,
+            BuildCommand = "dotnet build Demo.sln -v minimal",
+            TestCommand = "dotnet test Demo.sln --no-build"
+        });
+        var context = new ToolContext(
+            "session",
+            temp.Root,
+            [],
+            settings,
+            new ToolApprovalService(),
+            new StubSandboxJobService(),
+            new NullAuditLog());
+
+        var tool = Assert.IsAssignableFrom<AIFunction>(
+            new FileToolPack().Create(context).Single(function => function.Name == "workspace_info"));
+        var result = await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>()));
+
+        Assert.Contains("构建命令：dotnet build Demo.sln -v minimal", result?.ToString());
+        Assert.Contains("测试命令：dotnet test Demo.sln --no-build", result?.ToString());
     }
 
     [Fact]

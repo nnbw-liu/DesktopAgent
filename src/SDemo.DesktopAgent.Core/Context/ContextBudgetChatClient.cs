@@ -12,7 +12,8 @@ public sealed record ContextBudgetChatOptions(
     ITokenCounter Counter,
     double CalibrationFactor,
     int KeepRecentTurns,
-    int ToolResultChars);
+    int ToolResultChars,
+    int MaxOutputTokens = 0);
 
 /// <summary>
 /// 工具循环内的拦截器（§3.7 分支 A，spike 结论见 p1-report.md）：
@@ -42,7 +43,7 @@ public sealed class ContextBudgetChatClient : DelegatingChatClient
     {
         var prepared = Prepare(messages.ToList());
 
-        await foreach (var update in base.GetStreamingResponseAsync(prepared, options, cancellationToken))
+        await foreach (var update in base.GetStreamingResponseAsync(prepared, WithOutputLimit(options), cancellationToken))
         {
             yield return update;
         }
@@ -54,7 +55,19 @@ public sealed class ContextBudgetChatClient : DelegatingChatClient
         CancellationToken cancellationToken = default)
     {
         var prepared = Prepare(messages.ToList());
-        return await base.GetResponseAsync(prepared, options, cancellationToken).ConfigureAwait(false);
+        return await base.GetResponseAsync(prepared, WithOutputLimit(options), cancellationToken).ConfigureAwait(false);
+    }
+
+    private ChatOptions? WithOutputLimit(ChatOptions? options)
+    {
+        if (_options.MaxOutputTokens <= 0)
+        {
+            return options;
+        }
+
+        var result = options ?? new ChatOptions();
+        result.MaxOutputTokens = _options.MaxOutputTokens;
+        return result;
     }
 
     /// <summary>工具结果的头部 / 尾部各保留多少字符；中间用省略标记。</summary>

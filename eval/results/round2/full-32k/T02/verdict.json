@@ -1,0 +1,76 @@
+{
+  "id": "T02",
+  "type": "feature",
+  "title": "\u4E3A\u89E3\u6790\u7ED3\u679C\u589E\u52A0 IsParsed \u4FBF\u6377\u5C5E\u6027",
+  "success": false,
+  "steps": 10,
+  "turns": 3,
+  "seconds": 41.7,
+  "error": null,
+  "acceptanceExit": 1,
+  "acceptanceOutput": "Active code page: 65001\r\n  \u6B63\u5728\u786E\u5B9A\u8981\u8FD8\u539F\u7684\u9879\u76EE\u2026\r\n  \u6240\u6709\u9879\u76EE\u5747\u662F\u6700\u65B0\u7684\uFF0C\u65E0\u6CD5\u8FD8\u539F\u3002\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\ParserResult.cs(123,44): error CS1061: \u201CParserResultType\u201D\u672A\u5305\u542B\u201CSuccess\u201D\u7684\u5B9A\u4E49\uFF0C\u5E76\u4E14\u627E\u4E0D\u5230\u53EF\u63A5\u53D7\u7B2C\u4E00\u4E2A\u201CParserResultType\u201D\u7C7B\u578B\u53C2\u6570\u7684\u53EF\u8BBF\u95EE\u6269\u5C55\u65B9\u6CD5\u201CSuccess\u201D(\u662F\u5426\u7F3A\u5C11 using \u6307\u4EE4\u6216\u7A0B\u5E8F\u96C6\u5F15\u7528?) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net45]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\ParserResult.cs(123,44): error CS1061: \u201CParserResultType\u201D\u672A\u5305\u542B\u201CSuccess\u201D\u7684\u5B9A\u4E49\uFF0C\u5E76\u4E14\u627E\u4E0D\u5230\u53EF\u63A5\u53D7\u7B2C\u4E00\u4E2A\u201CParserResultType\u201D\u7C7B\u578B\u53C2\u6570\u7684\u53EF\u8BBF\u95EE\u6269\u5C55\u65B9\u6CD5\u201CSuccess\u201D(\u662F\u5426\u7F3A\u5C11 using \u6307\u4EE4\u6216\u7A0B\u5E8F\u96C6\u5F15\u7528?) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net461]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\ParserResult.cs(123,44): error CS1061: \u201CParserResultType\u201D\u672A\u5305\u542B\u201CSuccess\u201D\u7684\u5B9A\u4E49\uFF0C\u5E76\u4E14\u627E\u4E0D\u5230\u53EF\u63A5\u53D7\u7B2C\u4E00\u4E2A\u201CParserResultType\u201D\u7C7B\u578B\u53C2\u6570\u7684\u53EF\u8BBF\u95EE\u6269\u5C55\u65B9\u6CD5\u201CSuccess\u201D(\u662F\u5426\u7F3A\u5C11 using \u6307\u4EE4\u6216\u7A0B\u5E8F\u96C6\u5F15\u7528?) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\CommandLine.csproj::TargetFramework=netstandard2.0]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\ParserResult.cs(123,44): error CS1061: \u201CParserResultType\u201D\u672A\u5305\u542B\u201CSuccess\u201D\u7684\u5B9A\u4E49\uFF0C\u5E76\u4E14\u627E\u4E0D\u5230\u53EF\u63A5\u53D7\u7B2C\u4E00\u4E2A\u201CParserResultType\u201D\u7C7B\u578B\u53C2\u6570\u7684\u53EF\u8BBF\u95EE\u6269\u5C55\u65B9\u6CD5\u201CSuccess\u201D(\u662F\u5426\u7F3A\u5C11 using \u6307\u4EE4\u6216\u7A0B\u5E8F\u96C6\u5F15\u7528?) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net40]\r\n\r\n\u751F\u6210\u5931\u8D25\u3002\r\n\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\ParserResult.cs(123,44): error CS1061: \u201CParserResultType\u201D\u672A\u5305\u542B\u201CSuccess\u201D\u7684\u5B9A\u4E49\uFF0C\u5E76\u4E14\u627E\u4E0D\u5230\u53EF\u63A5\u53D7\u7B2C\u4E00\u4E2A\u201CParserResultType\u201D\u7C7B\u578B\u53C2\u6570\u7684\u53EF\u8BBF\u95EE\u6269\u5C55\u65B9\u6CD5\u201CSuccess\u201D(\u662F\u5426\u7F3A\u5C11 using \u6307\u4EE4\u6216\u7A0B\u5E8F\u96C6\u5F15\u7528?) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net45]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\ParserResult.cs(123,44): error CS1061: \u201CParserResultType\u201D\u672A\u5305\u542B\u201CSuccess\u201D\u7684\u5B9A\u4E49\uFF0C\u5E76\u4E14\u627E\u4E0D\u5230\u53EF\u63A5\u53D7\u7B2C\u4E00\u4E2A\u201CParserResultType\u201D\u7C7B\u578B\u53C2\u6570\u7684\u53EF\u8BBF\u95EE\u6269\u5C55\u65B9\u6CD5\u201CSuccess\u201D(\u662F\u5426\u7F3A\u5C11 using \u6307\u4EE4\u6216\u7A0B\u5E8F\u96C6\u5F15\u7528?) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net461]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\ParserResult.cs(123,44): error CS1061: \u201CParserResultType\u201D\u672A\u5305\u542B\u201CSuccess\u201D\u7684\u5B9A\u4E49\uFF0C\u5E76\u4E14\u627E\u4E0D\u5230\u53EF\u63A5\u53D7\u7B2C\u4E00\u4E2A\u201CParserResultType\u201D\u7C7B\u578B\u53C2\u6570\u7684\u53EF\u8BBF\u95EE\u6269\u5C55\u65B9\u6CD5\u201CSuccess\u201D(\u662F\u5426\u7F3A\u5C11 using \u6307\u4EE4\u6216\u7A0B\u5E8F\u96C6\u5F15\u7528?) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\CommandLine.csproj::TargetFramework=netstandard2.0]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\ParserResult.cs(123,44): error CS1061: \u201CParserResultType\u201D\u672A\u5305\u542B\u201CSuccess\u201D\u7684\u5B9A\u4E49\uFF0C\u5E76\u4E14\u627E\u4E0D\u5230\u53EF\u63A5\u53D7\u7B2C\u4E00\u4E2A\u201CParserResultType\u201D\u7C7B\u578B\u53C2\u6570\u7684\u53EF\u8BBF\u95EE\u6269\u5C55\u65B9\u6CD5\u201CSuccess\u201D(\u662F\u5426\u7F3A\u5C11 using \u6307\u4EE4\u6216\u7A0B\u5E8F\u96C6\u5F15\u7528?) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\src\\CommandLine\\CommandLine.csproj::TargetFramework=net40]\r\n    0 \u2026",
+  "checkFailure": null,
+  "failureClass": "F2 \u5DE5\u5177\u8BEF\u7528",
+  "trace": [
+    {
+      "toolId": "workspace_info",
+      "status": "ok",
+      "argsDigest": "",
+      "summary": "[TOOL_RESULT_BEGIN:workspace_info]\n\u5DE5\u4F5C\u533A\u6839\u76EE\u5F55\uFF1AC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "list_tree",
+      "status": "ok",
+      "argsDigest": ".",
+      "summary": "[TOOL_RESULT_BEGIN:list_tree]\nart/\n  art/CommandLine.png\n  art/CommandLine20.png\n  art/CommandLineNuGet.png\n  art/CommandLinePreRelNuGet.png\n  art/resharper-logo.png\ndemo/\n  demo/ReadText.Demo/\n  demo \u2026 rc/\n  src/CommandLine/\ntests/\n  tests/CommandLine.Tests/\n.editorconfig\n.gitignore\nappveyor.yml\nCHANGELOG.md\nCommandLine.sln\nCommandLine.snk\nDirectory.Build.props\nLicense.md\nREADME.md\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "glob_files",
+      "status": "ok",
+      "argsDigest": "**/*.cs",
+      "summary": "[TOOL_RESULT_BEGIN:glob_files]\ndemo/ReadText.Demo/Options.cs\ndemo/ReadText.Demo/Program.cs\ndemo/ReadText.Demo/Properties/AssemblyInfo.cs\ndemo/ReadText.LocalizedDemo/LocalizableSentenceBuilder.cs\ndemo/ \u2026 /HelpTextAutoBuildFix.cs\ntests/CommandLine.Tests/Unit/Text/HelpTextTests.cs\ntests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs\ntests/CommandLine.Tests/Unit/VerbAttributeTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "public abstract class Parsed\\\u003CT\\\u003E",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u672A\u627E\u5230\u5339\u914D\uFF1B\u5EFA\u8BAE\u653E\u5BBD glob \u6216\u6362\u5173\u952E\u8BCD\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "public class Parsed\\\u003CT\\\u003E",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u672A\u627E\u5230\u5339\u914D\uFF1B\u5EFA\u8BAE\u653E\u5BBD glob \u6216\u6362\u5173\u952E\u8BCD\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "class Parsed\\\u003CT\\\u003E",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 11 \u6761\u5339\u914D\uFF081 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 20 \u6761\uFF09\uFF1A\r\nsrc/CommandLine/ParserResult.cs:106: \nsrc/CommandLine/ParserResult.cs:107:     /// \u003Csummary\u003E\nsrc/CommandLine/ParserResult.cs:108:     ///  \u2026 eInfo typeInfo)\nsrc/CommandLine/ParserResult.cs:114:             : base(value, typeInfo)\nsrc/CommandLine/ParserResult.cs:115:         {\nsrc/CommandLine/ParserResult.cs:116:         }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserResult.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserResult.cs \u00B7 \u5171 218 \u884C \u00B7 \u672C\u6B21 106\u2013218\n 106| \n 107|     /// \u003Csummary\u003E\n 108|     /// It contains an instance of type \u003Ctypeparamref name=\u0022T\u0022/\u003E with parsed \u2026 false;\n 212|             }\n 213| \n 214|             return this.Tag.Equals(other.Tag)\n 215|                 \u0026\u0026 Errors.SequenceEqual(other.Errors);\n 216|         }\n 217|     }\n 218| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserResult.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1Asrc/CommandLine/ParserResult.cs (\u002B11 -11)\n[EDIT] src/CommandLine/ParserResult.cs \u002B11 -11\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\ParserResult.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserResult.cs \u00B7 \u5171 218 \u884C \u00B7 \u672C\u6B21 1\u2013218\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in the proj \u2026 false;\n 212|             }\n 213| \n 214|             return this.Tag.Equals(other.Tag)\n 215|                 \u0026\u0026 Errors.SequenceEqual(other.Errors);\n 216|         }\n 217|     }\n 218| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src\\CommandLine\\ParserResult.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserResult.cs \u00B7 \u5171 218 \u884C \u00B7 \u672C\u6B21 1\u2013218\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in the proj \u2026 false;\n 212|             }\n 213| \n 214|             return this.Tag.Equals(other.Tag)\n 215|                 \u0026\u0026 Errors.SequenceEqual(other.Errors);\n 216|         }\n 217|     }\n 218| }\n[TOOL_RESULT_END]"
+    }
+  ]
+}
