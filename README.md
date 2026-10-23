@@ -328,7 +328,7 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 
 ## 上下文预算、压缩与工作记忆
 
-每次请求都会先估算 token、按预算裁剪，再交给 Agent Framework；原始消息不删除，数据库里的历史保持完整。实现说明见 [docs/architecture/context-budget.md](docs/architecture/context-budget.md) 与 [docs/architecture/context-compaction.md](docs/architecture/context-compaction.md)。
+每次请求都会先估算 token、按预算裁剪，再交给 Agent Framework；原始消息不删除，数据库里的历史保持完整。实现说明见 [docs/architecture/context-budget.md](docs/architecture/context-budget.md) 与 [docs/architecture/context-compaction.md](docs/architecture/context-compaction.md)；工具 / 技能 / 知识库规模化后的能力路由与分段预算计划见 [docs/architecture/capability-routing.md](docs/architecture/capability-routing.md)。
 
 - **单一入口**：`ContextBuilder` 是唯一组装请求的地方（普通对话 → `AgentSessionRunner`，插件 → `PluginRunner` 的 passthrough）。
 - **预算**：`total = (window - 输出预留 - 安全余量) * 0.85`；8K 窗口下输入预算约 4.9K，保留最近 6 轮（小模型 4 轮）。
