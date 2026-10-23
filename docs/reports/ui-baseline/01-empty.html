@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>空态 · 新聊天室</title>
+  <link rel="stylesheet" href="../../../src/App/SDemo.DesktopAgent.UI/wwwroot/css/app.css" />
+  <style>
+    body { margin: 0; background: var(--bg); }
+    .baseline-frame { width: 1180px; min-height: 820px; margin: 0 auto; }
+    .baseline-caption { padding: 14px 20px 0; color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="baseline-frame">
+    <div class="baseline-caption">R1 截图基线 · 空态 · 新聊天室</div>
+    <section class="chat chat--empty"><div class="welcome"><h1>你好，我是 SDemo DesktopAgent</h1>
+            <p>描述你的任务，我会在本地工作区里帮你完成。</p></div>
+
+    <div class="chat-composer-area"><div class="composer"><div class="composer-header"><div class="workspace-picker"><button type="button" class="workspace-trigger" blazor:onclick="4"><span class="workspace-label">工作区</span>
+        <span class="workspace-name">选择工作区</span>
+        <span class="workspace-caret ">▾</span></button></div></div><textarea class="composer-text" rows="1" placeholder="描述你的任务，Enter 发送，Shift + Enter 换行…" value="" blazor:oninput="1"></textarea>
+
+    <div class="composer-footer"><div class="composer-tools"><label class="composer-plus " title="上传文件（可多选）"><input multiple class="composer-file-input" type="file" blazor:elementReference="e501111f-696b-4683-a1b6-f68f384da897"></input>
+                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.2v9.6M3.2 8h9.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></label></div>
+
+        <div class="composer-actions"><div class="model-picker"><select class="model-picker-select" title="选择模型" value="test|qwen3.5-4b" blazor:onchange="2"><option value="test|qwen3.5-4b" selected>本地 · qwen3.5-4b</option></select></div>
+
+            <button type="button" class="composer-send " title="发送" disabled blazor:onclick="3"><svg class="send-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M12 6l-5.5 5.5M12 6l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></div></div></div></div></section>
+  </div>
+</body>
+</html>

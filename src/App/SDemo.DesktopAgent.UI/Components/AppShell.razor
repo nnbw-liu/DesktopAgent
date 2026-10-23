@@ -504,6 +504,10 @@
         DurationMs = message.DurationMs,
         InputTokens = message.InputTokens,
         OutputTokens = message.OutputTokens,
+        // R1.4：分支会话保留用量归属，成本汇总不会把老会话算丢。
+        ProviderId = message.ProviderId,
+        ModelId = message.ModelId,
+        ApprovalCount = message.ApprovalCount,
         ToolCalls = new Dictionary<string, int>(message.ToolCalls, StringComparer.OrdinalIgnoreCase),
         Plugin = message.Plugin,
         Derived = [.. message.Derived],

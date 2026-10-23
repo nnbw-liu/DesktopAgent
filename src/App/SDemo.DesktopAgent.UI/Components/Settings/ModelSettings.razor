@@ -1,5 +1,6 @@
 @using SDemo.DesktopAgent.Models
 @inject ISettingsService Settings
+@inject UsageCostService UsageCost
 
 @* 模型设置：提供商列表（列表最后固定「添加模型提供商」） *@
 <div class="settings-pane settings-pane--models">
@@ -75,12 +76,93 @@
             </button>
         }
     </div>
+
+    @* R1.4：只读用量与成本。金额依赖模型条目里的价格配置，未配置时只显示 token。 *@
+    <section class="settings-section settings-section--usage">
+        <h2 class="settings-section-title">用量与成本</h2>
+        <p class="settings-section-hint">
+            按 provider / model 汇总已落库的助手消息 token。想看到金额，可在 settings.json 的模型条目里配置
+            InputPricePerMillion / OutputPricePerMillion（每百万 token 价格）。
+        </p>
+
+        @if (_usage is null)
+        {
+            <p class="settings-section-hint">统计中…</p>
+        }
+        else if (_usage.Lines.Count == 0)
+        {
+            <p class="settings-section-hint">还没有带模型归属的用量记录。</p>
+        }
+        else
+        {
+            <div class="usage-table">
+                <div class="usage-row usage-row--head">
+                    <span>提供商 / 模型</span>
+                    <span>调用</span>
+                    <span>输入</span>
+                    <span>输出</span>
+                    <span>金额</span>
+                </div>
+                @foreach (var line in _usage.Lines)
+                {
+                    <div class="usage-row">
+                        <span class="usage-model" title="@($"{line.ProviderId} · {line.ModelId}")">@line.ProviderId · @line.ModelId</span>
+                        <span>@line.Calls</span>
+                        <span>@ContextMeter.Format(line.InputTokens)</span>
+                        <span>@ContextMeter.Format(line.OutputTokens)</span>
+                        <span>@(line.Priced ? line.Cost?.ToString("0.####") : "未配价")</span>
+                    </div>
+                }
+                <div class="usage-row usage-row--total">
+                    <span>合计（@_usage.SessionsScanned 个会话）</span>
+                    <span>@_usage.TotalCalls</span>
+                    <span>@ContextMeter.Format(_usage.TotalInputTokens)</span>
+                    <span>@ContextMeter.Format(_usage.TotalOutputTokens)</span>
+                    <span>@(_usage.TotalCost is decimal total ? total.ToString("0.####") : "部分模型未配价")</span>
+                </div>
+            </div>
+
+            @if (_usage.CallsWithoutProvider > 0)
+            {
+                <p class="settings-section-hint">
+                    另有 @_usage.CallsWithoutProvider 条旧消息没有 provider / model 归属，只计入会话总数、不参与金额。
+                </p>
+            }
+        }
+
+        <button type="button" class="ghost-button" disabled="@_usageLoading" @onclick="LoadUsageAsync">
+            @(_usageLoading ? "统计中…" : "刷新用量")
+        </button>
+    </section>
 </div>
 
 @code {
     private bool _isAdding;
     private ModelProvider? _editing;
     private string? _pendingRemoveId;
+    private UsageCostSummary? _usage;
+    private bool _usageLoading;
+
+    protected override async Task OnInitializedAsync() => await LoadUsageAsync();
+
+    private async Task LoadUsageAsync()
+    {
+        _usageLoading = true;
+
+        try
+        {
+            _usage = await UsageCost.SummarizeAsync();
+        }
+        catch (Exception)
+        {
+            // 用量统计失败不能挡住模型设置：保持上一次快照 / 空态。
+            _usage ??= UsageCostSummary.Empty;
+        }
+        finally
+        {
+            _usageLoading = false;
+        }
+    }
 
     private IReadOnlyCollection<string> ExistingIds =>
         Settings.Current.Providers.Select(p => p.Id).ToList();

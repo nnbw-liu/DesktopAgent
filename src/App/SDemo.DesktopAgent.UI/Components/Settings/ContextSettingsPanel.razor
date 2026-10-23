@@ -162,6 +162,44 @@
     </section>
 
     <section class="settings-section">
+        <h2 class="settings-section-title">工具路由模型</h2>
+        <p class="settings-section-hint">
+            规则看不出该给哪些工具时，才用这个模型做一次结构化路由；超时 / 失败 / 输出非法都会自动回落规则，不影响对话。
+        </p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">启用小模型路由</span>
+                <span class="settings-row-hint">关闭后只用关键词规则；Compact 模式始终只用规则。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@Agent.SmallModelRoutingEnabled" @onchange="ToggleSmallModelRouting" />
+        </label>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">路由模型</span>
+                <span class="settings-row-hint">@_routingHint</span>
+            </span>
+            <select class="field-input field-input--select" value="@_routingKey" @onchange="HandleRoutingModelChanged">
+                <option value="">摘要模型 / 当前会话模型（默认）</option>
+                @foreach (var option in ModelOptions())
+                {
+                    <option value="@option.Key">@option.Text</option>
+                }
+            </select>
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">路由超时</span>
+                <span class="settings-row-hint">秒；超时直接回落规则，不重试。</span>
+            </span>
+            <input type="number" class="field-input field-input--number" min="1" max="60"
+                   @bind="Agent.RoutingTimeoutSeconds" @bind:after="SaveSettings" />
+        </div>
+    </section>
+
+    <section class="settings-section">
         <h2 class="settings-section-title">高级</h2>
         <p class="settings-section-hint">排查预算异常时再动这里；默认值适合大多数情况。</p>
 
@@ -206,13 +244,18 @@
     private int _calibrationCount;
     private string _summaryKey = string.Empty;
     private string _summaryHint = string.Empty;
+    private string _routingKey = string.Empty;
+    private string _routingHint = string.Empty;
 
     private ContextSettings Context => Settings.Current.Context;
+
+    private AgentSettings Agent => Settings.Current.Agent;
 
     protected override void OnInitialized()
     {
         _calibrationCount = Calibration.Snapshot().Count;
         RefreshSummaryKey();
+        RefreshRoutingKey();
     }
 
     private void SaveSettings() => Settings.Save();
@@ -253,7 +296,9 @@
         Settings.Save();
     }
 
-    private IEnumerable<(string Key, string Text)> SummaryOptions() =>
+    private IEnumerable<(string Key, string Text)> SummaryOptions() => ModelOptions();
+
+    private IEnumerable<(string Key, string Text)> ModelOptions() =>
         Settings.Current.Providers
             .SelectMany(provider => provider.Models.Select(model => new
             {
@@ -306,5 +351,51 @@
     {
         Calibration.ResetAll();
         _calibrationCount = 0;
+    }
+
+    private void ToggleSmallModelRouting(ChangeEventArgs args)
+    {
+        Agent.SmallModelRoutingEnabled = args.Value is true;
+        Settings.Save();
+    }
+
+    private void RefreshRoutingKey()
+    {
+        if (string.IsNullOrWhiteSpace(Agent.RoutingProviderId) || string.IsNullOrWhiteSpace(Agent.RoutingModelId))
+        {
+            _routingKey = string.Empty;
+            _routingHint = "默认复用摘要模型，没有摘要模型时用当前会话模型。";
+            return;
+        }
+
+        _routingKey = $"{Agent.RoutingProviderId}|{Agent.RoutingModelId}";
+
+        var provider = Settings.Current.Providers.FirstOrDefault(item => item.Id == Agent.RoutingProviderId);
+        var valid = provider?.Models.Any(model => model.Id == Agent.RoutingModelId) == true;
+
+        _routingHint = valid
+            ? "路由请求只发工具名与一句话描述，不发送会话正文。"
+            : "配置的路由模型已不可用，将回退摘要模型 / 当前会话模型。";
+    }
+
+    private void HandleRoutingModelChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? string.Empty;
+        var parts = value.Split('|', 2);
+
+        if (parts.Length != 2
+            || Settings.Current.Providers.All(provider => provider.Id != parts[0]))
+        {
+            Agent.RoutingProviderId = null;
+            Agent.RoutingModelId = null;
+        }
+        else
+        {
+            Agent.RoutingProviderId = parts[0];
+            Agent.RoutingModelId = parts[1];
+        }
+
+        RefreshRoutingKey();
+        Settings.Save();
     }
 }

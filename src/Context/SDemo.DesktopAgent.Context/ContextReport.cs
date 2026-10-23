@@ -40,13 +40,21 @@ public sealed record ContextReport(
     bool SummaryFallback = false,
     bool StatePackUsed = false,
     int StatePackTokens = 0,
-    RoutingDecision? Routing = null)
+    RoutingDecision? Routing = null,
+    int SummaryInputTokens = 0,
+    int SummaryOutputTokens = 0)
 {
     /// <summary>占输入预算的比例（0~1+）。</summary>
     public double Occupancy => Total <= 0 ? 0 : (double)Estimated / Total;
 
     /// <summary>占模型窗口的比例（UI 里给用户看的「窗口用了多少」）。</summary>
     public double WindowOccupancy => ContextWindow <= 0 ? 0 : (double)Estimated / ContextWindow;
+
+    /// <summary>
+    /// R1.4：本轮摘要请求花掉的 token（输入 + 输出）。摘要不写会话消息，
+    /// 只能靠报告的这两个字段让用户看到「压缩成本」。
+    /// </summary>
+    public int SummaryCostTokens => SummaryInputTokens + SummaryOutputTokens;
 
     /// <summary>本轮工具 schema 的 token（分段明细里的 Tools 段）。</summary>
     public int ToolSchemaTokens => Segments.ToolSchema;

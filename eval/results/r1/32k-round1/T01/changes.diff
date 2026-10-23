@@ -1,0 +1,70 @@
+diff --git a/src/CommandLine/ParserSettings.cs b/src/CommandLine/ParserSettings.cs
+index 5ed73f3..57902f1 100644
+--- a/src/CommandLine/ParserSettings.cs
++++ b/src/CommandLine/ParserSettings.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Globalization;
+@@ -177,10 +177,16 @@ namespace CommandLine
+         /// <summary>
+         /// Gets or sets the maximum width of the display.  This determines word wrap when displaying the text.
+         /// </summary>
++        /// <exception cref="ArgumentOutOfRangeException">The value is less than 1.</exception>
+         public int MaximumDisplayWidth
+         {
+             get { return maximumDisplayWidth; }
+-            set { maximumDisplayWidth = value; }
++            set
++            {
++                if (value < 1) throw new ArgumentOutOfRangeException("value");
++
++                maximumDisplayWidth = value;
++            }
+         }
+ 
+         /// <summary>
+diff --git a/tests/CommandLine.Tests/Unit/ParserSettingsTests.cs b/tests/CommandLine.Tests/Unit/ParserSettingsTests.cs
+index c8da906..f852754 100644
+--- a/tests/CommandLine.Tests/Unit/ParserSettingsTests.cs
++++ b/tests/CommandLine.Tests/Unit/ParserSettingsTests.cs
+@@ -1,4 +1,5 @@
+-﻿using System.IO;
++using System;
++using System.IO;
+ using Xunit;
+ using FluentAssertions;
+ 
+@@ -35,5 +36,30 @@ namespace CommandLine.Tests.Unit
+                 textWriter.Disposed.Should().BeFalse("not disposed");
+             }
+         }
++
++        [Theory]
++        [InlineData(0)]
++        [InlineData(-1)]
++        [InlineData(int.MinValue)]
++        public void Setting_MaximumDisplayWidth_to_value_less_than_one_throws(int value)
++        {
++            using (ParserSettings parserSettings = new ParserSettings())
++            {
++                Action act = () => parserSettings.MaximumDisplayWidth = value;
++
++                act.Should().Throw<ArgumentOutOfRangeException>();
++            }
++        }
++
++        [Fact]
++        public void Setting_MaximumDisplayWidth_to_valid_value_is_preserved()
++        {
++            using (ParserSettings parserSettings = new ParserSettings())
++            {
++                parserSettings.MaximumDisplayWidth = 80;
++
++                parserSettings.MaximumDisplayWidth.Should().Be(80);
++            }
++        }
+     }
+ }

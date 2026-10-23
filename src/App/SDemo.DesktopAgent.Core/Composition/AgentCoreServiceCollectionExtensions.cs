@@ -45,6 +45,8 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<WorkspaceContext>();
         services.AddSingleton<ChangeApplier>();
         services.AddSingleton<ChatStore>();
+        // R1.4：按 provider / model 汇总 token 成本（设置页只读展示）。
+        services.AddSingleton<UsageCostService>();
         services.AddSingleton<SkillCatalog>();
         // M2：技能库的契约视图，供工具包（load_skill）与上下文层共用。
         services.AddSingleton<ISkillLibrary>(sp => sp.GetRequiredService<SkillCatalog>());

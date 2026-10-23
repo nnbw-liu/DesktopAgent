@@ -17,8 +17,18 @@ public sealed record SummaryRequest(
     int InputMaxTokens,
     TimeSpan Timeout);
 
-/// <summary>摘要结果；<see cref="UsedModel"/> 为 false 时 <see cref="Error"/> 说明降级原因。</summary>
-public sealed record SummaryResult(string Text, bool UsedModel, int Tokens, string? Error)
+/// <summary>
+/// 摘要结果；<see cref="UsedModel"/> 为 false 时 <see cref="Error"/> 说明降级原因。
+/// <see cref="InputTokens"/> / <see cref="OutputTokens"/> 是这次摘要请求的 token 成本（R1.4）：
+/// 摘要不写会话消息，只有把它们带回去，用户才能在分解面板看到「压缩花了多少」。
+/// </summary>
+public sealed record SummaryResult(
+    string Text,
+    bool UsedModel,
+    int Tokens,
+    string? Error,
+    int InputTokens = 0,
+    int OutputTokens = 0)
 {
     public bool Ok => UsedModel && Error is null && !string.IsNullOrWhiteSpace(Text);
 

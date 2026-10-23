@@ -13,6 +13,7 @@ public sealed class AgentRunMetrics
     private readonly List<MemoryCitation> _citations = [];
     private int _rejectedToolCalls;
     private int _failedToolCalls;
+    private int _approvalCount;
 
     /// <summary>本次生成（turn）的 id；checkpoint 按它聚合一次生成里的多次编辑。</summary>
     public string RunId { get; } = Guid.NewGuid().ToString("N");
@@ -31,6 +32,15 @@ public sealed class AgentRunMetrics
 
     /// <summary>执行失败的调用数（参数错误 / 工具异常 / 业务失败）。</summary>
     public int FailedToolCalls => _failedToolCalls;
+
+    /// <summary>
+    /// 本轮真正弹给用户确认的审批次数（R1.4）。评测里的自动审批不经过审批服务，
+    /// 因此不会计入——这个数字只代表产品侧的人工确认成本。
+    /// </summary>
+    public int ApprovalCount => _approvalCount;
+
+    /// <summary>记录一次已展示给用户的审批（由审批服务在请求真正上屏时调用）。</summary>
+    public void RecordApproval() => _approvalCount++;
 
     /// <summary>一次生成最多保留的轨迹条数；只影响持久化 / 编辑摘要，不影响模型可见的最近 20 条。</summary>
     public const int MaxStoredEntries = 100;

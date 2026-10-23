@@ -1,0 +1,60 @@
+{
+  "generatedAt": "2026-10-24T00:07:00.3799016+08:00",
+  "pass": true,
+  "tools": {
+    "registered": 30,
+    "exposed": 6,
+    "measuredSchemaTokens": 493,
+    "allToolsSchemaTokens": 2658,
+    "routerEstimate": 876,
+    "budgetLimit": 1500,
+    "budgetPass": true,
+    "reportMatches": true,
+    "planBuilt": true,
+    "planEstimated": 522,
+    "planToolSegment": 493,
+    "live": {
+      "sent": true,
+      "status": 200,
+      "elapsedMs": 29718,
+      "toolCount": 6,
+      "bodyExcerpt": "{\n  \u0022id\u0022: \u0022chatcmpl-e8c23t644d9jqyuz1efqjf\u0022,\n  \u0022object\u0022: \u0022chat.completion\u0022,\n  \u0022created\u0022: 1792771611,\n  \u0022model\u0022: \u0022qwen3-4b-thinking-2507\u0022,\n  \u0022choices\u0022: [\n    {\n      \u0022index\u0022: 0,\n      \u0022message\u0022: {\n        \u0022role\u0022: \u0022assistant\u0022,\n        \u0022content\u0022: \u0022\u0022,\n        \u0022reasoning_content\u0022: \u0022\u597D\u7684\uFF0C\u7528\u6237\u8BA9\u6211\u53EA\u56DE\u590D\u201COK\u201D\uFF0C\u4E0D\u8981\u8C03\u7528\u4EFB\u4F55\u5DE5\u5177\u3002\u6211\u9700\u8981\u786E\u8BA4\u4E00\u4E0B\u3002\\n\\n\u9996\u5148\u770B\u7528\u6237\u7684\u6307\u4EE4\uFF1A\u201C\u53EA\u56DE\u590D OK\uFF0C\u4E0D\u8981\u8C03\u7528\u0022,\n        \u0022tool_calls\u0022: []\n      },\n      \u0022logprobs\u0022: null,\n    ",
+      "error": null
+    }
+  },
+  "skills": {
+    "skills": 20,
+    "indexed": 5,
+    "indexTokens": 333,
+    "indexLimit": 400,
+    "indexPass": true,
+    "top1": "sandbox-acl-report",
+    "targetInTop5": true,
+    "firstPage": {
+      "chars": 1840,
+      "hasMore": true,
+      "nextOffset": 1840
+    },
+    "secondPage": {
+      "chars": 756,
+      "hasMore": false,
+      "nextOffset": 0
+    },
+    "paginationPass": true
+  },
+  "archives": {
+    "archived": 20,
+    "hits": 1,
+    "query": "\u4E0A\u6B21\u5173\u4E8E\u6C99\u7BB1 ACL \u7684\u7ED3\u8BBA",
+    "firstHitId": "arch-00",
+    "firstHitTitle": "\u6C99\u7BB1 ACL \u7ED3\u8BBA",
+    "firstHitIsTarget": true,
+    "citationId": "arch-00",
+    "citationMatches": true,
+    "firstPageChars": 1995,
+    "nextOffset": 1800,
+    "readPaged": true,
+    "searchChars": 169,
+    "searchTokens": 70
+  }
+}

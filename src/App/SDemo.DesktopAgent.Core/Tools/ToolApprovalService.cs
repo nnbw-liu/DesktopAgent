@@ -63,6 +63,9 @@ public sealed class ToolApprovalService : IToolApprovalService
 
                 RaiseChanged();
 
+                // R1.4：请求已经真正上屏，计入本轮真实审批次数（自动审批不经过这里）。
+                ApprovalScope.RecordPresented();
+
                 return await entry.Completion.Task.ConfigureAwait(false);
             }
             finally

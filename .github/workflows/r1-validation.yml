@@ -1,0 +1,56 @@
+name: R1 validation
+
+# R1.1 的确定性部分（30 工具 schema / 20 技能索引 / 20 条归档检索）默认不在每次 PR 跑：
+# 它要建临时 FTS5 库、生成 20 个技能，比 Core 单测慢，也更适合手动触发。
+# 8K / 32K 真机跑依赖本地 LM Studio 或云端 Key，只在开发者机器上手动执行（见 docs/reports/r1-validation.md）。
+on:
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: '保留参数（真机跑轮次由本地脚本使用）'
+        required: false
+        default: '1'
+        type: string
+
+concurrency:
+  group: r1-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  r1-deterministic:
+    name: R1.1 规模化验收（30 工具 / 20 技能 / 20 归档）
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore runner
+        run: dotnet restore tools/r1-validate/R1Validate.csproj
+
+      - name: Run R1 validation
+        run: >
+          dotnet run --project tools/r1-validate -c Release --no-build
+          -- --out eval/results/r1-ci
+
+      - name: Upload R1 artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r1-validation
+          path: eval/results/r1-ci
+          if-no-files-found: warn
+          retention-days: 14

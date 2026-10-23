@@ -1,0 +1,25 @@
+diff --git a/src/CommandLine/ParserResult.cs b/src/CommandLine/ParserResult.cs
+index c7c9c83..4f8cf44 100644
+--- a/src/CommandLine/ParserResult.cs
++++ b/src/CommandLine/ParserResult.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections.Generic;
+@@ -88,6 +88,14 @@ namespace CommandLine
+             get { return this.tag; }
+         }
+ 
++        /// <summary>
++        /// Gets a value indicating whether parsing succeeded, that is if <see cref="Tag"/> equals <see cref="CommandLine.ParserResultType.Parsed"/>.
++        /// </summary>
++        public bool IsParsed
++        {
++            get { return this.tag == ParserResultType.Parsed; }
++        }
++
+         public TypeInfo TypeInfo
+         {
+             get { return typeInfo; }

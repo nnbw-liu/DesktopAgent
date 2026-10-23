@@ -199,6 +199,37 @@ public sealed class ContextSummarizerTests
         Assert.Contains("新文件只能放 src/ 下", result.Text);
     }
 
+    [Fact]
+    public async Task 模型摘要记录输入输出token成本()
+    {
+        var summarizer = new LlmContextSummarizer(new FakeTransport(ValidSummary()), _counter);
+
+        var result = await summarizer.SummarizeAsync(Request(), CancellationToken.None);
+
+        Assert.True(result.Ok);
+        Assert.True(result.InputTokens > 0, "输入 token 必须大于 0");
+        Assert.True(result.OutputTokens > 0, "输出 token 必须大于 0");
+        Assert.Equal(_counter.Count(result.Text), result.OutputTokens);
+    }
+
+    [Fact]
+    public async Task 格式重试时两次请求都计入输入成本()
+    {
+        var transport = new SequenceTransport("自由格式，没有小节。", ValidSummary());
+        var summarizer = new LlmContextSummarizer(transport, _counter);
+
+        var result = await summarizer.SummarizeAsync(Request(), CancellationToken.None);
+
+        Assert.True(result.Ok);
+        Assert.Equal(2, transport.Calls);
+
+        // 第二次提示多了一段格式纠正，输入成本必须严格大于单次请求。
+        var single = await new LlmContextSummarizer(new FakeTransport(ValidSummary()), _counter)
+            .SummarizeAsync(Request(), CancellationToken.None);
+
+        Assert.True(result.InputTokens > single.InputTokens);
+    }
+
     private sealed class SequenceTransport(params string[] responses) : ISummaryChatTransport
     {
         public int Calls { get; private set; }

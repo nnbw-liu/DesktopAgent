@@ -4400,3 +4400,47 @@ a {
 .memory-archive-row-title { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .memory-archive-row-meta { font-size: 11px; color: var(--text-muted); }
 .memory-archive-row-actions { margin-left: auto; display: flex; gap: 6px; }
+
+/* R1.4：设置 → 模型 → 用量与成本（只读）。 */
+.settings-section--usage {
+    margin-top: 18px;
+}
+
+.usage-table {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 10px 0 8px;
+    font-size: 12px;
+}
+
+.usage-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2.2fr) 0.6fr 0.8fr 0.8fr 0.9fr;
+    gap: 10px;
+    align-items: center;
+    padding: 5px 8px;
+    border-radius: 7px;
+}
+
+.usage-row:nth-child(even) {
+    background: var(--surface-hover);
+}
+
+.usage-row--head,
+.usage-row--total {
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.usage-row--total {
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    background: transparent;
+}
+
+.usage-model {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}

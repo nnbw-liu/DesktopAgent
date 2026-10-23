@@ -21,4 +21,9 @@
     <ProjectReference Include="..\SDemo.DesktopAgent.Core\SDemo.DesktopAgent.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- R1.2：bUnit 测试需要访问内部纯函数（例如 ContextMeter.Format）。 -->
+    <InternalsVisibleTo Include="SDemo.DesktopAgent.UI.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -506,6 +506,33 @@ S6 行为要点：
 - **首帧不闪**：`css/app.css` 里深色为默认值，并用 `@media (prefers-color-scheme: light)` 兜底，使 Blazor 接管前也显示正确配色；WebView2 的 `DefaultBackgroundColor` 也按当前主题设置。
 - 新增配色时，`Themes/Dark.xaml`、`Themes/Light.xaml` 与 `css/app.css` 中三处变量需保持一致。
 
+## 可信度与回归（R1）
+
+R1 不新增用户功能，补齐的是「敢改」的基础设施。报告与清单：
+
+- [docs/reports/r1-validation.md](docs/reports/r1-validation.md)：规模化验收（30 工具 / 20 技能 / 20 归档）与 8K / 32K 真机结果，数字全部来自运行器。
+- [docs/reports/r1-ui-checklist.md](docs/reports/r1-ui-checklist.md)：WebView2 手动验收清单。
+- [docs/reports/ui-baseline/](docs/reports/ui-baseline/)：组件渲染截图基线（同一份 Razor + `app.css`）。
+
+常用命令：
+
+```powershell
+# 上下文 / 技能 / 归档的规模化验收（离线；写 eval/results/r1/summary.json）
+dotnet run --project tools/r1-validate -c Release -- --out eval/results/r1
+
+# 想额外验证「带工具 schema 的请求真能发出」（读 %APPDATA% 里的 provider/Key）
+dotnet run --project tools/r1-validate -c Release -- --out eval/results/r1 --live --provider local
+
+# Blazor 组件回归（bUnit：占用环 / 分段明细 / 压缩分隔线 / 验证徽标 / 无修改回灌）
+dotnet test tests/SDemo.DesktopAgent.UI.Tests
+
+# 截图基线：先生成 HTML，再用系统 WebView2 运行时截成 PNG
+$env:SDEMO_UI_BASELINE=1; dotnet test tests/SDemo.DesktopAgent.UI.Tests --filter UiBaselineTests
+dotnet run --project tools/ui-baseline/WebViewShot -c Release -- docs/reports/ui-baseline
+```
+
+可观测性补全：摘要请求的输入 / 输出 token 进入上下文报告（分解面板显示「摘要成本」）；每轮记录真实审批次数（评测的自动审批不计入）；设置 → 模型新增只读「用量与成本」（价格在 `settings.json` 的模型条目里配 `inputPricePerMillion` / `outputPricePerMillion`）；设置 → 上下文新增「路由模型」选择。
+
 ## 开发约定
 
 **侧栏列表**：工作区来自设置的 `workspaces`（`Workspace` 模型），会话由 `AppShell` 在启动时通过 `ChatStore` 从 SQLite 加载（工作区库 + 历史库）；`Sidebar` 只负责展示与回调（新建 / 打开 / 重命名 / 删除 / 置顶 / 添加工作区），不直接改数据。工作区行点击时“有没有会话”的判断在 `Sidebar.HandleWorkspaceClick`，真正的新建仍由 `AppShell.NewChatInWorkspace` 完成。
@@ -521,7 +548,7 @@ S6 行为要点：
 
 ## 已知注意事项
 
-- 会话库用 `Database.EnsureCreated()` 建表，并在打开旧库时自动补 `AttachmentsJson` 列；**其它表结构变更仍没有迁移**，需要手动处理或删库重建。
+- 会话库改为 **EF Core 版本化迁移**（`src/Storage/SDemo.DesktopAgent.Storage/Migrations`）：新库直接 `Migrate()`；老库先补 `EnsureCreated` 时代的缺列，再把 `InitialCreate` 记为已应用（基线化），之后只跑真正新增的迁移。FTS5 知识库表是唯一例外，仍由 `ArchiveSchema` 在迁移后按需建（FTS5 缺失只影响知识库）。新增表结构请用 `dotnet ef migrations add`，不要再手写补列。
 - 上传附件目前只把文本内容内联给模型；图片 / PDF 等二进制文件只会给模型文件名、大小和路径，模型看不到内容。单个附件上限 25 MB、一次最多 10 个。
 - 关闭窗口默认把应用收进托盘，而不是退出；要恢复“关闭即退出”，把 `MainWindow.OnClosing` 里的隐藏逻辑去掉即可。
 - Markdown 代码块目前只有等宽字体和底色，**没有语法高亮**（Markdig 不内置；需要的话可以再接 highlight.js 或 ColorCode）。
@@ -552,3 +579,4 @@ S6 行为要点：
 - **两端共用数据时注意锁库**：WPF 与 MAUI-Windows 指向同一个 `%APPDATA%\SDemo\DesktopAgent`，两个进程同时写同一个会话库会 `database is locked`；并行调试用 `SDEMO_DATA_ROOT` 隔离。
 - **Android 的能力降级**：没有托盘、没有「选文件夹」对话框（`IFolderPickerService` 返回 `null`，工作区固定为应用私有目录）、没有自绘标题栏；窄屏（≤760px）下侧栏改为顶部的可滚动面板（`app.css` 末尾）。
 - MAUI 的 `BlazorWebView` 在 Windows 上同样用 WebView2，所以 `_content/` 静态资源、CSS、JS 与 WPF 端完全一致；Android 换成系统 WebView，`env(safe-area-inset-*)` 依赖 `viewport-fit=cover`（`Maui/wwwroot/index.html` 已设置）。
+

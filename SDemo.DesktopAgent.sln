@@ -113,6 +113,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "routing-eval", "routing-eva
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoutingEval", "tools\routing-eval\RoutingEval.csproj", "{BC721543-9623-4458-A11D-2B5D623E1E50}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SDemo.DesktopAgent.UI.Tests", "tests\SDemo.DesktopAgent.UI.Tests\SDemo.DesktopAgent.UI.Tests.csproj", "{57D73514-017D-4BD2-A8B9-D145DA362EB5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -567,6 +569,18 @@ Global
 		{BC721543-9623-4458-A11D-2B5D623E1E50}.Release|x64.Build.0 = Release|Any CPU
 		{BC721543-9623-4458-A11D-2B5D623E1E50}.Release|x86.ActiveCfg = Release|Any CPU
 		{BC721543-9623-4458-A11D-2B5D623E1E50}.Release|x86.Build.0 = Release|Any CPU
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Debug|x64.Build.0 = Debug|Any CPU
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Debug|x86.Build.0 = Debug|Any CPU
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Release|x64.ActiveCfg = Release|Any CPU
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Release|x64.Build.0 = Release|Any CPU
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Release|x86.ActiveCfg = Release|Any CPU
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -624,5 +638,6 @@ Global
 		{E54E6FBF-3B83-4CAF-BAA2-D42E2EC1CD73} = {C36AC070-2799-4CD4-BB42-67E372B9C1BB}
 		{2428F2E8-4E23-D9E6-2362-288ACBDDD2EC} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 		{BC721543-9623-4458-A11D-2B5D623E1E50} = {2428F2E8-4E23-D9E6-2362-288ACBDDD2EC}
+		{57D73514-017D-4BD2-A8B9-D145DA362EB5} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
