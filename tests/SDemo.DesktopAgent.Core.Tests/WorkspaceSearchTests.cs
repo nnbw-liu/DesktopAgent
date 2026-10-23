@@ -86,6 +86,44 @@ public sealed class WorkspaceSearchTests
     }
 
     [Fact]
+    public void 非法正则会回退到字面量()
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllText(Path.Combine(temp.Root, "a.txt"), "price [usd]\n");
+
+        var result = new WorkspaceSearch().Search(temp.Root, "[");
+
+        Assert.Contains("已按字面量搜索", result.Text);
+        Assert.Contains("a.txt:1:", result.Text);
+    }
+
+    [Fact]
+    public void 正则无命中时按字面量回退()
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllText(Path.Combine(temp.Root, "a.txt"), "a.b\naxb\n");
+
+        var result = new WorkspaceSearch().Search(temp.Root, "a.b", literal: true);
+
+        Assert.Contains("a.txt:1:", result.Text);
+        Assert.DoesNotContain("a.txt:2:", result.Text);
+    }
+
+    [Fact]
+    public void 点号符号名按成员名回退()
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllText(
+            Path.Combine(temp.Root, "ParserSettings.cs"),
+            "public sealed class ParserSettings\n{\n    public int MaximumDisplayWidth { get; set; }\n}\n");
+
+        var result = new WorkspaceSearch().Search(temp.Root, "ParserSettings.MaximumDisplayWidth");
+
+        Assert.Contains("已按成员名「MaximumDisplayWidth」回退", result.Text);
+        Assert.Contains("ParserSettings.cs:3:", result.Text);
+    }
+
+    [Fact]
     public void 二进制文件不参与搜索()
     {
         using var temp = new TempDirectory();

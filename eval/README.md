@@ -15,9 +15,10 @@
 eval/
   repo.json               仓库、commit、基线记录
   configs/
-    compact-8k.json       Qwen3.5-4B / Compact / 8K / 15 calls
-    full-32k.json         Qwen3-8B / Full / 32K / 15 calls（/no_think）
-    deepseek-32k.json     DeepSeek V4 Pro / Full / 32K / 15 calls（云端 ds provider）
+    compact-8k.json              Qwen3.5-4B / Compact / 8K / 15 calls
+    full-32k.json                Qwen3-8B / Full / 32K / 15 calls（/no_think）
+    deepseek-v4.1-flash-32k.json DeepSeek V4.1 Flash / Full / 32K / 15 calls（云端 火山 provider）
+    deepseek-32k.json            DeepSeek V4 Pro / Full / 32K / 15 calls（历史配置，不再用于新基准）
   tasks/T01..T08.md       8 个冻结任务（需求 + 验收命令 + 隐藏测试）
   tests/                  隐藏验收测试，只在验收阶段注入工作区
   routing/
@@ -70,16 +71,18 @@ dotnet run --project tools/AgentEval -c Release -- `
   --out eval/results/round1/full-32k
 ```
 
-云端 DeepSeek（先在应用里配好 `ds` provider 的 Key；运行器从 `%APPDATA%\SDemo\DesktopAgent\settings.json` 读取并解密）：
+云端 DeepSeek V4.1 Flash（先在应用里配好 `火山` provider 的 Key；运行器从 `%APPDATA%\SDemo\DesktopAgent\settings.json` 读取并解密）：
 
 ```powershell
 dotnet run --project tools/AgentEval -c Release -- `
   --repo F:\AI\Code\SDemo\p7-bench\commandline `
   --commit b0b0ec9f5470bacc0823c013a599ba3b4e115900 `
-  --config eval/configs/deepseek-32k.json `
+  --config eval/configs/deepseek-v4.1-flash-32k.json `
   --tasks eval/tasks `
-  --out eval/results/round1/deepseek-32k
+  --out eval/results/p1/deepseek-v4.1-flash-32k
 ```
+
+> 不再使用 `deepseek-v4-pro`：`deepseek-32k.json` 只保留为历史数据（V4 Pro 7/8），新基准一律用 V4.1 Flash。
 
 运行器会：
 

@@ -526,6 +526,7 @@
     private string? _selectedKey;
     private CancellationTokenSource? _cts;
     private bool _autoContinued;
+    private int _noEditRepromptAttempts;
 
     /// <summary>最近一次算出的上下文报告（预览或真实请求），驱动占用环与明细。</summary>
     private ContextReport? _contextPreview;
@@ -1411,6 +1412,7 @@
         if (!isAutoContinue)
         {
             _autoContinued = false;
+            _noEditRepromptAttempts = 0;
         }
 
         _isGenerating = true;
@@ -1420,6 +1422,7 @@
         _cts = cts;
 
         var history = Session.Messages.ToList();
+        var userInput = history.LastOrDefault(message => message.Role == ChatMessageRole.User)?.Content ?? string.Empty;
         var reply = new ChatMessage(ChatMessageRole.Assistant, string.Empty)
         {
             CreatedAt = DateTime.Now
@@ -1456,6 +1459,23 @@
                     telemetry,
                     cts.Token),
                 telemetry);
+
+            var noEdit = NoEditRepromptPolicy.Decide(
+                metrics,
+                userInput,
+                reply.Content,
+                _noEditRepromptAttempts,
+                Settings.Current.Agent.Mode == AgentModePreference.Compact);
+
+            if (noEdit.Continue && noEdit.Prompt is not null)
+            {
+                _noEditRepromptAttempts++;
+                Session.Messages.Add(new ChatMessage(ChatMessageRole.User, noEdit.Prompt));
+                StateHasChanged();
+                await NotifySessionChangedAsync();
+                await GenerateAsync(option, isAutoContinue: true);
+                return;
+            }
 
             var auto = BuildAutoContinueDecision();
             if (auto.Continue && !_autoContinued && auto.Prompt is not null)

@@ -65,7 +65,8 @@ public sealed class FileToolPack : IAgentToolPack
             AIFunctionFactory.Create(
                 functions.SearchFiles,
                 name: "search_files",
-                description: "按正则搜索工作区文本，返回 路径:行号: 内容；glob 可限定文件类型。"),
+                description: "按正则搜索工作区文本，返回 路径:行号: 内容；glob 可限定文件类型。"
+                    + "没有命中时会自动按字面量、再按 Type.Member 的成员名回退；也可以用 literal=true 直接按纯文本搜。"),
 
             AIFunctionFactory.Create(
                 functions.GlobFiles,
@@ -104,6 +105,19 @@ public sealed class FileToolPack : IAgentToolPack
                 {
                     builder.Append("\n（来自工作区设置，可直接用于 run_command）");
                 }
+            }
+
+            // P2：测试类任务最容易改错文件。给出测试项目范围，不泄露具体实现。
+            var testProjects = search
+                .Glob(context.WorkspaceRoot, "**/*.csproj", 200)
+                .Where(path => path.Contains("test", StringComparison.OrdinalIgnoreCase))
+                .Take(6)
+                .ToArray();
+
+            if (testProjects.Length > 0)
+            {
+                builder.Append("\n测试项目：").AppendJoin("、", testProjects);
+                builder.Append("\n测试类任务优先改上述项目下的测试文件；不要改产品代码，除非任务明确要求。");
             }
 
             return builder.ToString();
@@ -273,13 +287,14 @@ public sealed class FileToolPack : IAgentToolPack
         }
 
         public string SearchFiles(
-            [Description("正则表达式。")] string pattern,
+            [Description("正则表达式；没有命中时会自动按字面量再搜一次。")] string pattern,
             [Description("文件 glob，默认 **/*。")] string glob = "**/*",
             [Description("最多返回多少条，默认 80。")] int maxResults = WorkspaceSearch.MaxResultLines,
             [Description("命中行前后各带几行上下文，默认 0。")] int contextLines = 0,
-            [Description("是否区分大小写，默认 false。")] bool caseSensitive = false)
+            [Description("是否区分大小写，默认 false。")] bool caseSensitive = false,
+            [Description("按纯文本搜索（不解析正则元字符），默认 false。")] bool literal = false)
         {
-            var result = search.Search(context.WorkspaceRoot, pattern, glob, maxResults, contextLines, caseSensitive);
+            var result = search.Search(context.WorkspaceRoot, pattern, glob, maxResults, contextLines, caseSensitive, literal);
 
             foreach (var relative in result.MatchedPaths)
             {

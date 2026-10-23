@@ -1,0 +1,152 @@
+{
+  "id": "T08",
+  "type": "mixed",
+  "title": "\u589E\u52A0 SkipDefault \u5DE5\u5382\u65B9\u6CD5\u5E76\u9A8C\u8BC1",
+  "prompt": "## \u9700\u6C42\r\n\r\n\u0060UnParserSettings\u0060 \u5DF2\u6709 \u0060WithGroupSwitchesOnly()\u0060 \u548C \u0060WithUseEqualTokenOnly()\u0060 \u4E24\u4E2A\u5DE5\u5382\u65B9\u6CD5\uFF0C\u4F46\u8DF3\u8FC7\u9ED8\u8BA4\u503C\u53EA\u80FD\u624B\u52A8\u8BBE\u7F6E\u5C5E\u6027\u3002\u8BF7\u589E\u52A0\u4E00\u4E2A\u5BF9\u5E94\u7684 \u0060WithSkipDefaultOnly()\u0060 \u5DE5\u5382\u65B9\u6CD5\uFF0C\u8FD4\u56DE\u53EA\u628A \u0060SkipDefault\u0060 \u8BBE\u4E3A \u0060true\u0060 \u7684\u8BBE\u7F6E\u5BF9\u8C61\u3002\u518D\u8865\u4E00\u4E2A\u6D4B\u8BD5\uFF0C\u786E\u8BA4\u8BE5\u5DE5\u5382\u65B9\u6CD5\u4E0D\u4F1A\u987A\u5E26\u6253\u5F00\u5176\u4ED6\u5F00\u5173\u3002\r\n\r\n## \u5B8C\u6210\u6807\u51C6\r\n\r\n- \u65B0\u5DE5\u5382\u65B9\u6CD5\u53EF\u7F16\u8BD1\u3001\u53EF\u8C03\u7528\uFF0C\u4E14\u53EA\u8BBE\u7F6E \u0060SkipDefault\u0060\u3002\r\n- \u7528\u8BE5\u8BBE\u7F6E\u53CD\u89E3\u6790\u5E26\u9ED8\u8BA4\u503C\u7684\u5BF9\u8C61\u65F6\uFF0C\u9ED8\u8BA4\u503C\u9879\u88AB\u7701\u7565\u3002\r\n- \u65E2\u6709\u6D4B\u8BD5\u5168\u90E8\u901A\u8FC7\u3002",
+  "model": "deepseek-v4.1-flash",
+  "mode": "Full",
+  "contextWindow": 32768,
+  "output": "\u6211\u5C06\u5148\u5B9A\u4F4D\u76F8\u5173\u6587\u4EF6\u3002## \u8FDB\u5C55\u603B\u7ED3\uFF08\u56E0\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u6B21\u6570\u4E0A\u9650\u4E2D\u65AD\uFF09\n\n**\u5DF2\u5B8C\u6210**\n- \u5DF2\u5B8C\u6210 \u0060src/CommandLine/UnParserExtensions.cs\u0060 \u7684\u4FEE\u6539\uFF1A\u6309\u539F\u6709\u98CE\u683C\uFF0C\u5728 \u0060WithUseEqualTokenOnly()\u0060 \u4E4B\u540E\u65B0\u589E\u4E86 \u0060WithSkipDefaultOnly()\u0060\uFF1A\n  \u0060\u0060\u0060csharp\n  /// \u003Csummary\u003E\n  /// Factory method that creates an instance of \u003Csee cref=\u0022CommandLine.UnParserSettings\u0022/\u003E with SkipDefault set to true.\n  /// \u003C/summary\u003E\n  /// \u003Creturns\u003EA properly initalized \u003Csee cref=\u0022CommandLine.UnParserSettings\u0022/\u003E instance.\u003C/returns\u003E\n  public static UnParserSettings WithSkipDefaultOnly()\n  {\n      return new UnParserSettings { SkipDefault = true };\n  }\n  \u0060\u0060\u0060\n  \u6211\u5728\u6539\u524D\u8BFB\u53D6\u8FC7\u8BE5\u6587\u4EF6\uFF08\u539F 340 \u884C \u2192 \u73B0 349 \u884C\uFF09\uFF1B\u66FF\u6362\u53EA\u89E6\u53CA \u0060WithUseEqualTokenOnly\u0060 \u7ED3\u5C3E\u5904\uFF0C\u672A\u6539\u52A8\u5176\u4ED6\u903B\u8F91\u3002\n\n**\u672A\u5B8C\u6210**\n1. **\u6D4B\u8BD5\u672A\u5199**\u3002\u5B9A\u4F4D\u7ED3\u679C\uFF1A\u0060tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs\u0060 \u7684 \u0060#region PR 550\u0060\uFF08\u7B2C 157\u2013188 \u884C\uFF09\u5DF2\u6709 \u0060Options_With_Defaults\u0060 \u7684 skipDefault \u7528\u4F8B\uFF0C\u6700\u5408\u9002\u5728\u5176\u540E\uFF08\u7EA6\u7B2C 188 \u884C\u540E\uFF09\u63D2\u5165\uFF1A\n   - \u4E00\u4E2A\u7528\u4F8B\u9A8C\u8BC1 \u0060UnParserSettings.WithSkipDefaultOnly()\u0060 \u7684 \u0060SkipDefault == true\u0060\uFF0C\u4E14 \u0060GroupSwitches\u0060\u3001\u0060UseEqualToken\u0060\u3001\u0060ShowHidden\u0060 \u7B49\u5176\u4F59\u5F00\u5173\u5747\u4E3A \u0060false\u0060\uFF08\u8FD9\u6B63\u662F\u201C\u4E0D\u987A\u5E26\u6253\u5F00\u5176\u4ED6\u5F00\u5173\u201D\u7684\u65AD\u8A00\u70B9\uFF09\uFF1B\n   - \u4E00\u4E2A\u7528\u4F8B\u4EE5 \u0060new Options_With_Defaults { P2 = \u0022xyz\u0022, P1 = 99, P3 = 88, P4 = Shapes.Square }\u0060 \u8D70 \u0060new Parser().FormatCommandLine(options, s =\u003E ... \u5E94\u7528 WithSkipDefaultOnly() \u7684\u8BBE\u7F6E ...)\u0060\uFF0C\u65AD\u8A00\u7ED3\u679C\u4E3A \u0060--p2 xyz\u0060\u3002\n   \u6CE8\u610F\uFF1A\u0060FormatCommandLine\u0060 \u7684\u7B2C\u4E09\u4E2A\u53C2\u6570\u662F \u0060Action\u003CUnParserSettings\u003E\u0060\uFF08\u89C1 UnParserExtensions.cs:136\uFF0C\u5185\u90E8 \u0060new UnParserSettings()\u0060 \u540E\u8C03\u7528\u8BE5 lambda\uFF09\uFF0C**\u4E0D\u80FD\u76F4\u63A5\u4F20 \u0060UnParserSettings\u0060 \u5B9E\u4F8B**\uFF0C\u6545\u6D4B\u8BD5\u4E2D\u9700\u7528 lambda \u9010\u9879\u62F7\u8D1D\u5DE5\u5382\u65B9\u6CD5\u8FD4\u56DE\u5BF9\u8C61\u7684\u5C5E\u6027\uFF08\u6216\u65AD\u8A00\u8BE5\u5B9E\u4F8B\u5C5E\u6027\u540E\u518D\u4F20\u5165 lambda \u8D4B \u0060x.SkipDefault\u0060\uFF09\uFF0C\u6211\u5C1A\u672A\u786E\u5B9A\u4ED3\u5E93\u91CC\u662F\u5426\u6709\u65E2\u6709\u7684\u201C\u4ECE\u5B9E\u4F8B\u62F7\u8D1D\u5230 lambda\u201D\u8F85\u52A9\u5199\u6CD5\uFF0C\u9700\u8981\u4E0B\u6B21\u5148\u67E5 \u0060Example.cs\u0060 / \u0060HelpText\u0060 \u5982\u4F55\u628A \u0060FormatStyles\u0060 \u5582\u7ED9 \u0060FormatCommandLine\u0060\u3002\n2. **\u6D4B\u8BD5\u672A\u8FD0\u884C**\u3002\u0060dotnet test tests/CommandLine.Tests/CommandLine.Tests.csproj\u0060 \u672A\u6267\u884C\uFF1B\u56E0\u6B64\u201C\u65B0\u65B9\u6CD5\u53EF\u7F16\u8BD1\u201D\u201C\u9ED8\u8BA4\u503C\u9879\u88AB\u7701\u7565\u201D\u201C\u65E2\u6709\u6D4B\u8BD5\u5168\u90E8\u901A\u8FC7\u201D\u4E09\u6761\u5B8C\u6210\u6807\u51C6**\u5747\u672A\u9A8C\u8BC1**\uFF0C\u4E0D\u80FD\u58F0\u79F0\u901A\u8FC7\u3002\n\n**\u98CE\u9669**\uFF1A\u65B0\u589E\u65B9\u6CD5\u7684\u7F16\u8BD1\u6B63\u786E\u6027\u4F9D\u8D56 \u0060UnParserSettings\u0060 \u7684 \u0060SkipDefault\u0060 \u53EF\u5199\u5C5E\u6027\uFF08\u5DF2\u786E\u8BA4\u7B2C 63\u201367 \u884C\u5B58\u5728 get/set\uFF0C\u98CE\u9669\u4F4E\uFF09\uFF1B\u4E3B\u8981\u5F85\u786E\u8BA4\u9879\u662F\u6D4B\u8BD5\u4E2D\u6B63\u786E\u4F20\u9012 settings \u7684\u65B9\u5F0F\u3002\n\n\u5B8C\u6210\uFF1A\u672A\u5B8C\u6210\u2014\u2014\u5DE5\u5382\u65B9\u6CD5\u5DF2\u6DFB\u52A0\uFF0C\u4F46\u6D4B\u8BD5\u7528\u4F8B\u5C1A\u672A\u7F16\u5199\u3001\u4E5F\u672A\u8FD0\u884C\u4EFB\u4F55\u6D4B\u8BD5\u6765\u9A8C\u8BC1\u3002",
+  "turns": 1,
+  "steps": 16,
+  "seconds": 17.2,
+  "error": null,
+  "acceptanceExit": 0,
+  "acceptanceOutput": "\u003E dotnet build CommandLine.sln -v minimal\r\nActive code page: 65001\r\n  \u6B63\u5728\u786E\u5B9A\u8981\u8FD8\u539F\u7684\u9879\u76EE\u2026\r\n  \u6240\u6709\u9879\u76EE\u5747\u662F\u6700\u65B0\u7684\uFF0C\u65E0\u6CD5\u8FD8\u539F\u3002\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-222258\\src\\CommandLine\\bin\\Debug\\net45\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-222258\\src\\CommandLine\\bin\\Debug\\net461\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-222258\\src\\CommandLine\\bin\\Debug\\netstandard2.0\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-222258\\src\\CommandLine\\bin\\Debug\\net40\\CommandLine.dll\r\n  CommandLine.Tests -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-222258\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll\r\n  CommandLine.Tests -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-222258\\tests\\CommandLine.Tests\\bin\\Debug\\net461\\CommandLine.Tests.dll\r\n\r\n\u5DF2\u6210\u529F\u751F\u6210\u3002\r\n    0 \u4E2A\u8B66\u544A\r\n    0 \u4E2A\u9519\u8BEF\r\n\r\n\u5DF2\u7528\u65F6\u95F4 00:00:02.35\r\n\r\n[exit 0]\r\n\u003E dotnet test tests/CommandLine.Tests/CommandLine.Tests.csproj -f netcoreapp3.1 --no-build -v minimal\r\nActive code page: 65001\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-222258\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll (.NETCoreApp,Version=v3.1)\u7684\u6D4B\u8BD5\u8FD0\u884C\r\n\u603B\u5171 1 \u4E2A\u6D4B\u8BD5\u6587\u4EF6\u4E0E\u6307\u5B9A\u6A21\u5F0F\u76F8\u5339\u914D\u3002\r\n\r\n\u5DF2\u901A\u8FC7! - \u5931\u8D25:     0\uFF0C\u901A\u8FC7:   686\uFF0C\u5DF2\u8DF3\u8FC7:     0\uFF0C\u603B\u8BA1:   686\uFF0C\u6301\u7EED\u65F6\u95F4: 288 ms - CommandLine.Tests.dll (netcoreapp3.1)\r\n\r\n[exit 0]\r\n",
+  "checkFailure": null,
+  "failureClass": null,
+  "routing": [
+    {
+      "turn": 1,
+      "source": "rules",
+      "exposed": [
+        "read_file",
+        "search_files",
+        "apply_patch",
+        "run_command",
+        "todo_write",
+        "replace_text",
+        "write_file",
+        "list_files",
+        "list_tree",
+        "glob_files",
+        "workspace_info",
+        "search_capabilities"
+      ],
+      "called": [
+        "read_file",
+        "replace_text",
+        "search_files",
+        "todo_write",
+        "workspace_info"
+      ],
+      "unusedExposed": [
+        "apply_patch",
+        "run_command",
+        "write_file",
+        "list_files",
+        "list_tree",
+        "glob_files",
+        "search_capabilities"
+      ]
+    }
+  ],
+  "trace": [
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "WithUseEqualTokenOnly",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 5 \u6761\u5339\u914D\uFF085 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\ndemo/ReadText.Demo.VB/Options.vb:37:             Yield New Example(\u0022read more lines\u0022, New UnParserSettings() {UnParserSettings.WithGroupSwi \u2026  errors\u0022, new[] { UnParserSettings.WithGroupSwitchesOnly(), UnParserSettings.WithUseEqualTokenOnly() }, new Options_With_Usage_Attribute { InputFile = \u0022file.bin\u0022, LogError = true });\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "workspace_info",
+      "status": "ok",
+      "argsDigest": "",
+      "summary": "[TOOL_RESULT_BEGIN:workspace_info]\n\u5DE5\u4F5C\u533A\u6839\u76EE\u5F55\uFF1AC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-222258\n\u6D4B\u8BD5\u9879\u76EE\uFF1Atests/CommandLine.Tests/CommandLine.Tests.csproj\n\u6D4B\u8BD5\u7C7B\u4EFB\u52A1\u4F18\u5148\u6539\u4E0A\u8FF0\u9879\u76EE\u4E0B\u7684\u6D4B\u8BD5\u6587\u4EF6\uFF1B\u4E0D\u8981\u6539\u4EA7\u54C1\u4EE3\u7801\uFF0C\u9664\u975E\u4EFB\u52A1\u660E\u786E\u8981\u6C42\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 40\u2013119 \u00B7 \u63A5\u7EED\u7528 offset=120\n  40|             set { PopsicleSetter.Set(Consumed, ref groupSwitches, value); }\n  41|     \u2026 atCommandLine(options, config =\u003E { }).SplitArgs();\n 116|         }\n 117| \n 118|         /// \u003Csummary\u003E\n 119|         /// Format a command line argument string from a parsed instance. \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 60\u2013109 \u00B7 \u63A5\u7EED\u7528 offset=110\n  60|         /// \u003Csummary\u003E\n  61|         /// Gets or sets a value indicating whether unpar \u2026 ne argument string from a parsed instance in the form of string[]. \n 108|         /// \u003C/summary\u003E\n 109|         /// \u003Ctypeparam name=\u0022T\u0022\u003EType of \u003Cparamref name=\u0022options\u0022/\u003E.\u003C/typeparam\u003E\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 76\u201395 \u00B7 \u63A5\u7EED\u7528 offset=96\n  76| \n  77|         /// \u003Csummary\u003E\n  78|         /// Factory method that creates an instance  \u2026 / \u003C/summary\u003E\n  92|     public static class UnParserExtensions\n  93|     {\n  94|         /// \u003Csummary\u003E\n  95|         /// Format a command line argument string from a parsed instance. \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "todo_write",
+      "status": "ok",
+      "argsDigest": "sha256:1ec3940c\uFF08439 \u5B57\u7B26\uFF09",
+      "summary": "[TOOL_RESULT_BEGIN:todo_write]\n\u5DF2\u66F4\u65B0\u8BA1\u5212\uFF1A0/3 \u5B8C\u6210\r\n\u25D0 \u5728 src/CommandLine/UnParserExtensions.cs \u6DFB\u52A0 WithSkipDefaultOnly() \u5DE5\u5382\u65B9\u6CD5\r\n\u2610 \u5728 tests/CommandLine.Tests \u4E2D\u65B0\u589E\u6D4B\u8BD5\uFF0C\u9A8C\u8BC1\u53EA\u8BBE\u7F6E SkipDefault \u4E14\u9ED8\u8BA4\u503C\u9879\u88AB\u7701\u7565\r\n\u2610 \u8FD0\u884C\u6D4B\u8BD5\u786E\u8BA4\u5168\u90E8\u901A\u8FC7\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "SkipDefault",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 10 \u6761\u5339\u914D\uFF081 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\ntests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs:171:         public static void UnParsing_instance_with_default_values_when_skip_d \u2026 cted)\ntests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs:270:                 .FormatCommandLine(options, x =\u003E { x.SkipDefault = skipDefault; x.GroupSwitches = groupSwitches; })\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 140\u2013199 \u00B7 \u63A5\u7EED\u7528 offset=200\n 140|             var options = new Simple_Options_With_Values { StringS \u2026 ar result = new Parser()\n 195|                 .FormatCommandLine(options)\n 196|                 .Should().MatchRegex(\u0022--start\\\\s\\\u0022.\u002B\\\u0022\u0022);\n 197|         }\n 198| \n 199|         [Fact]\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 156\u2013191 \u00B7 \u63A5\u7EED\u7528 offset=192\n 156| \n 157|         #region PR 550\n 158| \n 159|         [Fact]\n 160|    \u2026 lt)\n 187|                 .Should().BeEquivalentTo(expected);\n 188|         }\n 189|         [Fact]\n 190|         public static void UnParsing_instance_with_datetime()\n 191|         {\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1Asrc/CommandLine/UnParserExtensions.cs (\u002B14 -5)\n[EDIT] src/CommandLine/UnParserExtensions.cs \u002B14 -5\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 349 \u884C \u00B7 \u672C\u6B21 100\u2013149 \u00B7 \u63A5\u7EED\u7528 offset=150\n 100|     /// \u003C/summary\u003E\n 101|     public static class UnParserExtensions\n 102|     {\n 103 \u2026 r = new StringBuilder();\n 146| \n 147|             type.GetVerbSpecification()\n 148|                 .MapValueOrDefault(verb =\u003E builder.Append(verb.Name).Append(\u0027 \u0027), builder);\n 149| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 349 \u884C \u00B7 \u672C\u6B21 126\u2013150 \u00B7 \u63A5\u7EED\u7528 offset=151\n 126| \n 127|         /// \u003Csummary\u003E\n 128|         /// Format a command line argument string \u2026  \n 147|             type.GetVerbSpecification()\n 148|                 .MapValueOrDefault(verb =\u003E builder.Append(verb.Name).Append(\u0027 \u0027), builder);\n 149| \n 150|             var specs =\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "UnParserSettings settings",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 2 \u6761\u5339\u914D\uFF081 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\nsrc/CommandLine/UnParserExtensions.cs:266:         private static string FormatOption(OptionSpecification spec, object value, UnParserSettings settings)\nsrc/CommandLine/UnParserExtensions.cs:274:         private static string FormatName(this OptionSpecification optionSpec, object value, UnParserSettings settings)\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "FormatCommandLine",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 7 \u6761\u5339\u914D\uFF081 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\nsrc/CommandLine/UnParserExtensions.cs:110:         public static string FormatCommandLine\u003CT\u003E(this Parser parser, T options)\nsrc/CommandLine \u2026 er, T options, Action\u003CUnParserSettings\u003E configuration)\nsrc/CommandLine/UnParserExtensions.cs:223:             return FormatCommandLine\u003CT\u003E(parser, options, configuration).SplitArgs();\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "UnParserSettings",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 29 \u6761\u5339\u914D\uFF082 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 60 \u6761\uFF09\uFF1A\r\nsrc/CommandLine/Text/Example.cs:15:         private readonly IEnumerable\u003CUnParserSettings\u003E formatStyles;\nsrc/CommandLine/Text/Example.cs:2 \u2026 erSettings settings)\nsrc/CommandLine/UnParserExtensions.cs:274:         private static string FormatName(this OptionSpecification optionSpec, object value, UnParserSettings settings)\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "rejected",
+      "argsDigest": "src/CommandLine/Text/Example.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:rejected]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    }
+  ]
+}

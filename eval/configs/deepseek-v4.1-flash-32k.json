@@ -1,0 +1,11 @@
+{
+  "name": "deepseek-v4.1-flash-32k",
+  "providerId": "火山",
+  "modelId": "deepseek-v4.1-flash",
+  "mode": "Full",
+  "contextWindow": 32768,
+  "maxOutputTokens": 4096,
+  "maxToolCalls": 15,
+  "disableThinking": false,
+  "repair": true
+}

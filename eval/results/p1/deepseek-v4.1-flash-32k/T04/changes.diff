@@ -1,0 +1,76 @@
+diff --git a/src/CommandLine/UnParserExtensions.cs b/src/CommandLine/UnParserExtensions.cs
+index e823a7f..3597baf 100644
+--- a/src/CommandLine/UnParserExtensions.cs
++++ b/src/CommandLine/UnParserExtensions.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections;
+@@ -321,19 +321,38 @@ namespace CommandLine
+                 return new string[0];
+ 
+             var inQuote = false;
+-            var chars = command.ToCharArray().Select(v =>
++            var chars = new List<char>(command.Length);
++            for (var i = 0; i < command.Length; i++)
+             {
++                var v = command[i];
++                // a backslash escaped double quote is a simple char, not a quote boundary
++                if (v == '\\' && i + 1 < command.Length && command[i + 1] == '"')
++                {
++                    chars.Add('"');
++                    i++;
++                    continue;
++                }
++
+                 if (v == '"')
+                     inQuote = !inQuote;
+-                return !inQuote && v == ' ' ? '\n' : v;
+-            }).ToArray();
++                chars.Add(!inQuote && v == ' ' ? '\n' : v);
++            }
+ 
+-            return new string(chars).Split('\n')
+-                .Select(x => keepQuote ? x : x.Trim('"'))
++            return new string(chars.ToArray()).Split('\n')
++                .Select(x => keepQuote ? x : x.RemoveQuote())
+                 .Where(x => !string.IsNullOrWhiteSpace(x))
+                 .ToArray();
+         }
+ 
++        private static string RemoveQuote(this string value)
++        {
++            if (value.Length > 0 && value[0] == '"')
++                value = value.Substring(1);
++            if (value.Length > 0 && value[value.Length - 1] == '"')
++                value = value.Substring(0, value.Length - 1);
++            return value;
++        }
++
+         #endregion
+ 
+     }
+diff --git a/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs b/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
+index 7e878f3..c3f58ed 100644
+--- a/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
++++ b/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections.Generic;
+@@ -300,8 +300,9 @@ namespace CommandLine.Tests.Unit
+         [InlineData("  --shape     Circle  ", new[] { "--shape", "Circle" })]
+         [InlineData("-a --shape Circle", new[] {"-a", "--shape", "Circle" })]
+         [InlineData("-a --shape Circle -- -x1 -x2", new[] { "-a", "--shape", "Circle","--","-x1","-x2" })]
+-        [InlineData("--name \"name with space and quote\" -x1", new[] { "--name", "name with space and quote","-x1" })]       
+-        public static void Split_arguments(string command, string[] expectedArgs)
++         [InlineData("--name \"name with space and quote\" -x1", new[] { "--name", "name with space and quote","-x1" })]       
++         [InlineData("\"say \\\"hi\\\" now\"", new[] { "say \"hi\" now" })]
++         public static void Split_arguments(string command, string[] expectedArgs)
+         {
+             var args = command.SplitArgs();
+             args.Should().BeEquivalentTo(expectedArgs);

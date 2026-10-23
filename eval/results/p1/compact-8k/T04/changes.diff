@@ -1,0 +1,49 @@
+diff --git a/test_project/commands_test.go b/test_project/commands_test.go
+new file mode 100644
+index 0000000..1f929f9
+--- /dev/null
++++ b/test_project/commands_test.go
+@@ -0,0 +1,43 @@
++package commands
++
++import (
++	"testing"
++)
++
++func TestSplitArgs(t *testing.T) {
++	tests := []struct {
++		name     string
++		input    string
++		expected []string
++	}{
++		{
++			name:     "带空格和双引号的字符串",
++			input:    `say "hi" now`,
++			expected: []string{"say \"hi\" now"},
++		},
++		{
++			name:     "普通带空格参数",
++			input:    `echo hello world`,
++			expected: []string{"hello", "world"},
++		},
++		{
++			name:     "普通引号参数",
++			input:    `"hello"`,
++			expected: []string{"\"hello\""},
++		},
++	}
++
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			result := SplitArgs(tt.input)
++			if len(result) != len(tt.expected) {
++				t.Errorf("SplitArgs(%q) = %v; expected %v", tt.input, result, tt.expected)
++			}
++			for i, v := range result {
++				if v != tt.expected[i] {
++					t.Errorf("SplitArgs(%q)[%d] = %q; expected %q", tt.input, i, v, tt.expected[i])
++				}
++			}
++		})
++	}
++}

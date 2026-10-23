@@ -22,23 +22,94 @@ public sealed class WorkspaceSearch
         ".git", ".vs", "bin", "obj", "node_modules", ".tmp", "TestResults"
     };
 
-    /// <summary>正则搜索；<paramref name="glob"/> 默认 <c>**/*</c>，contextLines 为命中行前后附带行数。</summary>
+    /// <summary>
+    /// 搜索：默认按正则；没有命中时自动做一次字面量回退，再把 <c>Type.Member</c> 退化成成员名。
+    /// 这样模型不用知道正则元字符，也不会因为写了 <c>ParserSettings.MaximumDisplayWidth</c>
+    /// 而搜不到只写 <c>MaximumDisplayWidth</c> 的属性行。回退会在结果首行说明用了哪种模式。
+    /// </summary>
     public WorkspaceSearchResult Search(
         string root,
         string pattern,
         string glob = "**/*",
         int maxResults = MaxResultLines,
         int contextLines = 0,
-        bool caseSensitive = false)
+        bool caseSensitive = false,
+        bool literal = false)
+    {
+        var primary = SearchCore(root, pattern, glob, maxResults, contextLines, caseSensitive, literal);
+        if (literal || HasHits(primary) || primary.Text.StartsWith("搜索超时", StringComparison.Ordinal))
+        {
+            return primary;
+        }
+
+        if (primary.Text.StartsWith("正则无效", StringComparison.Ordinal))
+        {
+            var escaped = SearchCore(root, pattern, glob, maxResults, contextLines, caseSensitive, literal: true);
+            return HasHits(escaped)
+                ? WithNote(escaped, $"正则无效，已按字面量搜索「{pattern}」：")
+                : primary;
+        }
+
+        var literalAttempt = SearchCore(root, pattern, glob, maxResults, contextLines, caseSensitive, literal: true);
+        if (HasHits(literalAttempt))
+        {
+            return WithNote(literalAttempt, $"没有正则命中，已按字面量回退「{pattern}」：");
+        }
+
+        var member = LastDottedMember(pattern);
+        if (member is not null)
+        {
+            var memberAttempt = SearchCore(root, member, glob, maxResults, contextLines, caseSensitive, literal: true);
+            if (HasHits(memberAttempt))
+            {
+                return WithNote(memberAttempt, $"没有找到「{pattern}」，已按成员名「{member}」回退：");
+            }
+        }
+
+        return primary;
+    }
+
+    private static bool HasHits(WorkspaceSearchResult result) =>
+        !result.Text.StartsWith("未找到", StringComparison.Ordinal)
+        && !result.Text.StartsWith("正则无效", StringComparison.Ordinal)
+        && !result.Text.StartsWith("搜索超时", StringComparison.Ordinal);
+
+    private static WorkspaceSearchResult WithNote(WorkspaceSearchResult result, string note) =>
+        new($"{note}\n{result.Text}", result.MatchedPaths);
+
+    /// <summary>把 <c>Type.Member</c> 退化成 <c>Member</c>；只处理明显是符号名的输入。</summary>
+    private static string? LastDottedMember(string pattern)
+    {
+        var parts = pattern.Trim().Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length < 2 || parts[^1].Length < 4)
+        {
+            return null;
+        }
+
+        var type = parts[^2];
+        return type.Length > 0 && char.IsUpper(type[0]) ? parts[^1] : null;
+    }
+
+    /// <summary>正则搜索的实现；<paramref name="literal"/> 为 true 时按字面量转义。</summary>
+    private WorkspaceSearchResult SearchCore(
+        string root,
+        string pattern,
+        string glob,
+        int maxResults,
+        int contextLines,
+        bool caseSensitive,
+        bool literal)
     {
         var limit = Math.Clamp(maxResults, 1, 200);
         var context = Math.Clamp(contextLines, 0, 5);
+
+        var expression = literal ? Regex.Escape(pattern) : pattern;
 
         Regex regex;
         try
         {
             regex = new Regex(
-                pattern,
+                expression,
                 RegexOptions.CultureInvariant
                 | (caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase),
                 TimeSpan.FromSeconds(1));

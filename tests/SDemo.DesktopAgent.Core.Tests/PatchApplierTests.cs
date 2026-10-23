@@ -112,7 +112,59 @@ public sealed class PatchApplierTests
         Assert.Contains("第 1 个 hunk 未匹配", result.Message);
         Assert.Contains("最近相似的片段", result.Message);
         Assert.Contains("建议先 read_file", result.Message);
+        Assert.Contains("候选补丁", result.Message);
         Assert.Equal("alpha\nbeta\n", File.ReadAllText(file));
+    }
+
+    [Fact]
+    public void 缩进漂移时按内容模糊定位()
+    {
+        using var temp = new TempDirectory();
+        var file = Path.Combine(temp.Root, "a.txt");
+        File.WriteAllText(file, "class A\n{\n    void M()\n    {\n        var x = 1;\n    }\n}\n");
+
+        // 上下文行少写了 4 个空格：精确 / 行尾空白都匹配不到，但逐行 Trim 后一致。
+        var result = Apply(temp.Root, """
+            --- a/a.txt
+            +++ b/a.txt
+            @@ -1,7 +1,7 @@
+             class A
+             {
+             void M()
+             {
+            -        var x = 1;
+            +        var x = 2;
+             }
+             }
+            """);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Contains("var x = 2;", File.ReadAllText(file));
+    }
+
+    [Fact]
+    public void 候选补丁使用实际上下文与修正后的行号()
+    {
+        using var temp = new TempDirectory();
+        var file = Path.Combine(temp.Root, "a.txt");
+        File.WriteAllText(file, "alpha\nbeta\ngamma\n");
+
+        var result = Apply(temp.Root, """
+            --- a/a.txt
+            +++ b/a.txt
+            @@ -1,3 +1,3 @@
+             alpha
+            -delta
+            +DELTA
+             gamma
+            """);
+
+        Assert.False(result.Success);
+        Assert.Contains("候选补丁", result.Message);
+        Assert.Contains("@@ -1,3 +1,3 @@", result.Message);
+        // 候选补丁里的上下文行必须来自文件实际内容，而不是模型写错的 delta。
+        Assert.Contains(" beta", result.Message);
+        Assert.Equal("alpha\nbeta\ngamma\n", File.ReadAllText(file));
     }
 
     [Fact]

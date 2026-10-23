@@ -1,0 +1,46 @@
+diff --git a/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs b/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
+index 7e878f3..4710cf6 100644
+--- a/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
++++ b/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections.Generic;
+@@ -438,5 +438,35 @@ namespace CommandLine.Tests.Unit
+             }
+         }
+ #endif
++
++        [Fact]
++        public static void AgentEval_PreferShortName_UsesShortWhenAvailable()
++        {
++            var options = new Simple_Options { ShortAndLong = "value" };
++
++            new Parser()
++                .FormatCommandLine(options, config => config.PreferShortName = true)
++                .Should().BeEquivalentTo("-s value");
++        }
++
++        [Fact]
++        public static void AgentEval_PreferShortName_FallsBackToLong()
++        {
++            var options = new Simple_Options { StringValue = "nospaces" };
++
++            new Parser()
++                .FormatCommandLine(options, config => config.PreferShortName = true)
++                .Should().BeEquivalentTo("--stringvalue nospaces");
++        }
++
++        [Fact]
++        public static void AgentEval_PreferShortName_DoesNotAffectSwitches()
++        {
++            var options = new Simple_Options { BoolValue = true, ShortAndLong = "value" };
++
++            new Parser()
++                .FormatCommandLine(options, config => config.PreferShortName = true)
++                .Should().BeEquivalentTo("-s value -x");
++        }
+     }
+ }
