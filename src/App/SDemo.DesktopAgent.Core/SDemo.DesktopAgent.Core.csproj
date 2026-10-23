@@ -41,6 +41,8 @@
     <ProjectReference Include="..\..\Tools\SDemo.DesktopAgent.Tools.Files\SDemo.DesktopAgent.Tools.Files.csproj" />
     <ProjectReference Include="..\..\Tools\SDemo.DesktopAgent.Tools.Search\SDemo.DesktopAgent.Tools.Search.csproj" />
     <ProjectReference Include="..\..\Tools\SDemo.DesktopAgent.Tools.Todo\SDemo.DesktopAgent.Tools.Todo.csproj" />
+    <!-- M2：技能工具包（load_skill），正文按需读取。 -->
+    <ProjectReference Include="..\..\Tools\SDemo.DesktopAgent.Tools.Skills\SDemo.DesktopAgent.Tools.Skills.csproj" />
     <!-- 沙箱契约：纯 record / enum / 协议常量，无平台 API。 -->
     <ProjectReference Include="..\..\Contracts\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
   </ItemGroup>

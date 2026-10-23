@@ -32,6 +32,12 @@ public sealed record ContextBudget(
         _ => 3000
     };
 
+    /// <summary>技能索引的固定上限（§3 账本 200–300；M2 验收放宽到 400）。</summary>
+    public const int SkillIndexTokenLimit = 400;
+
+    /// <summary>本轮技能索引最多占多少 token；超出只截断索引，不丢技能全文。</summary>
+    public int SkillIndexLimit => SkillIndexTokenLimit;
+
     /// <summary>按模型档案与设置计算预算。</summary>
     public static ContextBudget Create(ModelProfile profile, ContextSettings settings)
     {

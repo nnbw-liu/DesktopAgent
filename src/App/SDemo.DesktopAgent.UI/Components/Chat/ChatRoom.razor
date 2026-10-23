@@ -856,6 +856,9 @@
     /// </summary>
     private void RefreshToolPacks()
     {
+        // M2：技能索引 / load_skill 以技能库为准；技能目录变了（用户放了新 .md）也要刷新 chip。
+        _skills = SkillCatalog.List();
+
         var chips = new List<ToolPackChip>();
 
         foreach (var descriptor in ToolRegistry.Descriptors)
@@ -914,6 +917,12 @@
         if (!settings.Tools.IsPackEnabled(descriptor.Id, descriptor.DefaultEnabled))
         {
             return "在「设置 → 工具设置」中启用";
+        }
+
+        // 技能工具没有素材时不必暴露：系统提示不会产生索引，load_skill 也读不到正文。
+        if (descriptor.Id == "skills" && _skills.Count == 0)
+        {
+            return "还没有本地技能";
         }
 
         if (descriptor.Id == "powershell")

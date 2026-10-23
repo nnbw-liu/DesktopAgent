@@ -11,8 +11,13 @@ namespace SDemo.DesktopAgent.Services;
 public sealed class AgentToolRegistry
 {
     private readonly IReadOnlyList<IAgentToolPack> _packs;
+    private readonly ISkillLibrary? _skills;
 
-    public AgentToolRegistry(IEnumerable<IAgentToolPack> packs) => _packs = packs.ToArray();
+    public AgentToolRegistry(IEnumerable<IAgentToolPack> packs, ISkillLibrary? skills = null)
+    {
+        _packs = packs.ToArray();
+        _skills = skills;
+    }
 
     /// <summary>当前平台可见的工具包（按 Order 排序）。</summary>
     public IReadOnlyList<AgentToolPackDescriptor> Descriptors =>
@@ -108,10 +113,10 @@ public sealed class AgentToolRegistry
         return AIFunctionFactory.Create(
             (string query) => SearchCapabilities(entries, exposedToolNames, query),
             name: CapabilityRouter.EscapeHatchTool,
-            description: "按关键词查找当前会话可用的工具；返回工具名、所属工具包与用途。");
+            description: "按关键词查找当前会话可用的工具与技能；返回名字、所属分组与用途。");
     }
 
-    private static string SearchCapabilities(
+    private string SearchCapabilities(
         IReadOnlyList<(AgentToolPackDescriptor Pack, AgentToolFunctionDescriptor Function)> entries,
         IReadOnlySet<string> exposedToolNames,
         string query)
@@ -147,7 +152,36 @@ public sealed class AgentToolRegistry
 
         lines.Add("提示：本轮未暴露的工具不会交给模型；如需使用，请在下一轮明确说明用途，宿主会重新路由。");
 
+        AppendSkills(lines, normalized);
+
         return string.Join('\n', lines);
+    }
+
+    /// <summary>M2：兜底入口也列出技能索引，模型可以直接知道该 load_skill 哪个。</summary>
+    private void AppendSkills(List<string> lines, string normalized)
+    {
+        var skills = _skills?.Index() ?? [];
+        if (skills.Count == 0)
+        {
+            return;
+        }
+
+        var matched = normalized.Length == 0
+            ? skills
+            : skills.Where(skill =>
+                skill.Name.Contains(normalized, StringComparison.OrdinalIgnoreCase)
+                || skill.Description.Contains(normalized, StringComparison.OrdinalIgnoreCase)
+                || skill.WhenToUse.Contains(normalized, StringComparison.OrdinalIgnoreCase)
+                || skill.Tags.Any(tag => tag.Contains(normalized, StringComparison.OrdinalIgnoreCase))).ToArray();
+
+        lines.Add(matched.Count > 0
+            ? $"\n可用技能（用 load_skill(name) 读取正文，共 {skills.Count} 个）："
+            : $"\n没有匹配「{normalized}」的技能；当前共 {skills.Count} 个：");
+
+        foreach (var skill in (matched.Count > 0 ? matched : skills.Take(5)).Take(5))
+        {
+            lines.Add($"- {skill.Name}：{skill.Description}");
+        }
     }
 
     private static bool Matches(

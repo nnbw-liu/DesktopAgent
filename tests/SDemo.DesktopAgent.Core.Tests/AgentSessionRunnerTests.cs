@@ -80,9 +80,39 @@ public sealed class AgentSessionRunnerTests
         Assert.Contains("read_file", plan.Report.Routing!.ExposedTools);
     }
 
-    /// <summary>最小只读工具包：路由只需要描述符，测试不会真的调用工具。</summary>
-    private sealed class ReadOnlyPack : IAgentToolPack
+    [Fact]
+    public void 有技能时预览注入索引而不注入正文()
     {
+        var chat = new ScriptedChat([Script.Text("ok")]);
+        var root = TempRoot();
+        var skillsRoot = Path.Combine(root, "skills");
+        Directory.CreateDirectory(skillsRoot);
+        File.WriteAllText(
+            Path.Combine(skillsRoot, "总结.md"),
+            "---\ndescription: 一句话结论。\nwhen-to-use: 长文需要压缩时\n---\n\n这里是技能正文，默认不应进入系统提示。");
+
+        var calibration = new TokenCalibrationStore(Path.Combine(root, "calibration.json"));
+        var builder = new ContextBuilder(_counter, _settings, calibration);
+        var runner = new AgentSessionRunner(
+            chat,
+            builder,
+            _settings,
+            skills: new SkillCatalog(skillsRoot),
+            calibration: calibration);
+
+        var plan = runner.Preview(Request([
+            new ChatMessage(ChatMessageRole.User, "帮我总结这篇长文")
+        ]));
+
+        Assert.Contains("## 可用技能（索引）", plan.Instructions);
+        Assert.Contains("一句话结论。", plan.Instructions);
+        Assert.DoesNotContain("这里是技能正文", plan.Instructions);
+        Assert.True(plan.Report.Segments.Skills > 0);
+        Assert.Equal(plan.Report.Segments.Total, plan.Report.Estimated);
+    }
+
+    /// <summary>最小只读工具包：路由只需要描述符，测试不会真的调用工具。</summary>
+    private sealed class ReadOnlyPack : IAgentToolPack    {
         public AgentToolPackDescriptor Descriptor { get; } = new(
             "files",
             "文件（只读）",

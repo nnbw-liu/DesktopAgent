@@ -146,6 +146,43 @@ public sealed class CapabilityRouterTests
     }
 
     [Fact]
+    public void 技能工具与兜底入口各占一个名额()
+    {
+        var available = Available.Concat(["load_skill"]).ToArray();
+
+        var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
+            "随便聊两句",
+            [],
+            available,
+            AgentMode.Full,
+            MaxExposedTools: 6));
+
+        Assert.Contains(CapabilityRouter.LoadSkillTool, decision.ExposedTools);
+        Assert.Contains(CapabilityRouter.EscapeHatchTool, decision.ExposedTools);
+        Assert.Equal(6, decision.Count);
+        Assert.True(decision.ExposedTools.Count(name =>
+            !string.Equals(name, CapabilityRouter.LoadSkillTool, StringComparison.Ordinal)
+            && !string.Equals(name, CapabilityRouter.EscapeHatchTool, StringComparison.Ordinal)) <= 4);
+    }
+
+    [Fact]
+    public void Compact也暴露load_skill但总量仍不超过四()
+    {
+        var available = Available.Concat(["load_skill"]).ToArray();
+
+        var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
+            "嗯",
+            [],
+            available,
+            AgentMode.Compact,
+            MaxExposedTools: 6));
+
+        Assert.Equal(CapabilityRouter.CompactMaxTools, decision.Count);
+        Assert.Contains(CapabilityRouter.LoadSkillTool, decision.ExposedTools);
+        Assert.DoesNotContain(CapabilityRouter.EscapeHatchTool, decision.ExposedTools);
+    }
+
+    [Fact]
     public void 按窗口解析默认暴露上限()
     {
         var settings = new AgentSettings();

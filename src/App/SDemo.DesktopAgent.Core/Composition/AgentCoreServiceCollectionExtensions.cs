@@ -31,6 +31,7 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddFileTools();
         services.AddEditTools();
         services.AddTodoTools();
+        services.AddSkillTools();
 
         // P3：读前写注册表（按会话 + 2 小时 TTL）。
         services.AddSingleton<IFileReadRegistry, FileReadRegistry>();
@@ -44,6 +45,8 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<ChangeApplier>();
         services.AddSingleton<ChatStore>();
         services.AddSingleton<SkillCatalog>();
+        // M2：技能库的契约视图，供工具包（load_skill）与上下文层共用。
+        services.AddSingleton<ISkillLibrary>(sp => sp.GetRequiredService<SkillCatalog>());
 
         // P1 上下文层：单一入口 + 计量 + 校准 + 溢出自愈。
         services.AddSingleton<ITokenCounter, HeuristicTokenCounter>();

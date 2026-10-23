@@ -115,4 +115,5 @@ public sealed record ContextBuildRequest(
     string? StatePackText = null,
     bool SummaryFallback = false,
     AgentModePreference? ModeOverride = null,
-    RoutingDecision? Routing = null);
+    RoutingDecision? Routing = null,
+    string? SkillIndexText = null);

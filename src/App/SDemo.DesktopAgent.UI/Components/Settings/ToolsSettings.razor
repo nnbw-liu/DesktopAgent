@@ -157,6 +157,19 @@
                    checked="@Settings.Current.Agent.SearchCapabilitiesEnabled"
                    @onchange="ToggleSearchCapabilities" />
         </label>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">系统提示注入技能索引</span>
+                <span class="settings-row-hint">
+                    只放「名字 · 一句话 · 何时用」（20 个技能约 400 token）；正文由 load_skill 按需读取，手选技能仍全文注入。
+                </span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@Settings.Current.Agent.SkillIndexEnabled"
+                   @onchange="ToggleSkillIndex" />
+        </label>
     </section>
 
     <section class="settings-section">
@@ -908,6 +921,12 @@
     private void ToggleSearchCapabilities(ChangeEventArgs args)
     {
         Settings.Current.Agent.SearchCapabilitiesEnabled = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleSkillIndex(ChangeEventArgs args)
+    {
+        Settings.Current.Agent.SkillIndexEnabled = args.Value is true;
         Settings.Save();
     }
 

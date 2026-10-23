@@ -24,12 +24,15 @@ public static class CapabilityRouter
     /// <summary>路由失败时的兜底入口：列出当前会话可用的工具。</summary>
     public const string EscapeHatchTool = "search_capabilities";
 
+    /// <summary>技能正文加载（M2）：系统提示只放索引，正文按需读取。</summary>
+    public const string LoadSkillTool = "load_skill";
+
     /// <summary>
-    /// 核心集（§4.4）：只读、定位、修改、执行、计划各一个代表。
+    /// 核心集（§4.4）：只读、定位、修改、执行、计划各一个代表，外加两个元工具。
     /// 只有在可用集合里出现时才会暴露，用户关掉某个包不会凭空多出工具。
     /// </summary>
     public static readonly IReadOnlyList<string> CoreTools =
-        ["read_file", "search_files", "apply_patch", "run_command", "todo_write"];
+        ["read_file", "search_files", "apply_patch", "run_command", "todo_write", LoadSkillTool];
 
     private static readonly string[] EditWords =
         ["改", "修", "加", "重构", "实现", "新增", "删除", "测试", "fix", "add", "implement", "refactor"];
@@ -80,12 +83,19 @@ public static class CapabilityRouter
         var (intent, intentTools) = DetectIntent(input.UserInput);
         var ordered = new List<string>();
 
-        // 兜底入口不来自工具包，只有在 Full 且不是全量暴露时才占一个名额。
+        // M2 的两个元工具（兜底入口 / 技能正文加载）在 Full 暴露；Compact 也暴露 load_skill，
+        // 因为技能索引同样会进入 Compact 的系统提示，模型必须能取正文。
+        var hasLoadSkill = !input.ExposeAll
+                           && available.Contains(LoadSkillTool, StringComparer.Ordinal);
         var escapeHatch = input.Mode != AgentMode.Compact
                           && input.EscapeHatch
                           && !input.ExposeAll
                           && available.Length > 0;
-        var realLimit = escapeHatch ? Math.Max(0, limit - 1) : limit;
+        var metaCount = (escapeHatch ? 1 : 0) + (hasLoadSkill ? 1 : 0);
+        var realLimit = Math.Max(0, limit - metaCount);
+        var realAvailable = available
+            .Where(name => !string.Equals(name, LoadSkillTool, StringComparison.Ordinal))
+            .ToArray();
 
         if (input.Mode == AgentMode.Compact)
         {
@@ -94,7 +104,7 @@ public static class CapabilityRouter
 
             foreach (var recent in input.RecentToolIds.Reverse())
             {
-                if (Matches(recent, available) && !ordered.Contains(recent, StringComparer.Ordinal))
+                if (Matches(recent, realAvailable) && !ordered.Contains(recent, StringComparer.Ordinal))
                 {
                     ordered.Insert(0, recent);
                 }
@@ -105,29 +115,38 @@ public static class CapabilityRouter
         else
         {
             // Full：核心集永远先来，再按意图补包，最后按工具包 Order 填满剩余名额。
-            AddCandidates(ordered, CoreTools, available);
-            AddCandidates(ordered, intentTools, available);
+            AddCandidates(ordered, CoreTools, realAvailable);
+            AddCandidates(ordered, intentTools, realAvailable);
 
             foreach (var recent in input.RecentToolIds.Reverse())
             {
-                if (!ordered.Contains(recent, StringComparer.Ordinal))
+                if (Matches(recent, realAvailable) && !ordered.Contains(recent, StringComparer.Ordinal))
                 {
                     ordered.Add(recent);
                 }
             }
 
-            AddCandidates(ordered, available, available);
+            AddCandidates(ordered, realAvailable, realAvailable);
         }
 
         // 最近轨迹里可能有已经不可用的工具名：统一按可用集合过滤一次。
         var exposedReal = ordered
-            .Where(name => Matches(name, available))
+            .Where(name => Matches(name, realAvailable))
             .Take(realLimit)
             .ToList();
 
-        var exposed = escapeHatch
-            ? exposedReal.Append(EscapeHatchTool).ToArray()
-            : exposedReal.ToArray();
+        var meta = new List<string>();
+        if (escapeHatch)
+        {
+            meta.Add(EscapeHatchTool);
+        }
+
+        if (hasLoadSkill)
+        {
+            meta.Add(LoadSkillTool);
+        }
+
+        var exposed = exposedReal.Concat(meta).ToArray();
 
         var core = CoreTools
             .Where(name => exposed.Contains(name, StringComparer.Ordinal))
@@ -140,7 +159,7 @@ public static class CapabilityRouter
 
         var reason =
             $"{input.Mode} · 意图={intent} · 暴露 {exposed.Length}/{available.Length}"
-            + (available.Length > exposedReal.Count ? $"（上限 {limit}）" : string.Empty);
+            + (realAvailable.Length > exposedReal.Count ? $"（上限 {limit}）" : string.Empty);
 
         return new RoutingDecision(
             exposed,
@@ -149,7 +168,7 @@ public static class CapabilityRouter
             MaxExposedTools: input.ExposeAll ? available.Length : limit,
             EstimatedSchemaTokens: ToolSchemaEstimator.EstimateWithEscapeHatch(exposed, escapeHatch),
             EscapeHatch: escapeHatch,
-            Truncated: available.Length > exposedReal.Count,
+            Truncated: realAvailable.Length > exposedReal.Count,
             Reason: reason);
     }
 

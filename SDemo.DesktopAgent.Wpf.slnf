@@ -22,6 +22,7 @@
       "src\\Tools\\SDemo.DesktopAgent.Tools.Search\\SDemo.DesktopAgent.Tools.Search.csproj",
       "src\\Tools\\SDemo.DesktopAgent.Tools.Edits\\SDemo.DesktopAgent.Tools.Edits.csproj",
       "src\\Tools\\SDemo.DesktopAgent.Tools.Todo\\SDemo.DesktopAgent.Tools.Todo.csproj",
+      "src\\Tools\\SDemo.DesktopAgent.Tools.Skills\\SDemo.DesktopAgent.Tools.Skills.csproj",
       "src\\App\\SDemo.DesktopAgent.Core\\SDemo.DesktopAgent.Core.csproj",
       "src\\App\\SDemo.DesktopAgent.UI\\SDemo.DesktopAgent.UI.csproj",
       "src\\Platform\\SDemo.DesktopAgent.Windows\\SDemo.DesktopAgent.Windows.csproj",

@@ -260,21 +260,32 @@ public sealed class ContextBuilder
                                ?? (mode == AgentMode.Compact ? SystemPrompts.Compact : SystemPrompts.Full);
         var systemTokens = _counter.CountMessage("system", baseInstructions);
 
+        // M2：技能索引先进入固定块（只截断索引，不因此丢掉手选技能的全文）。
+        var instructions = baseInstructions;
+        var indexTokens = 0;
+
+        if (!string.IsNullOrWhiteSpace(request.SkillIndexText))
+        {
+            instructions += TruncateBlock(request.SkillIndexText!, budget.SkillIndexLimit, "技能索引已截断");
+            indexTokens = Math.Max(0, _counter.CountMessage("system", instructions) - systemTokens);
+        }
+
         if (string.IsNullOrWhiteSpace(request.SkillText))
         {
-            return (baseInstructions, systemTokens, 0, false);
+            return (instructions, systemTokens, indexTokens, false);
         }
 
         var header = $"\n\n## 本轮使用的技能：{request.SkillName}\n请严格按以下技能说明执行任务：\n\n";
         var skillText = request.SkillText;
         var truncated = false;
 
-        // 允许技能占满固定块剩余额度（按校准后的预算换算回原始估算）。
+        // 允许技能占满固定块剩余额度（按校准后的预算换算回原始估算），索引先占掉自己那一段。
         var factor = calibrationFactor <= 0 ? 1.0 : calibrationFactor;
-        var skillBudgetRaw = (int)Math.Floor(Math.Max(0, budget.FixedCap - systemTokens) / factor);
+        var skillBudgetRaw = (int)Math.Floor(Math.Max(0, budget.FixedCap - systemTokens - indexTokens) / factor);
         if (mode == AgentMode.Compact)
         {
-            skillBudgetRaw = Math.Min(skillBudgetRaw, 600);
+            // 600 是技能段硬上限；留 24 token 给截断提示与消息开销，避免收敛后轻微溢出。
+            skillBudgetRaw = Math.Min(skillBudgetRaw, Math.Max(0, 600 - indexTokens - 24));
         }
 
         var headerTokens = _counter.Count(header);
@@ -311,10 +322,10 @@ public sealed class ContextBuilder
 
         if (skillText.Length == 0)
         {
-            return (baseInstructions, systemTokens, 0, true);
+            return (instructions, systemTokens, indexTokens, true);
         }
 
-        var instructions = baseInstructions + header + skillText;
+        instructions += header + skillText;
         var skillTokens = Math.Max(0, _counter.CountMessage("system", instructions) - systemTokens);
 
         return (instructions, systemTokens, skillTokens, truncated);

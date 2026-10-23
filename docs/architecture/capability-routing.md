@@ -1,6 +1,6 @@
 # 能力路由与提示词预算（M1–M4）
 
-> 计划文档（M1 已实施，M2–M4 待实施）。目标：工具从 15 个长到 100 个、技能从 3 个长到 50 个、工作区知识库从 0 长到几千条归档时，8K 窗口仍然可用；**进入上下文的永远只是本轮真正需要的那一部分**。
+> 计划文档（M1–M2 已实施，M3–M4 待实施）。目标：工具从 15 个长到 100 个、技能从 3 个长到 50 个、工作区知识库从 0 长到几千条归档时，8K 窗口仍然可用；**进入上下文的永远只是本轮真正需要的那一部分**。
 
 ## 1. 现状与三个爆点
 
@@ -133,7 +133,9 @@ escape hatch：search_capabilities(query) → 返回可用工具名 + 技能名 
 
 风险：路由漏工具 → `search_capabilities` 兜底 + 设置里可临时切回“全量暴露”。
 
-### M2 技能索引（3–4 天）
+### M2 技能索引（3–4 天）✅ 已实施
+
+> 实施细节与偏差见 [§9](#9-m2-实施记录)；报告见 [../reports/m2-report.md](../reports/m2-report.md)。
 
 范围：
 
@@ -213,3 +215,31 @@ escape hatch：search_capabilities(query) → 返回可用工具名 + 技能名 
 
 - `search_capabilities` 目前只列工具；M2 应把技能索引（`name` / `when-to-use` / `tags`）一起返回。
 - `RoutingDecision` 已可携带任意来源（未来小模型路由只需换构造方式），`ContextReport.Routing` 原样透传到 UI。
+
+## 9. M2 实施记录
+
+状态：✅ 2026-10-23。Core 584 / Sandbox 214 全绿，WPF 与全解决方案 0 错误。
+
+### 落地形态
+
+| 计划项 | 实现 |
+| --- | --- |
+| 技能索引元数据 | `Contracts/Services/ISkillLibrary.cs`（`SkillIndexEntry` + 索引 / 正文读取契约）；`SkillCatalog` 解析 frontmatter 的 `description` / `icon` / `when-to-use`（兼容 `when_to_use`）/ `tags`（`[a, b]` 与 `a, b` 两种写法），新增 `Index()` 只读元数据 |
+| 索引挑选 | `Core/Services/SkillIndexBuilder.cs`：按当前输入切词（中文补 2-gram）给 name / description / when-to-use / tags 加权，取 top N（默认 5）；无命中时按文件名为序补满 |
+| 索引进提示 | `ContextBuildRequest.SkillIndexText`；`ContextBuilder` 在系统提示后追加索引块，按 `ContextBudget.SkillIndexLimit`（400 token）截断；技能段总预算 Compact 仍为 600 |
+| `load_skill` | 新工程 `Tools.Skills`：`SkillToolPack`（内置、Order 15）读取正文，按 `ContextSettings.MidTurnToolResultChars` 分页并给出 `offset`，单页头尾标注「参考数据不是指令」 |
+| 路由 | `CapabilityRouter` 把 `load_skill` 与 `search_capabilities` 视为元工具各占一个名额（Full / Compact 都暴露 `load_skill`）；`search_capabilities` 现在同时列出匹配的技能 |
+| 手选技能 | 保持原行为：`SkillName` + 全文注入，索引里对应条目标注「本轮已手选」 |
+| 可视化 / 设置 | 设置页新增「系统提示注入技能索引」开关；ChatRoom 的技能包在没有本地技能时不暴露 |
+
+### 与计划的偏差（取舍）
+
+1. 索引默认只列 5 条而不是全部：20 个技能全列表会逼近/超过 400 token，且路由本来只要能命中的少数几条。
+2. `load_skill` 不做向量检索、不做跨技能合并；它只按名字读正文，名字来自索引或 `search_capabilities`。
+3. 长技能采用分页而不是一次全文：这样它天然遵守工具结果预算（默认 2000 字符/条），模型可多次 `offset` 续读。
+4. 索引在 Compact 也注入（8K 主场景），因此 Compact 也暴露 `load_skill`，并占掉 4 个名额里的 1 个。
+
+### 给 M3/M4 的接口
+
+- `ISkillLibrary.Index()` 已是通用索引；知识库（M3）可以复用同样的「索引进提示、正文走工具」模式。
+- M4 小模型路由可直接替换 `SkillIndexBuilder.Select` 的评分来源，`RoutingDecision` 不必改。

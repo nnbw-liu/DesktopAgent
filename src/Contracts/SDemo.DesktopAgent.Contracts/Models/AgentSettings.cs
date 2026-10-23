@@ -30,6 +30,12 @@ public sealed class AgentSettings
     /// <summary>本轮是否提供 <c>search_capabilities</c> 兜底入口（使用工具时默认开启）。</summary>
     public bool SearchCapabilitiesEnabled { get; set; } = true;
 
+    /// <summary>M2：是否把技能索引注入系统提示（正文仍由 <c>load_skill</c> 按需读取）。</summary>
+    public bool SkillIndexEnabled { get; set; } = true;
+
+    /// <summary>索引最多列几条技能（3–5 条通常就够；默认 5）。</summary>
+    public int SkillIndexMaxEntries { get; set; } = 5;
+
     /// <summary>
     /// Compact 模式最大工具迭代（默认 8）。P6 实测 6 次会在「读两次 + 补丁失败重试」时
     /// 提前耗尽，模型来不及换 replace_text / write_file；循环安全由 FICC 轮数上限兜底。

@@ -442,9 +442,38 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             SummaryText: request.Session?.Summary,
             SummaryThroughOrder: request.Session?.SummaryThroughOrder ?? 0,
             StatePackText: statePackText,
-            SummaryFallback: request.Session?.SummaryIsFallback ?? false);
+            SummaryFallback: request.Session?.SummaryIsFallback ?? false,
+            SkillIndexText: BuildSkillIndexText(request));
 
         return build with { Routing = RouteCapabilities(request, build) };
+    }
+
+    /// <summary>
+    /// M2：技能渐进披露。系统提示只放「名字 / 一句话 / 何时用」的索引，
+    /// 按当前输入挑 top N；正文由模型用 load_skill 按需读取，或用户手选后全文注入。
+    /// </summary>
+    private string? BuildSkillIndexText(AgentRunRequest request)
+    {
+        var settings = _settings.Current.Agent ?? new AgentSettings();
+        if (!settings.SkillIndexEnabled)
+        {
+            return null;
+        }
+
+        var index = _skills?.Index() ?? [];
+        if (index.Count == 0)
+        {
+            return null;
+        }
+
+        var userInput = request.Messages
+            .LastOrDefault(message => message.Role == ChatMessageRole.User)?.Content ?? string.Empty;
+        var entries = SkillIndexBuilder.Select(
+            index,
+            userInput,
+            Math.Clamp(settings.SkillIndexMaxEntries, 1, 20));
+
+        return SkillIndexBuilder.Render(entries, request.SkillName);
     }
 
     /// <summary>

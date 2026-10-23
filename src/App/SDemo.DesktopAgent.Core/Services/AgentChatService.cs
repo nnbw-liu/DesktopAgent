@@ -60,6 +60,7 @@ public sealed class AgentChatService : IAgentChatService
     private readonly IAppPaths _paths;
     private readonly IFileReadRegistry _reads;
     private readonly IAgentRuntime _runtime;
+    private readonly ISkillLibrary? _skills;
 
     public AgentChatService(
         AgentToolRegistry tools,
@@ -70,7 +71,8 @@ public sealed class AgentChatService : IAgentChatService
         IToolAuditLog audit,
         IAppPaths paths,
         IFileReadRegistry reads,
-        IAgentRuntime runtime)
+        IAgentRuntime runtime,
+        ISkillLibrary? skills = null)
     {
         _tools = tools;
         _workspace = workspace;
@@ -81,6 +83,7 @@ public sealed class AgentChatService : IAgentChatService
         _paths = paths;
         _reads = reads;
         _runtime = runtime;
+        _skills = skills;
     }
 
     public async IAsyncEnumerable<AgentDelta> RunAsync(
@@ -103,7 +106,8 @@ public sealed class AgentChatService : IAgentChatService
             _reads,
             plan.Metrics,
             plan.Session,
-            plan.Metrics?.RunId);
+            plan.Metrics?.RunId,
+            _skills);
 
         var agentSettings = _settings.Current.Agent ?? new AgentSettings();
         var available = _tools.ToolNames(plan.ToolPacks);
