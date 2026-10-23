@@ -129,7 +129,11 @@ public sealed class AgentChatService : IAgentChatService
             tools = tools.Where(tool => selected.Contains(tool.Name, StringComparer.Ordinal)).ToList();
         }
 
-        var agent = CreateAgent(plan.Provider, plan.ModelId, tools, plan.Context, telemetry);
+        var toolCallLimit = agentMode == Context.AgentMode.Compact
+            ? Math.Clamp(_settings.Current.Agent.CompactMaxToolCalls, 1, 12)
+            : Context.ToolCallGuard.MaxCalls;
+
+        var agent = CreateAgent(plan.Provider, plan.ModelId, tools, plan.Context, telemetry, toolCallLimit);
 
         var pendingCalls = new Dictionary<string, (string Name, string? Digest)>(StringComparer.Ordinal);
 
@@ -177,7 +181,8 @@ public sealed class AgentChatService : IAgentChatService
         string modelId,
         IReadOnlyList<AITool> tools,
         ContextPlan plan,
-        ContextRunTelemetry telemetry)
+        ContextRunTelemetry telemetry,
+        int toolCallLimit)
     {
         var options = new OpenAIClientOptions
         {
@@ -204,7 +209,15 @@ public sealed class AgentChatService : IAgentChatService
         // 保证 FICC 在它外层（见 MidTurnPipelineSpikeTests）。
         var guarded = new ContextBudgetChatClient(chatClient.AsIChatClient(), budgetOptions, telemetry);
 
-        return guarded.AsAIAgent(
+        // P6：把工具循环显式收口。MAF 默认的上限远大于本应用的「每轮工具调用」预算；
+        // 小模型被 Block 后仍会继续发工具调用（实测 4B 在 6 次上限后仍调了 30+ 次），
+        // 所以用 FICC 的请求轮数上限兜底：允许的次数 + 2 次收尾。
+        var invoking = new FunctionInvokingChatClient(guarded)
+        {
+            MaximumIterationsPerRequest = toolCallLimit + 2
+        };
+
+        return invoking.AsAIAgent(
             instructions: plan.Instructions,
             name: "SDemo Agent",
             tools: tools.Count == 0 ? null : tools.ToList());

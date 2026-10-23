@@ -52,13 +52,13 @@ public sealed class ToolRouterTests
     {
         var context = new ToolSelectionContext(
             "改代码",
-            ["write_file"],
+            ["search_files"],
             Available,
             AgentMode.Compact);
 
         var selected = ToolRouter.Select(context);
 
-        Assert.Equal("write_file", selected[0]);
+        Assert.Equal("search_files", selected[0]);
     }
 
     [Fact]

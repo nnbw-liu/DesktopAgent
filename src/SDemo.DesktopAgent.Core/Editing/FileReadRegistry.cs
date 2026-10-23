@@ -127,6 +127,14 @@ public sealed class FileReadRegistry : IFileReadRegistry
         }
     }
 
+    /// <summary>
+    /// 与 WorkspacePath.Resolve 对齐：统一斜杠、去掉重复分隔符与 "." 段。
+    /// 差一个 "./" 就会让「读前写」误判成没读过。
+    /// </summary>
     private static string Normalize(string path) =>
-        path.Replace('\\', '/').TrimStart('/');
+        string.Join(
+            '/',
+            path.Replace('\\', '/')
+                .Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .Where(segment => segment != "."));
 }

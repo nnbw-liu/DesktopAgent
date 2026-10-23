@@ -40,7 +40,8 @@ public static class ToolRouter
 
         if (EditWords.Any(word => text.Contains(word, StringComparison.Ordinal)))
         {
-            preferred.AddRange(["read_file", "search_files", "apply_patch", "run_command"]);
+            // 小模型优先用「精确替换」；apply_patch 失败后还有 write_file 兜底。
+            preferred.AddRange(["read_file", "replace_text", "apply_patch", "write_file"]);
         }
         else if (RunWords.Any(word => text.Contains(word, StringComparison.Ordinal)))
         {
