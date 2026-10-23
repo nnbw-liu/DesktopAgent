@@ -16,8 +16,6 @@
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
     <!-- Markdown 渲染：CommonMark + GFM 表格 / 任务列表 / 自动链接等扩展 -->
     <PackageReference Include="Markdig" Version="1.4.0" />
-    <!-- 会话持久化：一个工作区一个 SQLite 文件，历史聊天一个文件 -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,6 +30,11 @@
     <ProjectReference Include="..\SDemo.DesktopAgent.Plugin.Translate\SDemo.DesktopAgent.Plugin.Translate.csproj" />
     <!-- 编辑引擎：路径守卫 / 补丁 / checkpoint。 -->
     <ProjectReference Include="..\SDemo.DesktopAgent.Editing\SDemo.DesktopAgent.Editing.csproj" />
+    <!-- 上下文引擎 / 内循环 / 持久化 / 沙箱。 -->
+    <ProjectReference Include="..\SDemo.DesktopAgent.Context\SDemo.DesktopAgent.Context.csproj" />
+    <ProjectReference Include="..\SDemo.DesktopAgent.Execution\SDemo.DesktopAgent.Execution.csproj" />
+    <ProjectReference Include="..\SDemo.DesktopAgent.Storage\SDemo.DesktopAgent.Storage.csproj" />
+    <ProjectReference Include="..\SDemo.DesktopAgent.Sandbox\SDemo.DesktopAgent.Sandbox.csproj" />
     <!-- 工具：契约 + 各内置工具包。 -->
     <ProjectReference Include="..\SDemo.DesktopAgent.Tools.Abstractions\SDemo.DesktopAgent.Tools.Abstractions.csproj" />
     <ProjectReference Include="..\SDemo.DesktopAgent.Tools.Edits\SDemo.DesktopAgent.Tools.Edits.csproj" />

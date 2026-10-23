@@ -13,7 +13,7 @@ public sealed class TodoToolPack : IAgentToolPack
 {
     public const string PackId = "todo";
     public const string FunctionId = "todo_write";
-    public const int MaxItems = 20;
+    public const int MaxItems = TodoItem.MaxItems;
     public const int MaxContentChars = 200;
 
     public AgentToolPackDescriptor Descriptor { get; } = new(

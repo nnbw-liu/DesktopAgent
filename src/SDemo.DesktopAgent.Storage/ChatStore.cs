@@ -617,7 +617,7 @@ public sealed class ChatStore
         {
             return JsonSerializer.Deserialize<List<TodoItem>>(json, JsonOptions)?
                 .Where(item => !string.IsNullOrWhiteSpace(item.Content))
-                .Take(TodoToolPack.MaxItems)
+                .Take(TodoItem.MaxItems)
                 .ToList() ?? [];
         }
         catch (JsonException)

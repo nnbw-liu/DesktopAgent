@@ -154,7 +154,7 @@ public static class StatePackFormatter
         var builder = new StringBuilder();
         builder.AppendLine("## 当前计划");
 
-        foreach (var item in todos.Take(TodoToolPack.MaxItems))
+        foreach (var item in todos.Take(TodoItem.MaxItems))
         {
             var line = $"{item.Icon} {item.Content}";
             var candidate = builder.ToString() + line;

@@ -11,7 +11,18 @@ Blazor Hybrid 多宿主应用：**一套 Razor 组件 + 一套业务服务**，�
 | `SDemo.DesktopAgent.Plugins.Runtime` | `net10.0` | 插件扫描 / 校验 / 注册表 / 提示词组装 |
 | `SDemo.DesktopAgent.Plugin.Translate` | `net10.0` | 内置翻译插件（清单与技能为嵌入资源） |
 | `SDemo.DesktopAgent.Plugin.Summarize` | `net10.0` | 内置总结插件（清单与技能为嵌入资源） |
-| `SDemo.DesktopAgent.Core` | `net10.0` | 应用编排与组合根；不含 AI SDK / 插件实现 |
+| `SDemo.DesktopAgent.Context` | `net10.0` | 上下文预算 / 裁剪 / 压缩 / 状态包 |
+| `SDemo.DesktopAgent.Editing` | `net10.0` | 路径守卫 / 补丁 / 读前写 / checkpoint |
+| `SDemo.DesktopAgent.Execution` | `net10.0` | 内循环策略、验证门、构建 / 测试解析 |
+| `SDemo.DesktopAgent.Storage` | `net10.0` | EF Core + SQLite 会话库 |
+| `SDemo.DesktopAgent.Sandbox` | `net10.0` | 沙箱的平台中立部分（工作区副本 / diff / 格式化） |
+| `SDemo.DesktopAgent.Tools.Abstractions` | `net10.0` | `IAgentToolPack` / `ToolContext` / 注册表 / 路由 |
+| `SDemo.DesktopAgent.Tools.Files` / `.Search` / `.Edits` / `.Todo` | `net10.0` | 各内置工具包，一个能力一个类库 |
+| `SDemo.DesktopAgent.Tools.Windows` | `net10.0-windows...` | PowerShell / PDF / run_command |
+| `SDemo.DesktopAgent.Sandbox.Windows` | `net10.0-windows...` | AppContainer / Job Object / Windows Sandbox |
+| `SDemo.DesktopAgent.Execution.Windows` | `net10.0-windows...` | 直跑进程 / 验证执行 / 热工作区 |
+| `SDemo.DesktopAgent.Windows` | `net10.0-windows...` | Windows 组合根：注册上面三个平台模块 |
+| `SDemo.DesktopAgent.Core` | `net10.0` | 应用编排与组合根；不含 AI SDK / 插件/工具实现 |
 | `SDemo.DesktopAgent.UI` | `net10.0`（Razor 类库） | 所有 `.razor` 组件 + `wwwroot`（css / js） |
 | `SDemo.DesktopAgent` | `net10.0-windows10.0.19041.0` | WPF 宿主：自绘标题栏、托盘、DPAPI、注册表主题 |
 | `SDemo.DesktopAgent.Maui` | `net10.0-windows10.0.19041.0`（默认）/ `net10.0-android`（`EnableAndroidTarget=true` 时） | MAUI 宿主：Windows 与 Android 共用同一套界面 |
@@ -70,12 +81,25 @@ DesktopAgent/
    ├─ SDemo.DesktopAgent.Plugins.Runtime/        # 扫描 / 校验 / 注册表 / 提示词 / 分段解析
    ├─ SDemo.DesktopAgent.Plugin.Translate/       # 内置翻译（plugin.json + skills 为嵌入资源）
    ├─ SDemo.DesktopAgent.Plugin.Summarize/       # 内置总结（同上）
+   ├─ SDemo.DesktopAgent.Context/                # 上下文引擎：预算 / 裁剪 / 压缩 / 状态包
+   ├─ SDemo.DesktopAgent.Editing/                # 路径守卫 / 补丁 / 读前写 / checkpoint
+   ├─ SDemo.DesktopAgent.Execution/              # 内循环策略：命令 / 验证门 / 结果解析
+   ├─ SDemo.DesktopAgent.Storage/                # ChatDbContext + ChatStore（EF Core / SQLite）
+   ├─ SDemo.DesktopAgent.Sandbox/                # 工作区副本 / 快照 / diff / 结果格式化
+   ├─ SDemo.DesktopAgent.Tools.Abstractions/     # IAgentToolPack / ToolContext / 注册表 / 路由
+   ├─ SDemo.DesktopAgent.Tools.Files/            # list / read / search / glob
+   ├─ SDemo.DesktopAgent.Tools.Search/           # web_search
+   ├─ SDemo.DesktopAgent.Tools.Edits/            # apply_patch / write_file / code_edit
+   ├─ SDemo.DesktopAgent.Tools.Todo/             # todo_write
    ├─ SDemo.DesktopAgent.Core/                   # 应用编排 + 组合根
-   │  ├─ Data/ChatDbContext.cs                   # SQLite + EF Core：sessions / messages
-   │  ├─ Services/                               # ChatStore、SettingsService、SkillCatalog、AgentChatService…
-   │  ├─ Context/                                # 预算 / 裁剪 / 压缩 / 状态包
+   │  ├─ Services/                               # SettingsService、SkillCatalog、AgentChatService、AgentSessionRunner…
    │  ├─ Plugins/PluginRunner.cs                 # 插件 Run 的编排（依赖 IAgentChatService）
+   │  ├─ Tools/                                  # 审批 / 审计的宿主实现
    │  └─ Composition/AgentCoreServiceCollectionExtensions.cs   # AddDesktopAgentCore()
+   ├─ SDemo.DesktopAgent.Windows/                # Windows 组合根（只做 DI + SandboxHost payload）
+   ├─ SDemo.DesktopAgent.Sandbox.Windows/        # AppContainer / Job Object / Windows Sandbox / 清理
+   ├─ SDemo.DesktopAgent.Execution.Windows/      # 直跑进程 / 验证 / 热工作区
+   ├─ SDemo.DesktopAgent.Tools.Windows/          # PowerShell / PDF / run_command
    ├─ SDemo.DesktopAgent.UI/                     # Razor 类库：两个宿主共用的界面
    │  ├─ _Imports.razor
    │  ├─ Components/                             # AppShell / Sidebar / Chat / Settings
@@ -496,7 +520,7 @@ S6 行为要点：
 
 使用方式：侧栏「新建聊天室」下方有「翻译」入口，点一下就是预选翻译的空会话；输入框底部的「翻译」chip 选中后发送走插件 Run；任意助手消息底部（时间右侧）的插件图标点一下，无参数直接跑、有参数弹出语言面板，产物是挂在原消息下的卡片，重启仍在、也不会进入下一轮上下文。`segments` 能力的卡片与消息都带「对照 / 译文」开关，切换只是重新渲染、不重新请求；呈现方式按会话记忆，新会话默认值在「设置 → 插件」。想关掉或调整上限也在「设置 → 插件」。
 
-**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（Core 当前 532 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 214 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令、构建 / 测试解析、todo / 验证门 / checkpoint / 循环保护、小模型模式 / 路由 / 工具修复、插件、沙箱与路径安全等。
+**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（当前 548 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 214 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令、构建 / 测试解析、todo / 验证门 / checkpoint / 循环保护、小模型模式 / 路由 / 工具修复、插件、沙箱与路径安全等。
 
 ## 主题实现
 
