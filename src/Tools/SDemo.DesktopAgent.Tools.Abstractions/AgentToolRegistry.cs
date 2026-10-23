@@ -31,6 +31,16 @@ public sealed class AgentToolRegistry
         !descriptor.WindowsOnly || OperatingSystem.IsWindows();
 
     /// <summary>
+    /// 某个启用集合下、当前平台可用的函数名（按工具包 Order 排列）。
+    /// 路由只需要名字，不需要实例化工具，所以它比 <see cref="Create"/> 便宜得多。
+    /// </summary>
+    public IReadOnlyList<string> ToolNames(IReadOnlySet<string> enabledPackIds) =>
+        EnabledPacks(enabledPackIds)
+            .SelectMany(pack => pack.Descriptor.Functions.Select(function => function.Id))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+    /// <summary>
     /// 按本轮启用的包生成工具。没有启用的包、平台不支持的包都不会出现在结果里，
     /// 模型看不到也就调用不到。
     /// </summary>
@@ -41,10 +51,7 @@ public sealed class AgentToolRegistry
     {
         var tools = new List<AITool>();
 
-        foreach (var pack in _packs
-                     .Where(pack => IsPlatformSupported(pack.Descriptor))
-                     .Where(pack => enabledPackIds.Contains(pack.Descriptor.Id))
-                     .OrderBy(pack => pack.Descriptor.Order))
+        foreach (var pack in EnabledPacks(enabledPackIds))
         {
             foreach (var tool in pack.Create(context))
             {
@@ -54,6 +61,103 @@ public sealed class AgentToolRegistry
 
         return tools;
     }
+
+    /// <summary>
+    /// M1：只生成路由选中的工具（核心集 + 选中包），并可附加 <c>search_capabilities</c> 兜底入口。
+    /// 仍然只从「平台支持 ∩ 用户启用」的包里生成，路由结果不会绕过开关。
+    /// </summary>
+    public IReadOnlyList<AITool> CreateExposed(
+        ToolContext context,
+        IReadOnlySet<string> enabledPackIds,
+        IReadOnlySet<string> exposedToolNames,
+        AgentRunMetrics? metrics = null,
+        bool escapeHatch = false)
+    {
+        var tools = Create(context, enabledPackIds, metrics)
+            .Where(tool => exposedToolNames.Contains(tool.Name, StringComparer.Ordinal))
+            .ToList();
+
+        if (escapeHatch && ToolNames(enabledPackIds).Count > 0)
+        {
+            tools.Add(Instrument(CreateEscapeHatch(enabledPackIds, exposedToolNames), metrics));
+        }
+
+        return tools;
+    }
+
+    private IEnumerable<IAgentToolPack> EnabledPacks(IReadOnlySet<string> enabledPackIds) =>
+        _packs
+            .Where(pack => IsPlatformSupported(pack.Descriptor))
+            .Where(pack => enabledPackIds.Contains(pack.Descriptor.Id))
+            .OrderBy(pack => pack.Descriptor.Order)
+            .ThenBy(pack => pack.Descriptor.Id, StringComparer.Ordinal);
+
+    /// <summary>
+    /// 兜底入口（§4.4 escape hatch）：让模型在路由漏掉工具时按关键词自查可用能力。
+    /// 它不绕过用户开关：返回的永远是「平台支持 ∩ 用户启用」里的工具。
+    /// </summary>
+    private AITool CreateEscapeHatch(
+        IReadOnlySet<string> enabledPackIds,
+        IReadOnlySet<string> exposedToolNames)
+    {
+        var entries = EnabledPacks(enabledPackIds)
+            .SelectMany(pack => pack.Descriptor.Functions
+                .Select(function => (Pack: pack.Descriptor, Function: function)))
+            .ToArray();
+
+        return AIFunctionFactory.Create(
+            (string query) => SearchCapabilities(entries, exposedToolNames, query),
+            name: CapabilityRouter.EscapeHatchTool,
+            description: "按关键词查找当前会话可用的工具；返回工具名、所属工具包与用途。");
+    }
+
+    private static string SearchCapabilities(
+        IReadOnlyList<(AgentToolPackDescriptor Pack, AgentToolFunctionDescriptor Function)> entries,
+        IReadOnlySet<string> exposedToolNames,
+        string query)
+    {
+        var normalized = (query ?? string.Empty).Trim().ToLowerInvariant();
+
+        var matches = entries
+            .Where(entry => normalized.Length == 0 || Matches(entry, normalized))
+            .Take(20)
+            .ToArray();
+
+        // 中文整句匹配不到时退回「全部可用工具」，总比一句“没找到”更有用。
+        var fallback = matches.Length == 0;
+        if (fallback)
+        {
+            matches = entries.Take(20).ToArray();
+        }
+
+        var lines = new List<string>
+        {
+            normalized.Length == 0
+                ? "当前会话可用工具："
+                : fallback
+                    ? $"没有精确匹配「{normalized}」，以下是全部可用工具："
+                    : $"匹配「{normalized}」的工具："
+        };
+
+        foreach (var (pack, function) in matches)
+        {
+            var state = exposedToolNames.Contains(function.Id, StringComparer.Ordinal) ? "已暴露" : "本轮未暴露";
+            lines.Add($"- {function.Id}（{pack.Name}）：{pack.Description} [{state}]");
+        }
+
+        lines.Add("提示：本轮未暴露的工具不会交给模型；如需使用，请在下一轮明确说明用途，宿主会重新路由。");
+
+        return string.Join('\n', lines);
+    }
+
+    private static bool Matches(
+        (AgentToolPackDescriptor Pack, AgentToolFunctionDescriptor Function) entry,
+        string normalized) =>
+        entry.Function.Id.Contains(normalized, StringComparison.OrdinalIgnoreCase)
+        || entry.Function.Name.Contains(normalized, StringComparison.OrdinalIgnoreCase)
+        || entry.Pack.Id.Contains(normalized, StringComparison.OrdinalIgnoreCase)
+        || entry.Pack.Name.Contains(normalized, StringComparison.OrdinalIgnoreCase)
+        || entry.Pack.Description.Contains(normalized, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// 记录调用次数，并把文本结果包进固定标记：模型必须把标记内的内容当数据，而不是指令。

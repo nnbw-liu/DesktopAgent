@@ -3917,6 +3917,7 @@ a {
 .seg-attachments { background: #fbbf24; }
 .seg-trace { background: #22d3ee; }
 .seg-pinned { background: #f472b6; }
+.seg-tools { background: #64748b; }
 
 .context-row {
     display: flex;

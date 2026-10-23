@@ -52,6 +52,11 @@ public sealed class ContextBuilder
 
         var calibrationFactor = _calibration?.GetFactor(request.Provider.Id, request.ModelId) ?? 1.0;
 
+        // M1：工具 schema 也要占预算。路由在进入上下文前给出粗估，宿主拿到真实工具后回填精确值。
+        var toolSchemaTokens = request.Routing is null
+            ? 0
+            : Math.Clamp(request.Routing.EstimatedSchemaTokens, 0, budget.ToolSchemaLimit);
+
         var (instructions, systemTokens, skillTokens, skillTruncated) =
             BuildInstructions(request, budget, calibrationFactor, mode);
 
@@ -70,7 +75,7 @@ public sealed class ContextBuilder
 
         var messageBudget = Math.Max(
             128,
-            budget.Total - systemTokens - skillTokens - injection.SummaryTokens - injection.StateTokens);
+            budget.Total - systemTokens - skillTokens - injection.SummaryTokens - injection.StateTokens - toolSchemaTokens);
         var trimOptions = TrimOptions.FromPolicy(
             policy,
             messageBudget,
@@ -91,10 +96,16 @@ public sealed class ContextBuilder
 
         var stats = trim.Stats;
         var segments = CalibrateSegments(
-            stats, systemTokens, skillTokens, calibrationFactor, injection.SummaryTokens, injection.StateTokens);
+            stats,
+            systemTokens,
+            skillTokens,
+            calibrationFactor,
+            injection.SummaryTokens,
+            injection.StateTokens,
+            toolSchemaTokens);
         var estimated = segments.Total;
         var rawEstimated = systemTokens + skillTokens + stats.MessageTokens
-            + injection.SummaryTokens + injection.StateTokens;
+            + injection.SummaryTokens + injection.StateTokens + toolSchemaTokens;
 
         var report = new ContextReport(
             request.Provider.Id,
@@ -122,7 +133,8 @@ public sealed class ContextBuilder
             CompactedMessages: stats.CompactedMessages,
             SummaryFallback: injection.SummaryTokens > 0 && request.SummaryFallback,
             StatePackUsed: injection.StateTokens > 0,
-            StatePackTokens: injection.StateTokens);
+            StatePackTokens: injection.StateTokens,
+            Routing: request.Routing);
 
         if (estimated > budget.Total)
         {
@@ -314,7 +326,8 @@ public sealed class ContextBuilder
         int skillTokens,
         double calibrationFactor,
         int summaryTokens = 0,
-        int statePackTokens = 0)
+        int statePackTokens = 0,
+        int toolSchemaTokens = 0)
     {
         var factor = calibrationFactor <= 0 ? 1.0 : calibrationFactor;
         int Scale(int raw) => (int)Math.Round(raw * factor, MidpointRounding.AwayFromZero);
@@ -327,7 +340,8 @@ public sealed class ContextBuilder
             ToolTrace: Scale(stats.TraceTokens),
             Pinned: Scale(stats.PinnedTokens),
             Summary: Scale(summaryTokens),
-            StatePack: Scale(statePackTokens));
+            StatePack: Scale(statePackTokens),
+            ToolSchema: Scale(toolSchemaTokens));
     }
 
     /// <summary>

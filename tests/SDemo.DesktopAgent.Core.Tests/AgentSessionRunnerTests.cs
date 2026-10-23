@@ -24,11 +24,12 @@ public sealed class AgentSessionRunnerTests
 
     private AgentRunRequest Request(
         IReadOnlyList<ChatMessage>? messages = null,
-        AgentRunMetrics? metrics = null) => new(
+        AgentRunMetrics? metrics = null,
+        IReadOnlySet<string>? toolPacks = null) => new(
         messages ?? [new ChatMessage(ChatMessageRole.User, "你好")],
         Provider(),
         "m",
-        new HashSet<string>(StringComparer.Ordinal),
+        toolPacks ?? new HashSet<string>(StringComparer.Ordinal),
         SessionId: "s1",
         Metrics: metrics);
 
@@ -59,6 +60,51 @@ public sealed class AgentSessionRunnerTests
         Assert.Equal(0, chat.Calls);
         Assert.True(plan.Report.Total > 0);
         Assert.Equal("m", plan.ModelId);
+    }
+
+    [Fact]
+    public void 启用工具时预览带路由与工具段()
+    {
+        var chat = new ScriptedChat([Script.Text("ok")]);
+        var root = TempRoot();
+        var calibration = new TokenCalibrationStore(Path.Combine(root, "calibration.json"));
+        var builder = new ContextBuilder(_counter, _settings, calibration);
+        var registry = new AgentToolRegistry([new ReadOnlyPack()]);
+        var runner = new AgentSessionRunner(chat, builder, _settings, calibration: calibration, tools: registry);
+
+        var plan = runner.Preview(Request(toolPacks: new HashSet<string> { "files" }));
+
+        Assert.NotNull(plan.Report.Routing);
+        Assert.True(plan.Report.Segments.ToolSchema > 0);
+        Assert.Equal(plan.Report.Segments.Total, plan.Report.Estimated);
+        Assert.Contains("read_file", plan.Report.Routing!.ExposedTools);
+    }
+
+    /// <summary>最小只读工具包：路由只需要描述符，测试不会真的调用工具。</summary>
+    private sealed class ReadOnlyPack : IAgentToolPack
+    {
+        public AgentToolPackDescriptor Descriptor { get; } = new(
+            "files",
+            "文件（只读）",
+            "读取与搜索工作区文件。",
+            "▤",
+            AgentToolRisk.Low,
+            Order: 20,
+            DefaultEnabled: true,
+            WindowsOnly: false,
+            [
+                new AgentToolFunctionDescriptor("read_file", "按行读取"),
+                new AgentToolFunctionDescriptor("search_files", "正则搜索"),
+                new AgentToolFunctionDescriptor("list_tree", "目录树")
+            ],
+            BuiltIn: true);
+
+        public IReadOnlyList<AITool> Create(ToolContext context) =>
+            [
+                AIFunctionFactory.Create(() => "ok", name: "read_file"),
+                AIFunctionFactory.Create(() => "ok", name: "search_files"),
+                AIFunctionFactory.Create(() => "ok", name: "list_tree")
+            ];
     }
 
     [Fact]

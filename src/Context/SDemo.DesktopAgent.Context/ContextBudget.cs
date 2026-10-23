@@ -21,6 +21,17 @@ public sealed record ContextBudget(
     int FixedCap,
     int CompactTarget)
 {
+    /// <summary>
+    /// 工具 schema 的独立上限（§3 预算账本）：4K 1K / 8K 1.5K / 32K 3K。
+    /// 路由预留与宿主侧实测都用它收口，避免 30 个工具吃掉整个窗口。
+    /// </summary>
+    public int ToolSchemaLimit => Window switch
+    {
+        <= 4096 => 1000,
+        <= 8192 => 1500,
+        _ => 3000
+    };
+
     /// <summary>按模型档案与设置计算预算。</summary>
     public static ContextBudget Create(ModelProfile profile, ContextSettings settings)
     {

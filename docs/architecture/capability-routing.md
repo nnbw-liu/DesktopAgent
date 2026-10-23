@@ -1,6 +1,6 @@
 # 能力路由与提示词预算（M1–M4）
 
-> 计划文档（尚未实施）。目标：工具从 15 个长到 100 个、技能从 3 个长到 50 个、工作区知识库从 0 长到几千条归档时，8K 窗口仍然可用；**进入上下文的永远只是本轮真正需要的那一部分**。
+> 计划文档（M1 已实施，M2–M4 待实施）。目标：工具从 15 个长到 100 个、技能从 3 个长到 50 个、工作区知识库从 0 长到几千条归档时，8K 窗口仍然可用；**进入上下文的永远只是本轮真正需要的那一部分**。
 
 ## 1. 现状与三个爆点
 
@@ -114,7 +114,9 @@ escape hatch：search_capabilities(query) → 返回可用工具名 + 技能名 
 
 ## 5. 里程碑
 
-### M1 工具预算与路由（2–3 天）
+### M1 工具预算与路由（2–3 天）✅ 已实施
+
+> 实施细节与偏差见 [§8](#8-m1-实施记录)；报告见 [../reports/m1-report.md](../reports/m1-report.md)。
 
 范围：
 
@@ -183,3 +185,31 @@ escape hatch：search_capabilities(query) → 返回可用工具名 + 技能名 
 - 不做 FICC 循环中途动态插工具。
 - 不做知识库预注入。
 - 不做技能/工具的动态 UI 插件化（本轮只做索引与路由）。
+
+## 8. M1 实施记录
+
+状态：✅ 2026-10-23。Core 565 / Sandbox 214 全绿，WPF 与全解决方案 0 错误。
+
+### 落地形态
+
+| 计划项 | 实现 |
+| --- | --- |
+| 能力注册表 | `Contracts/Context/RoutingDecision.cs`（纯契约：暴露集合 / 核心集 / 包集 / 上限 / 估算 token / 兜底 / 截断 / 理由）；`AgentSettings` 增加 `MaxExposedTools`、`ExposeAllTools`、`SearchCapabilitiesEnabled`，`ResolveMaxExposedTools(window)` 给出 8K 6 / 32K 12 |
+| 规则路由 | `Tools.Abstractions/CapabilityRouter.cs`：Compact 保留 P6 关键词 + 最近轨迹 + ≤4；Full 改为「核心集 → 意图补包 → 最近 → 按包 Order 填满」。关键词表新增 pdf / powershell / 联网 / 计划四组，减少路由漏工具 |
+| 工具暴露 | `AgentToolRegistry.ToolNames(enabled)` 只展开描述符（不实例化）；`CreateExposed(...)` 按路由结果生成，并附加 `search_capabilities`（只查「平台支持 ∩ 用户启用」） |
+| 分段预算 | `ContextBudget.ToolSchemaLimit`（4K 1K / 8K 1.5K / 32K 3K）；`ContextBuildRequest.Routing` 让 `ContextBuilder` 先预留；`ContextSegments.ToolSchema` 进入总估算 |
+| 实测回填 | `AgentChatService` 用 `HeuristicTokenCounter` 量真实 schema（名称 + 描述 + 参数 JSON），`ContextReport.WithRouting` 同步修正 `Estimated` / `RawEstimated`，超限时从路由尾部丢弃 |
+| 只路由一次 | `AgentSessionRunner` 在 `BuildRequest` 里算好路由（预览与发送同一决策）；插件 Run 等直接构造 plan 的路径由 `AgentChatService` 同规则补算 |
+| 可视化 | `ContextBreakdown` 新增「工具 schema」分段与「工具路由：暴露 N 个（上限 M）· 理由」；设置页新增上限 / 全量暴露 / 兜底开关 |
+
+### 与计划的偏差（取舍）
+
+1. `search_capabilities` 只在 Full 暴露并占一个名额；Compact 保留 ≤4 的 P6 行为（小模型用不上自查）。
+2. 兜底命中未暴露工具时**不**同轮续发（遵守 §7 非目标），只提示模型下一轮说明用途。
+3. 路由发生在工具实例化之前，预留用 `ToolSchemaEstimator` 粗估（130 token/工具 + 兜底 150），报告数字由宿主实测覆盖；二者偏差只影响消息预算预留（偏保守）。
+4. 未做真机 30 工具 / 8K 长任务实测与 `routing-eval`（M4 项）。
+
+### 给 M2 的接口
+
+- `search_capabilities` 目前只列工具；M2 应把技能索引（`name` / `when-to-use` / `tags`）一起返回。
+- `RoutingDecision` 已可携带任意来源（未来小模型路由只需换构造方式），`ContextReport.Routing` 原样透传到 UI。

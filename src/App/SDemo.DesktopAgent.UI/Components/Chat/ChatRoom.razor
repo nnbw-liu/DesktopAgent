@@ -695,7 +695,7 @@
                 Session.Messages.ToList(),
                 option.Provider,
                 option.ModelId,
-                new HashSet<string>(_enabledToolPacks, StringComparer.Ordinal),
+                EffectiveToolPacks(),
                 _selectedSkill,
                 Session.Id,
                 Session: Session)).Report;
@@ -882,6 +882,25 @@
 
         // 包在设置里被关掉 / 沙箱失效时，把本轮的选择也清掉，避免继续传给模型。
         _enabledToolPacks.RemoveWhere(id => chips.FirstOrDefault(chip => chip.Id == id) is not { Available: true });
+    }
+
+    /// <summary>
+    /// 本轮真正交给模型的工具包：用户在 chip 里选中的外部工具 + 当前可用的内置包。
+    /// 预览与发送共用它，否则占用环会低估工具 schema 的预算。
+    /// </summary>
+    private HashSet<string> EffectiveToolPacks()
+    {
+        var enabled = new HashSet<string>(_enabledToolPacks, StringComparer.Ordinal);
+
+        foreach (var descriptor in ToolRegistry.Descriptors.Where(descriptor => descriptor.BuiltIn))
+        {
+            if (GetUnavailableReason(descriptor) is null)
+            {
+                enabled.Add(descriptor.Id);
+            }
+        }
+
+        return enabled;
     }
 
     /// <summary>
@@ -1286,14 +1305,7 @@
         StateHasChanged();
 
         // 搜索等外部工具按用户选择；文件 / PDF / PowerShell 是内置能力，自动交给模型。
-        var enabledPacks = new HashSet<string>(_enabledToolPacks, StringComparer.Ordinal);
-        foreach (var descriptor in ToolRegistry.Descriptors.Where(descriptor => descriptor.BuiltIn))
-        {
-            if (GetUnavailableReason(descriptor) is null)
-            {
-                enabledPacks.Add(descriptor.Id);
-            }
-        }
+        var enabledPacks = EffectiveToolPacks();
         var metrics = new AgentRunMetrics();
         var startedAt = Stopwatch.GetTimestamp();
         var telemetry = new ContextRunTelemetry();

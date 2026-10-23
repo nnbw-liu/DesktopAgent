@@ -51,6 +51,53 @@ public sealed class AgentToolRegistryTests
         Assert.Equal(OperatingSystem.IsWindows(), AgentToolRegistry.IsPlatformSupported(descriptor));
     }
 
+    [Fact]
+    public void 可用工具名按包顺序展开()
+    {
+        var registry = new AgentToolRegistry([Pack("b", order: 20), Pack("a", order: 10)]);
+
+        Assert.Equal(["fake_tool", "fake_tool2"], registry.ToolNames(new HashSet<string> { "a", "b" }));
+        Assert.Empty(registry.ToolNames(new HashSet<string>()));
+    }
+
+    [Fact]
+    public void 只生成路由选中的工具()
+    {
+        var registry = new AgentToolRegistry([Pack("a", order: 10)]);
+        var context = Context();
+
+        var tools = registry.CreateExposed(
+            context,
+            new HashSet<string> { "a" },
+            new HashSet<string> { "fake_tool" });
+
+        Assert.Single(tools);
+        Assert.Equal("fake_tool", tools[0].Name);
+    }
+
+    [Fact]
+    public async Task 兜底入口能列出可用工具()
+    {
+        var registry = new AgentToolRegistry([Pack("a", order: 10)]);
+        var tools = registry.CreateExposed(
+            Context(),
+            new HashSet<string> { "a" },
+            new HashSet<string> { "fake_tool" },
+            escapeHatch: true);
+
+        var function = Assert.IsAssignableFrom<AIFunction>(
+            Assert.Single(tools, tool => tool.Name == CapabilityRouter.EscapeHatchTool));
+        var query = function.JsonSchema.GetProperty("properties").GetProperty("query");
+        Assert.NotEqual(System.Text.Json.JsonValueKind.Undefined, query.ValueKind);
+
+        var result = await function.InvokeAsync(
+            new AIFunctionArguments(new Dictionary<string, object?> { ["query"] = "fake" }));
+
+        var text = result?.ToString() ?? string.Empty;
+        Assert.Contains("fake_tool", text);
+        Assert.Contains("已暴露", text);
+    }
+
     private static IAgentToolPack Pack(string id, int order) =>
         new FakePack(new AgentToolPackDescriptor(
             id,
@@ -61,7 +108,10 @@ public sealed class AgentToolRegistryTests
             order,
             DefaultEnabled: false,
             WindowsOnly: false,
-            [new AgentToolFunctionDescriptor("fake_tool", "假工具")]));
+            [
+                new AgentToolFunctionDescriptor("fake_tool", "假工具"),
+                new AgentToolFunctionDescriptor("fake_tool2", "假工具二")
+            ]));
 
     private static AgentToolPackDescriptor Descriptor(string id, bool windowsOnly) => new(
         id,

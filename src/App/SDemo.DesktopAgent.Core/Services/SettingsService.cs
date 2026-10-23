@@ -90,6 +90,9 @@ public sealed class SettingsService : ISettingsService
                     // 旧 settings.json 没有 context 节点时按默认预算处理，零迁移。
                     settings.Context ??= new ContextSettings();
 
+                    // agent 节点（工具预算 / 小模型）同样兜底，避免 JSON 里写成 null。
+                    settings.Agent ??= new AgentSettings();
+
                     foreach (var provider in settings.Providers)
                     {
                         provider.ApiKey = !string.IsNullOrEmpty(provider.ApiKeyProtected)

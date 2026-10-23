@@ -39,13 +39,36 @@ public sealed record ContextReport(
     int CompactedMessages = 0,
     bool SummaryFallback = false,
     bool StatePackUsed = false,
-    int StatePackTokens = 0)
+    int StatePackTokens = 0,
+    RoutingDecision? Routing = null)
 {
     /// <summary>占输入预算的比例（0~1+）。</summary>
     public double Occupancy => Total <= 0 ? 0 : (double)Estimated / Total;
 
     /// <summary>占模型窗口的比例（UI 里给用户看的「窗口用了多少」）。</summary>
     public double WindowOccupancy => ContextWindow <= 0 ? 0 : (double)Estimated / ContextWindow;
+
+    /// <summary>本轮工具 schema 的 token（分段明细里的 Tools 段）。</summary>
+    public int ToolSchemaTokens => Segments.ToolSchema;
+
+    /// <summary>
+    /// 宿主侧量出真实工具 schema 后回填报告（M1）。同步修正 <see cref="Estimated"/> /
+    /// <see cref="RawEstimated"/>，保持「各分段之和 = 总估算」的不变量。
+    /// </summary>
+    public ContextReport WithRouting(int toolSchemaTokens, RoutingDecision? routing)
+    {
+        var clamped = Math.Max(0, toolSchemaTokens);
+        var delta = clamped - Segments.ToolSchema;
+        var segments = Segments with { ToolSchema = clamped };
+
+        return this with
+        {
+            Segments = segments,
+            Estimated = segments.Total,
+            RawEstimated = Math.Max(0, RawEstimated + delta),
+            Routing = routing ?? Routing
+        };
+    }
 }
 
 /// <summary>分段明细的 token 数；各段互斥，加总等于报告里的总估算。</summary>
@@ -57,9 +80,10 @@ public sealed record ContextSegments(
     int ToolTrace,
     int Pinned,
     int Summary = 0,
-    int StatePack = 0)
+    int StatePack = 0,
+    int ToolSchema = 0)
 {
-    public int Total => System + Skills + Turns + Attachments + ToolTrace + Pinned + Summary + StatePack;
+    public int Total => System + Skills + Turns + Attachments + ToolTrace + Pinned + Summary + StatePack + ToolSchema;
 }
 
 /// <summary>
@@ -90,4 +114,5 @@ public sealed record ContextBuildRequest(
     int SummaryThroughOrder = 0,
     string? StatePackText = null,
     bool SummaryFallback = false,
-    AgentModePreference? ModeOverride = null);
+    AgentModePreference? ModeOverride = null,
+    RoutingDecision? Routing = null);

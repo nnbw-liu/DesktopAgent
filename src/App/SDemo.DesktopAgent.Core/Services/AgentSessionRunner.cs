@@ -57,6 +57,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
     private readonly ContextCompactor? _compactor;
     private readonly WorkspaceStateProvider? _statePack;
     private readonly WorkspaceContext? _workspace;
+    private readonly AgentToolRegistry? _tools;
 
     public AgentSessionRunner(
         IAgentChatService chat,
@@ -66,7 +67,8 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         TokenCalibrationStore? calibration = null,
         ContextCompactor? compactor = null,
         WorkspaceStateProvider? statePack = null,
-        WorkspaceContext? workspace = null)
+        WorkspaceContext? workspace = null,
+        AgentToolRegistry? tools = null)
     {
         _chat = chat;
         _builder = builder;
@@ -76,6 +78,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         _compactor = compactor;
         _statePack = statePack;
         _workspace = workspace;
+        _tools = tools;
     }
 
     public ContextPlan Preview(AgentRunRequest request) =>
@@ -423,21 +426,68 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
     private ContextBuildRequest BuildRequest(
         AgentRunRequest request,
         double scale,
-        string? statePackText) => new(
-        request.Provider,
-        request.ModelId,
-        request.Messages,
-        SkillName: request.SkillName,
-        SkillText: _skills?.ReadContent(request.SkillName),
-        PinnedMessageIds: request.Messages
-            .Where(message => message.IsPinned)
-            .Select(message => message.Id)
-            .ToHashSet(StringComparer.Ordinal),
-        BudgetScale: scale,
-        SummaryText: request.Session?.Summary,
-        SummaryThroughOrder: request.Session?.SummaryThroughOrder ?? 0,
-        StatePackText: statePackText,
-        SummaryFallback: request.Session?.SummaryIsFallback ?? false);
+        string? statePackText)
+    {
+        var build = new ContextBuildRequest(
+            request.Provider,
+            request.ModelId,
+            request.Messages,
+            SkillName: request.SkillName,
+            SkillText: _skills?.ReadContent(request.SkillName),
+            PinnedMessageIds: request.Messages
+                .Where(message => message.IsPinned)
+                .Select(message => message.Id)
+                .ToHashSet(StringComparer.Ordinal),
+            BudgetScale: scale,
+            SummaryText: request.Session?.Summary,
+            SummaryThroughOrder: request.Session?.SummaryThroughOrder ?? 0,
+            StatePackText: statePackText,
+            SummaryFallback: request.Session?.SummaryIsFallback ?? false);
+
+        return build with { Routing = RouteCapabilities(request, build) };
+    }
+
+    /// <summary>
+    /// M1：每轮在这里路由一次（规则版），Preview 与实际请求走同一套判定，
+    /// 因此占用环里看到的工具段和被发送的工具 schema 是同一个决策。
+    /// 插件 Run / 未注册工具时返回 null，保持旧行为。
+    /// </summary>
+    private RoutingDecision? RouteCapabilities(AgentRunRequest request, ContextBuildRequest build)
+    {
+        if (_tools is null)
+        {
+            return null;
+        }
+
+        var available = _tools.ToolNames(request.ToolPacks);
+        if (available.Count == 0)
+        {
+            return RoutingDecision.Empty;
+        }
+
+        var profile = _builder.ResolveProfile(build);
+        var agent = _settings.Current.Agent ?? new AgentSettings();
+        var mode = AgentModeResolver.Resolve(
+            profile,
+            request.ModelId,
+            agent.Mode);
+
+        var userInput = request.Messages
+            .LastOrDefault(message => message.Role == ChatMessageRole.User)?.Content ?? string.Empty;
+        var recent = request.Metrics?.ToolTrace
+            .Select(entry => entry.ToolId)
+            .TakeLast(6)
+            .ToArray() ?? [];
+
+        return CapabilityRouter.Route(new CapabilityRoutingInput(
+            userInput,
+            recent,
+            available,
+            mode,
+            agent.ResolveMaxExposedTools(profile.ContextWindow, mode),
+            agent.SearchCapabilitiesEnabled,
+            agent.ExposeAllTools));
+    }
 
     /// <summary>
     /// 工作区状态包：树（30s 缓存）+ 最近改动 + 最近动作。没有工作区 / 关闭时返回 null，

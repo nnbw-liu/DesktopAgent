@@ -115,6 +115,51 @@
     </section>
 
     <section class="settings-section">
+        <h2 class="settings-section-title">工具预算与路由</h2>
+        <p class="settings-section-hint">
+            每轮只把「核心集 + 按需工具包」交给模型，其余工具按关键词路由；
+            工具 schema 单独占一段预算（8K 窗口上限 1.5K token）。
+        </p>
+
+        <div class="settings-grid">
+            <label class="field">
+                <span class="field-label">每轮最多暴露工具数</span>
+                <input class="field-input"
+                       type="number"
+                       min="0"
+                       max="24"
+                       value="@Settings.Current.Agent.MaxExposedTools"
+                       @onchange="ChangeMaxExposedTools" />
+                <span class="field-hint">0 = 自动（8K 6 个、32K 12 个）；1–24 手动覆盖。</span>
+            </label>
+        </div>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">临时全量暴露（排障用）</span>
+                <span class="settings-row-hint">
+                    路由漏工具时切回旧行为：所有启用工具都交给模型，仍受窗口工具段预算限制。
+                </span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@Settings.Current.Agent.ExposeAllTools"
+                   @onchange="ToggleExposeAll" />
+        </label>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">提供 search_capabilities 兜底入口</span>
+                <span class="settings-row-hint">模型可自查当前会话可用的工具；默认开启，只影响 Full 模式。</span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@Settings.Current.Agent.SearchCapabilitiesEnabled"
+                   @onchange="ToggleSearchCapabilities" />
+        </label>
+    </section>
+
+    <section class="settings-section">
         <h2 class="settings-section-title">内循环（直跑）</h2>
         <p class="settings-section-hint">
             构建 / 测试可以走宿主直跑，跳过沙箱复制的等待；参数不经过 shell，只放行白名单命令。
@@ -843,6 +888,27 @@
             Settings.Current.Agent.Mode = mode;
             Settings.Save();
         }
+    }
+
+    private void ChangeMaxExposedTools(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var max))
+        {
+            Settings.Current.Agent.MaxExposedTools = max <= 0 ? 0 : Math.Clamp(max, 1, 24);
+            Settings.Save();
+        }
+    }
+
+    private void ToggleExposeAll(ChangeEventArgs args)
+    {
+        Settings.Current.Agent.ExposeAllTools = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleSearchCapabilities(ChangeEventArgs args)
+    {
+        Settings.Current.Agent.SearchCapabilitiesEnabled = args.Value is true;
+        Settings.Save();
     }
 
     private void ToggleAutoVerify(ChangeEventArgs args)    {
