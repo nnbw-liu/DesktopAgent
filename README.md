@@ -63,7 +63,7 @@ Blazor Hybrid 多宿主应用：**一套 Razor 组件 + 一套业务服务**，�
 ```
 DesktopAgent/
 ├─ SDemo.DesktopAgent.sln
-├─ SDemo.DesktopAgent.Wpf.slnf          # 只含桌面端三个工程，没装 MAUI workload 也能构建
+├─ SDemo.DesktopAgent.Wpf.slnf          # 桌面端工程（含全部模块），没装 MAUI workload 也能构建
 └─ src/
    ├─ SDemo.DesktopAgent.Sandbox.Contracts/      # 沙箱协议（零依赖）
    ├─ SDemo.DesktopAgent.Contracts/              # 模型 / 设置 DTO / 跨模块接口

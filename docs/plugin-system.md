@@ -1241,6 +1241,8 @@ M5 建议在 M1 完成后就开始（先手工放目录），别等 M3/M4 全绿
 
 ### 17.9 文件清单
 
+> 下面是 M0–M6 当时的布局，保留作为设计记录。模块化重构后：插件契约与运行时在 `src/SDemo.DesktopAgent.Plugins.Abstractions` / `.Runtime`，内置插件在 `src/SDemo.DesktopAgent.Plugin.Translate` / `.Summarize`（嵌入资源），`PluginRunner` 仍在 Core 作为应用编排。
+
 #### 新增文件
 
 ```text
