@@ -16,6 +16,7 @@ public sealed record ToolTraceEntry(
 {
     public const string StatusOk = "ok";
     public const string StatusError = "error";
+    public const string StatusRejected = "rejected";
     public const string StatusDenied = "denied";
     public const string StatusCanceled = "canceled";
 }

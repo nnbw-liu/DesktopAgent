@@ -25,6 +25,21 @@ public sealed class FileToolPackTests
         Assert.Contains("[文件] a.txt", list);
     }
 
+    [Fact]
+    public async Task 工作区信息列出测试项目范围()
+    {
+        using var temp = new TempDirectory();
+        Directory.CreateDirectory(Path.Combine(temp.Root, "tests", "Demo.Tests"));
+        File.WriteAllText(Path.Combine(temp.Root, "tests", "Demo.Tests", "Demo.Tests.csproj"), "<Project />");
+        File.WriteAllText(Path.Combine(temp.Root, "Demo.csproj"), "<Project />");
+        var context = Context(temp.Root, new StubSettingsService(), new ToolApprovalService());
+
+        var info = await InvokeAsync(new FileToolPack(), context, "workspace_info");
+
+        Assert.Contains("测试项目：tests/Demo.Tests/Demo.Tests.csproj", info);
+        Assert.Contains("不要改产品代码", info);
+    }
+
     [Theory]
     [InlineData("../outside.txt")]
     [InlineData("..\\outside.txt")]

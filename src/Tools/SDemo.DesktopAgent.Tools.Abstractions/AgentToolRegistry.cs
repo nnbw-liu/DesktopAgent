@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.AI;
+using SDemo.DesktopAgent.Context;
 
 namespace SDemo.DesktopAgent.Services;
 
@@ -193,6 +194,9 @@ public sealed class AgentToolRegistry
         || entry.Pack.Name.Contains(normalized, StringComparison.OrdinalIgnoreCase)
         || entry.Pack.Description.Contains(normalized, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>工具失败 / 被拒绝时写在结果首行的状态标记；成功时不写，避免占 token。</summary>
+    internal const string ToolStatusPrefix = "[TOOL_STATUS:";
+
     /// <summary>
     /// 记录调用次数，并把文本结果包进固定标记：模型必须把标记内的内容当数据，而不是指令。
     /// </summary>
@@ -226,7 +230,8 @@ public sealed class AgentToolRegistry
 
             if (guard is { Allowed: false })
             {
-                return $"[TOOL_RESULT_BEGIN:{inner.Name}]\n{guard.Message}\n[TOOL_RESULT_END]";
+                metrics?.RecordToolResult(inner.Name, ToolTraceEntry.StatusRejected);
+                return Envelope(inner.Name, guard.Message ?? "本轮工具调用已达上限。", ToolTraceEntry.StatusRejected);
             }
 
             // P6：小模型会反复提交同一种坏补丁。连续两次写不进去就禁用本工具，
@@ -239,11 +244,15 @@ public sealed class AgentToolRegistry
                     "replace_text" => "请改用 apply_patch，或 write_file 重写整个文件；也可以先用文本说明卡在哪里。",
                     _ => "请改用 replace_text 或 apply_patch，或先用文本说明卡在哪里。"
                 };
-                return $"[TOOL_RESULT_BEGIN:{inner.Name}]\n"
-                    + $"{inner.Name} 已在本次生成中连续失败 2 次，本轮禁用；{alternative}\n[TOOL_RESULT_END]";
+                metrics?.RecordToolResult(inner.Name, ToolTraceEntry.StatusRejected);
+                return Envelope(
+                    inner.Name,
+                    $"{inner.Name} 已在本次生成中连续失败 2 次，本轮禁用；{alternative}",
+                    ToolTraceEntry.StatusRejected);
             }
 
             string text;
+            var status = ToolTraceEntry.StatusOk;
             try
             {
                 var result = await inner.InvokeAsync(arguments, cancellationToken).ConfigureAwait(false);
@@ -254,6 +263,7 @@ public sealed class AgentToolRegistry
                 // 小模型经常漏必填参数（例如只发 expectedHash 不发 patch）。
                 // 直接抛异常只会得到 "Error: Function failed."，模型无法自我修复；
                 // 这里把 schema 和收到的参数一起回传，让它按 schema 重试。
+                status = ToolTraceEntry.StatusError;
                 var provided = string.Join(", ", arguments.Keys.OrderBy(key => key, StringComparer.Ordinal));
                 text = $"{{\"error\":\"missing or invalid argument\",\"tool\":\"{inner.Name}\","
                     + $"\"provided\":\"{provided}\",\"message\":\"{Escape(ex.Message)}\","
@@ -261,6 +271,7 @@ public sealed class AgentToolRegistry
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                status = ToolTraceEntry.StatusError;
                 text = $"工具执行失败（未修改文件）：{ex.GetType().Name}: {ex.Message}";
             }
 
@@ -269,23 +280,71 @@ public sealed class AgentToolRegistry
                 text = $"[宿主提示] {warning}\n{text}";
             }
 
-            if (IsEditTool(inner.Name)
-                && (text.StartsWith("未写入任何文件", StringComparison.Ordinal)
-                    || text.StartsWith("未替换任何内容", StringComparison.Ordinal)))
+            if (IsEditTool(inner.Name))
             {
-                _failedEdits++;
-
-                if (_failedEdits >= 2)
+                if (IsEditFailure(text))
                 {
-                    text += "\n[宿主提示] 已连续失败 2 次。不要再调用本工具；请改用 replace_text 精确替换，或 write_file 重写整个文件。";
+                    status = ToolTraceEntry.StatusRejected;
+                    _failedEdits++;
+
+                    if (_failedEdits >= 2)
+                    {
+                        text += "\n[宿主提示] 已连续失败 2 次。不要再调用本工具；请改用 replace_text 精确替换，或 write_file 重写整个文件。";
+                    }
+                }
+                else if (status == ToolTraceEntry.StatusOk)
+                {
+                    _failedEdits = 0;
                 }
             }
-            else if (IsEditTool(inner.Name) && !text.StartsWith("未写入", StringComparison.Ordinal))
+
+            if (status == ToolTraceEntry.StatusOk)
             {
-                _failedEdits = 0;
+                status = InferStatus(text);
             }
 
-            return $"[TOOL_RESULT_BEGIN:{inner.Name}]\n{text}\n[TOOL_RESULT_END]";
+            metrics?.RecordToolResult(inner.Name, status);
+
+            return Envelope(inner.Name, text, status);
+        }
+
+        /// <summary>编辑类工具的“没写进去”结果；这些不算成功，避免循环保护与统计误判。</summary>
+        private static bool IsEditFailure(string text) =>
+            text.Contains("未写入任何文件", StringComparison.Ordinal)
+            || text.Contains("未替换任何内容", StringComparison.Ordinal)
+            || text.Contains("写入失败", StringComparison.Ordinal)
+            || text.Contains("创建检查点失败", StringComparison.Ordinal)
+            || text.Contains("疑似整文件重写丢失内容", StringComparison.Ordinal);
+
+        /// <summary>非编辑工具的错误文本也要有状态，便于 trace / 评测区分“没结果”和“执行失败”。</summary>
+        private static string InferStatus(string text)
+        {
+            if (text.Contains("用户拒绝", StringComparison.Ordinal)
+                || text.Contains("用户取消了", StringComparison.Ordinal))
+            {
+                return ToolTraceEntry.StatusRejected;
+            }
+
+            if (text.StartsWith("工具执行失败", StringComparison.Ordinal)
+                || text.StartsWith("执行失败", StringComparison.Ordinal)
+                || text.StartsWith("错误", StringComparison.Ordinal)
+                || text.StartsWith("正则无效", StringComparison.Ordinal)
+                || text.StartsWith("搜索超时", StringComparison.Ordinal)
+                || text.StartsWith("{\"error\"", StringComparison.Ordinal))
+            {
+                return ToolTraceEntry.StatusError;
+            }
+
+            return ToolTraceEntry.StatusOk;
+        }
+
+        private static string Envelope(string toolName, string text, string status)
+        {
+            var marker = string.Equals(status, ToolTraceEntry.StatusOk, StringComparison.Ordinal)
+                ? string.Empty
+                : $"{ToolStatusPrefix}{status}]\n";
+
+            return $"[TOOL_RESULT_BEGIN:{toolName}]\n{marker}{text}\n[TOOL_RESULT_END]";
         }
 
         private static bool IsEditTool(string name) =>

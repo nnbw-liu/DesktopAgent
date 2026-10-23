@@ -101,4 +101,21 @@ public sealed class ToolTraceTests
         var empty = AgentChatService.Classify(null);
         Assert.Equal(ToolTraceEntry.StatusError, empty.Status);
     }
+
+    [Fact]
+    public void 工具状态标记优先于文本猜测()
+    {
+        var rejected = AgentChatService.Classify(
+            "[TOOL_RESULT_BEGIN:write_file]\n[TOOL_STATUS:rejected]\n未写入 a.cs：疑似整文件重写丢失内容\n[TOOL_RESULT_END]");
+        Assert.Equal(ToolTraceEntry.StatusRejected, rejected.Status);
+
+        var failed = AgentChatService.Classify(
+            "[TOOL_RESULT_BEGIN:apply_patch]\n[TOOL_STATUS:error]\n工具执行失败（未修改文件）\n[TOOL_RESULT_END]");
+        Assert.Equal(ToolTraceEntry.StatusError, failed.Status);
+
+        // 没有标记时仍走旧启发式，兼容历史消息 / 旧库。
+        var legacy = AgentChatService.Classify(
+            "[TOOL_RESULT_BEGIN:apply_patch]\n未写入任何文件：第 1 个 hunk 未匹配\n[TOOL_RESULT_END]");
+        Assert.Equal(ToolTraceEntry.StatusRejected, legacy.Status);
+    }
 }

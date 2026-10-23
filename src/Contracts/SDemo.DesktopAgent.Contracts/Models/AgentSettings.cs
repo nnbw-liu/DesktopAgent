@@ -61,6 +61,12 @@ public sealed class AgentSettings
     public int RoutingTimeoutSeconds { get; set; } = 8;
 
     /// <summary>
+    /// P7：拒绝“明显缩水”的 write_file 覆盖（默认开启）。模型补丁失败后常整文件重写，
+    /// 只写回自己记得的片段会把源文件截断；关闭后允许合法的大段删减。
+    /// </summary>
+    public bool WriteFileShrinkGuard { get; set; } = true;
+
+    /// <summary>
     /// Compact 模式最大工具迭代（默认 8）。P6 实测 6 次会在「读两次 + 补丁失败重试」时
     /// 提前耗尽，模型来不及换 replace_text / write_file；循环安全由 FICC 轮数上限兜底。
     /// </summary>

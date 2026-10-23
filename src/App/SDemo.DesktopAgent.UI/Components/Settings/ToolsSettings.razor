@@ -409,6 +409,20 @@
                    checked="@Settings.Current.ConfirmFileWrite"
                    @onchange="ToggleConfirmWrite" />
         </label>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">拒绝明显缩水的整文件覆盖</span>
+                <span class="settings-row-hint">
+                    默认开启：新内容不到原文 70% 时拒绝 write_file，避免模型只写回片段把源文件截断；
+                    确实要合法大段删减时可临时关闭。
+                </span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@Settings.Current.Agent.WriteFileShrinkGuard"
+                   @onchange="ToggleWriteShrinkGuard" />
+        </label>
     </section>
 
     @if (PowerShellDescriptor is not null)
@@ -1216,9 +1230,9 @@
     }
 
 #if DEBUG
-    private const bool IsDebugBuild = true;
+    private static readonly bool IsDebugBuild = true;
 #else
-    private const bool IsDebugBuild = false;
+    private static readonly bool IsDebugBuild = false;
 #endif
 
     private void TogglePowerShell(ChangeEventArgs args)
@@ -1369,6 +1383,12 @@
     private void ToggleConfirmWrite(ChangeEventArgs args)
     {
         Settings.Current.ConfirmFileWrite = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleWriteShrinkGuard(ChangeEventArgs args)
+    {
+        Settings.Current.Agent.WriteFileShrinkGuard = args.Value is true;
         Settings.Save();
     }
 

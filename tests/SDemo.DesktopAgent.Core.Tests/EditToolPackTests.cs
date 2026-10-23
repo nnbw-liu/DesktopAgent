@@ -305,6 +305,26 @@ public sealed class EditToolPackTests
     }
 
     [Fact]
+    public async Task 关闭shrink_guard后允许合法删减()
+    {
+        using var temp = new TempDirectory();
+        var file = Path.Combine(temp.Root, "a.txt");
+        var original = string.Join("\n", Enumerable.Range(1, 30).Select(i => $"line {i} with enough content")) + "\n";
+        File.WriteAllText(file, original);
+        var settings = new StubSettingsService();
+        settings.Current.ConfirmFileWrite = false;
+        settings.Current.Agent.WriteFileShrinkGuard = false;
+        var tool = Tool(temp.Root, settings);
+        tool.Reads.RecordRead("session", "a.txt", FileReadRegistry.HashFile(file)!);
+
+        var result = await InvokeAsync(
+            tool.Context, tool.Pack, "write_file", ("path", "a.txt"), ("content", "short"));
+
+        Assert.Contains("已修改 1 个文件", result);
+        Assert.Equal("short", File.ReadAllText(file));
+    }
+
+    [Fact]
     public async Task replace_text拒绝重复添加已有成员()
     {
         using var temp = new TempDirectory();

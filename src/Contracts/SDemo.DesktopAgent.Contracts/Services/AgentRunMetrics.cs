@@ -11,6 +11,8 @@ public sealed class AgentRunMetrics
     private readonly Dictionary<string, int> _toolCalls = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ToolTraceEntry> _toolTrace = [];
     private readonly List<MemoryCitation> _citations = [];
+    private int _rejectedToolCalls;
+    private int _failedToolCalls;
 
     /// <summary>本次生成（turn）的 id；checkpoint 按它聚合一次生成里的多次编辑。</summary>
     public string RunId { get; } = Guid.NewGuid().ToString("N");
@@ -23,6 +25,12 @@ public sealed class AgentRunMetrics
     public int OutputTokens { get; private set; }
 
     public IReadOnlyDictionary<string, int> ToolCalls => _toolCalls;
+
+    /// <summary>被宿主拒绝的调用数（循环保护 / 用户拒绝 / 连续失败禁用）。</summary>
+    public int RejectedToolCalls => _rejectedToolCalls;
+
+    /// <summary>执行失败的调用数（参数错误 / 工具异常 / 业务失败）。</summary>
+    public int FailedToolCalls => _failedToolCalls;
 
     /// <summary>一次生成最多保留的轨迹条数；只影响持久化 / 编辑摘要，不影响模型可见的最近 20 条。</summary>
     public const int MaxStoredEntries = 100;
@@ -89,6 +97,22 @@ public sealed class AgentRunMetrics
         }
 
         _toolCalls[name] = _toolCalls.TryGetValue(name, out var count) ? count + 1 : 1;
+    }
+
+    /// <summary>
+    /// 记录一次工具结果的状态。工具文本会同时带上 <c>[TOOL_STATUS:*]</c> 标记，
+    /// 这里只做本轮计数，供评测和“被拒绝的写入不算成功”这类判断使用。
+    /// </summary>
+    public void RecordToolResult(string? name, string? status)
+    {
+        if (string.Equals(status, ToolTraceEntry.StatusRejected, StringComparison.Ordinal))
+        {
+            _rejectedToolCalls++;
+        }
+        else if (string.Equals(status, ToolTraceEntry.StatusError, StringComparison.Ordinal))
+        {
+            _failedToolCalls++;
+        }
     }
 
     /// <summary>追加一条轨迹；超过上限的静默丢弃（只保留最近的部分，前面已有汇总）。</summary>

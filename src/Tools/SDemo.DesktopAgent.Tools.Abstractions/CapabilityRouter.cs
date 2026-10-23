@@ -221,6 +221,16 @@ public static class CapabilityRouter
     public static string ClassifyIntent(string input) => DetectIntent(input).Intent;
 
     /// <summary>
+    /// 输入是否像“要改代码 / 跑命令”的任务，而不是寒暄或纯问答。
+    /// 供“无修改回灌”判断用，避免把普通聊天强行拽进工具循环。
+    /// </summary>
+    public static bool LooksLikeTask(string? input)
+    {
+        var text = input?.Trim() ?? string.Empty;
+        return text.Length >= 4 && HasTaskSignal(text);
+    }
+
+    /// <summary>
     /// M4：规则是否「不确定」到值得问一次小模型。只有同时满足以下条件才调用：
     /// Full、未全量暴露、工具数超过上限、输入有任务信号，且规则意图未知 / 多意图 / 命中的工具都不可用。
     /// </summary>

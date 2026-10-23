@@ -1,0 +1,105 @@
+name: CI
+
+# 桌面端构建 + Core 单测是必过门禁。
+# Sandbox 测试依赖 AppContainer / Windows Sandbox，托管 runner 上不保证可用，
+# 因此只在 push 到 master 或手动触发时跑，并保持非阻塞；稳定后可迁到 self-hosted 再转为必过。
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build-and-test:
+    name: Build + Core tests
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/*.sln', '**/*.slnf', 'Directory.Build.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore desktop solution
+        run: dotnet restore SDemo.DesktopAgent.Wpf.slnf
+
+      - name: Build desktop solution
+        run: dotnet build SDemo.DesktopAgent.Wpf.slnf -c Release --no-restore
+
+      - name: Core tests
+        run: >
+          dotnet test tests/SDemo.DesktopAgent.Core.Tests
+          -c Release
+          --logger "trx;LogFileName=core.trx"
+          --results-directory TestResults
+
+      - name: Upload Core test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-test-results
+          path: TestResults
+          if-no-files-found: ignore
+          retention-days: 7
+
+  sandbox-tests:
+    name: Sandbox tests (non-blocking)
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/*.sln', '**/*.slnf', 'Directory.Build.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Sandbox tests
+        run: >
+          dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests
+          -c Release
+          --logger "trx;LogFileName=sandbox.trx"
+          --results-directory TestResults
+
+      - name: Upload Sandbox test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandbox-test-results
+          path: TestResults
+          if-no-files-found: ignore
+          retention-days: 7

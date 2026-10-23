@@ -1,0 +1,289 @@
+diff --git a/.gitignore b/.gitignore
+index 4969d4d..5d4f139 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -40,4 +40,12 @@ artifacts/*
+ # Rider
+ .idea/
+ 
++# UnParserSettings project outputs
++UnParserSettings/bin/
++UnParserSettings/obj/
++UnParserSettings.Tests/bin/
++UnParserSettings.Tests/obj/
++UnParserSettings.Examples/bin/
++UnParserSettings.Examples/obj/
++
+ [R|r]elease/** 
+diff --git a/UnParserExample.cs b/UnParserExample.cs
+new file mode 100644
+index 0000000..d161f89
+--- /dev/null
++++ b/UnParserExample.cs
+@@ -0,0 +1,67 @@
++using System;
++using Unparser;
++
++namespace Unparser.Examples
++{
++    // 模拟一个带默认值的对象结构
++    public class SampleObject
++    {
++        public string Name { get; set; } = "default_name";
++        public int Value { get; set; } = 42;
++        public bool Flag { get; set; } = false;
++    }
++
++    // 模拟反解析器，演示如何使用 WithSkipDefaultOnly()
++    public class UnParserExample
++    {
++        public static void Main(string[] args)
++        {
++            Console.WriteLine("=== UnParserSettings 示例 ===\n");
++
++            // 1. 使用 WithSkipDefaultOnly() 创建设置对象
++            var settings = UnParserSettings.WithSkipDefaultOnly();
++            
++            Console.WriteLine($"设置状态:");
++            Console.WriteLine($"  SkipDefault: {settings.SkipDefault}");
++            Console.WriteLine($"  GroupSwitchesOnly: {settings.GroupSwitchesOnly}");
++            Console.WriteLine($"  UseEqualTokenOnly: {settings.UseEqualTokenOnly}\n");
++
++            // 2. 验证只设置了 SkipDefault，其他开关保持默认值（false）
++            if (settings.SkipDefault && !settings.GroupSwitchesOnly && !settings.UseEqualTokenOnly)
++            {
++                Console.WriteLine("✓ WithSkipDefaultOnly() 工作正常：只设置 SkipDefault，不影响其他开关");
++            }
++            else
++            {
++                Console.WriteLine("✗ WithSkipDefaultOnly() 工作异常");
++                Environment.Exit(1);
++            }
++
++            // 3. 模拟反解析行为（当 SkipDefault=true 时，默认值项会被省略）
++            Console.WriteLine("\n=== 模拟反解析行为 ===");
++            
++            var sampleObj = new SampleObject();
++            Console.WriteLine($"原始对象: Name={sampleObj.Name}, Value={sampleObj.Value}, Flag={sampleObj.Flag}");
++
++            // 当 SkipDefault=true 时，反解析器会省略默认值项
++            if (settings.SkipDefault)
++            {
++                Console.WriteLine("\n当 SkipDefault=true 时，反解析器将省略默认值项:");
++                Console.WriteLine("  - Name 将被省略（因为它是默认值）");
++                Console.WriteLine("  - Value 将被省略（因为它是默认值）");
++                Console.WriteLine("  - Flag 将被省略（因为它是默认值）");
++            }
++
++            // 4. 对比其他工厂方法
++            Console.WriteLine("\n=== 对比其他工厂方法 ===");
++            
++            var groupOnly = UnParserSettings.WithGroupSwitchesOnly();
++            Console.WriteLine($"WithGroupSwitchesOnly(): GroupSwitchesOnly={groupOnly.GroupSwitchesOnly}, SkipDefault={groupOnly.SkipDefault}");
++
++            var equalOnly = UnParserSettings.WithUseEqualTokenOnly();
++            Console.WriteLine($"WithUseEqualTokenOnly(): UseEqualTokenOnly={equalOnly.UseEqualTokenOnly}, SkipDefault={equalOnly.SkipDefault}");
++
++            Console.WriteLine("\n=== 完成 ===");
++        }
++    }
++}
+diff --git a/UnParserSettings.Examples.csproj b/UnParserSettings.Examples.csproj
+new file mode 100644
+index 0000000..bcabdc5
+--- /dev/null
++++ b/UnParserSettings.Examples.csproj
+@@ -0,0 +1,14 @@
++<Project Sdk="Microsoft.NET.Sdk">
++
++  <PropertyGroup>
++    <OutputType>Exe</OutputType>
++    <TargetFramework>net8.0</TargetFramework>
++    <ImplicitUsings>enable</ImplicitUsings>
++    <Nullable>enable</Nullable>
++  </PropertyGroup>
++
++  <ItemGroup>
++    <ProjectReference Include="UnParserSettings.csproj" />
++  </ItemGroup>
++
++</Project>
+diff --git a/UnParserSettings.Tests.csproj b/UnParserSettings.Tests.csproj
+new file mode 100644
+index 0000000..eeaf305
+--- /dev/null
++++ b/UnParserSettings.Tests.csproj
+@@ -0,0 +1,24 @@
++<Project Sdk="Microsoft.NET.Sdk">
++
++  <PropertyGroup>
++    <TargetFramework>net8.0</TargetFramework>
++    <ImplicitUsings>enable</ImplicitUsings>
++    <Nullable>enable</Nullable>
++    <IsPackable>false</IsPackable>
++    <IsTestProject>true</IsTestProject>
++  </PropertyGroup>
++
++  <ItemGroup>
++    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
++    <PackageReference Include="xunit" Version="2.5.3" />
++    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.1">
++      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
++      <PrivateAssets>all</PrivateAssets>
++    </PackageReference>
++  </ItemGroup>
++
++  <ItemGroup>
++    <ProjectReference Include="UnParserSettings.csproj" />
++  </ItemGroup>
++
++</Project>
+diff --git a/UnParserSettings.cs b/UnParserSettings.cs
+new file mode 100644
+index 0000000..673bced
+--- /dev/null
++++ b/UnParserSettings.cs
+@@ -0,0 +1,37 @@
++using System;
++using System.Collections.Generic;
++
++namespace Unparser
++{
++    public class UnParserSettings
++    {
++        private bool _groupSwitchesOnly = false;
++        private bool _useEqualTokenOnly = false;
++        private bool _skipDefault = false;
++
++        public bool GroupSwitchesOnly => _groupSwitchesOnly;
++        public bool UseEqualTokenOnly => _useEqualTokenOnly;
++        public bool SkipDefault => _skipDefault;
++
++        public static UnParserSettings WithGroupSwitchesOnly()
++        {
++            var settings = new UnParserSettings();
++            settings._groupSwitchesOnly = true;
++            return settings;
++        }
++
++        public static UnParserSettings WithUseEqualTokenOnly()
++        {
++            var settings = new UnParserSettings();
++            settings._useEqualTokenOnly = true;
++            return settings;
++        }
++
++        public static UnParserSettings WithSkipDefaultOnly()
++        {
++            var settings = new UnParserSettings();
++            settings._skipDefault = true;
++            return settings;
++        }
++    }
++}
+diff --git a/UnParserSettings.csproj b/UnParserSettings.csproj
+new file mode 100644
+index 0000000..30402ac
+--- /dev/null
++++ b/UnParserSettings.csproj
+@@ -0,0 +1,9 @@
++<Project Sdk="Microsoft.NET.Sdk">
++
++  <PropertyGroup>
++    <TargetFramework>net8.0</TargetFramework>
++    <ImplicitUsings>enable</ImplicitUsings>
++    <Nullable>enable</Nullable>
++  </PropertyGroup>
++
++</Project>
+diff --git a/UnParserSettingsExample.cs b/UnParserSettingsExample.cs
+new file mode 100644
+index 0000000..d196da8
+--- /dev/null
++++ b/UnParserSettingsExample.cs
+@@ -0,0 +1,29 @@
++using System;
++using Unparser;
++
++namespace Unparser.Examples
++{
++    public class Program
++    {
++        public static void Main(string[] args)
++        {
++            // 使用 WithSkipDefaultOnly() 创建设置对象
++            var settings = UnParserSettings.WithSkipDefaultOnly();
++            
++            Console.WriteLine($"SkipDefault: {settings.SkipDefault}");
++            Console.WriteLine($"GroupSwitchesOnly: {settings.GroupSwitchesOnly}");
++            Console.WriteLine($"UseEqualTokenOnly: {settings.UseEqualTokenOnly}");
++            
++            // 验证只设置了 SkipDefault，其他开关保持默认值（false）
++            if (settings.SkipDefault && !settings.GroupSwitchesOnly && !settings.UseEqualTokenOnly)
++            {
++                Console.WriteLine("✓ WithSkipDefaultOnly() 工作正常：只设置 SkipDefault，不影响其他开关");
++            }
++            else
++            {
++                Console.WriteLine("✗ WithSkipDefaultOnly() 工作异常");
++                Environment.Exit(1);
++            }
++        }
++    }
++}
+diff --git a/UnParserSettingsTests.cs b/UnParserSettingsTests.cs
+new file mode 100644
+index 0000000..7873f80
+--- /dev/null
++++ b/UnParserSettingsTests.cs
+@@ -0,0 +1,50 @@
++using System;
++using Xunit;
++using Unparser;
++
++namespace Unparser.Tests
++{
++    public class UnParserSettingsTests
++    {
++        [Fact]
++        public void WithSkipDefaultOnly_ShouldSetSkipDefaultToTrue()
++        {
++            var settings = UnParserSettings.WithSkipDefaultOnly();
++            
++            Assert.True(settings.SkipDefault);
++            Assert.False(settings.GroupSwitchesOnly);
++            Assert.False(settings.UseEqualTokenOnly);
++        }
++
++        [Fact]
++        public void WithGroupSwitchesOnly_ShouldNotAffectSkipDefault()
++        {
++            var settings = UnParserSettings.WithGroupSwitchesOnly();
++            
++            Assert.True(settings.GroupSwitchesOnly);
++            Assert.False(settings.SkipDefault);
++            Assert.False(settings.UseEqualTokenOnly);
++        }
++
++        [Fact]
++        public void WithUseEqualTokenOnly_ShouldNotAffectSkipDefault()
++        {
++            var settings = UnParserSettings.WithUseEqualTokenOnly();
++            
++            Assert.True(settings.UseEqualTokenOnly);
++            Assert.False(settings.SkipDefault);
++            Assert.False(settings.GroupSwitchesOnly);
++        }
++
++        [Fact]
++        public void WithSkipDefaultOnly_ShouldNotAffectOtherSwitches()
++        {
++            var settings = UnParserSettings.WithSkipDefaultOnly();
++            
++            // 确认只设置了 SkipDefault，其他开关保持默认值（false）
++            Assert.True(settings.SkipDefault);
++            Assert.False(settings.GroupSwitchesOnly, "WithSkipDefaultOnly 不应打开 GroupSwitchesOnly");
++            Assert.False(settings.UseEqualTokenOnly, "WithSkipDefaultOnly 不应打开 UseEqualTokenOnly");
++        }
++    }
++}

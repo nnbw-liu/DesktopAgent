@@ -1,0 +1,366 @@
+{
+  "id": "T06",
+  "type": "tests",
+  "title": "\u8865\u9F50 SplitArgs \u8FB9\u754C\u6D4B\u8BD5",
+  "success": false,
+  "steps": 49,
+  "turns": 3,
+  "seconds": 65.5,
+  "error": null,
+  "acceptanceExit": 0,
+  "acceptanceOutput": "\u003E dotnet build CommandLine.sln -v minimal\r\nActive code page: 65001\r\n  \u6B63\u5728\u786E\u5B9A\u8981\u8FD8\u539F\u7684\u9879\u76EE\u2026\r\n  \u6240\u6709\u9879\u76EE\u5747\u662F\u6700\u65B0\u7684\uFF0C\u65E0\u6CD5\u8FD8\u539F\u3002\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-222410\\src\\CommandLine\\bin\\Debug\\net45\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-222410\\src\\CommandLine\\bin\\Debug\\net461\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-222410\\src\\CommandLine\\bin\\Debug\\netstandard2.0\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-222410\\src\\CommandLine\\bin\\Debug\\net40\\CommandLine.dll\r\n  CommandLine.Tests -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-222410\\tests\\CommandLine.Tests\\bin\\Debug\\net461\\CommandLine.Tests.dll\r\n  CommandLine.Tests -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-222410\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll\r\n\r\n\u5DF2\u6210\u529F\u751F\u6210\u3002\r\n    0 \u4E2A\u8B66\u544A\r\n    0 \u4E2A\u9519\u8BEF\r\n\r\n\u5DF2\u7528\u65F6\u95F4 00:00:02.19\r\n\r\n[exit 0]\r\n\u003E dotnet test tests/CommandLine.Tests/CommandLine.Tests.csproj -f netcoreapp3.1 --no-build -v minimal\r\nActive code page: 65001\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-222410\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll (.NETCoreApp,Version=v3.1)\u7684\u6D4B\u8BD5\u8FD0\u884C\r\n\u603B\u5171 1 \u4E2A\u6D4B\u8BD5\u6587\u4EF6\u4E0E\u6307\u5B9A\u6A21\u5F0F\u76F8\u5339\u914D\u3002\r\n\r\n\u5DF2\u901A\u8FC7! - \u5931\u8D25:     0\uFF0C\u901A\u8FC7:   684\uFF0C\u5DF2\u8DF3\u8FC7:     0\uFF0C\u603B\u8BA1:   684\uFF0C\u6301\u7EED\u65F6\u95F4: 261 ms - CommandLine.Tests.dll (netcoreapp3.1)\r\n\r\n[exit 0]\r\n",
+  "checkFailure": "\u6587\u4EF6 tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u672A\u5305\u542B\u9A8C\u6536\u6A21\u5F0F\uFF1AAgentEval_SplitArgs_EmptyInput",
+  "failureClass": "F6 \u5FAA\u73AF",
+  "trace": [
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "src/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n[\u5BBF\u4E3B\u63D0\u793A] \u540C\u4E00\u5DE5\u5177\u8C03\u7528\u5DF2\u8FDE\u7EED\u51FA\u73B0 3 \u6B21\uFF08read_file\uFF09\u3002\u8BF7\u6362\u7B56\u7565\uFF0C\u6216\u5148\u603B\u7ED3\u5F53\u524D\u7ED3\u679C\u518D\u7EE7\u7EED\u3002\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "rejected",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:rejected]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "rejected",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:rejected]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "../AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u62D2\u7EDD\u5305\u542B .. \u7684\u8DEF\u5F84\uFF1A../AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n[\u5BBF\u4E3B\u63D0\u793A] \u540C\u4E00\u5DE5\u5177\u8C03\u7528\u5DF2\u8FDE\u7EED\u51FA\u73B0 3 \u6B21\uFF08read_file\uFF09\u3002\u8BF7\u6362\u7B56\u7565\uFF0C\u6216\u5148\u603B\u7ED3\u5F53\u524D\u7ED3\u679C\u518D\u7EE7\u7EED\u3002\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "rejected",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:rejected]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "../tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u62D2\u7EDD\u5305\u542B .. \u7684\u8DEF\u5F84\uFF1A../tests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n[\u5BBF\u4E3B\u63D0\u793A] \u540C\u4E00\u5DE5\u5177\u8C03\u7528\u5DF2\u8FDE\u7EED\u51FA\u73B0 3 \u6B21\uFF08read_file\uFF09\u3002\u8BF7\u6362\u7B56\u7565\uFF0C\u6216\u5148\u603B\u7ED3\u5F53\u524D\u7ED3\u679C\u518D\u7EE7\u7EED\u3002\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "error",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:error]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/AgentEval/SplitArgsTest.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "rejected",
+      "argsDigest": "tests/AgentEval/SplitArgsTest.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[TOOL_STATUS:rejected]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    }
+  ],
+  "routing": [
+    {
+      "turn": 1,
+      "source": "rules",
+      "exposed": [
+        "read_file",
+        "replace_text",
+        "apply_patch",
+        "write_file"
+      ],
+      "called": [
+        "read_file"
+      ],
+      "unusedExposed": [
+        "replace_text",
+        "apply_patch",
+        "write_file"
+      ]
+    },
+    {
+      "turn": 2,
+      "source": "rules",
+      "exposed": [
+        "read_file",
+        "replace_text",
+        "apply_patch",
+        "write_file"
+      ],
+      "called": [
+        "read_file"
+      ],
+      "unusedExposed": [
+        "replace_text",
+        "apply_patch",
+        "write_file"
+      ]
+    },
+    {
+      "turn": 3,
+      "source": "rules",
+      "exposed": [
+        "read_file",
+        "replace_text",
+        "apply_patch",
+        "write_file"
+      ],
+      "called": [
+        "read_file"
+      ],
+      "unusedExposed": [
+        "replace_text",
+        "apply_patch",
+        "write_file"
+      ]
+    }
+  ]
+}

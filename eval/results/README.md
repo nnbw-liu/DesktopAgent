@@ -7,6 +7,8 @@
 - `round2/compact-8k/`：同上，8K Compact。
 - `round1/deepseek-32k/`、`round2/deepseek-32k/`：云端 DeepSeek V4 Pro，32K Full，同配置双跑（7/8、7/8）。
 - `cloud-smoke/`：云端 T01 冒烟，用于确认 provider/Key/工具调用链路。
+- `p1/deepseek-v4.1-flash-32k/`：P1 重跑，云端 DeepSeek V4.1 Flash，32K Full，8/8（单轮）。
+- `p1/compact-8k/`：P1 重跑，Qwen3.5-4B，8K Compact，0/8（外部仓库仍非 8K 目标）。
 
 每个任务目录：
 

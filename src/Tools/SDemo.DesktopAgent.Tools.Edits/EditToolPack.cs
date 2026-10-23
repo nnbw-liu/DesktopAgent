@@ -401,7 +401,9 @@ public sealed class EditToolPack : IAgentToolPack
                 // P7 外部仓库实测：模型补丁失败后会按提示词「重写整个文件」，
                 // 但只写回自己记得的片段，导致源文件被截断。对明显缩水的覆盖直接拒绝，
                 // 把模型推回 replace_text / apply_patch；新建文件不受影响。
-                if (original.Length >= 500 && content.Length < original.Length * 0.7)
+                if (context.Settings.Current.Agent.WriteFileShrinkGuard
+                    && original.Length >= 500
+                    && content.Length < original.Length * 0.7)
                 {
                     return $"未写入 {relative}：新内容只有 {content.Length} 字符，原文件 {original.Length} 字符，"
                         + "疑似整文件重写丢失内容。请用 replace_text 或 apply_patch 只改需要的行；"

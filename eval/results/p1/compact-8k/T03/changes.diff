@@ -1,0 +1,31 @@
+diff --git a/src/HelpText.cs b/src/HelpText.cs
+new file mode 100644
+index 0000000..1e7d807
+--- /dev/null
++++ b/src/HelpText.cs
+@@ -0,0 +1,25 @@
++namespace MyApp
++{
++    public class HelpText
++    {
++        // 构造函数逻辑保持不变
++        public HelpText()
++        {
++            MaximumDisplayWidth = 40;
++        }
++
++        // 属性定义及范围检查（新增验证）
++        public int MaximumDisplayWidth 
++        { 
++            get => _maximumDisplayWidth; 
++            set 
++            {
++                if (value < 1)
++                    throw new ArgumentOutOfRangeException(nameof(MaximumDisplayWidth));
++                _maximumDisplayWidth = value;
++            }
++        }
++
++        private int _maximumDisplayWidth;
++    }
++}

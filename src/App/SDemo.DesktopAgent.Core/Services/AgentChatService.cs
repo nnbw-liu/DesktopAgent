@@ -377,10 +377,38 @@ public sealed class AgentChatService : IAgentChatService
 
         body = body.Trim();
 
+        // 工具包装器只在失败 / 被拒绝时写状态标记；成功结果没有标记，保持旧文本的 token 成本。
+        if (body.StartsWith("[TOOL_STATUS:", StringComparison.Ordinal))
+        {
+            var end = body.IndexOf(']');
+            if (end > 0)
+            {
+                var status = body["[TOOL_STATUS:".Length..end].Trim();
+                body = body[(end + 1)..].Trim();
+
+                if (string.Equals(status, ToolTraceEntry.StatusRejected, StringComparison.OrdinalIgnoreCase))
+                {
+                    return (ToolTraceEntry.StatusRejected, null);
+                }
+
+                if (string.Equals(status, ToolTraceEntry.StatusError, StringComparison.OrdinalIgnoreCase))
+                {
+                    return (ToolTraceEntry.StatusError, null);
+                }
+            }
+        }
+
         if (body.Contains("用户拒绝", StringComparison.Ordinal)
             || body.Contains("denied", StringComparison.OrdinalIgnoreCase))
         {
             return (ToolTraceEntry.StatusDenied, null);
+        }
+
+        if (body.Contains("未写入任何文件", StringComparison.Ordinal)
+            || body.Contains("未替换任何内容", StringComparison.Ordinal)
+            || body.Contains("疑似整文件重写丢失内容", StringComparison.Ordinal))
+        {
+            return (ToolTraceEntry.StatusRejected, null);
         }
 
         var exitMatch = ExitCodePattern.Match(body);

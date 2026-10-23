@@ -1,0 +1,66 @@
+diff --git a/tests/UnParserTests.cs b/tests/UnParserTests.cs
+new file mode 100644
+index 0000000..5664229
+--- /dev/null
++++ b/tests/UnParserTests.cs
+@@ -0,0 +1,60 @@
++// This file is intentionally empty to demonstrate the correct usage of write_file for creating a new file.
++// In this scenario, we are creating a new test file with three xUnit tests for UnParserSettings.PreferShortName.
++
++using System;
++using Xunit;
++using Microsoft.CodeAnalysis.CSharp;
++using Microsoft.CodeAnalysis.CSharp.Scripting;
++using Microsoft.CodeAnalysis.CSharp.Workspaces;
++using Microsoft.CodeAnalysis;
++using System.Collections.Generic;
++using System.Linq;
++using System.Threading.Tasks;
++
++namespace YourNamespace.Tests
++{
++    public class UnParserTests
++    {
++        [Fact]
++        public void AgentEval_PreferShortName_UsesShortWhenAvailable()
++        {
++            // Arrange
++            var settings = new UnParserSettings();
++            settings.PreferShortName = true;
++
++            // Act
++            var result = UnParser.Parse(settings);
++
++            // Assert
++            Assert.Equal("short", result.Name);
++        }
++
++        [Fact]
++        public void AgentEval_PreferShortName_FallsBackToLong()
++        {
++            // Arrange
++            var settings = new UnParserSettings();
++            settings.PreferShortName = true;
++
++            // Act
++            var result = UnParser.Parse(settings);
++
++            // Assert
++            Assert.Equal("long", result.Name);
++        }
++
++        [Fact]
++        public void AgentEval_PreferShortName_DoesNotAffectSwitches()
++        {
++            // Arrange
++            var settings = new UnParserSettings();
++            settings.PreferShortName = true;
++
++            // Act
++            var result = UnParser.Parse(settings);
++
++            // Assert
++            Assert.Equal("switch", result.Name);
++        }
++    }
++}

@@ -13,7 +13,8 @@ public static class SystemPrompts
         4. 改代码优先用 replace_text 精确替换（old_text 含缩进、逐字符一致）；失败再 apply_patch；
         5. write_file 只用于新建文件，或确实要整体重写且已完整 read_file 的情况；不要把 write_file 当作补丁失败的默认兜底；
         6. 工具连续失败两次就换策略，不要重复同一调用；不要伪造构建/测试结果；
-        7. 完成后输出「完成：<一句话>」；如果未完成，明确说明缺什么，不要谎报成功。
+        7. 测试类任务先用 workspace_info / glob_files 确认测试项目，只改测试文件；不要顺手改产品代码；
+        8. 完成后输出「完成：<一句话>」；如果未完成，明确说明缺什么，不要谎报成功。
         """;
 
     /// <summary>≤250 token：只保留编码任务的最小行为契约。</summary>
