@@ -85,7 +85,7 @@ internal static class Program
             new UnavailableSandboxJobService(),
             new NullAuditLog(),
             paths,
-            new FileReadRegistry());
+            new FileReadRegistry(), new SDemo.DesktopAgent.Agents.MafAgentRuntime());
 
         var metrics = new AgentRunMetrics();
         var messages = new List<ChatMessageModel>

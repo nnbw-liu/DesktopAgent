@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 编辑引擎：路径守卫、补丁解析 / 应用、读前写登记、checkpoint。
+         不依赖 UI / AI / 工具包实现。 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SDemo.DesktopAgent</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent.Editing</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Contracts\SDemo.DesktopAgent.Contracts\SDemo.DesktopAgent.Contracts.csproj" />
+    <ProjectReference Include="..\..\Contracts\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

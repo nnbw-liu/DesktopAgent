@@ -12,6 +12,6 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.1" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\SDemo.DesktopAgent.Core\SDemo.DesktopAgent.Core.csproj" />
+    <ProjectReference Include="..\..\src\App\SDemo.DesktopAgent.Core\SDemo.DesktopAgent.Core.csproj" />
   </ItemGroup>
 </Project>

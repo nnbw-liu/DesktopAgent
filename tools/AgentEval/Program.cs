@@ -117,7 +117,7 @@ internal static class Program
         };
         var registry = new AgentToolRegistry(packs);
         var chat = new AgentChatService(registry, workspace, settings, approvals,
-            new UnavailableSandboxJobService(), audit, paths, reads);
+            new UnavailableSandboxJobService(), audit, paths, reads, new SDemo.DesktopAgent.Agents.MafAgentRuntime());
         var builder = new ContextBuilder(new HeuristicTokenCounter(), settings);
 
         var results = new List<TaskOutcome>();

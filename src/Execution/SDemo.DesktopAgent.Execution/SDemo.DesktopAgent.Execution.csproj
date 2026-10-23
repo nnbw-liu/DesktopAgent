@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 内循环 / 验证门：命令策略、构建与测试结果解析、验证记录、checkpoint 设置、自动续跑。
+         平台相关的进程执行在 Execution.Windows。 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SDemo.DesktopAgent</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent.Execution</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Contracts\SDemo.DesktopAgent.Contracts\SDemo.DesktopAgent.Contracts.csproj" />
+    <ProjectReference Include="..\..\Editing\SDemo.DesktopAgent.Editing\SDemo.DesktopAgent.Editing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SDemo.DesktopAgent.Core.Tests" />
+  </ItemGroup>
+
+</Project>

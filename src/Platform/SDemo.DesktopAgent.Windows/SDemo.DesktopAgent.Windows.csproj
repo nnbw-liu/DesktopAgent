@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Windows 组合根：只负责把 Sandbox.Windows / Tools.Windows / Execution.Windows
+         注册进 DI，并保证 SandboxHost payload 出现在输出目录。 -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <RootNamespace>SDemo.DesktopAgent.Platform.Windows</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent.Windows</AssemblyName>
+    <!-- 命名空间刻意不写成 SDemo.DesktopAgent.Windows：
+         那会创建子命名空间 Windows，遮蔽 WinRT 的 Windows.*（Windows.Storage / Windows.Foundation），
+         使 MAUI-Windows 宿主里所有 SDemo.DesktopAgent.* 命名空间内的 WinRT 引用失效。 -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Contracts\SDemo.DesktopAgent.Contracts\SDemo.DesktopAgent.Contracts.csproj" />
+    <ProjectReference Include="..\..\Execution\SDemo.DesktopAgent.Execution\SDemo.DesktopAgent.Execution.csproj" />
+    <ProjectReference Include="..\..\Execution\SDemo.DesktopAgent.Execution.Windows\SDemo.DesktopAgent.Execution.Windows.csproj" />
+    <ProjectReference Include="..\..\Sandbox\SDemo.DesktopAgent.Sandbox\SDemo.DesktopAgent.Sandbox.csproj" />
+    <ProjectReference Include="..\..\Contracts\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
+    <ProjectReference Include="..\..\Sandbox\SDemo.DesktopAgent.Sandbox.Windows\SDemo.DesktopAgent.Sandbox.Windows.csproj" />
+    <ProjectReference Include="..\..\Tools\SDemo.DesktopAgent.Tools.Abstractions\SDemo.DesktopAgent.Tools.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Tools\SDemo.DesktopAgent.Tools.Windows\SDemo.DesktopAgent.Tools.Windows.csproj" />
+    <ProjectReference Include="..\..\Sandbox\SDemo.DesktopAgent.SandboxHost\SDemo.DesktopAgent.SandboxHost.csproj"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- 桌面宿主与 MAUI-Windows 都从这里取 SandboxHost；安装器再复制到沙箱根目录。 -->
+  <Target Name="CopySandboxHostPayload" AfterTargets="Build">
+    <ItemGroup>
+      <SandboxHostFiles Include="$(MSBuildProjectDirectory)\..\SDemo.DesktopAgent.SandboxHost\bin\$(Configuration)\net10.0-windows10.0.19041.0\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SandboxHostFiles)"
+          DestinationFolder="$(OutDir)sandbox-host\%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

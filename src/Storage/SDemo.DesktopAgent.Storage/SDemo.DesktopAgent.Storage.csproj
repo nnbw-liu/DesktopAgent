@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 持久化：EF Core + SQLite，会话 / 消息 / 摘要 / 插件卡片 / todo / 验证记录。 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SDemo.DesktopAgent</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent.Storage</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Contracts\SDemo.DesktopAgent.Contracts\SDemo.DesktopAgent.Contracts.csproj" />
+    <ProjectReference Include="..\..\Context\SDemo.DesktopAgent.Context\SDemo.DesktopAgent.Context.csproj" />
+    <ProjectReference Include="..\..\Execution\SDemo.DesktopAgent.Execution\SDemo.DesktopAgent.Execution.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SDemo.DesktopAgent.Core.Tests" />
+  </ItemGroup>
+
+</Project>

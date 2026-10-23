@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 纯 .NET，不引用任何 UI / 平台 API：WPF 与 MAUI 两个宿主共用 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SDemo.DesktopAgent</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent.Core</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <!-- 中立 AI 抽象（IChatClient / ChatMessage / AITool）；具体 SDK 在 Agents 工程。 -->
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
+    <!-- Markdown 渲染：CommonMark + GFM 表格 / 任务列表 / 自动链接等扩展 -->
+    <PackageReference Include="Markdig" Version="1.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- AI 接入层：MAF / OpenAI 的唯一出入口。 -->
+    <ProjectReference Include="..\..\Agents\SDemo.DesktopAgent.Agents\SDemo.DesktopAgent.Agents.csproj" />
+    <!-- 契约层：模型 / 设置 DTO / 跨模块接口（不含任何实现）。 -->
+    <ProjectReference Include="..\..\Contracts\SDemo.DesktopAgent.Contracts\SDemo.DesktopAgent.Contracts.csproj" />
+    <!-- 插件：契约 + 运行时 + 内置插件包（每个内置插件一个类库）。 -->
+    <ProjectReference Include="..\..\Plugins\SDemo.DesktopAgent.Plugins.Abstractions\SDemo.DesktopAgent.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Plugins\SDemo.DesktopAgent.Plugins.Runtime\SDemo.DesktopAgent.Plugins.Runtime.csproj" />
+    <ProjectReference Include="..\..\Plugins\SDemo.DesktopAgent.Plugin.Summarize\SDemo.DesktopAgent.Plugin.Summarize.csproj" />
+    <ProjectReference Include="..\..\Plugins\SDemo.DesktopAgent.Plugin.Translate\SDemo.DesktopAgent.Plugin.Translate.csproj" />
+    <!-- 编辑引擎：路径守卫 / 补丁 / checkpoint。 -->
+    <ProjectReference Include="..\..\Editing\SDemo.DesktopAgent.Editing\SDemo.DesktopAgent.Editing.csproj" />
+    <!-- 上下文引擎 / 内循环 / 持久化 / 沙箱。 -->
+    <ProjectReference Include="..\..\Context\SDemo.DesktopAgent.Context\SDemo.DesktopAgent.Context.csproj" />
+    <ProjectReference Include="..\..\Execution\SDemo.DesktopAgent.Execution\SDemo.DesktopAgent.Execution.csproj" />
+    <ProjectReference Include="..\..\Storage\SDemo.DesktopAgent.Storage\SDemo.DesktopAgent.Storage.csproj" />
+    <ProjectReference Include="..\..\Sandbox\SDemo.DesktopAgent.Sandbox\SDemo.DesktopAgent.Sandbox.csproj" />
+    <!-- 工具：契约 + 各内置工具包。 -->
+    <ProjectReference Include="..\..\Tools\SDemo.DesktopAgent.Tools.Abstractions\SDemo.DesktopAgent.Tools.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Tools\SDemo.DesktopAgent.Tools.Edits\SDemo.DesktopAgent.Tools.Edits.csproj" />
+    <ProjectReference Include="..\..\Tools\SDemo.DesktopAgent.Tools.Files\SDemo.DesktopAgent.Tools.Files.csproj" />
+    <ProjectReference Include="..\..\Tools\SDemo.DesktopAgent.Tools.Search\SDemo.DesktopAgent.Tools.Search.csproj" />
+    <ProjectReference Include="..\..\Tools\SDemo.DesktopAgent.Tools.Todo\SDemo.DesktopAgent.Tools.Todo.csproj" />
+    <!-- 沙箱契约：纯 record / enum / 协议常量，无平台 API。 -->
+    <ProjectReference Include="..\..\Contracts\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 单元测试要直接构造内部 DTO（PluginManifestDto）验证清单解析 -->
+    <InternalsVisibleTo Include="SDemo.DesktopAgent.Core.Tests" />
+  </ItemGroup>
+
+</Project>

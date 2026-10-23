@@ -64,83 +64,56 @@ Blazor Hybrid 多宿主应用：**一套 Razor 组件 + 一套业务服务**，�
 DesktopAgent/
 ├─ SDemo.DesktopAgent.sln
 ├─ SDemo.DesktopAgent.Wpf.slnf          # 桌面端工程（含全部模块），没装 MAUI workload 也能构建
-└─ src/
-   ├─ SDemo.DesktopAgent.Sandbox.Contracts/      # 沙箱协议（零依赖）
-   ├─ SDemo.DesktopAgent.Contracts/              # 模型 / 设置 DTO / 跨模块接口
-   │  ├─ Models/                                 # 会话 / 消息 / 附件 / 设置 / 工作区
-   │  ├─ Abstractions/                           # IAppPaths / ISecureStore / 沙箱 / 审批接口
-   │  ├─ Services/                               # ISettingsService / IModelCatalogService…
-   │  ├─ Context/                                # ISummaryChatTransport / AgentMode / 工具轨迹 DTO
-   │  └─ Execution/                              # VerificationRecord / 验证与 checkpoint 设置
-   ├─ SDemo.DesktopAgent.Agents/                 # MAF + OpenAI 唯一出入口
-   │  ├─ AgentRuntime.cs                         # IAgentRuntime / AgentInvocation / 流式事件
-   │  ├─ MafAgentRuntime.cs                      # OpenAI → 裁剪装饰器 → FICC → AsAIAgent
-   │  ├─ OpenAiSummaryChatTransport.cs           # 摘要的非流式调用
-   │  └─ ModelCatalogService.cs                  # GET /models
-   ├─ SDemo.DesktopAgent.Plugins.Abstractions/   # 插件描述符 / IPluginPackage / 内容源
-   ├─ SDemo.DesktopAgent.Plugins.Runtime/        # 扫描 / 校验 / 注册表 / 提示词 / 分段解析
-   ├─ SDemo.DesktopAgent.Plugin.Translate/       # 内置翻译（plugin.json + skills 为嵌入资源）
-   ├─ SDemo.DesktopAgent.Plugin.Summarize/       # 内置总结（同上）
-   ├─ SDemo.DesktopAgent.Context/                # 上下文引擎：预算 / 裁剪 / 压缩 / 状态包
-   ├─ SDemo.DesktopAgent.Editing/                # 路径守卫 / 补丁 / 读前写 / checkpoint
-   ├─ SDemo.DesktopAgent.Execution/              # 内循环策略：命令 / 验证门 / 结果解析
-   ├─ SDemo.DesktopAgent.Storage/                # ChatDbContext + ChatStore（EF Core / SQLite）
-   ├─ SDemo.DesktopAgent.Sandbox/                # 工作区副本 / 快照 / diff / 结果格式化
-   ├─ SDemo.DesktopAgent.Tools.Abstractions/     # IAgentToolPack / ToolContext / 注册表 / 路由
-   ├─ SDemo.DesktopAgent.Tools.Files/            # list / read / search / glob
-   ├─ SDemo.DesktopAgent.Tools.Search/           # web_search
-   ├─ SDemo.DesktopAgent.Tools.Edits/            # apply_patch / write_file / code_edit
-   ├─ SDemo.DesktopAgent.Tools.Todo/             # todo_write
-   ├─ SDemo.DesktopAgent.Core/                   # 应用编排 + 组合根
-   │  ├─ Services/                               # SettingsService、SkillCatalog、AgentChatService、AgentSessionRunner…
-   │  ├─ Plugins/PluginRunner.cs                 # 插件 Run 的编排（依赖 IAgentChatService）
-   │  ├─ Tools/                                  # 审批 / 审计的宿主实现
-   │  └─ Composition/AgentCoreServiceCollectionExtensions.cs   # AddDesktopAgentCore()
-   ├─ SDemo.DesktopAgent.Windows/                # Windows 组合根（只做 DI + SandboxHost payload）
-   ├─ SDemo.DesktopAgent.Sandbox.Windows/        # AppContainer / Job Object / Windows Sandbox / 清理
-   ├─ SDemo.DesktopAgent.Execution.Windows/      # 直跑进程 / 验证 / 热工作区
-   ├─ SDemo.DesktopAgent.Tools.Windows/          # PowerShell / PDF / run_command
-   ├─ SDemo.DesktopAgent.UI/                     # Razor 类库：两个宿主共用的界面
-   │  ├─ _Imports.razor
-   │  ├─ Components/                             # AppShell / Sidebar / Chat / Settings
-   │  ├─ Services/AttachmentStore.cs             # IBrowserFile → 落盘（依赖 Blazor 类型，放这里）
-   │  └─ wwwroot/                                # css/app.css、js/*.js（经 _content/ 访问）
-   ├─ SDemo.DesktopAgent/                        # WPF 宿主
-   │  ├─ App.xaml / App.xaml.cs                  # DI 组装、WebView2 检查、主题初始化
-   │  ├─ MainWindow.xaml / .xaml.cs              # 自绘标题栏 + BlazorWebView + 状态栏
-   │  ├─ Services/WindowsAppPaths.cs             # %APPDATA%\SDemo\DesktopAgent
-   │  ├─ Services/DpapiSecureStore.cs            # DPAPI 加密 API Key
-   │  ├─ Services/RegistrySystemThemeProvider.cs # 读「应用模式」注册表
-   │  ├─ Services/FolderPickerService.cs         # OpenFolderDialog（延迟到下一轮消息循环）
-   │  ├─ Services/WebView2EnvironmentService.cs  # 运行环境信息 + WebView2 版本
-   │  ├─ Services/TrayIconService.cs             # 托盘：显示 / 退出
-   │  ├─ Theme/ + Themes/                        # WPF 主题资源字典
-   │  └─ wwwroot/index.html                      # 引用 _content/SDemo.DesktopAgent.UI/…
-   └─ SDemo.DesktopAgent.Maui/                   # MAUI 宿主（Windows / Android）
-      ├─ MauiProgram.cs                          # AddMauiBlazorWebView + 平台实现
-      ├─ App.xaml / MainPage.xaml                # BlazorWebView 挂同一个 AppShell
-      ├─ Services/MauiAppPaths.cs                # Windows 与 WPF 共用目录；Android 用 AppDataDirectory
-      ├─ Services/MauiSecureStore.cs             # Windows: DPAPI；Android: AES-GCM
-      ├─ Services/MauiFolderPickerService.cs     # Windows: FolderPicker；Android: 返回 null
-      ├─ Services/MauiSystemThemeProvider.cs     # RequestedTheme → 浅色 / 深色
-      ├─ Platforms/Android|Windows/              # MainActivity / MauiWinUIApplication
-      ├─ Resources/                              # 图标、启动图
-      └─ wwwroot/index.html
+├─ docs/
+│  ├─ architecture/                      # 设计文档：上下文 / 插件 / 沙箱 / 小模型 / 任务循环
+│  ├─ features/                          # 使用与开发指南（插件制作、沙箱排障）
+│  └─ reports/                           # 阶段计划、验收报告与基准数据
+├─ src/
+│  ├─ Contracts/                         # 零实现契约层
+│  │  ├─ SDemo.DesktopAgent.Contracts/          # 模型 / 设置 DTO / 跨模块接口
+│  │  └─ SDemo.DesktopAgent.Sandbox.Contracts/  # 沙箱协议（零依赖）
+│  ├─ Agents/                            # MAF + OpenAI 唯一出入口
+│  ├─ Plugins/                           # 插件契约 + 运行时 + 每个内置插件一个类库
+│  ├─ Context/                           # 上下文引擎：预算 / 裁剪 / 压缩 / 状态包
+│  ├─ Editing/                           # 路径守卫 / 补丁 / 读前写 / checkpoint
+│  ├─ Execution/                         # 内循环策略 + Windows 执行实现
+│  ├─ Storage/                           # ChatDbContext + ChatStore（EF Core / SQLite）
+│  ├─ Sandbox/                           # 中立层 / Windows 实现 / SandboxHost
+│  ├─ Tools/                             # 工具契约 + 各工具包（含 Windows 工具）
+│  ├─ App/                               # 应用层
+│  │  ├─ SDemo.DesktopAgent.Core/               # 编排 + 组合根
+│  │  └─ SDemo.DesktopAgent.UI/                 # Razor 类库：两个宿主共用的界面
+│  ├─ Platform/                          # Windows 平台组合根（只做 DI + SandboxHost payload）
+│  └─ Hosts/                             # 宿主外壳
+│     ├─ Wpf/                            # WPF 宿主（SDemo.DesktopAgent.csproj）
+│     └─ Maui/                           # MAUI 宿主（Windows / Android）
+└─ tools/                                # 评测与基准控制台（解决方案 tools 分组）
 ```
+
+各模块的职责与依赖顺序：
+
+```
+Contracts → Editing / Context / Execution / Sandbox / Agents / Plugins
+          → Tools（各包）→ Storage → Core（组合根）→ UI / Hosts
+```
+
+- `Core` 只做编排与组合，不直接引用 MAF / OpenAI，也不承载插件或工具实现。
+- 平台相关实现集中在三个 Windows 工程：`Sandbox.Windows`、`Execution.Windows`、`Tools.Windows`；`Platform/Windows` 只负责把它们注册进 DI。
+- 内置插件（`Plugins/Plugin.*`）以嵌入资源发布，新增插件 = 新建类库 + 注册 `IPluginPackage`。
 
 ## 运行
 
 WPF 宿主（主入口，免安装 exe 形态）：
 
 ```powershell
-dotnet run --project src/SDemo.DesktopAgent
+dotnet run --project src/Hosts/Wpf
 ```
 
 MAUI 宿主（默认**只构建 Windows**，`TargetFrameworks` 里只有 `net10.0-windows10.0.19041.0`）：
 
 ```powershell
-dotnet run --project src/SDemo.DesktopAgent.Maui        # 需要 maui-windows workload
-dotnet build src/SDemo.DesktopAgent.Maui -f net10.0-windows10.0.19041.0
+dotnet run --project src/Hosts/Maui        # 需要 maui-windows workload
+dotnet build src/Hosts/Maui -f net10.0-windows10.0.19041.0
 ```
 
 Android 目标是**按需打开**的（`EnableAndroidTarget`，默认关闭）。没有 JDK 17 + Android SDK 时不要打开，
@@ -148,7 +121,7 @@ Android 目标是**按需打开**的（`EnableAndroidTarget`，默认关闭）�
 
 ```powershell
 # 需要 Android 时：先装好 JDK 17 + Android SDK，再显式打开目标
-dotnet build src/SDemo.DesktopAgent.Maui -p:EnableAndroidTarget=true -f net10.0-android
+dotnet build src/Hosts/Maui -p:EnableAndroidTarget=true -f net10.0-android
 ```
 
 只构建桌面端（没有 MAUI workload 时用这个）：
@@ -173,7 +146,7 @@ MAUI 宿主的调试目标选 **Windows Machine**（`Properties/launchSettings.j
 
 ```powershell
 $env:SDEMO_FORCED_THEME = 'light'   # 或 dark；仅 Debug 构建生效
-dotnet run --project src/SDemo.DesktopAgent
+dotnet run --project src/Hosts/Wpf
 ```
 
 两个宿主同时运行时，用 `SDEMO_DATA_ROOT` 隔离数据，避免抢同一个 SQLite：
@@ -355,7 +328,7 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 
 ## 上下文预算、压缩与工作记忆
 
-每次请求都会先估算 token、按预算裁剪，再交给 Agent Framework；原始消息不删除，数据库里的历史保持完整。实现说明见 [docs/context-budget.md](docs/context-budget.md) 与 [docs/context-compaction.md](docs/context-compaction.md)。
+每次请求都会先估算 token、按预算裁剪，再交给 Agent Framework；原始消息不删除，数据库里的历史保持完整。实现说明见 [docs/architecture/context-budget.md](docs/architecture/context-budget.md) 与 [docs/architecture/context-compaction.md](docs/architecture/context-compaction.md)。
 
 - **单一入口**：`ContextBuilder` 是唯一组装请求的地方（普通对话 → `AgentSessionRunner`，插件 → `PluginRunner` 的 passthrough）。
 - **预算**：`total = (window - 输出预留 - 安全余量) * 0.85`；8K 窗口下输入预算约 4.9K，保留最近 6 轮（小模型 4 轮）。
@@ -370,15 +343,15 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 
 ## 内循环（P4）
 
-构建 / 测试默认进沙箱；在「设置 → 工具设置 → 内循环」显式打开直跑后，`run_command` 可以跳过沙箱复制的等待。直跑只放行白名单可执行文件，参数不经过 shell，每次执行写审计；安全命令可「本会话允许」，高风险命令永不提供。默认关闭，关闭时 `run_powershell` 与沙箱行为不变。构建 / 测试结果会解析成验证记录，落库并进入状态包。详见 [docs/inner-loop.md](docs/inner-loop.md)。
+构建 / 测试默认进沙箱；在「设置 → 工具设置 → 内循环」显式打开直跑后，`run_command` 可以跳过沙箱复制的等待。直跑只放行白名单可执行文件，参数不经过 shell，每次执行写审计；安全命令可「本会话允许」，高风险命令永不提供。默认关闭，关闭时 `run_powershell` 与沙箱行为不变。构建 / 测试结果会解析成验证记录，落库并进入状态包。详见 [docs/architecture/inner-loop.md](docs/architecture/inner-loop.md)。
 
 ## 任务循环（P5）
 
-多步任务可以用 `todo_write` 维护计划（整体替换、会话级持久化、标题下面板展开）；有编辑但之后没有成功 build/test 时会显示「未验证改动」徽标，可手动运行验证。每次编辑前会创建 checkpoint，`EditSummaryPanel` 可「撤销最近一次改动」，冲突（检查点后又被外部修改）会先要求确认。同一工具调用连续 3 次会收到宿主提示，单轮超过 8 次会被阻断并要求用文本总结。详见 [docs/task-loop.md](docs/task-loop.md)。
+多步任务可以用 `todo_write` 维护计划（整体替换、会话级持久化、标题下面板展开）；有编辑但之后没有成功 build/test 时会显示「未验证改动」徽标，可手动运行验证。每次编辑前会创建 checkpoint，`EditSummaryPanel` 可「撤销最近一次改动」，冲突（检查点后又被外部修改）会先要求确认。同一工具调用连续 3 次会收到宿主提示，单轮超过 8 次会被阻断并要求用文本总结。详见 [docs/architecture/task-loop.md](docs/architecture/task-loop.md)。
 
 ## 小模型模式（P6）
 
-8K / 无工具 / 名称含 `3b`、`4b`、`7b` 等模型自动进入 Compact：短系统提示（≤250 token）、技能 ≤600 token、最多 4 个工具、关键词路由、最大 6 次工具调用；可手动切回完整模式。提供 `code_edit` 单工具模式（read/search/patch 三合一）与工具参数修复函数。实测 `qwen3-4b-thinking-2507` 在 8K/Compact 下无法完成工具任务（思考 token 占满输出），不建议把 4B thinking 模型用于工具任务；详见 [small-model-mode.md](docs/small-model-mode.md)。
+8K / 无工具 / 名称含 `3b`、`4b`、`7b` 等模型自动进入 Compact：短系统提示（≤250 token）、技能 ≤600 token、最多 4 个工具、关键词路由、最大 6 次工具调用；可手动切回完整模式。提供 `code_edit` 单工具模式（read/search/patch 三合一）与工具参数修复函数。实测 `qwen3-4b-thinking-2507` 在 8K/Compact 下无法完成工具任务（思考 token 占满输出），不建议把 4B thinking 模型用于工具任务；详见 [small-model-mode.md](docs/architecture/small-model-mode.md)。
 
 ## 技能与工具
 输入框底部现在是「上传文件 + 常用技能」和右侧的「工具 + 模型 + 发送」：
@@ -432,10 +405,10 @@ version: 1.0
 ### 沙箱执行（S1–S6 已完成）
 
 PowerShell 与 PDF 解析都在沙箱里运行；沙箱不可用时直接拒绝执行，**不会**退回主进程直跑。
-完整开发手册见 [docs/sandbox-development-manual.md](docs/sandbox-development-manual.md)，
-S6 验收与偏差见 [docs/sandbox-s6-report.md](docs/sandbox-s6-report.md)，
-UI 逐项验收记录见 [docs/sandbox-ui-acceptance-s6.md](docs/sandbox-ui-acceptance-s6.md)，
-常见问题见 [docs/sandbox-troubleshooting.md](docs/sandbox-troubleshooting.md)。
+完整开发手册见 [docs/architecture/sandbox-development-manual.md](docs/architecture/sandbox-development-manual.md)，
+S6 验收与偏差见 [docs/reports/sandbox-s6-report.md](docs/reports/sandbox-s6-report.md)，
+UI 逐项验收记录见 [docs/reports/sandbox-ui-acceptance-s6.md](docs/reports/sandbox-ui-acceptance-s6.md)，
+常见问题见 [docs/features/sandbox-troubleshooting.md](docs/features/sandbox-troubleshooting.md)。
 
 | 阶段 | 状态 | 能力 |
 | --- | --- | --- |
@@ -472,7 +445,7 @@ S6 行为要点：
 
 ## 插件
 
-插件是**零代码**的声明式能力包：一个目录 + `plugin.json` + 若干 `.md` 技能文件，不需要编译、不需要重装应用。完整设计见 [docs/plugin-system.md](docs/plugin-system.md)；**自己写插件请看 [插件开发手册](docs/plugin-authoring.md)**（清单字段、参数、入口、双语对照、报错对照表、可复制模板）。
+插件是**零代码**的声明式能力包：一个目录 + `plugin.json` + 若干 `.md` 技能文件，不需要编译、不需要重装应用。完整设计见 [docs/architecture/plugin-system.md](docs/architecture/plugin-system.md)；**自己写插件请看 [插件开发手册](docs/features/plugin-authoring.md)**（清单字段、参数、入口、双语对照、报错对照表、可复制模板）。
 
 目录：
 
@@ -564,7 +537,7 @@ S6 行为要点：
 
   ```powershell
   # 首次准备 Android SDK / JDK（之后构建要加 -p:EnableAndroidTarget=true）
-  dotnet build src/SDemo.DesktopAgent.Maui -p:EnableAndroidTarget=true -f net10.0-android `
+  dotnet build src/Hosts/Maui -p:EnableAndroidTarget=true -f net10.0-android `
     -t:InstallAndroidDependencies `
     -p:AndroidSdkDirectory="$env:LOCALAPPDATA\Android\Sdk" `
     -p:JavaSdkDirectory="$env:LOCALAPPDATA\Android\jdk" `

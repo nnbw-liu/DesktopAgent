@@ -111,7 +111,7 @@ internal static class Program
             new UnavailableSandboxJobService(),
             audit,
             paths,
-            reads);
+            reads, new SDemo.DesktopAgent.Agents.MafAgentRuntime());
         var builder = new ContextBuilder(new HeuristicTokenCounter(), settings);
         var verification = new VerificationRunner(new DirectProcessRunner(), settings, audit);
 

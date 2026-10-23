@@ -24,17 +24,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\SDemo.DesktopAgent.Windows\SDemo.DesktopAgent.Windows.csproj" />
-    <ProjectReference Include="..\..\src\SDemo.DesktopAgent.Core\SDemo.DesktopAgent.Core.csproj" />
-    <ProjectReference Include="..\..\src\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\SDemo.DesktopAgent.SandboxHost\SDemo.DesktopAgent.SandboxHost.csproj"
+    <ProjectReference Include="..\..\src\Platform\SDemo.DesktopAgent.Windows\SDemo.DesktopAgent.Windows.csproj" />
+    <ProjectReference Include="..\..\src\App\SDemo.DesktopAgent.Core\SDemo.DesktopAgent.Core.csproj" />
+    <ProjectReference Include="..\..\src\Contracts\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Sandbox\SDemo.DesktopAgent.SandboxHost\SDemo.DesktopAgent.SandboxHost.csproj"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <!-- 测试 / 本地运行时把 SandboxHost 发布文件放到 sandbox-host，安装器会复制到沙箱根目录。 -->
   <Target Name="CopySandboxHostPayload" AfterTargets="Build">
     <ItemGroup>
-      <SandboxHostFiles Include="$(MSBuildProjectDirectory)\..\..\src\SDemo.DesktopAgent.SandboxHost\bin\$(Configuration)\net10.0-windows10.0.19041.0\**\*.*" />
+      <SandboxHostFiles Include="$(MSBuildProjectDirectory)\..\..\src\Sandbox\SDemo.DesktopAgent.SandboxHost\bin\$(Configuration)\net10.0-windows10.0.19041.0\**\*.*" />
     </ItemGroup>
     <Copy SourceFiles="@(SandboxHostFiles)"
           DestinationFolder="$(OutDir)sandbox-host\%(RecursiveDir)"

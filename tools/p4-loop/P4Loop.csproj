@@ -9,7 +9,7 @@
     <RootNamespace>SDemo.P4Loop</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\SDemo.DesktopAgent.Windows\SDemo.DesktopAgent.Windows.csproj" />
-    <ProjectReference Include="..\..\src\SDemo.DesktopAgent.Core\SDemo.DesktopAgent.Core.csproj" />
+    <ProjectReference Include="..\..\src\Platform\SDemo.DesktopAgent.Windows\SDemo.DesktopAgent.Windows.csproj" />
+    <ProjectReference Include="..\..\src\App\SDemo.DesktopAgent.Core\SDemo.DesktopAgent.Core.csproj" />
   </ItemGroup>
 </Project>
