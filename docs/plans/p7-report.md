@@ -2,7 +2,7 @@
 
 > 日期：2026-10-23 · 仓库：`commandlineparser/commandline` @ `b0b0ec9`（tag `v2.9.1`）
 > 模型：Qwen3.5-4B（8K Compact）与 Qwen3-8B Q4_K_M（32K Full，`/no_think`）
-> 结论：**P7 出口指标未达成**。32K Full 1/8，8K Compact 0/8；两轮修复没有把成功率推过门槛，差距主要来自模型能力，其次才是工具链。
+> 结论：**P7 出口指标未达成**。32K Full 两轮均 1/8；8K Compact 从 0/8 提升到 1/8。两轮修复没有把成功率推过门槛，差距主要来自模型能力，其次才是工具链。
 
 ## 1. 做了什么- 锁定外部仓库与 commit，记录基线：`dotnet build CommandLine.sln` 通过，`netcoreapp3.1` 684 个测试全绿，冷构建约 29s。
 - 冻结 8 个任务（T01–T08）：feature / bugfix / tests / refactor / mixed，每个任务带验收命令与隐藏测试。
