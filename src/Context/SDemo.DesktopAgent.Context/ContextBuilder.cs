@@ -57,7 +57,7 @@ public sealed class ContextBuilder
             ? 0
             : Math.Clamp(request.Routing.EstimatedSchemaTokens, 0, budget.ToolSchemaLimit);
 
-        var (instructions, systemTokens, skillTokens, skillTruncated) =
+        var (instructions, systemTokens, skillTokens, knowledgeTokens, skillTruncated) =
             BuildInstructions(request, budget, calibrationFactor, mode);
 
         // 插件 Run：不做预算裁剪（输入上限由 PluginRunner 单独把关），但同样经过这里，
@@ -68,14 +68,15 @@ public sealed class ContextBuilder
         }
 
         // P2：滚动摘要 + 工作区状态包进入固定块；两者各自计量，先于历史消息分配预算。
-        var injection = BuildInjection(request, budget, settings, systemTokens, skillTokens);
+        var injection = BuildInjection(request, budget, settings, systemTokens, skillTokens, knowledgeTokens);
         var finalInstructions = injection.Text.Length == 0
             ? instructions
             : instructions + injection.Text;
 
         var messageBudget = Math.Max(
             128,
-            budget.Total - systemTokens - skillTokens - injection.SummaryTokens - injection.StateTokens - toolSchemaTokens);
+            budget.Total - systemTokens - skillTokens - knowledgeTokens
+            - injection.SummaryTokens - injection.StateTokens - toolSchemaTokens);
         var trimOptions = TrimOptions.FromPolicy(
             policy,
             messageBudget,
@@ -102,9 +103,10 @@ public sealed class ContextBuilder
             calibrationFactor,
             injection.SummaryTokens,
             injection.StateTokens,
-            toolSchemaTokens);
+            toolSchemaTokens,
+            knowledgeTokens);
         var estimated = segments.Total;
-        var rawEstimated = systemTokens + skillTokens + stats.MessageTokens
+        var rawEstimated = systemTokens + skillTokens + knowledgeTokens + stats.MessageTokens
             + injection.SummaryTokens + injection.StateTokens + toolSchemaTokens;
 
         var report = new ContextReport(
@@ -249,7 +251,7 @@ public sealed class ContextBuilder
     /// 固定块：系统提示词 + 可选技能。技能超预算时截断正文并加提示（§3.4），
     /// 而不是让请求失败；系统提示词本身不截断（它是行为契约）。
     /// </summary>
-    private (string Instructions, int SystemTokens, int SkillTokens, bool SkillTruncated)
+    private (string Instructions, int SystemTokens, int SkillTokens, int KnowledgeTokens, bool SkillTruncated)
         BuildInstructions(
             ContextBuildRequest request,
             ContextBudget budget,
@@ -270,22 +272,34 @@ public sealed class ContextBuilder
             indexTokens = Math.Max(0, _counter.CountMessage("system", instructions) - systemTokens);
         }
 
+        // M3：工作区知识库只放一句索引；关闭 / 没有归档会话时这里是空的，成本严格为 0。
+        var knowledgeTokens = 0;
+
+        if (!string.IsNullOrWhiteSpace(request.MemoryText))
+        {
+            instructions += TruncateBlock(request.MemoryText!, budget.KnowledgeLimit, "知识库索引已截断");
+            knowledgeTokens = Math.Max(
+                0,
+                _counter.CountMessage("system", instructions) - systemTokens - indexTokens);
+        }
+
         if (string.IsNullOrWhiteSpace(request.SkillText))
         {
-            return (instructions, systemTokens, indexTokens, false);
+            return (instructions, systemTokens, indexTokens, knowledgeTokens, false);
         }
 
         var header = $"\n\n## 本轮使用的技能：{request.SkillName}\n请严格按以下技能说明执行任务：\n\n";
         var skillText = request.SkillText;
         var truncated = false;
 
-        // 允许技能占满固定块剩余额度（按校准后的预算换算回原始估算），索引先占掉自己那一段。
+        // 允许技能占满固定块剩余额度（按校准后的预算换算回原始估算），索引 / 知识库先占掉自己的那一段。
         var factor = calibrationFactor <= 0 ? 1.0 : calibrationFactor;
-        var skillBudgetRaw = (int)Math.Floor(Math.Max(0, budget.FixedCap - systemTokens - indexTokens) / factor);
+        var skillBudgetRaw = (int)Math.Floor(
+            Math.Max(0, budget.FixedCap - systemTokens - indexTokens - knowledgeTokens) / factor);
         if (mode == AgentMode.Compact)
         {
             // 600 是技能段硬上限；留 24 token 给截断提示与消息开销，避免收敛后轻微溢出。
-            skillBudgetRaw = Math.Min(skillBudgetRaw, Math.Max(0, 600 - indexTokens - 24));
+            skillBudgetRaw = Math.Min(skillBudgetRaw, Math.Max(0, 600 - indexTokens - knowledgeTokens - 24));
         }
 
         var headerTokens = _counter.Count(header);
@@ -322,13 +336,15 @@ public sealed class ContextBuilder
 
         if (skillText.Length == 0)
         {
-            return (instructions, systemTokens, indexTokens, true);
+            return (instructions, systemTokens, indexTokens, knowledgeTokens, true);
         }
 
         instructions += header + skillText;
-        var skillTokens = Math.Max(0, _counter.CountMessage("system", instructions) - systemTokens);
+        var skillTokens = Math.Max(
+            0,
+            _counter.CountMessage("system", instructions) - systemTokens - knowledgeTokens);
 
-        return (instructions, systemTokens, skillTokens, truncated);
+        return (instructions, systemTokens, skillTokens, knowledgeTokens, truncated);
     }
 
     private ContextSegments CalibrateSegments(
@@ -338,7 +354,8 @@ public sealed class ContextBuilder
         double calibrationFactor,
         int summaryTokens = 0,
         int statePackTokens = 0,
-        int toolSchemaTokens = 0)
+        int toolSchemaTokens = 0,
+        int knowledgeTokens = 0)
     {
         var factor = calibrationFactor <= 0 ? 1.0 : calibrationFactor;
         int Scale(int raw) => (int)Math.Round(raw * factor, MidpointRounding.AwayFromZero);
@@ -352,7 +369,8 @@ public sealed class ContextBuilder
             Pinned: Scale(stats.PinnedTokens),
             Summary: Scale(summaryTokens),
             StatePack: Scale(statePackTokens),
-            ToolSchema: Scale(toolSchemaTokens));
+            ToolSchema: Scale(toolSchemaTokens),
+            Knowledge: Scale(knowledgeTokens));
     }
 
     /// <summary>
@@ -364,7 +382,8 @@ public sealed class ContextBuilder
         ContextBudget budget,
         ContextSettings settings,
         int systemTokens,
-        int skillTokens)
+        int skillTokens,
+        int knowledgeTokens = 0)
     {
         var hasSummary = !string.IsNullOrWhiteSpace(request.SummaryText);
         var hasState = !string.IsNullOrWhiteSpace(request.StatePackText);
@@ -375,7 +394,7 @@ public sealed class ContextBuilder
         }
 
         // 给历史消息留出至少 128 token：注入块不能把裁剪器逼进「什么都放不下」。
-        var remaining = Math.Max(0, budget.Total - systemTokens - skillTokens - 128);
+        var remaining = Math.Max(0, budget.Total - systemTokens - skillTokens - knowledgeTokens - 128);
         if (remaining < 64)
         {
             return InjectionBlock.Empty;

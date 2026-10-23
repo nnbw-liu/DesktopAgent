@@ -34,6 +34,29 @@ public sealed class AgentRunMetricsTests
         Assert.Equal(AgentRunMetrics.MaxStoredEntries, metrics.ToolTrace.Count);
     }
 
+    [Fact]
+    public void 暴露与实际调用可对比()
+    {
+        var metrics = new AgentRunMetrics();
+        metrics.RecordRouting(new RoutingDecision(
+            ["read_file", "apply_patch", "web_search"],
+            ["read_file", "apply_patch"],
+            ["web_search"],
+            MaxExposedTools: 6,
+            EstimatedSchemaTokens: 400,
+            EscapeHatch: true,
+            Truncated: false,
+            Reason: "test"));
+
+        metrics.RecordToolCall("read_file");
+        metrics.RecordToolCall("read_file");
+
+        Assert.Equal(3, metrics.ExposedToolCount);
+        Assert.Equal(1, metrics.CalledToolCount);
+        Assert.Equal(["apply_patch", "web_search"], metrics.UnusedExposedTools);
+        Assert.Empty(metrics.CalledUnexposedTools);
+    }
+
     private static ToolTraceEntry Entry(int index) =>
         new(
             index == 20 ? "apply_patch" : "read_file",

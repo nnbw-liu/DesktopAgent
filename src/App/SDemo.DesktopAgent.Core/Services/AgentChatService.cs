@@ -61,6 +61,7 @@ public sealed class AgentChatService : IAgentChatService
     private readonly IFileReadRegistry _reads;
     private readonly IAgentRuntime _runtime;
     private readonly ISkillLibrary? _skills;
+    private readonly IWorkspaceMemory? _memory;
 
     public AgentChatService(
         AgentToolRegistry tools,
@@ -72,7 +73,8 @@ public sealed class AgentChatService : IAgentChatService
         IAppPaths paths,
         IFileReadRegistry reads,
         IAgentRuntime runtime,
-        ISkillLibrary? skills = null)
+        ISkillLibrary? skills = null,
+        IWorkspaceMemory? memory = null)
     {
         _tools = tools;
         _workspace = workspace;
@@ -84,6 +86,7 @@ public sealed class AgentChatService : IAgentChatService
         _reads = reads;
         _runtime = runtime;
         _skills = skills;
+        _memory = memory;
     }
 
     public async IAsyncEnumerable<AgentDelta> RunAsync(
@@ -107,7 +110,9 @@ public sealed class AgentChatService : IAgentChatService
             plan.Metrics,
             plan.Session,
             plan.Metrics?.RunId,
-            _skills);
+            _skills,
+            plan.Session?.WorkspaceId,
+            _memory);
 
         var agentSettings = _settings.Current.Agent ?? new AgentSettings();
         var available = _tools.ToolNames(plan.ToolPacks);
@@ -119,6 +124,9 @@ public sealed class AgentChatService : IAgentChatService
 
         // M1：每轮只路由一次；工具集合 = 核心集 + 选中包（+ 兜底入口），不再全量灌给模型。
         var (tools, measuredSchemaTokens) = CreateExposedTools(context, plan, decision);
+
+        // M4：把本轮路由记进 metrics，流结束后可算「暴露 N 个 / 实际调用 M 个 / 未用 K 个」。
+        plan.Metrics?.RecordRouting(decision);
 
         // 宿主侧量出真实 schema 后回填报告，UI 的分段明细与预算账本用的是同一次路由。
         telemetry.Report = (telemetry.Report ?? plan.Context.Report)

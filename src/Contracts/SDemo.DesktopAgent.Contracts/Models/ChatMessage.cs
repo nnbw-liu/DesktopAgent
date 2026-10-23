@@ -54,5 +54,11 @@ public sealed class ChatMessage(ChatMessageRole role, string content)
     /// <summary>本条助手消息的工具轨迹；持久化到 ToolTraceJson，回放时压成紧凑行。</summary>
     public List<Context.ToolTraceEntry> ToolTrace { get; init; } = [];
 
+    /// <summary>
+    /// M3：本轮从工作区知识库引用的归档会话；只用于界面跳转，
+    /// 与派生卡片一样<b>不进入后续请求上下文</b>。持久化到 MemoryCitationsJson。
+    /// </summary>
+    public List<Context.MemoryCitation> MemoryCitations { get; init; } = [];
+
     public int TotalTokens => InputTokens + OutputTokens;
 }

@@ -35,8 +35,14 @@ public sealed record ContextBudget(
     /// <summary>技能索引的固定上限（§3 账本 200–300；M2 验收放宽到 400）。</summary>
     public const int SkillIndexTokenLimit = 400;
 
+    /// <summary>M3：工作区知识库只注入一句索引（本工作区有 N 条归档会话），上限 120 token。</summary>
+    public const int KnowledgeTokenLimit = 120;
+
     /// <summary>本轮技能索引最多占多少 token；超出只截断索引，不丢技能全文。</summary>
     public int SkillIndexLimit => SkillIndexTokenLimit;
+
+    /// <summary>本轮知识库索引行最多占多少 token。</summary>
+    public int KnowledgeLimit => KnowledgeTokenLimit;
 
     /// <summary>按模型档案与设置计算预算。</summary>
     public static ContextBudget Create(ModelProfile profile, ContextSettings settings)

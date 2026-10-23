@@ -6,6 +6,8 @@
 @inject WorkspaceContext WorkspaceContext
 @inject IFolderPickerService FolderPicker
 @inject ChatStore ChatStore
+@inject SessionArchiveService ArchiveService
+@inject IWorkspaceMemory Memory
 @inject PluginCatalog PluginCatalog
 @inject PluginRegistry PluginRegistry
 
@@ -27,6 +29,7 @@
              OnAddWorkspace="AddWorkspace"
              OnTogglePin="TogglePin"
              OnDeleteSession="DeleteSession"
+             OnArchiveSession="ArchiveSession"
              OnRenameSession="RenameSession"
              OnDeleteWorkspace="DeleteWorkspace"
              OnRenameWorkspace="RenameWorkspace" />
@@ -34,7 +37,7 @@
     <main class="main-area">
         @if (_view == MainView.Settings)
         {
-            <SettingsView InitialSection="_settingsSection" />
+            <SettingsView InitialSection="_settingsSection" OnOpenSession="OpenSettingsSession" />
         }
         else if (_activeSession is null)
         {
@@ -56,7 +59,9 @@
                       OnGeneratingChanged="SetGenerating"
                       OnOpenModelSettings="OpenModelSettings"
                       OnWorkspaceChanged="ChangeWorkspace"
-                      OnPickWorkspace="PickWorkspace" />
+                      OnPickWorkspace="PickWorkspace"
+                      OnOpenSessionById="OpenSessionById"
+                      OnArchiveChanged="OnArchiveChanged" />
         }
     </main>
 
@@ -87,6 +92,8 @@
 
     private IReadOnlyList<ChatSession> SortedSessions =>
         _sessions
+            // M3：归档会话默认不出现在侧栏；如果正打开着它，保留一行以便继续查看 / 取消归档。
+            .Where(session => !session.IsArchived || string.Equals(session.Id, _activeSession?.Id, StringComparison.Ordinal))
             .OrderByDescending(session => session.IsPinned)
             .ThenByDescending(session => session.UpdatedAt)
             .ToList();
@@ -161,6 +168,50 @@
         UpdateWorkspaceRoot();
     }
 
+    /// <summary>M3：知识库引用 chip 跳转。归档会话不在侧栏也照样能按 id 打开。</summary>
+    private void OpenSessionById(string sessionId)
+    {
+        var session = _sessions.FirstOrDefault(item =>
+            string.Equals(item.Id, sessionId, StringComparison.Ordinal));
+
+        if (session is not null)
+        {
+            OpenSession(session);
+        }
+    }
+
+    /// <summary>从设置页的归档列表打开会话：先切回聊天页。</summary>
+    private void OpenSettingsSession(string sessionId)
+    {
+        OpenSessionById(sessionId);
+
+        if (_activeSession is not null
+            && string.Equals(_activeSession.Id, sessionId, StringComparison.Ordinal))
+        {
+            _view = MainView.Chat;
+        }
+    }
+
+    /// <summary>M3：侧栏「归档 / 取消归档」。归档后侧栏隐藏，但当前打开的会话保持可见。</summary>
+    private async Task ArchiveSession(ChatSession session)
+    {
+        if (session.IsArchived)
+        {
+            await ArchiveService.UnarchiveAsync(session);
+        }
+        else
+        {
+            await ArchiveService.ArchiveAsync(session);
+        }
+
+        // 归档列表在设置页里重新加载；侧栏过滤只看 IsArchived。
+        StateHasChanged();
+    }
+
+    /// <summary>ChatRoom 内归档后通知外层刷新（父组件不会因子组件状态变化自动重渲染）。</summary>
+    private void OnArchiveChanged(ChatSession session) =>
+        _ = InvokeAsync(StateHasChanged);
+
     /// <summary>打开设置：右侧整页显示。</summary>
     private void OpenSettings()
     {
@@ -185,6 +236,15 @@
     {
         _sessions.Remove(session);
         await ChatStore.DeleteSessionAsync(session);
+
+        try
+        {
+            Memory.Remove(session.WorkspaceId, session.Id);
+        }
+        catch (Exception)
+        {
+            // 索引清理失败不影响删除；下次检索前的 EnsureIndexed 会重建。
+        }
 
         if (ReferenceEquals(_activeSession, session))
         {
@@ -234,6 +294,8 @@
         foreach (var session in affected)
         {
             session.WorkspaceId = null;
+            // M3：工作区没了，归档会话回到历史聊天后也要取消归档，避免从侧栏消失。
+            session.IsArchived = false;
             await ChatStore.SaveSessionAsync(session);
         }
 
@@ -259,7 +321,25 @@
         }
         else
         {
+            var previousWorkspaceId = _activeSession.WorkspaceId;
             await ChatStore.MoveSessionAsync(_activeSession, workspace.Id);
+
+            // M3：归档会话换了工作区，旧库索引要删、新库要重建，否则检索会指向不存在的库。
+            if (previousWorkspaceId != workspace.Id)
+            {
+                try
+                {
+                    Memory.Remove(previousWorkspaceId, _activeSession.Id);
+                    if (_activeSession.IsArchived)
+                    {
+                        Memory.Index(workspace.Id, _activeSession.Id);
+                    }
+                }
+                catch (Exception)
+                {
+                    // 索引自愈交给下次检索前的 EnsureIndexed。
+                }
+            }
         }
 
         UpdateWorkspaceRoot();

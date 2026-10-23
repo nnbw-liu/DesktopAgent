@@ -1,0 +1,242 @@
+[
+  {
+    "id": "R01",
+    "prompt": "帮我读一下 README 并解释构建步骤",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["read_file"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "普通读取"
+  },
+  {
+    "id": "R02",
+    "prompt": "这个函数定义在哪个文件",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["search_files"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "定位代码"
+  },
+  {
+    "id": "R03",
+    "prompt": "帮我修一下这个 bug",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["apply_patch"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "编辑"
+  },
+  {
+    "id": "R04",
+    "prompt": "把这个文件里的旧名字替换成新名字",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["replace_text"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "精确替换"
+  },
+  {
+    "id": "R05",
+    "prompt": "读一下这个 PDF 的第 3 页",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["pdf_read"],
+    "forbiddenTools": ["run_powershell", "search_workspace_memory"],
+    "note": "PDF 意图"
+  },
+  {
+    "id": "R06",
+    "prompt": "在沙箱里跑一段 PowerShell 脚本",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["run_powershell"],
+    "forbiddenTools": ["search_workspace_memory", "pdf_read"],
+    "note": "沙箱脚本"
+  },
+  {
+    "id": "R07",
+    "prompt": "跑一下 dotnet test 看看有没有失败",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["run_command"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "构建 / 测试"
+  },
+  {
+    "id": "R08",
+    "prompt": "上次关于沙箱 ACL 的结论",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["search_workspace_memory", "read_archived_session"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "跨会话回忆优先于沙箱关键词"
+  },
+  {
+    "id": "R09",
+    "prompt": "帮我联网搜一下这个报错",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["web_search"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "联网"
+  },
+  {
+    "id": "R10",
+    "prompt": "先列个计划，再一步步做",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["todo_write"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "计划"
+  },
+  {
+    "id": "R11",
+    "prompt": "看看工作区目录结构",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["list_tree"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "未知意图由核心 + 包 Order 补齐"
+  },
+  {
+    "id": "R12",
+    "prompt": "用 PowerShell 看一下目录",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["run_powershell"],
+    "forbiddenTools": ["search_workspace_memory"],
+    "note": "显式 PowerShell"
+  },
+  {
+    "id": "R13",
+    "prompt": "读取附件里的 PDF 并总结重点",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["pdf_read"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "PDF 总结"
+  },
+  {
+    "id": "R14",
+    "prompt": "新建一个文件写 hello",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["write_file"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "新建文件"
+  },
+  {
+    "id": "R15",
+    "prompt": "检查一下最近的改动，有问题就修",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["apply_patch"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "检查并修复"
+  },
+  {
+    "id": "R16",
+    "prompt": "搜索一下 web 上有没有这个 API 的文档",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["web_search"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "联网文档"
+  },
+  {
+    "id": "R17",
+    "prompt": "上次讨论的那个方案还在吗",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["search_workspace_memory"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "回忆"
+  },
+  {
+    "id": "R18",
+    "prompt": "把 setting.json 里的端口从 8080 改成 9090",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["replace_text"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "精确修改"
+  },
+  {
+    "id": "R19",
+    "prompt": "为什么构建失败了，看看日志",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["run_command"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "构建排错"
+  },
+  {
+    "id": "R20",
+    "prompt": "帮我对齐一下这段代码的缩进格式",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["apply_patch"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "含糊指令但核心集覆盖"
+  },
+  {
+    "id": "R21",
+    "prompt": "打开昨天那个归档会话",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["search_workspace_memory"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "归档回忆"
+  },
+  {
+    "id": "R22",
+    "prompt": "用命令行跑一下测试",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["run_command"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "命令行测试"
+  },
+  {
+    "id": "R23",
+    "prompt": "帮我改一下这个文件里的错误",
+    "packs": ["skills", "files", "edits"],
+    "mode": "Compact",
+    "window": 8192,
+    "expectedTools": ["apply_patch"],
+    "forbiddenTools": ["web_search"],
+    "note": "8K Compact 仍按意图选编辑工具"
+  },
+  {
+    "id": "R24",
+    "prompt": "读一下 src 目录下的 Program.cs",
+    "packs": ["skills", "files", "edits"],
+    "mode": "Compact",
+    "window": 8192,
+    "expectedTools": ["read_file"],
+    "forbiddenTools": ["apply_patch"],
+    "note": "8K Compact 读取"
+  }
+]

@@ -59,7 +59,7 @@
                 <PluginSettings />
                 break;
             default:
-                <ToolsSettings />
+                <ToolsSettings OnOpenSession="OnOpenSession" />
                 break;
         }
     </div>
@@ -69,6 +69,10 @@
     /// <summary>打开设置时默认显示的分区（例如从聊天页的「未配置模型」跳过来）。</summary>
     [Parameter]
     public SettingsSection InitialSection { get; set; } = SettingsSection.General;
+
+    /// <summary>M3：从知识库归档列表跳到某个会话。</summary>
+    [Parameter]
+    public EventCallback<string> OnOpenSession { get; set; }
 
     private SettingsSection _tab = SettingsSection.General;
 

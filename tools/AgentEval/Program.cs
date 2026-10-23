@@ -134,6 +134,7 @@ internal static class Program
             var messages = new List<ChatMessage> { new(ChatMessageRole.User, task.Prompt) };
             var output = new StringBuilder();
             var trace = new List<TraceRow>();
+            var routings = new List<RoutingRow>();
             var totalSteps = 0;
             var totalSeconds = 0d;
             string? error = null;
@@ -158,10 +159,11 @@ internal static class Program
                     Session: session);
 
                 var turnOutput = new StringBuilder();
+                var telemetry = new ContextRunTelemetry();
                 var stopwatch = Stopwatch.StartNew();
                 try
                 {
-                    await foreach (var delta in chat.RunAsync(runPlan))
+                    await foreach (var delta in chat.RunAsync(runPlan, telemetry))
                     {
                         turnOutput.Append(delta.Text);
                     }
@@ -177,6 +179,14 @@ internal static class Program
                 totalSteps += metrics.ToolTrace.Count;
                 trace.AddRange(metrics.ToolTrace.Select(row => new TraceRow(
                     row.ToolId, row.Status, row.ArgsDigest ?? "", Clip(row.Summary, 500))));
+
+                var routing = telemetry.Report?.Routing;
+                routings.Add(new RoutingRow(
+                    turn,
+                    routing?.Source ?? "none",
+                    routing?.ExposedTools.ToArray() ?? [],
+                    metrics.ToolCalls.Keys.OrderBy(name => name, StringComparer.Ordinal).ToArray(),
+                    metrics.UnusedExposedTools.ToArray()));
 
                 if (error is not null)
                 {
@@ -237,7 +247,7 @@ internal static class Program
                 task.Id, task.Type, task.Title, success,
                 totalSteps, turns, Math.Round(totalSeconds, 1),
                 error, acceptance.ExitCode, Clip(acceptance.Output, 3000),
-                checkFailure, failureClass, trace);
+                checkFailure, failureClass, trace, routings);
             results.Add(outcome);
 
             var transcript = new
@@ -258,6 +268,7 @@ internal static class Program
                 AcceptanceOutput = acceptance.Output,
                 CheckFailure = checkFailure,
                 FailureClass = failureClass,
+                Routing = routings,
                 Trace = trace
             };
             File.WriteAllText(Path.Combine(taskDir, "transcript.json"),
@@ -283,6 +294,8 @@ internal static class Program
             StartedAt = DateTimeOffset.Now,
             Passed = results.Count(item => item.Success),
             Total = results.Count,
+            ExposedToolRounds = results.Sum(item => item.Routing.Sum(round => round.Exposed.Length)),
+            CalledToolRounds = results.Sum(item => item.Routing.Sum(round => round.Called.Length)),
             Results = results
         };
         File.WriteAllText(Path.Combine(outRoot, "summary.json"),
@@ -586,10 +599,13 @@ internal static class Program
 
     private sealed record TraceRow(string ToolId, string Status, string ArgsDigest, string Summary);
 
+    private sealed record RoutingRow(
+        int Turn, string Source, string[] Exposed, string[] Called, string[] UnusedExposed);
+
     private sealed record TaskOutcome(
         string Id, string Type, string Title, bool Success, int Steps, int Turns, double Seconds,
         string? Error, int AcceptanceExit, string AcceptanceOutput, string? CheckFailure,
-        string? FailureClass, IReadOnlyList<TraceRow> Trace);
+        string? FailureClass, IReadOnlyList<TraceRow> Trace, IReadOnlyList<RoutingRow> Routing);
 
     private sealed record EvalConfig(
         string Name, string ProviderId, string ModelId, AgentModePreference Mode,

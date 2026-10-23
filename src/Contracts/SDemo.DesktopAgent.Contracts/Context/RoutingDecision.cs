@@ -22,6 +22,18 @@ public sealed record RoutingDecision(
     bool Truncated,
     string Reason)
 {
+    /// <summary>规则路由（成本档 0，默认）。</summary>
+    public const string RulesSource = "rules";
+
+    /// <summary>小模型路由（成本档 1，M4）。</summary>
+    public const string SmallModelSource = "small-model";
+
+    /// <summary>
+    /// 本轮决策来源：<see cref="RulesSource"/> / <see cref="SmallModelSource"/>。
+    /// 模型不可用、超时或返回非法结果时仍回落规则，源保持 rules，并在 Reason 里注明原因。
+    /// </summary>
+    public string Source { get; init; } = RulesSource;
+
     /// <summary>本轮没有可用工具（插件 Run / 用户全关工具包）。</summary>
     public static RoutingDecision Empty { get; } = new(
         [],

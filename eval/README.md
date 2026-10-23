@@ -20,8 +20,32 @@ eval/
     deepseek-32k.json     DeepSeek V4 Pro / Full / 32K / 15 calls（云端 ds provider）
   tasks/T01..T08.md       8 个冻结任务（需求 + 验收命令 + 隐藏测试）
   tests/                  隐藏验收测试，只在验收阶段注入工作区
+  routing/
+    cases.json            M4 路由评测集（24 条：prompt / 期望工具 / 禁用工具）
   results/                Round 1 / Round 2 产物
 ```
+
+## M4 路由评测
+
+`tools/routing-eval` 不跑完整任务，只验证「本轮该暴露哪些工具」：
+
+```powershell
+# 离线规则（无网络、无模型）
+dotnet run --project tools/routing-eval -c Release -- --mode rules `
+  --out docs/reports/m4-routing-eval.json
+
+# 在线小模型（从 %APPDATA%\SDemo\DesktopAgent\settings.json 读取并解密 Key）
+dotnet run --project tools/routing-eval -c Release -- --mode live `
+  --provider ds --model deepseek-flash `
+  --out docs/reports/m4-routing-eval-live.json
+
+# 对所有 case 施压，检查建议是否挤掉必要工具
+dotnet run --project tools/routing-eval -c Release -- --mode live `
+  --provider ds --model deepseek-flash --always-advise `
+  --out docs/reports/m4-routing-eval-live-always.json
+```
+
+每个 case 输出 `expectedTools / exposedTools / missing / forbiddenExposed`；命中 = 期望工具全部暴露且禁用工具未暴露。默认阈值 90%，低于阈值返回退出码 2。`--only R08,R19` 可只跑指定用例，`--timeout` 控制单次分类超时。
 
 ## 运行
 

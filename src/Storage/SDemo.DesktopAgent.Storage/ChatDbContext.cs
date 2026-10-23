@@ -25,6 +25,8 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         session.Property(record => record.ActiveMountId);
         session.Property(record => record.LastPluginId);
         session.Property(record => record.PluginMemoryJson);
+        // M3：归档状态；知识库只索引已归档的工作区会话。
+        session.Property(record => record.IsArchived);
         // P1 只建列（P2 才开始写入摘要）；老库由 ChatStore.RequiredColumns 补列。
         session.Property(record => record.Summary);
         session.Property(record => record.SummaryThroughOrder);
@@ -54,6 +56,8 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         message.Property(record => record.PluginJson);
         message.Property(record => record.DerivedJson);
         message.Property(record => record.ToolTraceJson);
+        // M3：知识库引用（只用于界面跳转，不进入上下文）。
+        message.Property(record => record.MemoryCitationsJson);
         message.Property(record => record.IsPinned);
         message.HasIndex(record => record.SessionId);
     }
@@ -71,6 +75,9 @@ public sealed class SessionRecord
     public string? WorkspaceId { get; set; }
 
     public bool IsPinned { get; set; }
+
+    /// <summary>M3：已归档会话进入工作区知识库；侧栏默认隐藏。</summary>
+    public bool IsArchived { get; set; }
 
     public DateTime UpdatedAt { get; set; }
 
@@ -145,6 +152,9 @@ public sealed class MessageRecord
 
     /// <summary>工具轨迹（ToolTraceEntry[]）的 JSON。</summary>
     public string? ToolTraceJson { get; set; }
+
+    /// <summary>知识库引用（MemoryCitation[]）的 JSON；M3。</summary>
+    public string? MemoryCitationsJson { get; set; }
 
     /// <summary>pin 标记；裁剪时永不淘汰。</summary>
     public bool IsPinned { get; set; }

@@ -207,6 +207,10 @@
     [Parameter]
     public EventCallback<ChatSession> OnDeleteSession { get; set; }
 
+    /// <summary>M3：归档 / 取消归档（只有归属工作区的会话才显示这个入口）。</summary>
+    [Parameter]
+    public EventCallback<ChatSession> OnArchiveSession { get; set; }
+
     [Parameter]
     public EventCallback<(ChatSession Session, string Title)> OnRenameSession { get; set; }
 
@@ -334,6 +338,12 @@
         await OnDeleteSession.InvokeAsync(session);
     }
 
+    private async Task ArchiveSession(ChatSession session)
+    {
+        _openMenu = null;
+        await OnArchiveSession.InvokeAsync(session);
+    }
+
     private async Task DeleteWorkspace(Workspace workspace)
     {
         _openMenu = null;
@@ -437,6 +447,12 @@
                 {
                     <div class="item-menu">
                         <button type="button" class="item-menu-entry" @onclick="() => StartRename(menuKey, session.Title)">重命名</button>
+                        @if (!string.IsNullOrEmpty(session.WorkspaceId))
+                        {
+                            <button type="button" class="item-menu-entry" @onclick="() => ArchiveSession(session)">
+                                @(session.IsArchived ? "取消归档" : "归档到知识库")
+                            </button>
+                        }
                         <button type="button" class="item-menu-entry item-menu-entry--danger" @onclick="() => DeleteSession(session)">删除</button>
                     </div>
                 }

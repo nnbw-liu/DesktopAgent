@@ -57,14 +57,19 @@ public sealed class CompositionTests
 
         var registry = provider.GetRequiredService<AgentToolRegistry>();
         Assert.Equal(
-            ["todo", "search", "skills", "files", "edits", "code_edit"],
+            ["todo", "search", "skills", "files", "edits", "code_edit", "memory"],
             registry.Descriptors.Select(descriptor => descriptor.Id));
 
         // 文件读写是内置能力：不再依赖输入框 chip；搜索仍由用户逐轮选择。
         Assert.True(registry.Find("files")!.BuiltIn);
         Assert.True(registry.Find("edits")!.BuiltIn);
         Assert.True(registry.Find("skills")!.BuiltIn);
+        Assert.True(registry.Find("memory")!.BuiltIn);
         Assert.False(registry.Find("search")!.BuiltIn);
+
+        // M3：知识库索引与归档服务也必须能从核心容器解析。
+        Assert.NotNull(provider.GetRequiredService<IWorkspaceMemory>());
+        Assert.NotNull(provider.GetRequiredService<SessionArchiveService>());
 
         // 校验 PowerShell 之外的核心包都有工具；PowerShell 由 Windows 宿主单独注册。
         Assert.All(registry.Descriptors, descriptor => Assert.NotEmpty(descriptor.Functions));

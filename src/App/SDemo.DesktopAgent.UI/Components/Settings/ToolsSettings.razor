@@ -11,6 +11,9 @@
 @inject SessionGrantStore Grants
 @inject WorkspaceContext Workspace
 @inject SDemo.DesktopAgent.Execution.IWorkspaceWarmupService Warmup
+@inject ChatStore ChatStore
+@inject IWorkspaceMemory Memory
+@inject SessionArchiveService ArchiveService
 
 @* 工具设置：联网搜索后端 + 文件写入确认 *@
 <div class="settings-pane">
@@ -170,6 +173,98 @@
                    checked="@Settings.Current.Agent.SkillIndexEnabled"
                    @onchange="ToggleSkillIndex" />
         </label>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">规则不确定时用小模型辅助路由</span>
+                <span class="settings-row-hint">
+                    只影响 Full 模式：规则看不出意图、多意图或命中不到工具时，发一次 JSON 路由请求；
+                    超时 / 失败自动回落规则。路由模型复用摘要模型，未配置时用当前会话模型。
+                </span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@Settings.Current.Agent.SmallModelRoutingEnabled"
+                   @onchange="ToggleSmallModelRouting" />
+        </label>
+
+        <div class="settings-grid">
+            <label class="field">
+                <span class="field-label">小模型路由超时（秒）</span>
+                <input class="field-input"
+                       type="number"
+                       min="1"
+                       max="60"
+                       value="@Settings.Current.Agent.RoutingTimeoutSeconds"
+                       @onchange="ChangeRoutingTimeout" />
+                <span class="field-hint">超时直接回落规则，不阻塞对话；默认 8 秒。</span>
+            </label>
+        </div>
+    </section>
+
+    <section class="settings-section">
+        <h2 class="settings-section-title">工作区知识库</h2>
+        <p class="settings-section-hint">
+            归档会话会进入当前工作区的检索索引。开启后系统提示只多一句「本工作区有 N 条归档会话」，
+            检索与正文都按需走工具结果预算；关闭时上下文成本为 0。
+        </p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">启用工作区知识库</span>
+                <span class="settings-row-hint">
+                    索引在本机 SQLite（FTS5）里；中文 2 字词与英文缩写都能检索。归档会话默认不显示在侧栏。
+                </span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@Settings.Current.Agent.WorkspaceMemoryEnabled"
+                   @onchange="ToggleWorkspaceMemory" />
+        </label>
+
+        @if (CurrentWorkspace is null)
+        {
+            <p class="settings-message">当前会话没有归属工作区；知识库只对工作区会话生效。</p>
+        }
+        else if (_archived.Count == 0)
+        {
+            <p class="settings-message">
+                工作区「@CurrentWorkspace.Name」还没有归档会话。在侧栏会话菜单里点「归档到知识库」。
+            </p>
+        }
+        else
+        {
+            <div class="memory-archive-list">
+                @foreach (var card in _archived)
+                {
+                    <div class="memory-archive-row">
+                        <div class="memory-archive-row-text">
+                            <span class="memory-archive-row-title">@card.Title</span>
+                            <span class="memory-archive-row-meta">
+                                @card.UpdatedAt.ToString("yyyy-MM-dd HH:mm") · @card.MessageCount 条消息
+                            </span>
+                        </div>
+                        <div class="memory-archive-row-actions">
+                            <button type="button" class="ghost-button" @onclick="() => OpenArchived(card)">打开</button>
+                            <button type="button" class="ghost-button" @onclick="() => UnarchiveAsync(card)">取消归档</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <div class="editor-footer">
+            <button type="button" class="ghost-button"
+                    disabled="@(CurrentWorkspace is null)"
+                    @onclick="RebuildIndexAsync">
+                重建索引
+            </button>
+        </div>
+
+        @if (_memoryMessage is not null)
+        {
+            <p class="settings-message">@_memoryMessage</p>
+        }
     </section>
 
     <section class="settings-section">
@@ -681,6 +776,10 @@
 </div>
 
 @code {
+    /// <summary>M3：从归档列表跳到会话。</summary>
+    [Parameter]
+    public EventCallback<string> OnOpenSession { get; set; }
+
     private string _endpoint = string.Empty;
     private string _apiKey = string.Empty;
     private bool _showKey;
@@ -704,6 +803,8 @@
     private string _testCommand = string.Empty;
     private string? _executionMessage;
     private bool _isWarming;
+    private IReadOnlyList<MemorySessionCard> _archived = [];
+    private string? _memoryMessage;
 
     private SDemo.DesktopAgent.Models.Workspace? CurrentWorkspace
     {
@@ -742,6 +843,7 @@
         _apiKey = Settings.Current.Search.ApiKey;
         _allowlistText = string.Join(", ", Settings.Current.Execution.Allowlist);
         LoadWorkspaceCommands();
+        await RefreshArchivedAsync();
 
         // 启动清理是后台任务；如果它已经跳过某些 job，这里直接把“待处理”展示出来。
         if (Maintenance.LastReport is { PendingJobs: > 0 } report)
@@ -928,6 +1030,80 @@
     {
         Settings.Current.Agent.SkillIndexEnabled = args.Value is true;
         Settings.Save();
+    }
+
+    private void ToggleSmallModelRouting(ChangeEventArgs args)
+    {
+        Settings.Current.Agent.SmallModelRoutingEnabled = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ChangeRoutingTimeout(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var seconds))
+        {
+            Settings.Current.Agent.RoutingTimeoutSeconds = Math.Clamp(seconds, 1, 60);
+            Settings.Save();
+        }
+    }
+
+    private void ToggleWorkspaceMemory(ChangeEventArgs args)
+    {
+        Settings.Current.Agent.WorkspaceMemoryEnabled = args.Value is true;
+        Settings.Save();
+        _memoryMessage = Settings.Current.Agent.WorkspaceMemoryEnabled ? "工作区知识库已开启。" : "工作区知识库已关闭；上下文成本为 0。";
+    }
+
+    private async Task RefreshArchivedAsync()
+    {
+        if (CurrentWorkspace is not { } workspace)
+        {
+            _archived = [];
+            return;
+        }
+
+        try
+        {
+            _archived = Memory.ListArchived(workspace.Id);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _archived = [];
+            _memoryMessage = $"读取归档列表失败：{ex.Message}";
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task RebuildIndexAsync()
+    {
+        if (CurrentWorkspace is not { } workspace)
+        {
+            return;
+        }
+
+        _memoryMessage = ArchiveService.Rebuild(workspace.Id);
+        await RefreshArchivedAsync();
+    }
+
+    private void OpenArchived(MemorySessionCard card) =>
+        _ = OnOpenSession.InvokeAsync(card.SessionId);
+
+    private async Task UnarchiveAsync(MemorySessionCard card)
+    {
+        var session = (await ChatStore.LoadAllAsync(Settings.Current.Workspaces))
+            .FirstOrDefault(item => string.Equals(item.Id, card.SessionId, StringComparison.Ordinal));
+
+        if (session is null)
+        {
+            _memoryMessage = "会话已不存在；下次重建索引时会自动清理。";
+            await RefreshArchivedAsync();
+            return;
+        }
+
+        var outcome = await ArchiveService.UnarchiveAsync(session);
+        _memoryMessage = outcome.Message;
+        await RefreshArchivedAsync();
     }
 
     private void ToggleAutoVerify(ChangeEventArgs args)    {

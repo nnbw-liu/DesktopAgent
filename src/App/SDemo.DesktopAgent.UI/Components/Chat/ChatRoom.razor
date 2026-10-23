@@ -16,6 +16,8 @@
 @inject PluginParameterResolver ParameterResolver
 @inject IPluginRunner PluginRunner
 @inject WorkspaceContext WorkspaceContext
+@inject SessionArchiveService ArchiveService
+@inject IWorkspaceMemory Memory
 @implements IDisposable
 
 @* 聊天室：空会话（欢迎语 + 输入框，垂直居中）与有记录会话（标题 / 消息区 / 输入框）共用本组件 *@
@@ -63,6 +65,13 @@
                                     @onclick="ClearSummaryAsync">
                                 清空摘要
                             </button>
+                            @if (!string.IsNullOrEmpty(Session.WorkspaceId))
+                            {
+                                <button type="button" class="item-menu-entry" role="menuitem"
+                                        @onclick="ToggleArchiveAsync">
+                                    @(Session.IsArchived ? "取消归档" : "归档到知识库")
+                                </button>
+                            }
                         </div>
                     }
                 </div>
@@ -153,6 +162,24 @@
                         @if (!isUser && message.ToolTrace.Count > 0)
                         {
                             <EditSummaryPanel Trace="message.ToolTrace" SessionId="Session.Id" />
+                        }
+
+                        @* M3：知识库引用来源。点击跳到原归档会话；引用不进入后续上下文。 *@
+                        @if (message.MemoryCitations.Count > 0)
+                        {
+                            <div class="memory-citations">
+                                <span class="memory-citations-label">引用来源</span>
+                                @foreach (var citation in message.MemoryCitations)
+                                {
+                                    <button type="button"
+                                            class="memory-citation"
+                                            title="@citation.Title"
+                                            @onclick="() => OpenCitedSession(citation.SessionId)">
+                                        <span class="memory-citation-title">@citation.Title</span>
+                                        <span class="memory-citation-date">@citation.At.ToString("yyyy-MM-dd")</span>
+                                    </button>
+                                }
+                            </div>
                         }
 
                         <div class="msg-meta">
@@ -482,6 +509,14 @@
     [Parameter]
     public EventCallback OnPickWorkspace { get; set; }
 
+    /// <summary>M3：知识库引用跳转；由外层按 sessionId 找到并打开会话。</summary>
+    [Parameter]
+    public EventCallback<string> OnOpenSessionById { get; set; }
+
+    /// <summary>M3：归档 / 取消归档后通知外层刷新侧栏与设置页。</summary>
+    [Parameter]
+    public EventCallback<ChatSession> OnArchiveChanged { get; set; }
+
     private string _draft = string.Empty;
     private bool _isGenerating;
     private string? _sessionId;
@@ -494,6 +529,9 @@
 
     /// <summary>最近一次算出的上下文报告（预览或真实请求），驱动占用环与明细。</summary>
     private ContextReport? _contextPreview;
+
+    /// <summary>预览版本号：异步路由返回时只应用最新一次请求，避免旧结果覆盖新结果。</summary>
+    private int _previewVersion;
 
     /// <summary>宿主提示（溢出重试 / 需压缩 / 压缩结果）；不渲染进对话正文，也不进入后续上下文。</summary>
     private string? _contextNotice;
@@ -676,38 +714,68 @@
     }
 
     /// <summary>
-    /// 重新估算「下一次请求」的上下文占用；只读、不发请求。
+    /// 重新估算「下一次请求」的上下文占用；只读、不发对话请求。
+    /// M4 起规则不确定时会先问一次小模型路由（有 2 分钟缓存），因此预览是异步的；
     /// 预算超限时把错误报告留在 <see cref="_contextPreview"/>，让占用环仍然显示真实数值。
     /// </summary>
     private void RefreshContextPreview()
+    {
+        var version = ++_previewVersion;
+        _ = RefreshContextPreviewAsync(version);
+    }
+
+    private async Task RefreshContextPreviewAsync(int version)
     {
         var option = CurrentModelOption();
 
         if (option is null || Session.Messages.Count == 0)
         {
-            _contextPreview = null;
+            if (version == _previewVersion)
+            {
+                _contextPreview = null;
+            }
+
             return;
         }
 
+        ContextReport? report;
+
         try
         {
-            _contextPreview = Runner.Preview(new AgentRunRequest(
+            var plan = await Runner.PreviewAsync(new AgentRunRequest(
                 Session.Messages.ToList(),
                 option.Provider,
                 option.ModelId,
                 EffectiveToolPacks(),
                 _selectedSkill,
                 Session.Id,
-                Session: Session)).Report;
+                Session: Session));
+            report = plan.Report;
         }
         catch (ContextBudgetException ex)
         {
-            _contextPreview = ex.Report;
+            report = ex.Report;
         }
         catch (Exception)
         {
             // 预览失败不影响发送：设置页可能刚被改坏，真正发送时还会再报一次。
-            _contextPreview = null;
+            report = null;
+        }
+
+        if (version != _previewVersion)
+        {
+            return;
+        }
+
+        _contextPreview = report;
+
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception)
+        {
+            // 组件已释放：预览结果不再需要渲染。
         }
     }
 
@@ -814,6 +882,31 @@
         await NotifySessionChangedAsync();
         StateHasChanged();
     }
+
+    /// <summary>M3：把当前会话归档到工作区知识库 / 取消归档。</summary>
+    private async Task ToggleArchiveAsync()
+    {
+        _sessionMenuOpen = false;
+
+        if (_isGenerating)
+        {
+            return;
+        }
+
+        var outcome = Session.IsArchived
+            ? await ArchiveService.UnarchiveAsync(Session)
+            : await ArchiveService.ArchiveAsync(Session);
+
+        _contextNotice = outcome.Message;
+        await NotifySessionChangedAsync();
+        await OnArchiveChanged.InvokeAsync(Session);
+        RefreshContextPreview();
+        StateHasChanged();
+    }
+
+    /// <summary>M3：点击引用来源，按 sessionId 跳到原归档会话。</summary>
+    private void OpenCitedSession(string sessionId) =>
+        _ = OnOpenSessionById.InvokeAsync(sessionId);
 
     /// <summary>切换一条消息的 pin；上限由 Core 的 PinPolicy 判定（便于单测）。</summary>
     private async Task TogglePinAsync(ChatMessage message)
@@ -923,6 +1016,32 @@
         if (descriptor.Id == "skills" && _skills.Count == 0)
         {
             return "还没有本地技能";
+        }
+
+        // M3：知识库工具只在「开关打开 ∩ 有工作区 ∩ 有归档会话」时暴露。
+        if (descriptor.Id == MemoryToolPack.PackId)
+        {
+            if (!settings.Agent.WorkspaceMemoryEnabled)
+            {
+                return "工作区知识库已在设置中关闭";
+            }
+
+            if (string.IsNullOrWhiteSpace(Session.WorkspaceId))
+            {
+                return "当前会话不属于工作区";
+            }
+
+            try
+            {
+                if (Memory.CountArchived(Session.WorkspaceId) == 0)
+                {
+                    return "当前工作区还没有归档会话";
+                }
+            }
+            catch (Exception)
+            {
+                return "工作区知识库暂不可用";
+            }
         }
 
         if (descriptor.Id == "powershell")
@@ -1332,7 +1451,8 @@
                         enabledPacks,
                         _selectedSkill,
                         Session.Id,
-                        metrics),
+                        metrics,
+                        Session: Session),
                     telemetry,
                     cts.Token),
                 telemetry);
@@ -1357,6 +1477,19 @@
             await SetGeneratingAsync(false);
             StateHasChanged();
             await NotifySessionChangedAsync();
+
+            // M3：归档会话继续对话时同步刷新索引，避免检索到旧内容。
+            if (Session.IsArchived && !string.IsNullOrWhiteSpace(Session.WorkspaceId))
+            {
+                try
+                {
+                    Memory.Index(Session.WorkspaceId, Session.Id);
+                }
+                catch (Exception)
+                {
+                    // 索引失败不影响本轮；下次检索前的 EnsureIndexed 会重建。
+                }
+            }
         }
     }
 
@@ -1621,6 +1754,11 @@
         if (metrics.ToolTrace.Count > 0)
         {
             reply.ToolTrace.AddRange(metrics.ToolTrace);
+        }
+
+        if (metrics.Citations.Count > 0)
+        {
+            reply.MemoryCitations.AddRange(metrics.Citations);
         }
     }
 

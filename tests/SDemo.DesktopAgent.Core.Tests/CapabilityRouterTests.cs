@@ -183,6 +183,29 @@ public sealed class CapabilityRouterTests
     }
 
     [Fact]
+    public void 回忆意图补知识库工具且不会被沙箱关键词抢走()
+    {
+        var available = Available
+            .Concat(["run_powershell", "pdf_read", CapabilityRouter.SearchMemoryTool, CapabilityRouter.ReadMemoryTool])
+            .ToArray();
+
+        var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
+            "上次关于沙箱 ACL 的结论",
+            [],
+            available,
+            AgentMode.Full,
+            MaxExposedTools: 12));
+
+        Assert.Contains(CapabilityRouter.SearchMemoryTool, decision.ExposedTools);
+        Assert.Contains(CapabilityRouter.ReadMemoryTool, decision.ExposedTools);
+        // 意图判定必须是 memory 而不是 shell；即使填充阶段带上了 run_powershell，memory 也排在前面。
+        Assert.Contains("意图=memory", decision.Reason);
+        Assert.True(
+            decision.ExposedTools.ToList().IndexOf(CapabilityRouter.SearchMemoryTool)
+            < decision.ExposedTools.ToList().IndexOf("run_powershell"));
+    }
+
+    [Fact]
     public void 按窗口解析默认暴露上限()
     {
         var settings = new AgentSettings();
@@ -207,6 +230,92 @@ public sealed class CapabilityRouterTests
 
         settings.ExposeAllTools = true;
         Assert.Equal(int.MaxValue, settings.ResolveMaxExposedTools(8192, AgentMode.Compact));
+    }
+
+    [Fact]
+    public void 小模型建议优先但仍在可用集合与上限内()
+    {
+        var available = Available
+            .Concat(["pdf_read", "pdf_info", "run_powershell", "web_search"])
+            .ToArray();
+        var input = new CapabilityRoutingInput(
+            "帮我看看这个 PDF 并总结",
+            [],
+            available,
+            AgentMode.Full,
+            MaxExposedTools: 6);
+        var rule = CapabilityRouter.Route(input);
+
+        var decision = CapabilityRouter.ApplyAdvice(
+            input,
+            new RoutingAdvice(["pdf_read", "not_a_tool", "read_file"], "pdf", "需要读 PDF", 0.9),
+            rule);
+
+        Assert.Equal(RoutingDecision.SmallModelSource, decision.Source);
+        Assert.Contains("pdf_read", decision.ExposedTools);
+        Assert.DoesNotContain("not_a_tool", decision.ExposedTools);
+        Assert.True(decision.Count <= 6);
+        Assert.Contains("意图=pdf", decision.Reason);
+        Assert.Contains("小模型路由", decision.Reason);
+    }
+
+    [Fact]
+    public void 小模型建议全部非法时沿用规则()
+    {
+        var input = new CapabilityRoutingInput(
+            "帮我改一下这个文件",
+            [],
+            Available,
+            AgentMode.Full,
+            MaxExposedTools: 6);
+        var rule = CapabilityRouter.Route(input);
+
+        var decision = CapabilityRouter.ApplyAdvice(
+            input,
+            new RoutingAdvice(["made_up_tool"], "edit", null, 0.4),
+            rule);
+
+        Assert.Equal(RoutingDecision.RulesSource, decision.Source);
+        Assert.Equal(rule.ExposedTools, decision.ExposedTools);
+        Assert.Contains("沿用规则", decision.Reason);
+    }
+
+    [Fact]
+    public void 规则不确定时才建议问小模型()
+    {
+        var available = Enumerable.Range(0, 12).Select(index => $"tool_{index}")
+            .Concat(CapabilityRouter.CoreTools)
+            .Concat(["pdf_read", "web_search", CapabilityRouter.SearchMemoryTool])
+            .ToArray();
+
+        var ambiguous = new CapabilityRoutingInput(
+            "帮我处理一下那个东西",
+            [],
+            available,
+            AgentMode.Full,
+            MaxExposedTools: 6);
+        Assert.True(CapabilityRouter.ShouldConsultAdvisor(
+            ambiguous, CapabilityRouter.Route(ambiguous)));
+
+        var chatter = new CapabilityRoutingInput(
+            "你好",
+            [],
+            available,
+            AgentMode.Full,
+            MaxExposedTools: 6);
+        Assert.False(CapabilityRouter.ShouldConsultAdvisor(
+            chatter, CapabilityRouter.Route(chatter)));
+
+        var clear = new CapabilityRoutingInput(
+            "跑一下构建",
+            [],
+            available,
+            AgentMode.Full,
+            MaxExposedTools: 6);
+        Assert.False(CapabilityRouter.ShouldConsultAdvisor(clear, CapabilityRouter.Route(clear)));
+
+        var compact = ambiguous with { Mode = AgentMode.Compact };
+        Assert.False(CapabilityRouter.ShouldConsultAdvisor(compact, CapabilityRouter.Route(compact)));
     }
 
     private static IReadOnlyList<string> Select(

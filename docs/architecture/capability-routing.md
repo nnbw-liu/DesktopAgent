@@ -1,6 +1,6 @@
 # 能力路由与提示词预算（M1–M4）
 
-> 计划文档（M1–M2 已实施，M3–M4 待实施）。目标：工具从 15 个长到 100 个、技能从 3 个长到 50 个、工作区知识库从 0 长到几千条归档时，8K 窗口仍然可用；**进入上下文的永远只是本轮真正需要的那一部分**。
+> 计划文档（M1–M4 已实施）。目标：工具从 15 个长到 100 个、技能从 3 个长到 50 个、工作区知识库从 0 长到几千条归档时，8K 窗口仍然可用；**进入上下文的永远只是本轮真正需要的那一部分**。
 
 ## 1. 现状与三个爆点
 
@@ -149,7 +149,9 @@ escape hatch：search_capabilities(query) → 返回可用工具名 + 技能名 
 - `load_skill` 能取到正文并遵守工具结果预算。
 - 现有技能相关测试通过。
 
-### M3 工作区知识库工具（4–6 天）
+### M3 工作区知识库工具（4–6 天）✅ 已实施
+
+> 详细设计与偏差见 [workspace-memory.md](workspace-memory.md)；实施记录见 [§10](#10-m3-实施记录)；报告见 [../reports/m3-report.md](../reports/m3-report.md)。
 
 范围：
 
@@ -161,7 +163,9 @@ escape hatch：search_capabilities(query) → 返回可用工具名 + 技能名 
 - 20 个归档会话，问“上次关于沙箱 ACL 的结论”能命中并跳转。
 - 关闭知识库时上下文成本为 0；开启后单次检索 ≤800 token。
 
-### M4 路由升级与评测（3–4 天）
+### M4 路由升级与评测（3–4 天）✅ 已实施
+
+> 实施细节与偏差见 [§11](#11-m4-实施记录)；报告见 [../reports/m4-report.md](../reports/m4-report.md)；评测数据见 [../reports/m4-routing-eval.json](../reports/m4-routing-eval.json)。
 
 范围：
 
@@ -243,3 +247,73 @@ escape hatch：search_capabilities(query) → 返回可用工具名 + 技能名 
 
 - `ISkillLibrary.Index()` 已是通用索引；知识库（M3）可以复用同样的「索引进提示、正文走工具」模式。
 - M4 小模型路由可直接替换 `SkillIndexBuilder.Select` 的评分来源，`RoutingDecision` 不必改。
+
+## 10. M3 实施记录
+
+状态：✅ 2026-10-23。Core 601 / Sandbox 214（1 跳过）全绿，WPF 与全解决方案 0 错误。详细设计见 [workspace-memory.md](workspace-memory.md)。
+
+### 落地形态
+
+| 计划项 | 实现 |
+| --- | --- |
+| 归档状态 | `ChatSession.IsArchived` + `sessions.IsArchived`；`ChatStore.RequiredColumns` 自动补列；侧栏 / 会话菜单 / 设置页三处入口；移动到历史聊天时自动清归档 |
+| 索引 | `Storage/WorkspaceMemoryIndex.cs`：每条归档会话一行 FTS5；`terms` 预分词（中文 2-gram + 拉丁小写），标题 ×4 / 摘要 ×3 / 正文 ×1；`body` 仅用于片段定位。搜索前 `EnsureIndexed` 按「索引行数 < 归档数」整库重建 |
+| 检索 | `search_workspace_memory(query, topK)`：AND → OR 放宽 → 单字 `LIKE` 兜底；每条片段 ≤140 字，整段 ≤1000 字（实测 ≤800 token） |
+| 正文 | `read_archived_session(sessionId, query?, offset)`：有 query 时按词频挑最多 6 轮，按 `MidTurnToolResultChars` 分页 |
+| 系统提示 | `ContextBuildRequest.MemoryText` + `ContextSegments.Knowledge` + `ContextBudget.KnowledgeLimit`（120 token）；关闭 / 无工作区 / 0 条归档时为 null，成本 0 |
+| 路由 | `CapabilityRouter` 新增 memory 意图，排在 shell 之前（「上次关于沙箱 ACL」不会被带去 `run_powershell`）；`memory` 包 Order 24，只在路由命中时占名额 |
+| 引用跳转 | `AgentRunMetrics.Citations` → `ChatMessage.MemoryCitations`（`MemoryCitationsJson`）→ 消息下「引用来源」chip → `AppShell.OpenSessionById` |
+| 设置页 | 工具设置新增「工作区知识库」：总开关、归档列表（打开 / 取消归档）、重建索引 |
+
+### 与计划的偏差（取舍）
+
+1. **正文落两份**：FTS 表保留 `body UNINDEXED` 用于生成含查询词的片段；代价是磁盘约为原库 3 倍，规模变大时应改成外部内容表。
+2. **不做语义 / 向量检索**：同义改写（「隔离配置」↔「沙箱 ACL」）命中不了；本轮只保证关键词可命中。
+3. **引用不持久化到上下文**：`MemoryCitationsJson` 只给界面跳转，和派生卡片一样不进入后续请求。
+4. **归档只对工作区会话开放**：历史聊天没有工作区 DB，也就没有知识库作用域；移到历史聊天时自动取消归档。
+5. **未做真机 20 条归档的端到端跳转实测**：单测覆盖索引 / 检索 / 分页 / 预算 / 引用记录，UI 跳转由 `OnOpenSessionById` 接线。
+
+### 给 M4 的接口
+
+- `RoutingDecision` 仍与来源无关；M4 小模型路由只要替换 `CapabilityRouter.Route` 的调用点，不需要改知识库。
+- 检索评分集中在 `WorkspaceMemoryIndex`，语义检索可在此替换实现，工具契约不变。
+
+## 11. M4 实施记录
+
+状态：✅ 2026-10-23。Core 616 / Sandbox 214（1 跳过）全绿，全解决方案构建 0 错误。报告见 [../reports/m4-report.md](../reports/m4-report.md)。
+
+### 落地形态
+
+| 计划项 | 实现 |
+| --- | --- |
+| 路由建议契约 | `Contracts/Context/RoutingAdvice.cs`：`RoutingAdvice`（工具 / 意图 / 理由 / 置信度）、`RoutingCapability`、`RoutingAdviceRequest`、`IRoutingAdvisor`；`IRoutingChatTransport` 与摘要传输分开 |
+| 小模型建议 | `Core/Services/SmallModelRoutingAdvisor.cs`：JSON Schema 提示 + 严格校验 + 2 分钟缓存；解析时过滤未知工具、大小写归一、空结果视为无效；任何异常返回 null |
+| 规则触发条件 | `CapabilityRouter.ShouldConsultAdvisor`：仅 Full、未全量、工具数超上限、输入有任务信号，且意图未知 / 多意图 / 命中工具都不可用时调用；Compact 永不调用 |
+| 建议落地 | `CapabilityRouter.ApplyAdvice`：建议只决定优先顺序，未知工具丢弃；规则结果补齐剩余名额，元工具（`search_capabilities` / `load_skill`）仍由宿主按模式追加；仍受窗口 / 模式上限约束 |
+| 失败回落 | `AgentSessionRunner.ResolveRoutingAsync`：超时（默认 8s） / 网络 / JSON 非法 / 空建议都回落规则，`RoutingDecision.Source` 保持 `rules`，Reason 追加「回落规则」 |
+| 一轮一次 | `AgentSessionRunner` 在 `StreamAsync` / `PreviewAsync` 开头算一次，压缩重建与溢出重试复用；`RoutingDecision.Source` 透传到 `ContextReport` 与分解面板 |
+| 指标 | `AgentRunMetrics.RecordRouting` + `ExposedToolCount` / `CalledToolCount` / `UnusedExposedTools` / `CalledUnexposedTools`；AgentEval transcript 每轮记录 `Routing`（exposes / called / unused） |
+| 评测 | 新工程 `tools/routing-eval`：`eval/routing/cases.json` 24 条（22 条 32K Full + 2 条 8K Compact），记录 exposes / missing / forbidden；支持 `--mode rules` 与 `--mode live`，`--always-advise` 可对全量 case 施压 |
+| 设置 / UI | 工具设置新增「规则不确定时用小模型辅助路由」与超时；`ContextBreakdown` 显示「工具路由（规则 / 小模型）」；预览改为异步，旧结果用版本号丢弃 |
+| 路由模型解析 | `AgentSettings.RoutingProviderId/ModelId` 显式优先，其次摘要模型，最后当前会话模型；未配置路由模型也能工作，但会使用会话模型 |
+
+### 评测结果（2026-10-23）
+
+| 配置 | 规则命中 | 最终命中 | 调路由模型 | 平均延迟 |
+| --- | --- | --- | --- | --- |
+| `--mode rules`（离线） | 24/24 | 24/24 | 0 | — |
+| `--mode live`（DeepSeek Flash，仅不确定） | 24/24 | **24/24** | 7/24 | 1369 ms |
+| `--mode live --always-advise`（DeepSeek Flash，全量施压） | 24/24 | **24/24** | 22/24（Compact 2 条跳过） | 1253 ms |
+
+- 24 条 case 平均暴露 11.3 个工具（上限 12；2 条 8K Compact 为 4）。
+- 小模型 7 次建议全部返回合法 JSON；没有一次因建议导致缺工具（missing 为空）。
+- 初次 live 曾出现一次 R19 选择 `run_powershell` 的过度暴露，收紧提示词（构建 / 日志优先 `run_command`，明确要求 PowerShell 才选）后消除；数据保留在报告里作为提示词调优记录。
+
+### 与计划的偏差（取舍）
+
+1. **只路由工具，不路由技能**：`RoutingAdvice` 只携带工具名；技能索引仍由 `SkillIndexBuilder` 规则挑选。M2 预留的“替换评分来源”留到后续。
+2. **Compact 不进入 tier 1**：按 §4.3 计划，Compact 只用规则；8K 主场景仍靠 M1/M2 的规则 + 索引。
+3. **路由模型不做独立选择 UI**：复用摘要模型（`ContextSettings.SummaryProviderId/ModelId`），可用 `settings.json` 的 `agent.routingProviderId/routingModelId` 覆盖；避免为一次分类调用再维护一套 provider 下拉。
+4. **评测是路由级，不是任务完成级**：`tools/routing-eval` 冻结 24 条查询与期望工具，验证命中率 ≥90%；8K 长任务完成率仍由 `tools/AgentEval` 跑，需真实 8K 模型，本轮没有重跑（M1–M3 也没有真机 8K 长任务基线）。
+5. **缓存键不含 provider**：同一输入换 provider 仍会命中 2 分钟缓存；影响仅是少一次分类调用，不影响工具白名单。
+6. **`ShouldConsultAdvisor` 依赖关键词任务信号**：纯寒暄不调用；不含任务词的回忆句（如「上次那个结论」）直接走规则 memory，不额外花模型调用。

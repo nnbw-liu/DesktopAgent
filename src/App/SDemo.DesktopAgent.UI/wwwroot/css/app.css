@@ -3918,6 +3918,7 @@ a {
 .seg-trace { background: #22d3ee; }
 .seg-pinned { background: #f472b6; }
 .seg-tools { background: #64748b; }
+.seg-knowledge { background: #c084fc; }
 
 .context-row {
     display: flex;
@@ -4383,3 +4384,19 @@ a {
 .edit-summary-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); }
 .edit-summary-conflict { flex: 1; min-width: 240px; color: var(--danger, #d9534f); font-size: 12px; }
 .edit-summary-note { color: var(--text-muted); font-size: 12px; }
+
+/* M3：工作区知识库引用来源 */
+.memory-citations { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.memory-citations-label { color: var(--text-muted); font-size: 12px; }
+.memory-citation { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 12px; cursor: pointer; }
+.memory-citation:hover { border-color: var(--accent); }
+.memory-citation-title { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memory-citation-date { color: var(--text-muted); font-size: 11px; }
+
+/* M3：设置页里的归档会话列表 */
+.memory-archive-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.memory-archive-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.memory-archive-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.memory-archive-row-title { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memory-archive-row-meta { font-size: 11px; color: var(--text-muted); }
+.memory-archive-row-actions { margin-left: auto; display: flex; gap: 6px; }

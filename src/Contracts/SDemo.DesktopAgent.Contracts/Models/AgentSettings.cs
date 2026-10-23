@@ -37,6 +37,30 @@ public sealed class AgentSettings
     public int SkillIndexMaxEntries { get; set; } = 5;
 
     /// <summary>
+    /// M3：是否启用工作区知识库。关闭时不注入索引行、不暴露 memory 工具，
+    /// 上下文成本严格为 0；打开时只多一句「本工作区有 N 条归档会话」。
+    /// </summary>
+    public bool WorkspaceMemoryEnabled { get; set; } = true;
+
+    /// <summary>单次检索默认返回几条命中（1–5；结果还要受 800 token 预算约束）。</summary>
+    public int WorkspaceMemoryMaxHits { get; set; } = 5;
+
+    /// <summary>
+    /// M4：规则不确定时是否让小模型做一次结构化路由（成本档 1）。
+    /// Compact 永远只用规则；模型不可用 / 超时 / JSON 不合规时自动回落规则，不阻塞对话。
+    /// </summary>
+    public bool SmallModelRoutingEnabled { get; set; } = true;
+
+    /// <summary>路由模型 provider id；为空时复用摘要模型，再退到当前会话模型。</summary>
+    public string? RoutingProviderId { get; set; }
+
+    /// <summary>路由模型 id；为空时复用摘要模型，再退到当前会话模型。</summary>
+    public string? RoutingModelId { get; set; }
+
+    /// <summary>小模型路由超时（秒）；超时直接回落规则。</summary>
+    public int RoutingTimeoutSeconds { get; set; } = 8;
+
+    /// <summary>
     /// Compact 模式最大工具迭代（默认 8）。P6 实测 6 次会在「读两次 + 补丁失败重试」时
     /// 提前耗尽，模型来不及换 replace_text / write_file；循环安全由 FICC 轮数上限兜底。
     /// </summary>
