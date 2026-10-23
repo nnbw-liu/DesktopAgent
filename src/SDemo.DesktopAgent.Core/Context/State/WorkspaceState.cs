@@ -9,7 +9,8 @@ public sealed record WorkspaceState(
     IReadOnlyList<RecentEdit> RecentEdits,
     IReadOnlyList<RecentAction> RecentActions,
     string? LastVerification,
-    int PinnedCount);
+    int PinnedCount,
+    IReadOnlyList<TodoItem>? Todos = null);
 
 /// <summary>最近改动的一个文件。</summary>
 public sealed record RecentEdit(string Path, string? HashPrefix, DateTime At, string ToolId);

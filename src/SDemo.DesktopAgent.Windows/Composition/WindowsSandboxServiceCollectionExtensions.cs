@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using SDemo.DesktopAgent.Execution;
 using SDemo.DesktopAgent.Services;
 using SDemo.DesktopAgent.Platform.Windows.Sandbox;
 using SDemo.DesktopAgent.Platform.Windows.Tools;
@@ -47,6 +49,16 @@ public static class WindowsSandboxServiceCollectionExtensions
 
         // S3：PowerShell 工具包。只有 Windows 宿主注册；Android 连这个工程都不引用。
         services.AddSingleton<IAgentToolPack, PowerShellToolPack>();
+
+        // P4：直跑白名单命令（run_command）+ 会话级授权。
+        services.TryAddSingleton<SessionGrantStore>();
+        services.AddSingleton<SDemo.DesktopAgent.Platform.Windows.Execution.IDirectProcessRunner,
+            SDemo.DesktopAgent.Platform.Windows.Execution.DirectProcessRunner>();
+        services.AddSingleton<IAgentToolPack, CommandToolPack>();
+        services.AddSingleton<SDemo.DesktopAgent.Execution.IWorkspaceWarmupService,
+            SDemo.DesktopAgent.Platform.Windows.Execution.WorkspaceWarmupService>();
+        services.AddSingleton<SDemo.DesktopAgent.Execution.IVerificationRunner,
+            SDemo.DesktopAgent.Platform.Windows.Execution.VerificationRunner>();
 
         // S5：PDF 工具包与附件文本提取。解析在 SandboxHost（沙箱内）完成，宿主只负责编排。
         services.AddSingleton<IAgentToolPack, PdfToolPack>();

@@ -1,6 +1,7 @@
 @using System.Diagnostics
 @using System.IO
 @using SDemo.DesktopAgent.Context
+@using SDemo.DesktopAgent.Execution
 @using SDemo.DesktopAgent.Models
 @using SDemo.DesktopAgent.Sandbox
 @using Microsoft.AspNetCore.Components
@@ -14,6 +15,7 @@
 @inject PluginRegistry Registry
 @inject PluginParameterResolver ParameterResolver
 @inject IPluginRunner PluginRunner
+@inject WorkspaceContext WorkspaceContext
 @implements IDisposable
 
 @* 聊天室：空会话（欢迎语 + 输入框，垂直居中）与有记录会话（标题 / 消息区 / 输入框）共用本组件 *@
@@ -66,6 +68,9 @@
                 </div>
             </div>
         </header>
+
+        <TodosPanel Todos="Session.Todos" />
+        <VerificationBadge Session="Session" />
 
         <div class="chat-scroll" @ref="_scrollElement">
             <div class="chat-messages">
@@ -143,6 +148,11 @@
                                     </span>
                                 }
                             </div>
+                        }
+
+                        @if (!isUser && message.ToolTrace.Count > 0)
+                        {
+                            <EditSummaryPanel Trace="message.ToolTrace" SessionId="Session.Id" />
                         }
 
                         <div class="msg-meta">
@@ -478,6 +488,7 @@
     private List<ModelOption> _modelOptions = [];
     private string? _selectedKey;
     private CancellationTokenSource? _cts;
+    private bool _autoContinued;
 
     /// <summary>最近一次算出的上下文报告（预览或真实请求），驱动占用环与明细。</summary>
     private ContextReport? _contextPreview;
@@ -1246,8 +1257,13 @@
     }
 
     /// <summary>用 Agent Framework 流式生成回复，边生成边写入会话。</summary>
-    private async Task GenerateAsync(ModelOption option)
+    private async Task GenerateAsync(ModelOption option, bool isAutoContinue = false)
     {
+        if (!isAutoContinue)
+        {
+            _autoContinued = false;
+        }
+
         _isGenerating = true;
         await SetGeneratingAsync(true);
 
@@ -1297,6 +1313,16 @@
                     telemetry,
                     cts.Token),
                 telemetry);
+
+            var auto = BuildAutoContinueDecision();
+            if (auto.Continue && !_autoContinued && auto.Prompt is not null)
+            {
+                _autoContinued = true;
+                Session.Messages.Add(new ChatMessage(ChatMessageRole.User, auto.Prompt));
+                StateHasChanged();
+                await NotifySessionChangedAsync();
+                await GenerateAsync(option, isAutoContinue: true);
+            }
         }
         finally
         {
@@ -1309,6 +1335,27 @@
             StateHasChanged();
             await NotifySessionChangedAsync();
         }
+    }
+
+    private AutoContinueDecision BuildAutoContinueDecision()
+    {
+        var workspace = Settings.Current.Workspaces.FirstOrDefault(item =>
+            !string.IsNullOrWhiteSpace(item.Path)
+            && string.Equals(
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(item.Path)),
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(WorkspaceContext.RootPath)),
+                StringComparison.OrdinalIgnoreCase));
+
+        var suggestion = WorkspaceCommandDetector.Detect(WorkspaceContext.RootPath);
+        var build = workspace?.BuildCommand ?? suggestion.BuildCommand;
+        var test = workspace?.TestCommand ?? suggestion.TestCommand;
+
+        return AutoContinuePolicy.Decide(
+            Session,
+            build,
+            test,
+            Settings.Current.Verification,
+            _autoContinued ? 1 : 0);
     }
 
     /// <summary>插件 Run：单轮、默认无历史、无全局技能；产物是一条带 Plugin 归属的普通助手消息。</summary>

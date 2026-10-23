@@ -1,0 +1,34 @@
+diff --git a/src/ParserSettings.cs b/src/ParserSettings.cs
+new file mode 100644
+index 0000000..5a48d55
+--- /dev/null
++++ b/src/ParserSettings.cs
+@@ -0,0 +1,28 @@
++using System;
++using System.Collections.Generic;
++
++namespace App
++{
++    public class ParserSettings
++    {
++        private int _maximumDisplayWidth = 80;
++
++        public int MaximumDisplayWidth
++        {
++            get => _maximumDisplayWidth;
++            set
++            {
++                if (value < 1)
++                {
++                    throw new ArgumentOutOfRangeException(nameof(value), "MaximumDisplayWidth must be at least 1.");
++                }
++                _maximumDisplayWidth = value;
++            }
++        }
++
++        public class HelpText
++        {
++            // 帮助文本内容
++        }
++    }
++}

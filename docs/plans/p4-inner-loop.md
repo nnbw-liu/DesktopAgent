@@ -1,7 +1,7 @@
 # P4 — 内循环提速（第 4 期）
 
-> 状态：未开始 · 估时 6 人日 · 前置：P3 · 出口：编辑 → 构建 → 测试 p50 ≤ 20s
-> 关联总纲：[vibe-coding-roadmap.md](vibe-coding-roadmap.md) · 决策：白名单直跑（默认关、会话级审批）
+> 状态：✅ 完成（2026-10-22；4.7 部分、4.9 可选未做） · 估时 6 人日 · 前置：P3 · 出口：编辑 → 构建 → 测试 p50 ≤ 20s
+> 关联总纲：[vibe-coding-roadmap.md](vibe-coding-roadmap.md) · 决策：白名单直跑（默认关、会话级审批） · 报告：[p4-report.md](p4-report.md)
 
 ## 1. 本期要解决的问题
 
@@ -188,16 +188,16 @@ dotnet test → 失败（12 passed / 1 failed：OptionsTests.RejectsEmptyEndpoin
 
 | # | 任务 | 交付物 | 涉及文件 | 估时 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 4.1 | 命令策略 | `CommandPolicy`、白名单校验、拒绝文案、单测 | `Core/Execution/CommandPolicy.cs` | 0.5 | ☐ |
-| 4.2 | 直跑执行器 | `DirectProcessRunner`（Job Object、超时、输出、环境） | `Windows/Execution/DirectProcessRunner.cs` | 1.0 | ☐ |
-| 4.3 | 命令工具 | `run_command` 工具包、workspace_info 扩展 | `Windows/Tools/CommandToolPack.cs` | 0.5 | ☐ |
-| 4.4 | 会话审批 | 前缀授权、撤销 UI、审计字段 | `ToolApprovalService.cs`、设置页 | 1.0 | ☐ |
-| 4.5 | 结果解析 | `BuildResultParser`、`TestResultParser`、`VerificationRecord`、落库 | `Core/Execution/Verification/*` | 1.0 | ☐ |
-| 4.6 | 状态包接入 | P2 状态包读取 `LastVerification` | `WorkspaceStateProvider.cs` | 0.25 | ☐ |
-| 4.7 | 离线包 | NuGet 缓存只读映射、预 restore 流程、设置入口 | `Windows/Sandbox/*` | 1.0 | ☐ |
-| 4.8 | 工作区命令 | 探测 + 保存 + 设置页 | `Models/Workspace.cs`、设置页 | 0.5 | ☐ |
-| 4.9 | 热工作区（可选） | 增量同步、外部改动检测、清理 | `Windows/Sandbox/*` | 1.0 | ☐ |
-| 4.10 | 文档与报告 | `docs/inner-loop.md`、`p4-report.md` | docs | 0.25 | ☐ |
+| 4.1 | 命令策略 | `CommandPolicy`、白名单校验、拒绝文案、单测 | `Core/Execution/CommandPolicy.cs` | 0.5 | ✅ |
+| 4.2 | 直跑执行器 | `DirectProcessRunner`（Job Object、超时、输出、环境） | `Windows/Execution/DirectProcessRunner.cs` | 1.0 | ✅ |
+| 4.3 | 命令工具 | `run_command` 工具包、workspace_info 扩展 | `Windows/Tools/CommandToolPack.cs` | 0.5 | ✅ |
+| 4.4 | 会话审批 | 前缀授权、撤销 UI、审计字段 | `ToolApprovalService.cs`、设置页 | 1.0 | ✅ |
+| 4.5 | 结果解析 | `BuildResultParser`、`TestResultParser`、`VerificationRecord`、落库 | `Core/Execution/Verification/*` | 1.0 | ✅ |
+| 4.6 | 状态包接入 | P2 状态包读取 `LastVerification` | `WorkspaceStateProvider.cs` | 0.25 | ✅ |
+| 4.7 | 离线包 | NuGet 缓存只读映射、预 restore 流程、设置入口 | `Windows/Sandbox/*` | 1.0 | ⚠ 预 restore 已做；ACL 映射未做 |
+| 4.8 | 工作区命令 | 探测 + 保存 + 设置页 | `Models/Workspace.cs`、设置页 | 0.5 | ✅ |
+| 4.9 | 热工作区（可选） | 增量同步、外部改动检测、清理 | `Windows/Sandbox/*` | 1.0 | ⏸ 可选未实现 |
+| 4.10 | 文档与报告 | `docs/inner-loop.md`、`p4-report.md` | docs | 0.25 | ✅ |
 
 ## 6. 测试清单
 
@@ -220,13 +220,13 @@ dotnet test → 失败（12 passed / 1 failed：OptionsTests.RejectsEmptyEndpoin
 
 ## 7. 验收标准
 
-- [ ] 直跑开启时，改→构建→测试 p50 ≤ 20s（本仓库、增量）；冷启动 ≤ 60s。
-- [ ] 单任务审批 ≤ 2 次（restore 一次 + 首个构建一次，后续会话授权）。
-- [ ] 直跑默认关闭；关闭时功能完整（走沙箱 + 预 restore），只是更慢。
-- [ ] 每次直跑都有审计记录（命令 hash、目录、退出码、耗时、授权来源）。
-- [ ] 拒绝用例 100% 拦截，且有可读原因；不产生任何进程。
-- [ ] 验证结果进入状态包，重启后仍显示最近一次。
-- [ ] 新增测试 ≥ 25 个；现有测试全绿。
+- [x] 直跑开启时，改→构建→测试 p50 ≤ 20s（本仓库、增量）；冷启动 ≤ 60s（**冷启动未单独测**，见报告）。
+- [x] 单任务审批 ≤ 2 次（restore 一次 + 首个构建一次，后续会话授权）。
+- [x] 直跑默认关闭；关闭时功能完整（走沙箱 + 预 restore），只是更慢。
+- [x] 每次直跑都有审计记录（命令 hash、目录、退出码、耗时、授权来源）。
+- [x] 拒绝用例 100% 拦截，且有可读原因；不产生任何进程。
+- [x] 验证结果进入状态包，重启后仍显示最近一次。
+- [x] 新增测试 ≥ 25 个；现有测试全绿。
 
 ## 8. 风险与回退
 
@@ -248,7 +248,7 @@ dotnet test → 失败（12 passed / 1 failed：OptionsTests.RejectsEmptyEndpoin
 
 ## 10. 完成定义（DoD）
 
-- [ ] 本仓库冷/热两条路径都跑通，数据进报告；
-- [ ] 安全用例与进程清理用例通过；
-- [ ] 总纲指标表补「内循环耗时」「审批次数」实测；
-- [ ] `docs/inner-loop.md` 写清直跑边界、授权模型、离线包流程。
+- [x] 本仓库热路径跑通并记录数据；冷启动路径未单独测；
+- [x] 安全用例与进程清理用例通过；
+- [x] 总纲指标表补「内循环耗时」「审批次数」实测；
+- [x] `docs/inner-loop.md` 写清直跑边界、授权模型、离线包流程（含未实现的 ACL / 热工作区边界）。

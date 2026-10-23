@@ -1,0 +1,11 @@
+{
+  "name": "deepseek-32k",
+  "providerId": "ds",
+  "modelId": "deepseek-v4-pro",
+  "mode": "Full",
+  "contextWindow": 32768,
+  "maxOutputTokens": 4096,
+  "maxToolCalls": 15,
+  "disableThinking": false,
+  "repair": true
+}

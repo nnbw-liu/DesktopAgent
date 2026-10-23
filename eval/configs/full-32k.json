@@ -1,0 +1,11 @@
+{
+  "name": "full-32k",
+  "providerId": "local",
+  "modelId": "qwen/qwen3-8b",
+  "mode": "Full",
+  "contextWindow": 32768,
+  "maxOutputTokens": 3072,
+  "maxToolCalls": 15,
+  "disableThinking": true,
+  "repair": true
+}

@@ -1,11 +1,12 @@
 using System.IO;
 using Microsoft.Extensions.AI;
+using SDemo.DesktopAgent.Editing;
 using SDemo.DesktopAgent.Services;
 using Xunit;
 
 namespace SDemo.DesktopAgent.Core.Tests;
 
-/// <summary>文件工具包：路径 jail、写入审批、原子覆盖。</summary>
+/// <summary>只读文件工具：按行读取、路径 jail；写入由 EditToolPack 的用例覆盖。</summary>
 public sealed class FileToolPackTests
 {
     [Fact]
@@ -19,7 +20,8 @@ public sealed class FileToolPackTests
         var read = await InvokeAsync(pack, context, "read_file", ("path", "a.txt"));
         var list = await InvokeAsync(pack, context, "list_files", ("path", "."));
 
-        Assert.Equal("hello", read);
+        Assert.Contains("共 1 行", read);
+        Assert.Contains("1| hello", read);
         Assert.Contains("[文件] a.txt", list);
     }
 
@@ -71,11 +73,14 @@ public sealed class FileToolPackTests
         settings.Current.ConfirmFileWrite = true;
         var approvals = new ToolApprovalService();
         var context = Context(temp.Root, settings, approvals);
-        var pack = new FileToolPack();
+        var pack = new EditToolPack();
 
         var invocation = InvokeAsync(pack, context, "write_file", ("path", "new.txt"), ("content", "data"));
 
         await WaitUntilAsync(() => approvals.Current is not null);
+        Assert.Equal(ToolApprovalKind.FileEdit, approvals.Current!.Kind);
+        Assert.False(approvals.Current.AllowSessionRemember);
+        Assert.Contains("+data", approvals.Current.Detail);
         approvals.Resolve(ToolApprovalDecision.Deny);
 
         var result = await invocation;
@@ -92,12 +97,12 @@ public sealed class FileToolPackTests
         settings.Current.ConfirmFileWrite = true;
         var approvals = new ToolApprovalService();
         var context = Context(temp.Root, settings, approvals);
-        var pack = new FileToolPack();
+        var pack = new EditToolPack();
 
         var invocation = InvokeAsync(pack, context, "write_file", ("path", "sub/new.txt"), ("content", "第一次"));
         await WaitUntilAsync(() => approvals.Current is not null);
         Assert.Equal("sub/new.txt", approvals.Current!.Summary.Replace("路径：", string.Empty));
-        Assert.Equal("第一次", approvals.Current.Detail);
+        Assert.Contains("+第一次", approvals.Current.Detail);
         approvals.Resolve(ToolApprovalDecision.ApproveOnce);
         await invocation;
 
@@ -120,17 +125,41 @@ public sealed class FileToolPackTests
         settings.Current.ConfirmFileWrite = false;
         var approvals = new ToolApprovalService();
         var context = Context(temp.Root, settings, approvals);
-        var pack = new FileToolPack();
+        var pack = new EditToolPack();
 
         var result = await InvokeAsync(pack, context, "write_file", ("path", "a.txt"), ("content", "x"));
 
-        Assert.Contains("已写入", result);
+        Assert.Contains("已修改 1 个文件", result);
         Assert.Equal("x", File.ReadAllText(Path.Combine(temp.Root, "a.txt")));
         Assert.Null(approvals.Current);
     }
 
+    [Fact]
+    public async Task 未读已有文件时拒绝写入()
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllText(Path.Combine(temp.Root, "a.txt"), "old");
+        var settings = new StubSettingsService();
+        settings.Current.ConfirmFileWrite = false;
+        var context = Context(temp.Root, settings, new ToolApprovalService());
+        var pack = new EditToolPack();
+
+        var result = await InvokeAsync(pack, context, "write_file", ("path", "a.txt"), ("content", "new"));
+
+        Assert.Contains("先 read_file", result);
+        Assert.Equal("old", File.ReadAllText(Path.Combine(temp.Root, "a.txt")));
+    }
+
     private static ToolContext Context(string root, StubSettingsService settings, IToolApprovalService approvals) =>
-        new("session", root, [], settings, approvals, new StubSandboxJobService(), new NullAuditLog());
+        new(
+            "session",
+            root,
+            [],
+            settings,
+            approvals,
+            new StubSandboxJobService(),
+            new NullAuditLog(),
+            new FileReadRegistry());
 
     private static async Task<string> InvokeAsync(
         IAgentToolPack pack,

@@ -70,11 +70,13 @@ public sealed class ChatStoreContextTests : IDisposable
         loaded.Messages[0].IsPinned = true;
         loaded.Messages[0].ToolTrace.Add(new ToolTraceEntry(
             "read_file", ToolTraceEntry.StatusOk, null, "a.md", "ok", 10, DateTime.Now));
+        loaded.Todos = [new TodoItem("补列后的计划", TodoStatus.InProgress)];
         await store.SaveSessionAsync(loaded);
 
         var reopened = Assert.Single(await store.LoadAllAsync([legacyWorkspace]));
         Assert.True(reopened.Messages[0].IsPinned);
         Assert.Single(reopened.Messages[0].ToolTrace);
+        Assert.Equal("补列后的计划", Assert.Single(reopened.Todos).Content);
 
         SqliteConnection.ClearAllPools();
         using var connection = new SqliteConnection($"Data Source={databasePath}");
@@ -85,6 +87,8 @@ public sealed class ChatStoreContextTests : IDisposable
         Assert.Contains("SummaryThroughOrder", sessionColumns);
         Assert.Contains("SummaryUpdatedAt", sessionColumns);
         Assert.Contains("SummaryTokens", sessionColumns);
+        Assert.Contains("LastVerificationJson", sessionColumns);
+        Assert.Contains("TodosJson", sessionColumns);
 
         var messageColumns = ReadColumns(connection, "messages");
         Assert.Contains("ToolTraceJson", messageColumns);

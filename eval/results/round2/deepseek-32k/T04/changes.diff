@@ -1,0 +1,39 @@
+diff --git a/src/CommandLine/UnParserExtensions.cs b/src/CommandLine/UnParserExtensions.cs
+index e823a7f..50c26b5 100644
+--- a/src/CommandLine/UnParserExtensions.cs
++++ b/src/CommandLine/UnParserExtensions.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections;
+@@ -321,14 +321,24 @@ namespace CommandLine
+                 return new string[0];
+ 
+             var inQuote = false;
+-            var chars = command.ToCharArray().Select(v =>
++            var builder = new StringBuilder();
++            var chars = command.ToCharArray();
++            for (var i = 0; i < chars.Length; i++)
+             {
++                var v = chars[i];
++                if (v == '\\' && i + 1 < chars.Length && chars[i + 1] == '"')
++                {
++                    // An escaped double quote is a literal quote, not a group boundary.
++                    builder.Append('"');
++                    i++;
++                    continue;
++                }
+                 if (v == '"')
+                     inQuote = !inQuote;
+-                return !inQuote && v == ' ' ? '\n' : v;
+-            }).ToArray();
++                builder.Append(!inQuote && v == ' ' ? '\n' : v);
++            }
+ 
+-            return new string(chars).Split('\n')
++            return builder.ToString().Split('\n')
+                 .Select(x => keepQuote ? x : x.Trim('"'))
+                 .Where(x => !string.IsNullOrWhiteSpace(x))
+                 .ToArray();

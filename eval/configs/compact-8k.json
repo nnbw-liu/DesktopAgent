@@ -1,0 +1,11 @@
+{
+  "name": "compact-8k",
+  "providerId": "local",
+  "modelId": "qwen3.5-4b",
+  "mode": "Compact",
+  "contextWindow": 8192,
+  "maxOutputTokens": 2048,
+  "maxToolCalls": 15,
+  "disableThinking": false,
+  "repair": true
+}

@@ -9,6 +9,7 @@ using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Chat;
 using SDemo.DesktopAgent.Context;
+using SDemo.DesktopAgent.Editing;
 using SDemo.DesktopAgent.Models;
 
 namespace SDemo.DesktopAgent.Services;
@@ -26,7 +27,8 @@ public sealed record AgentRunPlan(
     ContextPlan Context,
     IReadOnlySet<string> ToolPacks,
     string SessionId = "",
-    AgentRunMetrics? Metrics = null);
+    AgentRunMetrics? Metrics = null,
+    ChatSession? Session = null);
 
 /// <summary>
 /// 通过 Microsoft Agent Framework 调用模型。只负责传输、流式解析与工具轨迹采集；
@@ -48,6 +50,10 @@ public sealed class AgentChatService : IAgentChatService
         @"exit(?: code)?\s*[:=]?\s*(?<code>\d+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    private static readonly Regex EditLinePattern = new(
+        @"^\[EDIT\]\s+(?<path>.+?)\s+\+(?<added>\d+)\s+-(?<removed>\d+)\s*$",
+        RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.CultureInvariant);
+
     private readonly AgentToolRegistry _tools;
     private readonly WorkspaceContext _workspace;
     private readonly ISettingsService _settings;
@@ -55,6 +61,7 @@ public sealed class AgentChatService : IAgentChatService
     private readonly ISandboxJobService _sandbox;
     private readonly IToolAuditLog _audit;
     private readonly IAppPaths _paths;
+    private readonly IFileReadRegistry _reads;
 
     public AgentChatService(
         AgentToolRegistry tools,
@@ -63,7 +70,8 @@ public sealed class AgentChatService : IAgentChatService
         IToolApprovalService approvals,
         ISandboxJobService sandbox,
         IToolAuditLog audit,
-        IAppPaths paths)
+        IAppPaths paths,
+        IFileReadRegistry reads)
     {
         _tools = tools;
         _workspace = workspace;
@@ -72,6 +80,7 @@ public sealed class AgentChatService : IAgentChatService
         _sandbox = sandbox;
         _audit = audit;
         _paths = paths;
+        _reads = reads;
     }
 
     public async IAsyncEnumerable<AgentDelta> RunAsync(
@@ -90,10 +99,46 @@ public sealed class AgentChatService : IAgentChatService
             _settings,
             _approvals,
             _sandbox,
-            _audit);
+            _audit,
+            _reads,
+            plan.Metrics,
+            plan.Session,
+            plan.Metrics?.RunId);
 
         var tools = _tools.Create(context, plan.ToolPacks, plan.Metrics);
-        var agent = CreateAgent(plan.Provider, plan.ModelId, tools, plan.Context, telemetry);
+        var agentMode = Context.AgentModeResolver.Resolve(
+            plan.Context.Profile,
+            plan.ModelId,
+            _settings.Current.Agent.Mode);
+
+        if (agentMode == Context.AgentMode.Compact)
+        {
+            if (plan.Metrics is not null)
+            {
+                plan.Metrics.Guard.Limit = Math.Clamp(_settings.Current.Agent.CompactMaxToolCalls, 1, 16);
+            }
+
+            var available = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
+            var userInput = plan.Context.Messages
+                .LastOrDefault(message => message.Role == ChatRole.User)?.Text ?? string.Empty;
+            var recent = plan.Metrics?.ToolTrace.Select(entry => entry.ToolId).TakeLast(6).ToArray() ?? [];
+            var selected = ToolRouter.Select(
+                new ToolSelectionContext(userInput, recent, available, agentMode),
+                _settings.Current.Agent.CompactMaxTools);
+
+            tools = tools.Where(tool => selected.Contains(tool.Name, StringComparer.Ordinal)).ToList();
+        }
+
+        var toolCallLimit = agentMode == Context.AgentMode.Compact
+            ? Math.Clamp(_settings.Current.Agent.CompactMaxToolCalls, 1, 16)
+            : Math.Clamp(_settings.Current.Agent.FullMaxToolCalls, 1, 16);
+
+        if (plan.Metrics is not null)
+        {
+            plan.Metrics.Guard.Limit = toolCallLimit;
+        }
+
+        var agent = CreateAgent(plan.Provider, plan.ModelId, tools, plan.Context, telemetry, toolCallLimit);
 
         var pendingCalls = new Dictionary<string, (string Name, string? Digest)>(StringComparer.Ordinal);
 
@@ -141,7 +186,8 @@ public sealed class AgentChatService : IAgentChatService
         string modelId,
         IReadOnlyList<AITool> tools,
         ContextPlan plan,
-        ContextRunTelemetry telemetry)
+        ContextRunTelemetry telemetry,
+        int toolCallLimit)
     {
         var options = new OpenAIClientOptions
         {
@@ -161,13 +207,22 @@ public sealed class AgentChatService : IAgentChatService
             Counter: new HeuristicTokenCounter(),
             CalibrationFactor: plan.Report.CalibrationFactor,
             KeepRecentTurns: settings.KeepRecentTurns,
-            ToolResultChars: settings.MidTurnToolResultChars);
+            ToolResultChars: settings.MidTurnToolResultChars,
+            MaxOutputTokens: Math.Clamp(plan.Profile.MaxOutputTokens, 128, 8192));
 
         // AsIChatClient() 是 OpenAI ChatClient → IChatClient 的桥；装饰器加在 AsAIAgent 之前，
         // 保证 FICC 在它外层（见 MidTurnPipelineSpikeTests）。
         var guarded = new ContextBudgetChatClient(chatClient.AsIChatClient(), budgetOptions, telemetry);
 
-        return guarded.AsAIAgent(
+        // P6：把工具循环显式收口。MAF 默认的上限远大于本应用的「每轮工具调用」预算；
+        // 小模型被 Block 后仍会继续发工具调用（实测 4B 在 6 次上限后仍调了 30+ 次），
+        // 所以用 FICC 的请求轮数上限兜底：允许的次数 + 2 次收尾。
+        var invoking = new FunctionInvokingChatClient(guarded)
+        {
+            MaximumIterationsPerRequest = toolCallLimit + 2
+        };
+
+        return invoking.AsAIAgent(
             instructions: plan.Instructions,
             name: "SDemo Agent",
             tools: tools.Count == 0 ? null : tools.ToList());
@@ -190,7 +245,31 @@ public sealed class AgentChatService : IAgentChatService
             digest,
             Summarize(text),
             text?.Length ?? 0,
-            DateTime.Now);
+            DateTime.Now,
+            ParseEdits(text));
+    }
+
+    /// <summary>从工具结果末尾的 <c>[EDIT] 路径 +N -M</c> 行汇总本次改动，供消息下方展示。</summary>
+    internal static IReadOnlyList<EditedFile>? ParseEdits(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text) || !text.Contains("[EDIT]", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var edits = new List<EditedFile>();
+        foreach (Match match in EditLinePattern.Matches(text))
+        {
+            if (!int.TryParse(match.Groups["added"].Value, out var added)
+                || !int.TryParse(match.Groups["removed"].Value, out var removed))
+            {
+                continue;
+            }
+
+            edits.Add(new EditedFile(match.Groups["path"].Value.Trim(), added, removed));
+        }
+
+        return edits.Count == 0 ? null : edits;
     }
 
     /// <summary>

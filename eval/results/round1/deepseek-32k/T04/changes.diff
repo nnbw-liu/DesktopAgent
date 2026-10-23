@@ -1,0 +1,47 @@
+diff --git a/src/CommandLine/UnParserExtensions.cs b/src/CommandLine/UnParserExtensions.cs
+index e823a7f..a866a92 100644
+--- a/src/CommandLine/UnParserExtensions.cs
++++ b/src/CommandLine/UnParserExtensions.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections;
+@@ -320,17 +320,31 @@ namespace CommandLine
+             if (string.IsNullOrEmpty(command))
+                 return new string[0];
+ 
++            const char escapedQuote = '\u0001';
+             var inQuote = false;
+-            var chars = command.ToCharArray().Select(v =>
++            var chars = new List<char>(command.Length);
++
++            for (var i = 0; i < command.Length; i++)
+             {
+-                if (v == '"')
++                var c = command[i];
++
++                if (c == '\\' && i + 1 < command.Length && command[i + 1] == '"')
++                {
++                    chars.Add(escapedQuote);
++                    i++;
++                    continue;
++                }
++
++                if (c == '"')
+                     inQuote = !inQuote;
+-                return !inQuote && v == ' ' ? '\n' : v;
+-            }).ToArray();
+ 
+-            return new string(chars).Split('\n')
++                chars.Add(!inQuote && c == ' ' ? '\n' : c);
++            }
++
++            return new string(chars.ToArray()).Split('\n')
+                 .Select(x => keepQuote ? x : x.Trim('"'))
+                 .Where(x => !string.IsNullOrWhiteSpace(x))
++                .Select(x => x.Replace(escapedQuote, '"'))
+                 .ToArray();
+         }
+ 

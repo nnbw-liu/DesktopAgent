@@ -1,0 +1,33 @@
+diff --git a/src/CommandLine/UnParserExtensions.cs b/src/CommandLine/UnParserExtensions.cs
+index e823a7f..a11954a 100644
+--- a/src/CommandLine/UnParserExtensions.cs
++++ b/src/CommandLine/UnParserExtensions.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections;
+@@ -237,15 +237,15 @@ namespace CommandLine
+         private static object FormatWithQuotesIfString(object value)
+         {
+             string s = value.ToString();
+-            if (!string.IsNullOrEmpty(s) && !s.Contains("\"") && s.Contains(" "))
+-                return $"\"{s}\"";
++            if (!NeedsQuotes(s))
++                return s;
+ 
+-            Func<string, string> doubQt = v
+-                => v.Contains("\"") ? v.Replace("\"", "\\\"") : v;
++            return "\"".JoinTo(s.Contains("\"") ? s.Replace("\"", "\\\"") : s, "\"");
++        }
+ 
+-            return s.ToMaybe()
+-                    .MapValueOrDefault(v => v.Contains(' ') || v.Contains("\"")
+-                        ? "\"".JoinTo(doubQt(v), "\"") : v, value);
++        private static bool NeedsQuotes(string value)
++        {
++            return !string.IsNullOrEmpty(value) && (value.Contains(' ') || value.Contains("\""));
+         }
+ 
+         private static char SeperatorOrSpace(this Specification spec)

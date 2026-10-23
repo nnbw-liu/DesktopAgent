@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using SDemo.DesktopAgent.Context;
+using SDemo.DesktopAgent.Editing;
 using SDemo.DesktopAgent.Plugins;
 using SDemo.DesktopAgent.Sandbox;
 
@@ -23,6 +24,18 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<AgentToolRegistry>();
         services.AddSingleton<IAgentToolPack, SearchToolPack>();
         services.AddSingleton<IAgentToolPack, FileToolPack>();
+        services.AddSingleton<IAgentToolPack, EditToolPack>();
+        services.AddSingleton<IAgentToolPack, TodoToolPack>();
+        services.AddSingleton<IAgentToolPack, CodeEditToolPack>();
+
+        // P3：读前写注册表（按会话 + 2 小时 TTL）。
+        services.AddSingleton<IFileReadRegistry, FileReadRegistry>();
+        services.AddSingleton<SDemo.DesktopAgent.Editing.CheckpointStore>();
+        services.AddSingleton<SDemo.DesktopAgent.Execution.SessionGrantStore>();
+        services.AddSingleton<SDemo.DesktopAgent.Execution.IWorkspaceWarmupService,
+            SDemo.DesktopAgent.Execution.UnavailableWorkspaceWarmupService>();
+        services.AddSingleton<SDemo.DesktopAgent.Execution.IVerificationRunner,
+            SDemo.DesktopAgent.Execution.UnavailableVerificationRunner>();
         services.AddSingleton<WorkspaceContext>();
         services.AddSingleton<ChangeApplier>();
         services.AddSingleton<ChatStore>();

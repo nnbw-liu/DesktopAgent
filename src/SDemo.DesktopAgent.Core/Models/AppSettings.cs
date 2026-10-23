@@ -40,4 +40,19 @@ public sealed class AppSettings
 
     /// <summary>上下文预算与裁剪（P1 起；旧文件没有该节点时按默认值）。</summary>
     public ContextSettings Context { get; set; } = new();
+
+    /// <summary>直跑与命令白名单（P4 起；默认关闭）。</summary>
+    public ExecutionSettings Execution { get; set; } = new();
+
+    /// <summary>热工作区（P4 可选；默认关闭）。</summary>
+    public WarmWorkspaceSettings WarmWorkspace { get; set; } = new();
+
+    /// <summary>验证门与自动续跑（P5）。</summary>
+    public SDemo.DesktopAgent.Execution.VerificationSettings Verification { get; set; } = new();
+
+    /// <summary>编辑检查点（P5）。</summary>
+    public SDemo.DesktopAgent.Execution.CheckpointSettings Checkpoints { get; set; } = new();
+
+    /// <summary>小模型 / 工具面（P6）。</summary>
+    public AgentSettings Agent { get; set; } = new();
 }

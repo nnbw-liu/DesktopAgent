@@ -1,0 +1,40 @@
+diff --git a/tests/UnitTests/AgentEval/SplitArgsTests.cs b/tests/UnitTests/AgentEval/SplitArgsTests.cs
+new file mode 100644
+index 0000000..b5b4843
+--- /dev/null
++++ b/tests/UnitTests/AgentEval/SplitArgsTests.cs
+@@ -0,0 +1,34 @@
++using System;
++using Xunit;
++
++namespace AgentEval.UnitTests.AgentEval
++{
++    public class SplitArgsTests
++    {
++        [Fact]
++        public void AgentEval_SplitArgs_EmptyInput()
++        {
++            var result = SplitArgs("");
++            Assert.Empty(result);
++        }
++
++        [Fact]
++        public void AgentEval_SplitArgs_KeepsQuotedSpace()
++        {
++            var result = SplitArgs("a b", "c");
++            Assert.Equal(2, result.Length);
++            Assert.Equal("a b", result[0]);
++            Assert.Equal("c", result[1]);
++        }
++
++        [Fact]
++        public void AgentEval_SplitArgs_KeepQuote()
++        {
++            var result = SplitArgs("a \"b\" c", new SplitArgsOptions { KeepQuote = true });
++            Assert.Equal(3, result.Length);
++            Assert.Equal("a ", result[0]);
++            Assert.Equal("\"b\"", result[1]);
++            Assert.Equal(" c", result[2]);
++        }
++    }
++}

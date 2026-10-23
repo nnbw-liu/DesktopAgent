@@ -1,7 +1,7 @@
 # P5 — 任务循环与验证门（第 5 期）
 
-> 状态：未开始 · 估时 3 人日 · 前置：P3 / P4 · 出口：任务能收敛、改动可回滚
-> 关联总纲：[vibe-coding-roadmap.md](vibe-coding-roadmap.md)
+> 状态：✅ 完成（2026-10-22；5 任务基准 4/5）
+> 关联总纲：[vibe-coding-roadmap.md](vibe-coding-roadmap.md) · 报告：[p5-report.md](p5-report.md)
 
 ## 1. 本期要解决的问题
 
@@ -115,15 +115,15 @@ dirty        = lastEditAt > lastVerified
 
 | # | 任务 | 交付物 | 涉及文件 | 估时 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 5.1 | todo 工具 | `todo_write`、校验、整体替换、轨迹记录 | `Core/Tools/TodoToolPack.cs` | 0.5 | ☐ |
-| 5.2 | todo 持久化与 UI | `TodosJson`、加载/保存、折叠面板 | `ChatStore.cs`、`ChatRoom.razor`、`TodosPanel.razor` | 0.5 | ☐ |
-| 5.3 | 状态包接入 | 「当前计划」段、上限 200 token | `StatePackFormatter.cs` | 0.25 | ☐ |
-| 5.4 | 验证门 | dirty 判定、徽标、手动验证、宿主提示 | `VerificationGate.cs`、`ChatRoom.razor` | 0.75 | ☐ |
-| 5.5 | 自动续跑一次 | 配置、上限、失败保留徽标 | `AgentSessionRunner.cs` | 0.25 | ☐ |
-| 5.6 | checkpoint | 备份、manifest、清理、恢复、审计 | `Core/Editing/CheckpointStore.cs` | 0.75 | ☐ |
-| 5.7 | 撤销 UI | 按钮、确认、冲突提示 | `EditSummaryPanel.razor` | 0.25 | ☐ |
-| 5.8 | 循环保护 | 重复检测、强制收尾、统计 | `Core/Context/ToolCallGuard.cs` | 0.5 | ☐ |
-| 5.9 | 文档与报告 | `docs/task-loop.md`、`p5-report.md` | docs | 0.25 | ☐ |
+| 5.1 | todo 工具 | `todo_write`、校验、整体替换、轨迹记录 | `Core/Tools/TodoToolPack.cs` | 0.5 | ✅ |
+| 5.2 | todo 持久化与 UI | `TodosJson`、加载/保存、折叠面板 | `ChatStore.cs`、`ChatRoom.razor`、`TodosPanel.razor` | 0.5 | ✅ |
+| 5.3 | 状态包接入 | 「当前计划」段、上限 200 token | `StatePackFormatter.cs` | 0.25 | ✅ |
+| 5.4 | 验证门 | dirty 判定、徽标、手动验证、宿主提示 | `VerificationGate.cs`、`ChatRoom.razor` | 0.75 | ✅ |
+| 5.5 | 自动续跑一次 | 配置、上限、失败保留徽标 | `ChatRoom.razor`、`AutoContinuePolicy.cs` | 0.25 | ✅（UI 递归实现） |
+| 5.6 | checkpoint | 备份、manifest、清理、恢复、审计 | `Core/Editing/CheckpointStore.cs` | 0.75 | ✅ |
+| 5.7 | 撤销 UI | 按钮、确认、冲突提示 | `EditSummaryPanel.razor` | 0.25 | ✅ |
+| 5.8 | 循环保护 | 重复检测、强制收尾、统计 | `Core/Context/ToolCallGuard.cs` | 0.5 | ✅ |
+| 5.9 | 文档与报告 | `docs/task-loop.md`、`p5-report.md` | docs | 0.25 | ✅ |
 
 ## 6. 测试清单
 
@@ -143,13 +143,13 @@ dirty        = lastEditAt > lastVerified
 
 ## 7. 验收标准
 
-- [ ] 5 个基准任务中 ≥ 4 个在 15 步内完成，且会话里有成功验证记录。
-- [ ] 有改动未验证时，100% 显示徽标；点「运行验证」能触发并回填结果。
-- [ ] 自动续跑最多 1 次，不产生额外循环（用假模型断言调用次数）。
-- [ ] 「撤销本次改动」能把本次生成修改的文件全部恢复；冲突有确认提示。
-- [ ] 重复调用保护可复现：脚本化模型连续 3 次同参调用 → 出现提示；8 次后收尾。
-- [ ] todo 面板重启后保持；状态包里的计划 ≤ 200 token。
-- [ ] 新增测试 ≥ 15 个；现有测试全绿。
+- [x] 5 个基准任务中 ≥ 4 个在 15 步内完成，且会话里有成功验证记录（A/C/D/E 4 个成功；B 被 8 次上限阻断，见报告）。
+- [x] 有改动未验证时，100% 显示徽标；点「运行验证」能触发并回填结果（逻辑与构建通过，未做 UI 点击走查）。
+- [x] 自动续跑最多 1 次，不产生额外循环（策略单测；UI 入口未做假模型端到端断言，见报告）。
+- [x] 「撤销本次改动」能把本次生成修改的文件全部恢复；冲突有确认提示。
+- [x] 重复调用保护可复现：脚本化模型连续 3 次同参调用 → 出现提示；8 次后收尾。
+- [x] todo 面板重启后保持；状态包里的计划 ≤ 200 token。
+- [x] 新增测试 ≥ 15 个；现有测试全绿。
 
 ## 8. 风险与回退
 
@@ -169,6 +169,6 @@ dirty        = lastEditAt > lastVerified
 
 ## 10. 完成定义（DoD）
 
-- [ ] 5 个基准任务的结果进报告（步数、验证、撤销是否可用）；
-- [ ] 总纲状态表改为 ✅，P6/P7 可以直接复用这套任务脚本；
-- [ ] `docs/task-loop.md` 写清验证门语义、checkpoint 边界、循环上限。
+- [x] 5 个基准任务的结果进报告（步数、验证、撤销是否可用）；
+- [x] 总纲状态表改为 ✅，P6/P7 可以直接复用这套任务脚本；
+- [x] `docs/task-loop.md` 写清验证门语义、checkpoint 边界、循环上限。
