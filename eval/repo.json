@@ -1,0 +1,23 @@
+{
+  "repository": "https://github.com/commandlineparser/commandline",
+  "mirror": "F:\\AI\\Code\\SDemo\\p7-bench\\commandline",
+  "commit": "b0b0ec9f5470bacc0823c013a599ba3b4e115900",
+  "tag": "v2.9.1",
+  "commitDate": "2023-03-07",
+  "solution": "CommandLine.sln",
+  "build": "dotnet build CommandLine.sln -v minimal",
+  "test": "dotnet test tests/CommandLine.Tests/CommandLine.Tests.csproj -f netcoreapp3.1 --no-build -v minimal",
+  "testFramework": "netcoreapp3.1",
+  "baseline": {
+    "build": "pass",
+    "tests": 684,
+    "failed": 0,
+    "coldBuildSeconds": 29.3,
+    "testSeconds": 0.3
+  },
+  "notes": [
+    "锁定 tag v2.9.1 的 commit，任务与结果都绑定该哈希。",
+    "仓库仅通过 SSH 镜像到本机；评测运行器从镜像 worktree 复制，不污染镜像。",
+    "net461 目标由 Microsoft.NETFramework.ReferenceAssemblies 提供；测试只跑 netcoreapp3.1。"
+  ]
+}

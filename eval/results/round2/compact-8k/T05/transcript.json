@@ -1,0 +1,320 @@
+{
+  "id": "T05",
+  "type": "tests",
+  "title": "\u8865\u9F50 PreferShortName \u53CD\u89E3\u6790\u6D4B\u8BD5",
+  "prompt": "## \u9700\u6C42\n\n\u0060UnParserSettings.PreferShortName\u0060 \u76EE\u524D\u6CA1\u6709\u76F4\u63A5\u5355\u6D4B\u3002\u8BF7\u5728\u73B0\u6709\u53CD\u89E3\u6790\u6D4B\u8BD5\u6587\u4EF6\u4E2D\u8865 3 \u4E2A xUnit \u6D4B\u8BD5\uFF0C\u8986\u76D6\uFF1A\n\n1. \u9009\u9879\u540C\u65F6\u6709\u77ED\u540D\u548C\u957F\u540D\u65F6\uFF0C\u5F00\u542F \u0060PreferShortName\u0060 \u8F93\u51FA\u77ED\u540D\uFF08\u6D4B\u8BD5\u540D \u0060AgentEval_PreferShortName_UsesShortWhenAvailable\u0060\uFF09\u3002\n2. \u9009\u9879\u53EA\u6709\u957F\u540D\u65F6\uFF0C\u5F00\u542F \u0060PreferShortName\u0060 \u4ECD\u8F93\u51FA\u957F\u540D\uFF08\u0060AgentEval_PreferShortName_FallsBackToLong\u0060\uFF09\u3002\n3. \u5E03\u5C14\u5F00\u5173\u5728\u5F00\u542F \u0060PreferShortName\u0060 \u65F6\u4ECD\u6309\u539F\u89C4\u5219\u8F93\u51FA\uFF08\u0060AgentEval_PreferShortName_DoesNotAffectSwitches\u0060\uFF09\u3002\n\n\u590D\u7528\u4ED3\u5E93\u73B0\u6709\u6D4B\u8BD5\u5047\u7C7B\u578B\uFF0C\u4E0D\u8981\u65B0\u589E\u751F\u4EA7\u4EE3\u7801\uFF0C\u4E0D\u8981\u6539\u52A8\u73B0\u6709\u6D4B\u8BD5\u3002\n\n## \u5B8C\u6210\u6807\u51C6\n\n- \u4E09\u4E2A\u6D4B\u8BD5\u90FD\u80FD\u7F16\u8BD1\u5E76\u901A\u8FC7\u3002\n- \u65E2\u6709 684 \u4E2A\u6D4B\u8BD5\u4ECD\u5168\u90E8\u901A\u8FC7\u3002",
+  "model": "qwen3.5-4b",
+  "mode": "Compact",
+  "contextWindow": 8192,
+  "output": "## \u8FDB\u5C55\u603B\u7ED3\n\n- **\u5DF2\u5B8C\u6210**\uFF1A\u5DF2\u591A\u6B21\u5C1D\u8BD5\u8BFB\u53D6 \u0060tests/UnParserTests.cs\u0060\uFF0C\u4F46\u8FDE\u7EED\u5931\u8D25\uFF08\u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u5DE5\u4F5C\u533A\uFF09\u3002\n- **\u672A\u5B8C\u6210\u9879**\uFF1A\u5C1A\u672A\u6210\u529F\u83B7\u53D6\u6D4B\u8BD5\u6587\u4EF6\u5185\u5BB9\uFF0C\u65E0\u6CD5\u786E\u8BA4\u73B0\u6709\u6D4B\u8BD5\u7ED3\u6784\u3001\u5047\u7C7B\u578B\u53CA\u547D\u540D\u7EA6\u5B9A\u3002\n- **\u98CE\u9669**\uFF1A\n  - \u82E5\u65E0\u6CD5\u8BBF\u95EE\u6D4B\u8BD5\u6587\u4EF6\uFF0C\u5C06\u96BE\u4EE5\u590D\u7528\u73B0\u6709\u5047\u7C7B\u578B\u548C\u547D\u540D\u98CE\u683C\uFF1B\n  - \u53EF\u80FD\u9700\u5148\u901A\u8FC7 \u0060list_tree\u0060 \u6216 \u0060search_files\u0060 \u5B9A\u4F4D\u6B63\u786E\u8DEF\u5F84\uFF1B\n  - \u5F53\u524D\u5DE5\u4F5C\u533A\u9650\u5236\u5BFC\u81F4\u65E0\u6CD5\u7EE7\u7EED\u8C03\u7528\u5DE5\u5177\u3002\n\n## \u4E0B\u4E00\u6B65\u8BA1\u5212\uFF08\u5F85\u89E3\u9664\u5DE5\u4F5C\u533A\u9650\u5236\u540E\uFF09\n\n1. \u4F7F\u7528 \u0060list_tree\u0060 \u67E5\u770B\u9879\u76EE\u7ED3\u6784\uFF0C\u786E\u8BA4\u6D4B\u8BD5\u6587\u4EF6\u5B9E\u9645\u8DEF\u5F84\uFF1B\n2. \u8BFB\u53D6\u73B0\u6709\u6D4B\u8BD5\u6587\u4EF6\uFF0C\u5206\u6790 \u0060UnParserSettings.PreferShortName\u0060 \u76F8\u5173\u6D4B\u8BD5\u6A21\u5F0F\u4E0E\u5047\u7C7B\u578B\uFF1B\n3. \u6309\u9700\u6C42\u6DFB\u52A0\u4E09\u4E2A xUnit \u6D4B\u8BD5\u65B9\u6CD5\uFF0C\u8986\u76D6\u6307\u5B9A\u573A\u666F\u3002\n\n\u5B8C\u6210\u6807\u51C6\uFF1A\u4E09\u4E2A\u6D4B\u8BD5\u7F16\u8BD1\u901A\u8FC7\u4E14\u4E0D\u5F71\u54CD\u5176\u4ED6 684 \u4E2A\u6D4B\u8BD5\u3002## \u8FDB\u5C55\u603B\u7ED3\n\n- **\u5DF2\u5B8C\u6210**\uFF1A\u5DF2\u5C1D\u8BD5\u591A\u6B21\u8BFB\u53D6 \u0060tests/UnParserTests.cs\u0060\uFF0C\u4F46\u6587\u4EF6\u5185\u5BB9\u59CB\u7EC8\u4E3A\u7A7A\uFF08\u4EC5 1 \u884C\u7A7A\u767D\uFF09\uFF0C\u4E14\u65E0\u6CD5\u901A\u8FC7\u5DE5\u5177\u8C03\u7528\u83B7\u53D6\u5B9E\u9645\u6D4B\u8BD5\u4EE3\u7801\u3002\n- **\u672A\u5B8C\u6210\u9879**\uFF1A\u5C1A\u672A\u6210\u529F\u8BFB\u53D6\u5230\u73B0\u6709\u6D4B\u8BD5\u6587\u4EF6\u7684\u771F\u5B9E\u5185\u5BB9\uFF0C\u56E0\u6B64\u65E0\u6CD5\u786E\u8BA4\uFF1A\n  - \u73B0\u6709\u7684\u5047\u7C7B\u578B\u7ED3\u6784\uFF1B\n  - \u547D\u540D\u7EA6\u5B9A\u4E0E\u6D4B\u8BD5\u98CE\u683C\uFF1B\n  - \u0060UnParserSettings.PreferShortName\u0060 \u7684\u5B9E\u9645\u884C\u4E3A\u903B\u8F91\u3002\n- **\u98CE\u9669**\uFF1A\n  - \u6587\u4EF6\u53EF\u80FD\u4F4D\u4E8E\u5176\u4ED6\u8DEF\u5F84\uFF08\u5982 \u0060src/Tests/...\u0060 \u6216 \u0060TestProjects/...\u0060\uFF09\uFF1B\n  - \u5F53\u524D\u5DE5\u4F5C\u533A\u9650\u5236\u5BFC\u81F4\u65E0\u6CD5\u7EE7\u7EED\u8C03\u7528\u5DE5\u5177\uFF0C\u4EFB\u52A1\u5361\u4F4F\uFF1B\n  - \u82E5\u6D4B\u8BD5\u6587\u4EF6\u4E0D\u5B58\u5728\u6216\u4E3A\u7A7A\uFF0C\u9700\u5148\u786E\u8BA4\u9879\u76EE\u7ED3\u6784\u3002\n\n## \u4E0B\u4E00\u6B65\u8BA1\u5212\uFF08\u5F85\u89E3\u9664\u5DE5\u4F5C\u533A\u9650\u5236\u540E\uFF09\n\n1. \u4F7F\u7528 \u0060list_tree\u0060 \u67E5\u770B\u9879\u76EE\u6839\u76EE\u5F55\u7ED3\u6784\uFF0C\u5B9A\u4F4D\u6D4B\u8BD5\u6587\u4EF6\u5B9E\u9645\u8DEF\u5F84\uFF1B\n2. \u8BFB\u53D6\u73B0\u6709\u6D4B\u8BD5\u6587\u4EF6\uFF0C\u5206\u6790 \u0060UnParserSettings.PreferShortName\u0060 \u76F8\u5173\u6D4B\u8BD5\u6A21\u5F0F\u4E0E\u5047\u7C7B\u578B\uFF1B\n3. \u6309\u9700\u6C42\u6DFB\u52A0\u4E09\u4E2A xUnit \u6D4B\u8BD5\u65B9\u6CD5\uFF0C\u8986\u76D6\u6307\u5B9A\u573A\u666F\u3002\n\n\u5B8C\u6210\u6807\u51C6\uFF1A\u4E09\u4E2A\u6D4B\u8BD5\u7F16\u8BD1\u901A\u8FC7\u4E14\u4E0D\u5F71\u54CD\u5176\u4ED6 684 \u4E2A\u6D4B\u8BD5\u3002\u003Ctool_call\u003E\n\u003Cfunction=read_file\u003E\n\u003Cparameter=path\u003E\ntests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs\n\u003C/parameter\u003E\n\u003Cparameter=offset\u003E\n370\n\u003C/parameter\u003E\n\u003Cparameter=limit\u003E\n150\n\u003C/parameter\u003E\n\u003C/function\u003E\n\u003C/tool_call\u003E",
+  "turns": 3,
+  "steps": 50,
+  "seconds": 88.6,
+  "error": null,
+  "acceptanceExit": 0,
+  "acceptanceOutput": "\u003E dotnet build CommandLine.sln -v minimal\r\nActive code page: 65001\r\n  \u6B63\u5728\u786E\u5B9A\u8981\u8FD8\u539F\u7684\u9879\u76EE\u2026\r\n  \u6240\u6709\u9879\u76EE\u5747\u662F\u6700\u65B0\u7684\uFF0C\u65E0\u6CD5\u8FD8\u539F\u3002\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\src\\CommandLine\\bin\\Debug\\net45\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\src\\CommandLine\\bin\\Debug\\net461\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\src\\CommandLine\\bin\\Debug\\netstandard2.0\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\src\\CommandLine\\bin\\Debug\\net40\\CommandLine.dll\r\n  CommandLine.Tests -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\bin\\Debug\\net461\\CommandLine.Tests.dll\r\n  CommandLine.Tests -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll\r\n\r\n\u5DF2\u6210\u529F\u751F\u6210\u3002\r\n    0 \u4E2A\u8B66\u544A\r\n    0 \u4E2A\u9519\u8BEF\r\n\r\n\u5DF2\u7528\u65F6\u95F4 00:00:02.86\r\n\r\n[exit 0]\r\n\u003E dotnet test tests/CommandLine.Tests/CommandLine.Tests.csproj -f netcoreapp3.1 --no-build -v minimal\r\nActive code page: 65001\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll (.NETCoreApp,Version=v3.1)\u7684\u6D4B\u8BD5\u8FD0\u884C\r\n\u603B\u5171 1 \u4E2A\u6D4B\u8BD5\u6587\u4EF6\u4E0E\u6307\u5B9A\u6A21\u5F0F\u76F8\u5339\u914D\u3002\r\n\r\n\u5DF2\u901A\u8FC7! - \u5931\u8D25:     0\uFF0C\u901A\u8FC7:   684\uFF0C\u5DF2\u8DF3\u8FC7:     0\uFF0C\u603B\u8BA1:   684\uFF0C\u6301\u7EED\u65F6\u95F4: 285 ms - CommandLine.Tests.dll (netcoreapp3.1)\r\n\r\n[exit 0]\r\n",
+  "checkFailure": "\u6587\u4EF6 tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u672A\u5305\u542B\u9A8C\u6536\u6A21\u5F0F\uFF1AAgentEval_PreferShortName_UsesShortWhenAvailable",
+  "failureClass": "F6 \u5FAA\u73AF",
+  "trace": [
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[\u5BBF\u4E3B\u63D0\u793A] \u540C\u4E00\u5DE5\u5177\u8C03\u7528\u5DF2\u8FDE\u7EED\u51FA\u73B0 3 \u6B21\uFF08read_file\uFF09\u3002\u8BF7\u6362\u7B56\u7565\uFF0C\u6216\u5148\u603B\u7ED3\u5F53\u524D\u7ED3\u679C\u518D\u7EE7\u7EED\u3002\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/UnParserTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1Atests/UnParserTests.cs (\u002B2 -0)\uFF08\u65B0\u5EFA\uFF09\n[EDIT] tests/UnParserTests.cs \u002B2 -0\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/UnParserTests.cs \u00B7 \u5171 1 \u884C \u00B7 \u672C\u6B21 1\u20131\n   1| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1Atests/UnParserTests.cs (\u002B2 -2)\n[EDIT] tests/UnParserTests.cs \u002B2 -2\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/UnParserTests.cs \u00B7 \u5171 1 \u884C \u00B7 \u672C\u6B21 1\u20131\n   1| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1Atests/UnParserTests.cs (\u002B2 -2)\n[EDIT] tests/UnParserTests.cs \u002B2 -2\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/UnParserTests.cs \u00B7 \u5171 1 \u884C \u00B7 \u672C\u6B21 1\u20131\n   1| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1Atests/UnParserTests.cs (\u002B2 -2)\n[EDIT] tests/UnParserTests.cs \u002B2 -2\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/UnParserTests.cs \u00B7 \u5171 1 \u884C \u00B7 \u672C\u6B21 1\u20131\n   1| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1Atests/UnParserTests.cs (\u002B2 -2)\n[EDIT] tests/UnParserTests.cs \u002B2 -2\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/UnParserTests.cs \u00B7 \u5171 1 \u884C \u00B7 \u672C\u6B21 1\u20131\n   1| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1Atests/UnParserTests.cs (\u002B2 -2)\n[EDIT] tests/UnParserTests.cs \u002B2 -2\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/UnParserTests.cs \u00B7 \u5171 1 \u884C \u00B7 \u672C\u6B21 1\u20131\n   1| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1Atests/UnParserTests.cs (\u002B2 -2)\n[EDIT] tests/UnParserTests.cs \u002B2 -2\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/UnParserTests.cs \u00B7 \u5171 1 \u884C \u00B7 \u672C\u6B21 1\u20131\n   1| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1Atests/UnParserTests.cs (\u002B2 -2)\n[EDIT] tests/UnParserTests.cs \u002B2 -2\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/UnParserTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 1\u2013400 \u00B7 \u63A5\u7EED\u7528 offset=401\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All ri \u2026  \u0022mysource.cs\u0022 }, \u0022add --patch mysource.cs\u0022 };\n 400|                 yield return new object[] { new Add_Verb { Force = true, FileName = \u0022mysource.fs\u0022 }, \u0022add --force mysource.fs\u0022 };\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 401\u2013442\n 401|             }\n 402|         }\n 403| \n 404|         public static IEnumerable\u003Cobject \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 350\u2013442\n 350|         }\n 351|         class Options_Date_Nullable\n 352|         {\n 353|           \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 300\u2013442\n 300|         [InlineData(\u0022  --shape     Circle  \u0022, new[] { \u0022--shape\u0022, \u0022Circle\u0022 })]\n 301| \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 100\u2013442\n 100| \n 101|         [Fact]\n 102|         public static void UnParsing_instance_with_grou \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 150\u2013442\n 150|             var options = new Options_With_TimeSpan { Duration = TimeSpan.FromMinut \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 100\u2013349 \u00B7 \u63A5\u7EED\u7528 offset=350\n 100| \n 101|         [Fact]\n 102|         public static void UnParsing_i \u2026   public Shapes? Shape { get; set; }\n 345|         }\n 346|         class Options_Date\n 347|         {\n 348|             [Option]\n 349|             public DateTime Start { get; set; }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 200\u2013349 \u00B7 \u63A5\u7EED\u7528 offset=350\n 200|         public static void UnParsing_instance_with_datetime_nullab \u2026   public Shapes? Shape { get; set; }\n 345|         }\n 346|         class Options_Date\n 347|         {\n 348|             [Option]\n 349|             public DateTime Start { get; set; }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 250\u2013399 \u00B7 \u63A5\u7EED\u7528 offset=400\n 250|         {\n 251|             var options = new Option_Int_Nullable  \u2026 return new object[] { new Add_Verb(), \u0022add\u0022 };\n 399|                 yield return new object[] { new Add_Verb { Patch = true, FileName = \u0022mysource.cs\u0022 }, \u0022add --patch mysource.cs\u0022 };\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 300\u2013442\n 300|         [InlineData(\u0022  --shape     Circle  \u0022, new[] { \u0022--shape\u0022, \u0022Circle\u0022 })]\n 301| \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 350\u2013442\n 350|         }\n 351|         class Options_Date_Nullable\n 352|         {\n 353|           \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 370\u2013442\n 370|             {\n 371|                 yield return new object[] { new Simple_Options( \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 370\u2013442\n 370|             {\n 371|                 yield return new object[] { new Simple_Options( \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 370\u2013442\n 370|             {\n 371|                 yield return new object[] { new Simple_Options( \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n[\u5BBF\u4E3B\u63D0\u793A] \u540C\u4E00\u5DE5\u5177\u8C03\u7528\u5DF2\u8FDE\u7EED\u51FA\u73B0 3 \u6B21\uFF08read_file\uFF09\u3002\u8BF7\u6362\u7B56\u7565\uFF0C\u6216\u5148\u603B\u7ED3\u5F53\u524D\u7ED3\u679C\u518D\u7EE7\u7EED\u3002\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 370\u2013442\n 370|             {\n 371|             \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    }
+  ]
+}

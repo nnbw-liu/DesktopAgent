@@ -1,0 +1,199 @@
+> dotnet build CommandLine.sln -v minimal
+Active code page: 65001
+  正在确定要还原的项目…
+  所有项目均是最新的，无法还原。
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\src\CommandLine\bin\Debug\net45\CommandLine.dll
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\src\CommandLine\bin\Debug\net461\CommandLine.dll
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\src\CommandLine\bin\Debug\netstandard2.0\CommandLine.dll
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\src\CommandLine\bin\Debug\net40\CommandLine.dll
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\Core\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+  CommandLine.Tests -> C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\bin\Debug\net461\CommandLine.Tests.dll
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\Core\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+  CommandLine.Tests -> C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\bin\Debug\netcoreapp3.1\CommandLine.Tests.dll
+  包 CommandLineParser.0.0.0 缺少自述文件。转到 https://aka.ms/nuget/authoring-best-practices/readme 了解为什么包阅读主题很重要。
+  已成功创建包“C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\src\CommandLine\bin\Debug\CommandLineParser.0.0.0.nupkg”。
+  已成功创建包“C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\src\CommandLine\bin\Debug\CommandLineParser.0.0.0.snupkg”。
+
+已成功生成。
+
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\Core\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=net461]
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\Core\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]
+    2 个警告
+    0 个错误
+
+已用时间 00:00:04.29
+
+[exit 0]
+> dotnet test tests/CommandLine.Tests/CommandLine.Tests.csproj -f netcoreapp3.1 --no-build -v minimal
+Active code page: 65001
+C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\bin\Debug\netcoreapp3.1\CommandLine.Tests.dll (.NETCoreApp,Version=v3.1)的测试运行
+总共 1 个测试文件与指定模式相匹配。
+[xUnit.net 00:00:01.07]     CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_with_splitArgs_returns_same_option_class(options: Simple_Options { BoolValue = False, IntSequence = null, LongValue = 0, ShortAndLong = null, StringValue = "with\"quote" }, result: "--stringvalue \"with\\\"quote\"") [FAIL]
+[xUnit.net 00:00:01.07]     CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_with_splitArgs_returns_same_option_class(options: Simple_Options { BoolValue = False, IntSequence = null, LongValue = 0, ShortAndLong = null, StringValue = "with \"quotes\" spaced" }, result: "--stringvalue \"with \\\"quotes\\\" spaced\"") [FAIL]
+  失败 CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_with_splitArgs_returns_same_option_class(options: Simple_Options { BoolValue = False, IntSequence = null, LongValue = 0, ShortAndLong = null, StringValue = "with\"quote" }, result: "--stringvalue \"with\\\"quote\"") [130 ms]
+  错误消息:
+   Expected item[1] to be 
+"with\"quote" with a length of 11, but 
+"with"quote" has a length of 10.
+
+With configuration:
+- Use declared types and members
+- Compare enums by value
+- Include all non-private properties
+- Include all non-private fields
+- Match member by name (or throw)
+- Without automatic conversion.
+- Without automatic conversion.
+- Be strict about the order of items in byte arrays
+
+  堆栈跟踪:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.CollectingAssertionStrategy.ThrowIfAny(IDictionary`2 context)
+   at FluentAssertions.Equivalency.EquivalencyValidator.AssertEquality(EquivalencyValidationContext context)
+   at FluentAssertions.Collections.StringCollectionAssertions.BeEquivalentTo(IEnumerable`1 expectation, Func`2 config, String because, Object[] becauseArgs)
+   at FluentAssertions.Collections.StringCollectionAssertions.BeEquivalentTo(String[] expectation)
+   at CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_with_splitArgs_returns_same_option_class(Simple_Options options, String result) in C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs:line 31
+  失败 CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_with_splitArgs_returns_same_option_class(options: Simple_Options { BoolValue = False, IntSequence = null, LongValue = 0, ShortAndLong = null, StringValue = "with \"quotes\" spaced" }, result: "--stringvalue \"with \\\"quotes\\\" spaced\"") [1 ms]
+  错误消息:
+   Expected item[1] to be 
+"with \"quotes\" spaced" with a length of 22, but 
+"with "quotes" spaced" has a length of 20.
+
+With configuration:
+- Use declared types and members
+- Compare enums by value
+- Include all non-private properties
+- Include all non-private fields
+- Match member by name (or throw)
+- Without automatic conversion.
+- Without automatic conversion.
+- Be strict about the order of items in byte arrays
+
+  堆栈跟踪:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.CollectingAssertionStrategy.ThrowIfAny(IDictionary`2 context)
+   at FluentAssertions.Equivalency.EquivalencyValidator.AssertEquality(EquivalencyValidationContext context)
+   at FluentAssertions.Collections.StringCollectionAssertions.BeEquivalentTo(IEnumerable`1 expectation, Func`2 config, String because, Object[] becauseArgs)
+   at FluentAssertions.Collections.StringCollectionAssertions.BeEquivalentTo(String[] expectation)
+   at CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_with_splitArgs_returns_same_option_class(Simple_Options options, String result) in C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs:line 31
+[xUnit.net 00:00:01.07]     CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_with_splitArgs_returns_same_option_class(options: Simple_Options { BoolValue = True, IntSequence = [1, 2, 3], LongValue = 123456789, ShortAndLong = null, StringValue = "with \"quotes\" spaced" }, result: "-i 1 2 3 --stringvalue \"with \\\"quotes\\\" space"...) [FAIL]
+  失败 CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_with_splitArgs_returns_same_option_class(options: Simple_Options { BoolValue = True, IntSequence = [1, 2, 3], LongValue = 123456789, ShortAndLong = null, StringValue = "with \"quotes\" spaced" }, result: "-i 1 2 3 --stringvalue \"with \\\"quotes\\\" space"...) [1 ms]
+  错误消息:
+   Expected item[5] to be 
+"with \"quotes\" spaced" with a length of 22, but 
+"with "quotes" spaced" has a length of 20.
+
+With configuration:
+- Use declared types and members
+- Compare enums by value
+- Include all non-private properties
+- Include all non-private fields
+- Match member by name (or throw)
+- Without automatic conversion.
+- Without automatic conversion.
+- Be strict about the order of items in byte arrays
+
+  堆栈跟踪:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.CollectingAssertionStrategy.ThrowIfAny(IDictionary`2 context)
+   at FluentAssertions.Equivalency.EquivalencyValidator.AssertEquality(EquivalencyValidationContext context)
+   at FluentAssertions.Collections.StringCollectionAssertions.BeEquivalentTo(IEnumerable`1 expectation, Func`2 config, String because, Object[] becauseArgs)
+   at FluentAssertions.Collections.StringCollectionAssertions.BeEquivalentTo(String[] expectation)
+   at CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_with_splitArgs_returns_same_option_class(Simple_Options options, String result) in C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs:line 31
+[xUnit.net 00:00:01.09]     CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_returns_command_line(options: Simple_Options { BoolValue = False, IntSequence = null, LongValue = 0, ShortAndLong = null, StringValue = "with\"quote" }, result: "--stringvalue \"with\\\"quote\"") [FAIL]
+[xUnit.net 00:00:01.10]     CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_returns_command_line(options: Simple_Options { BoolValue = False, IntSequence = null, LongValue = 0, ShortAndLong = null, StringValue = "with \"quotes\" spaced" }, result: "--stringvalue \"with \\\"quotes\\\" spaced\"") [FAIL]
+  失败 CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_returns_command_line(options: Simple_Options { BoolValue = False, IntSequence = null, LongValue = 0, ShortAndLong = null, StringValue = "with\"quote" }, result: "--stringvalue \"with\\\"quote\"") [17 ms]
+  错误消息:
+   Expected string to be equivalent to 
+"--stringvalue "with\"quote"" with a length of 27, but 
+"--stringvalue "with"quote"" has a length of 26.
+  堆栈跟踪:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Primitives.StringEqualityValidator.ValidateAgainstLengthDifferences()
+   at FluentAssertions.Primitives.StringValidator.Validate()
+   at FluentAssertions.Primitives.StringAssertions.BeEquivalentTo(String expected, String because, Object[] becauseArgs)
+   at CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_returns_command_line(Simple_Options options, String result) in C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs:line 22
+  失败 CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_returns_command_line(options: Simple_Options { BoolValue = False, IntSequence = null, LongValue = 0, ShortAndLong = null, StringValue = "with \"quotes\" spaced" }, result: "--stringvalue \"with \\\"quotes\\\" spaced\"") [1 ms]
+  错误消息:
+   Expected string to be equivalent to 
+"--stringvalue "with \"quotes\" spaced"" with a length of 38, but 
+"--stringvalue "with "quotes" spaced"" has a length of 36.
+  堆栈跟踪:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Primitives.StringEqualityValidator.ValidateAgainstLengthDifferences()
+   at FluentAssertions.Primitives.StringValidator.Validate()
+   at FluentAssertions.Primitives.StringAssertions.BeEquivalentTo(String expected, String because, Object[] becauseArgs)
+   at CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_returns_command_line(Simple_Options options, String result) in C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs:line 22
+[xUnit.net 00:00:01.10]     CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_returns_command_line(options: Simple_Options { BoolValue = True, IntSequence = [1, 2, 3], LongValue = 123456789, ShortAndLong = null, StringValue = "with \"quotes\" spaced" }, result: "-i 1 2 3 --stringvalue \"with \\\"quotes\\\" space"...) [FAIL]
+  失败 CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_returns_command_line(options: Simple_Options { BoolValue = True, IntSequence = [1, 2, 3], LongValue = 123456789, ShortAndLong = null, StringValue = "with \"quotes\" spaced" }, result: "-i 1 2 3 --stringvalue \"with \\\"quotes\\\" space"...) [3 ms]
+  错误消息:
+   Expected string to be equivalent to 
+"-i 1 2 3 --stringvalue "with \"quotes\" spaced" -x 123456789" with a length of 60, but 
+"-i 1 2 3 --stringvalue "with "quotes" spaced" -x 123456789" has a length of 58.
+  堆栈跟踪:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Primitives.StringEqualityValidator.ValidateAgainstLengthDifferences()
+   at FluentAssertions.Primitives.StringValidator.Validate()
+   at FluentAssertions.Primitives.StringAssertions.BeEquivalentTo(String expected, String because, Object[] becauseArgs)
+   at CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_instance_returns_command_line(Simple_Options options, String result) in C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs:line 22
+[xUnit.net 00:00:01.12]     CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_immutable_instance_returns_command_line(options: Immutable_Simple_Options { BoolValue = False, IntSequence = [], LongValue = 0, StringValue = "with\"quote" }, result: "--stringvalue \"with\\\"quote\"") [FAIL]
+[xUnit.net 00:00:01.12]     CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_immutable_instance_returns_command_line(options: Immutable_Simple_Options { BoolValue = False, IntSequence = [], LongValue = 0, StringValue = "with \"quotes\" spaced" }, result: "--stringvalue \"with \\\"quotes\\\" spaced\"") [FAIL]
+[xUnit.net 00:00:01.12]     CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_immutable_instance_returns_command_line(options: Immutable_Simple_Options { BoolValue = True, IntSequence = [1, 2, 3], LongValue = 123456789, StringValue = "with \"quotes\" spaced" }, result: "-i 1 2 3 --stringvalue \"with \\\"quotes\\\" space"...) [FAIL]
+  失败 CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_immutable_instance_returns_command_line(options: Immutable_Simple_Options { BoolValue = False, IntSequence = [], LongValue = 0, StringValue = "with\"quote" }, result: "--stringvalue \"with\\\"quote\"") [1 ms]
+  错误消息:
+   Expected string to be equivalent to 
+"--stringvalue "with\"quote"" with a length of 27, but 
+"--stringvalue "with"quote"" has a length of 26.
+  堆栈跟踪:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Primitives.StringEqualityValidator.ValidateAgainstLengthDifferences()
+   at FluentAssertions.Primitives.StringValidator.Validate()
+   at FluentAssertions.Primitives.StringAssertions.BeEquivalentTo(String expected, String because, Object[] becauseArgs)
+   at CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_immutable_instance_returns_command_line(Immutable_Simple_Options options, String result) in C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs:line 76
+  失败 CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_immutable_instance_returns_command_line(options: Immutable_Simple_Options { BoolValue = False, IntSequence = [], LongValue = 0, StringValue = "with \"quotes\" spaced" }, result: "--stringvalue \"with \\\"quotes\\\" spaced\"") [< 1 ms]
+  错误消息:
+   Expected string to be equivalent to 
+"--stringvalue "with \"quotes\" spaced"" with a length of 38, but 
+"--stringvalue "with "quotes" spaced"" has a length of 36.
+  堆栈跟踪:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Primitives.StringEqualityValidator.ValidateAgainstLengthDifferences()
+   at FluentAssertions.Primitives.StringValidator.Validate()
+   at FluentAssertions.Primitives.StringAssertions.BeEquivalentTo(String expected, String because, Object[] becauseArgs)
+   at CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_immutable_instance_returns_command_line(Immutable_Simple_Options options, String result) in C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs:line 76
+  失败 CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_immutable_instance_returns_command_line(options: Immutable_Simple_Options { BoolValue = True, IntSequence = [1, 2, 3], LongValue = 123456789, StringValue = "with \"quotes\" spaced" }, result: "-i 1 2 3 --stringvalue \"with \\\"quotes\\\" space"...) [1 ms]
+  错误消息:
+   Expected string to be equivalent to 
+"-i 1 2 3 --stringvalue "with \"quotes\" spaced" -x 123456789" with a length of 60, but 
+"-i 1 2 3 --stringvalue "with "quotes" spaced" -x 123456789" has a length of 58.
+  堆栈跟踪:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Primitives.StringEqualityValidator.ValidateAgainstLengthDifferences()
+   at FluentAssertions.Primitives.StringValidator.Validate()
+   at FluentAssertions.Primitives.StringAssertions.BeEquivalentTo(String expected, String because, Object[] becauseArgs)
+   at CommandLine.Tests.Unit.UnParserExtensionsTests.UnParsing_immutable_instance_returns_command_line(Immutable_Simple_Options options, String result) in C:\Users\12105\AppData\Local\Temp\agent-eval\compact-8k-20261023-094311\tests\CommandLine.Tests\Unit\UnParserExtensionsTests.cs:line 76
+
+失败!  - 失败:     9，通过:   675，已跳过:     0，总计:   684，持续时间: 282 ms - CommandLine.Tests.dll (netcoreapp3.1)
+
+[exit 1]

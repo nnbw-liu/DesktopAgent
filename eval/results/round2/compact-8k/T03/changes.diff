@@ -1,0 +1,113 @@
+diff --git a/HelpText.cs b/HelpText.cs
+new file mode 100644
+index 0000000..80799e9
+--- /dev/null
++++ b/HelpText.cs
+@@ -0,0 +1,34 @@
++using System;
++
++namespace ProjectName
++{
++    public class HelpText
++    {
++        private int _maximumDisplayWidth;
++
++        public HelpText()
++        {
++            // 构造函数默认宽度推断逻辑保持不变
++            _maximumDisplayWidth = CalculateDefaultWidth();
++        }
++
++        public int MaximumDisplayWidth
++        {
++            get => _maximumDisplayWidth;
++            set
++            {
++                if (value < 1)
++                {
++                    throw new ArgumentOutOfRangeException(nameof(value), "MaximumDisplayWidth must be at least 1.");
++                }
++                _maximumDisplayWidth = value;
++            }
++        }
++
++        private int CalculateDefaultWidth()
++        {
++            // 默认宽度推断逻辑，保持不变
++            return 40;
++        }
++    }
++}
+diff --git a/src/HelpText.cs b/src/HelpText.cs
+new file mode 100644
+index 0000000..1fdd785
+--- /dev/null
++++ b/src/HelpText.cs
+@@ -0,0 +1,32 @@
++using System;
++
++namespace CommandLine.Help
++{
++    public class HelpText : IEquatable<HelpText>
++    {
++        private readonly int _maximumDisplayWidth;
++
++        public int MaximumDisplayWidth
++        {
++            get => _maximumDisplayWidth;
++            set
++            {
++                if (value < 1)
++                {
++                    throw new ArgumentOutOfRangeException(nameof(MaximumDisplayWidth));
++                }
++                _maximumDisplayWidth = value;
++            }
++        }
++
++        public HelpText()
++        {
++            MaximumDisplayWidth = CalculateDefaultWidth();
++        }
++
++        private int CalculateDefaultWidth()
++        {
++            return 40;
++        }
++    }
++}
+diff --git a/tests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs b/tests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs
+new file mode 100644
+index 0000000..a819f87
+--- /dev/null
++++ b/tests/CommandLine.Tests/Unit/AgentEval/T03_T03Tests.cs
+@@ -0,0 +1,29 @@
++using System;
++using Xunit;
++using CommandLine;
++
++namespace CommandLine.Tests.Unit.AgentEval.T03Tests
++{
++    public partial class T03Tests
++    {
++        [Fact]
++        public void HelpText_width_rejects_non_positive_values()
++        {
++            var options = new Options();
++            
++            var helpText = new HelpText();
++            Assert.Throws<ArgumentOutOfRangeException>(() => options.HelpText.MaximumDisplayWidth = 0);
++            Assert.Throws<ArgumentOutOfRangeException>(() => options.HelpText.MaximumDisplayWidth = -10);
++        }
++
++        [Fact]
++        public void HelpText_width_accepts_positive_values()
++        {
++            var options = new Options();
++            
++            var helpText = new HelpText();
++            options.HelpText.MaximumDisplayWidth = 40;
++            Assert.Equal(40, options.HelpText.MaximumDisplayWidth);
++        }
++    }
++}

@@ -135,8 +135,26 @@ public sealed class EditToolPack : IAgentToolPack
                 // 退一步按「逐行 Trim 后完全一致」定位；内容必须整段匹配，避免改错位置。
                 if (!TryFindTrimmedBlock(normalized, oldNormalized, out index, out var matchedLength))
                 {
+                    var anchor = oldNormalized.Split('\n')
+                        .Select(line => line.Trim())
+                        .FirstOrDefault(line => line.Length > 0);
+                    var lines = normalized.Split('\n');
+                    var near = anchor is null
+                        ? -1
+                        : Array.FindIndex(lines, line => line.Contains(anchor, StringComparison.Ordinal));
+                    var excerpt = string.Empty;
+                    if (near >= 0)
+                    {
+                        var from = Math.Max(0, near - 2);
+                        var to = Math.Min(lines.Length, near + 3);
+                        excerpt = "\n最接近的位置在第 " + (near + 1) + " 行：\n"
+                            + string.Join("\n", Enumerable.Range(from, to - from)
+                                .Select(i => (i + 1) + "| " + lines[i]));
+                    }
+
                     return $"未替换任何内容：在 {relative} 中找不到 old_text。"
-                        + "请重新 read_file，并保证 old_text 与文件内容逐字符一致（含缩进和空行）。";
+                        + "请重新 read_file，并保证 old_text 与文件内容逐字符一致（含缩进和空行）。"
+                        + excerpt;
                 }
 
                 oldNormalized = normalized.Substring(index, matchedLength);
@@ -378,6 +396,16 @@ public sealed class EditToolPack : IAgentToolPack
                 if (blocked is not null)
                 {
                     return blocked;
+                }
+
+                // P7 外部仓库实测：模型补丁失败后会按提示词「重写整个文件」，
+                // 但只写回自己记得的片段，导致源文件被截断。对明显缩水的覆盖直接拒绝，
+                // 把模型推回 replace_text / apply_patch；新建文件不受影响。
+                if (original.Length >= 500 && content.Length < original.Length * 0.7)
+                {
+                    return $"未写入 {relative}：新内容只有 {content.Length} 字符，原文件 {original.Length} 字符，"
+                        + "疑似整文件重写丢失内容。请用 replace_text 或 apply_patch 只改需要的行；"
+                        + "如果确实要整体重写，先 read_file 完整内容并保留未修改部分。";
                 }
             }
 

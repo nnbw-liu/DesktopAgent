@@ -1,0 +1,316 @@
+{
+  "id": "T08",
+  "type": "mixed",
+  "title": "\u589E\u52A0 SkipDefault \u5DE5\u5382\u65B9\u6CD5\u5E76\u9A8C\u8BC1",
+  "success": false,
+  "steps": 50,
+  "turns": 3,
+  "seconds": 191.7,
+  "error": null,
+  "acceptanceExit": 1,
+  "acceptanceOutput": "Active code page: 65001\r\n  \u6B63\u5728\u786E\u5B9A\u8981\u8FD8\u539F\u7684\u9879\u76EE\u2026\r\n  \u6240\u6709\u9879\u76EE\u5747\u662F\u6700\u65B0\u7684\uFF0C\u65E0\u6CD5\u8FD8\u539F\u3002\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\src\\CommandLine\\bin\\Debug\\net45\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\src\\CommandLine\\bin\\Debug\\net461\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\src\\CommandLine\\bin\\Debug\\netstandard2.0\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\src\\CommandLine\\bin\\Debug\\net40\\CommandLine.dll\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\Unit\\AgentEval\\T08_T08Tests.cs(11,45): error CS0117: \u201CUnParserSettings\u201D\u672A\u5305\u542B\u201CWithSkipDefaultOnly\u201D\u7684\u5B9A\u4E49 [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=net461]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\Unit\\AgentEval\\T08_T08Tests.cs(33,48): error CS0117: \u201CUnParserSettings\u201D\u672A\u5305\u542B\u201CWithSkipDefaultOnly\u201D\u7684\u5B9A\u4E49 [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=net461]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\Unit\\Core\\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=net461]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\Unit\\AgentEval\\T08_T08Tests.cs(11,45): error CS0117: \u201CUnParserSettings\u201D\u672A\u5305\u542B\u201CWithSkipDefaultOnly\u201D\u7684\u5B9A\u4E49 [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\Unit\\AgentEval\\T08_T08Tests.cs(33,48): error CS0117: \u201CUnParserSettings\u201D\u672A\u5305\u542B\u201CWithSkipDefaultOnly\u201D\u7684\u5B9A\u4E49 [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\Unit\\Core\\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]\r\n\r\n\u751F\u6210\u5931\u8D25\u3002\r\n\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\compact-8k-20261023-102334\\tests\\CommandLine.Tests\\Unit\\Core\\GetoptTokenizerTests.cs(93,13):\u2026",
+  "checkFailure": null,
+  "failureClass": "F6 \u5FAA\u73AF",
+  "trace": [
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/UnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AUnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/UnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AUnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/UnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AUnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/UnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AUnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/UnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AUnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/UnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AUnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/UnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1AUnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/UnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1AUnParserSettings.cs (\u002B1 -0)\uFF08\u65B0\u5EFA\uFF09\n[EDIT] UnParserSettings.cs \u002B1 -0\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# UnParserSettings.cs \u00B7 \u7A7A\u6587\u4EF6\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1AUnParserSettings.cs (\u002B41 -1)\n[EDIT] UnParserSettings.cs \u002B41 -1\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettingsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1AUnParserSettingsTests.cs (\u002B30 -0)\uFF08\u65B0\u5EFA\uFF09\n[EDIT] UnParserSettingsTests.cs \u002B30 -0\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# UnParserSettings.cs \u00B7 \u5171 40 \u884C \u00B7 \u672C\u6B21 1\u201340\n   1| using System;\n   2| using System.Collections.Generic;\n   3| using System.Linq;\n   4| \n   5| namespace Unparser\n   6| {\n   7 \u2026 s = new UnParserSettings();\n  36|             settings._skipDefault = false; // \u8BBE\u7F6E skipDefault \u4E3A false\uFF0C\u8868\u793A\u4E0D\u8DF3\u8FC7\u9ED8\u8BA4\u503C\n  37|             return settings;\n  38|         }\n  39|     }\n  40| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettingsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# UnParserSettingsTests.cs \u00B7 \u5171 29 \u884C \u00B7 \u672C\u6B21 1\u201329\n   1| using System;\n   2| using Xunit;\n   3| \n   4| namespace Unparser.Tests\n   5| {\n   6|     public class UnParserSettings \u2026       var settings = UnParserSettings.WithSkipDefaultOnly();\n  26|             Assert.False(settings.UseEqualTokenOnly); // \u4E0D\u5E94\u8BBE\u7F6E useEqualTokenOnly\n  27|         }\n  28|     }\n  29| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1AUnParserSettings.cs (\u002B41 -41)\n[EDIT] UnParserSettings.cs \u002B41 -41\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettingsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1AUnParserSettingsTests.cs (\u002B30 -30)\n[EDIT] UnParserSettingsTests.cs \u002B30 -30\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1AUnParserSettings.cs (\u002B41 -41)\n[EDIT] UnParserSettings.cs \u002B41 -41\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettingsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1AUnParserSettingsTests.cs (\u002B30 -30)\n[EDIT] UnParserSettingsTests.cs \u002B30 -30\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1AUnParserSettings.cs (\u002B41 -41)\n[EDIT] UnParserSettings.cs \u002B41 -41\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettingsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1AUnParserSettingsTests.cs (\u002B30 -30)\n[EDIT] UnParserSettingsTests.cs \u002B30 -30\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1AUnParserSettings.cs (\u002B41 -41)\n[EDIT] UnParserSettings.cs \u002B41 -41\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettingsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1AUnParserSettingsTests.cs (\u002B30 -30)\n[EDIT] UnParserSettingsTests.cs \u002B30 -30\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u5DF2\u4FEE\u6539 1 \u4E2A\u6587\u4EF6\uFF1AUnParserSettings.cs (\u002B41 -41)\n[EDIT] UnParserSettings.cs \u002B41 -41\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "UnParserSettingsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/CommandLine/UnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs \u00B7 \u5171 126 \u884C \u00B7 \u672C\u6B21 1\u2013126\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved.  \u2026 ould().Be(countExcepted);\n 121|             tokens.First().Text.Should().Be(first);\n 122|             tokens.Last().Text.Should().Be(last);\n 123|         }\n 124|     }\n 125| \n 126| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/AgentEval/T08_T08Tests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Atests/CommandLine.Tests/Unit/AgentEval/T08_T08Tests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u5DE5\u5177\u6267\u884C\u5931\u8D25\uFF08\u672A\u4FEE\u6539\u6587\u4EF6\uFF09\uFF1AInvalidOperationException: \u8DEF\u5F84\u4E0D\u5728\u5141\u8BB8\u7684\u5DE5\u4F5C\u533A\u5185\uFF1Asrc/CommandLine/UnParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs \u00B7 \u5171 126 \u884C \u00B7 \u672C\u6B21 1\u2013126\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved.  \u2026 ould().Be(countExcepted);\n 121|             tokens.First().Text.Should().Be(first);\n 122|             tokens.Last().Text.Should().Be(last);\n 123|         }\n 124|     }\n 125| \n 126| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs \u00B7 \u5171 126 \u884C \u00B7 \u672C\u6B21 85\u2013104 \u00B7 \u63A5\u7EED\u7528 offset=105\n  85|         {\n  86|             var args = new[] { \u0022--option1 = fail\u0022 \u2026 Type.Value, tokens.Last().Tag);\n 101|             Assert.Equal(\u0022option2\u0022, tokens.First().Text);\n 102|             Assert.Equal(\u0022 succeed\u0022, tokens.Last().Text);\n 103|         }\n 104| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs \u00B7 \u5171 126 \u884C \u00B7 \u672C\u6B21 93\u201397 \u00B7 \u63A5\u7EED\u7528 offset=98\n  93|             Assert.Equal(1, errors.Count());\n  94|             Assert.Equal(ErrorType.BadFormatTokenError, errors.First().Tag);\n  95| \n  96|             var tokens = result.SucceededWith();\n  97|             Assert.NotNull(tokens);\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs \u00B7 \u5171 126 \u884C \u00B7 \u672C\u6B21 105\u2013126\n 105| \n 106|         [Theory]\n 107|         [InlineData(new[] { \u0022-a\u0022, \u0022-\u0022 }, 2,\u0022a\u0022,\u0022-\u0022) \u2026 ould().Be(countExcepted);\n 121|             tokens.First().Text.Should().Be(first);\n 122|             tokens.Last().Text.Should().Be(last);\n 123|         }\n 124|     }\n 125| \n 126| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs \u00B7 \u5171 126 \u884C \u00B7 \u672C\u6B21 70\u2013104 \u00B7 \u63A5\u7EED\u7528 offset=105\n  70|              */\n  71|             var args = new[] { \u0022--connectio \u2026 Type.Value, tokens.Last().Tag);\n 101|             Assert.Equal(\u0022option2\u0022, tokens.First().Text);\n 102|             Assert.Equal(\u0022 succeed\u0022, tokens.Last().Text);\n 103|         }\n 104| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs \u00B7 \u5171 126 \u884C \u00B7 \u672C\u6B21 50\u201379 \u00B7 \u63A5\u7EED\u7528 offset=80\n  50|                 GetoptTokenizer.ExplodeOptionList(\n  51|            \u2026 edWith();\n  76| \n  77|             Assert.NotNull(tokens);\n  78|             Assert.Equal(2, tokens.Count());\n  79|             Assert.Equal(\u0022connectionString\u0022, tokens.First().Text);\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs \u00B7 \u5171 126 \u884C \u00B7 \u672C\u6B21 30\u201379 \u00B7 \u63A5\u7EED\u7528 offset=80\n  30|                             Token.Name(\u0022string-seq\u0022), Token.Value(\u0022 \u2026 edWith();\n  76| \n  77|             Assert.NotNull(tokens);\n  78|             Assert.Equal(2, tokens.Count());\n  79|             Assert.Equal(\u0022connectionString\u0022, tokens.First().Text);\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs \u00B7 \u5171 126 \u884C \u00B7 \u672C\u6B21 10\u201339 \u00B7 \u63A5\u7EED\u7528 offset=40\n  10| using CommandLine.Core;\n  11| \n  12| namespace CommandLine.Tests.Un \u2026              ((Ok\u003CIEnumerable\u003CToken\u003E, Error\u003E)result).Success.Should().BeEquivalentTo(expectedTokens);\n  35| \n  36|             // Teardown\n  37|         }\n  38| \n  39|         [Fact]\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs \u00B7 \u5171 126 \u884C \u00B7 \u672C\u6B21 20\u201334 \u00B7 \u63A5\u7EED\u7528 offset=35\n  20|             var expectedTokens = new[] { Token.Name(\u0022i\u0022), Token.Val \u2026 nName, specs, StringComparer.Ordinal));\n  33|             // Verify outcome\n  34|             ((Ok\u003CIEnumerable\u003CToken\u003E, Error\u003E)result).Success.Should().BeEquivalentTo(expectedTokens);\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs \u00B7 \u5171 126 \u884C \u00B7 \u672C\u6B21 40\u201374 \u00B7 \u63A5\u7EED\u7528 offset=75\n  40|         public void Explode_scalar_with_separator_in_even_args_inpu \u2026 ocalhost;Data Source=(LocalDB)\\v12.0;Initial Catalog=temp;\u0022 };\n  72| \n  73|             var result = GetoptTokenizer.Tokenize(args, name =\u003E NameLookupResult.OtherOptionFound);\n  74| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs \u00B7 \u5171 126 \u884C \u00B7 \u672C\u6B21 60\u201384 \u00B7 \u63A5\u7EED\u7528 offset=85\n  60|             // Teardown\n  61|         }\n  62| \n  63|         [Fact] \u2026 0;Initial Catalog=temp;\u0022, tokens.Last().Text);\n  81|         }\n  82| \n  83|         [Fact]\n  84|         public void Should_return_error_if_option_format_with_equals_is_not_correct()\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/Core/GetoptTokenizerTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    }
+  ]
+}

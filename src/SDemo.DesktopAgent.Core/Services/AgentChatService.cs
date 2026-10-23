@@ -115,7 +115,7 @@ public sealed class AgentChatService : IAgentChatService
         {
             if (plan.Metrics is not null)
             {
-                plan.Metrics.Guard.Limit = Math.Clamp(_settings.Current.Agent.CompactMaxToolCalls, 1, 12);
+                plan.Metrics.Guard.Limit = Math.Clamp(_settings.Current.Agent.CompactMaxToolCalls, 1, 16);
             }
 
             var available = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
@@ -130,8 +130,13 @@ public sealed class AgentChatService : IAgentChatService
         }
 
         var toolCallLimit = agentMode == Context.AgentMode.Compact
-            ? Math.Clamp(_settings.Current.Agent.CompactMaxToolCalls, 1, 12)
-            : Context.ToolCallGuard.MaxCalls;
+            ? Math.Clamp(_settings.Current.Agent.CompactMaxToolCalls, 1, 16)
+            : Math.Clamp(_settings.Current.Agent.FullMaxToolCalls, 1, 16);
+
+        if (plan.Metrics is not null)
+        {
+            plan.Metrics.Guard.Limit = toolCallLimit;
+        }
 
         var agent = CreateAgent(plan.Provider, plan.ModelId, tools, plan.Context, telemetry, toolCallLimit);
 

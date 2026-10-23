@@ -266,6 +266,45 @@ public sealed class EditToolPackTests
     }
 
     [Fact]
+    public async Task replace_text找不到时给出最接近的行()
+    {
+        using var temp = new TempDirectory();
+        var file = Path.Combine(temp.Root, "a.txt");
+        File.WriteAllText(file, "alpha\nbeta\ngamma\n");
+        var tool = Tool(temp.Root);
+        tool.Reads.RecordRead("session", "a.txt", FileReadRegistry.HashFile(file)!);
+
+        var result = await InvokeAsync(
+            tool.Context,
+            tool.Pack,
+            "replace_text",
+            ("path", "a.txt"),
+            ("oldText", "beta\nextra"),
+            ("newText", "BETA"));
+
+        Assert.Contains("最接近的位置在第 2 行", result);
+        Assert.Contains("2| beta", result);
+        Assert.Equal("alpha\nbeta\ngamma\n", File.ReadAllText(file));
+    }
+
+    [Fact]
+    public async Task write_file拒绝明显缩水的已有文件覆盖()
+    {
+        using var temp = new TempDirectory();
+        var file = Path.Combine(temp.Root, "a.txt");
+        var original = string.Join("\n", Enumerable.Range(1, 30).Select(i => $"line {i} with enough content")) + "\n";
+        File.WriteAllText(file, original);
+        var tool = Tool(temp.Root);
+        tool.Reads.RecordRead("session", "a.txt", FileReadRegistry.HashFile(file)!);
+
+        var result = await InvokeAsync(
+            tool.Context, tool.Pack, "write_file", ("path", "a.txt"), ("content", "short"));
+
+        Assert.Contains("疑似整文件重写丢失内容", result);
+        Assert.Equal(original, File.ReadAllText(file));
+    }
+
+    [Fact]
     public async Task replace_text拒绝重复添加已有成员()
     {
         using var temp = new TempDirectory();

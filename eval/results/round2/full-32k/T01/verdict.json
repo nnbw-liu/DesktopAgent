@@ -1,0 +1,298 @@
+{
+  "id": "T01",
+  "type": "feature",
+  "title": "\u62D2\u7EDD\u975E\u6B63\u7684\u5E2E\u52A9\u663E\u793A\u5BBD\u5EA6",
+  "success": false,
+  "steps": 47,
+  "turns": 3,
+  "seconds": 358.2,
+  "error": null,
+  "acceptanceExit": 1,
+  "acceptanceOutput": "Active code page: 65001\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll (.NETCoreApp,Version=v3.1)\u7684\u6D4B\u8BD5\u8FD0\u884C\r\n\u603B\u5171 1 \u4E2A\u6D4B\u8BD5\u6587\u4EF6\u4E0E\u6307\u5B9A\u6A21\u5F0F\u76F8\u5339\u914D\u3002\r\n[xUnit.net 00:00:00.93]     CommandLine.Tests.Unit.AgentEval.T01Tests.MaximumDisplayWidth_rejects_non_positive_values [FAIL]\r\n  \u5931\u8D25 CommandLine.Tests.Unit.AgentEval.T01Tests.MaximumDisplayWidth_rejects_non_positive_values [11 ms]\r\n  \u9519\u8BEF\u6D88\u606F:\r\n   Assert.Throws() Failure\r\nExpected: typeof(System.ArgumentOutOfRangeException)\r\nActual:   (No exception was thrown)\r\n  \u5806\u6808\u8DDF\u8E2A:\r\n     at CommandLine.Tests.Unit.AgentEval.T01Tests.MaximumDisplayWidth_rejects_non_positive_values() in C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\\tests\\CommandLine.Tests\\Unit\\AgentEval\\T01_T01Tests.cs:line 13\r\n\r\n\u5931\u8D25!  - \u5931\u8D25:     1\uFF0C\u901A\u8FC7:   684\uFF0C\u5DF2\u8DF3\u8FC7:     0\uFF0C\u603B\u8BA1:   685\uFF0C\u6301\u7EED\u65F6\u95F4: 262 ms - CommandLine.Tests.dll (netcoreapp3.1)\r\n",
+  "checkFailure": null,
+  "failureClass": "F6 \u5FAA\u73AF",
+  "trace": [
+    {
+      "toolId": "workspace_info",
+      "status": "ok",
+      "argsDigest": "",
+      "summary": "[TOOL_RESULT_BEGIN:workspace_info]\n\u5DE5\u4F5C\u533A\u6839\u76EE\u5F55\uFF1AC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\full-32k-20261023-095237\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "list_tree",
+      "status": "ok",
+      "argsDigest": ".",
+      "summary": "[TOOL_RESULT_BEGIN:list_tree]\nart/\n  art/CommandLine.png\n  art/CommandLine20.png\n  art/CommandLineNuGet.png\n  art/CommandLinePreRelNuGet.png\n  art/resharper-logo.png\ndemo/\n  demo/ReadText.Demo/\n  demo \u2026 rc/\n  src/CommandLine/\ntests/\n  tests/CommandLine.Tests/\n.editorconfig\n.gitignore\nappveyor.yml\nCHANGELOG.md\nCommandLine.sln\nCommandLine.snk\nDirectory.Build.props\nLicense.md\nREADME.md\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "glob_files",
+      "status": "ok",
+      "argsDigest": "**/*.cs",
+      "summary": "[TOOL_RESULT_BEGIN:glob_files]\ndemo/ReadText.Demo/Options.cs\ndemo/ReadText.Demo/Program.cs\ndemo/ReadText.Demo/Properties/AssemblyInfo.cs\ndemo/ReadText.LocalizedDemo/LocalizableSentenceBuilder.cs\ndemo/ \u2026 /HelpTextAutoBuildFix.cs\ntests/CommandLine.Tests/Unit/Text/HelpTextTests.cs\ntests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs\ntests/CommandLine.Tests/Unit/VerbAttributeTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "ParserSettings\\.MaximumDisplayWidth",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u672A\u627E\u5230\u5339\u914D\uFF1B\u5EFA\u8BAE\u653E\u5BBD glob \u6216\u6362\u5173\u952E\u8BCD\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "list_files",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/Core",
+      "summary": "[TOOL_RESULT_BEGIN:list_files]\n[\u6587\u4EF6] ArgumentsExtensions.cs (989 \u5B57\u8282)\n[\u6587\u4EF6] GetoptTokenizer.cs (9565 \u5B57\u8282)\n[\u6587\u4EF6] InstanceBuilder.cs (10394 \u5B57\u8282)\n[\u6587\u4EF6] InstanceChooser.cs (7035 \u5B57\u8282)\n[\u6587\u4EF6] KeyValuePairHelper.cs (1 \u2026 \u6587\u4EF6] TypeConverter.cs (6765 \u5B57\u8282)\n[\u6587\u4EF6] TypeDescriptor.cs (1650 \u5B57\u8282)\n[\u6587\u4EF6] TypeLookup.cs (1338 \u5B57\u8282)\n[\u6587\u4EF6] ValueMapper.cs (3810 \u5B57\u8282)\n[\u6587\u4EF6] ValueSpecification.cs (1870 \u5B57\u8282)\n[\u6587\u4EF6] Verb.cs (1827 \u5B57\u8282)\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "list_files",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/Core/OptionSpecification.cs",
+      "summary": "[TOOL_RESULT_BEGIN:list_files]\n\u76EE\u5F55\u4E0D\u5B58\u5728\uFF1Asrc/CommandLine/Core/OptionSpecification.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "list_files",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/Core",
+      "summary": "[TOOL_RESULT_BEGIN:list_files]\n[\u6587\u4EF6] ArgumentsExtensions.cs (989 \u5B57\u8282)\n[\u6587\u4EF6] GetoptTokenizer.cs (9565 \u5B57\u8282)\n[\u6587\u4EF6] InstanceBuilder.cs (10394 \u5B57\u8282)\n[\u6587\u4EF6] InstanceChooser.cs (7035 \u5B57\u8282)\n[\u6587\u4EF6] KeyValuePairHelper.cs (1 \u2026 \u6587\u4EF6] TypeConverter.cs (6765 \u5B57\u8282)\n[\u6587\u4EF6] TypeDescriptor.cs (1650 \u5B57\u8282)\n[\u6587\u4EF6] TypeLookup.cs (1338 \u5B57\u8282)\n[\u6587\u4EF6] ValueMapper.cs (3810 \u5B57\u8282)\n[\u6587\u4EF6] ValueSpecification.cs (1870 \u5B57\u8282)\n[\u6587\u4EF6] Verb.cs (1827 \u5B57\u8282)\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "list_files",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/Core/OptionSpecification.cs",
+      "summary": "[TOOL_RESULT_BEGIN:list_files]\n\u76EE\u5F55\u4E0D\u5B58\u5728\uFF1Asrc/CommandLine/Core/OptionSpecification.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "list_tree",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/Core",
+      "summary": "[TOOL_RESULT_BEGIN:list_tree]\nsrc/CommandLine/Core/ArgumentsExtensions.cs\nsrc/CommandLine/Core/GetoptTokenizer.cs\nsrc/CommandLine/Core/InstanceBuilder.cs\nsrc/CommandLine/Core/InstanceChooser.cs\nsrc/Co \u2026 \nsrc/CommandLine/Core/TypeDescriptor.cs\nsrc/CommandLine/Core/TypeLookup.cs\nsrc/CommandLine/Core/ValueMapper.cs\nsrc/CommandLine/Core/ValueSpecification.cs\nsrc/CommandLine/Core/Verb.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/Core/OptionSpecification.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/Core/OptionSpecification.cs \u00B7 \u5171 93 \u884C \u00B7 \u672C\u6B21 1\u201393\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md i \u2026  the command line\n  87|         /// \u003C/summary\u003E\n  88|         public bool FlagCounter\n  89|         {\n  90|             get { return flagCounter; }\n  91|         }\n  92|     }\n  93| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "ParserSettings\\.MaximumDisplayWidth",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u672A\u627E\u5230\u5339\u914D\uFF1B\u5EFA\u8BAE\u653E\u5BBD glob \u6216\u6362\u5173\u952E\u8BCD\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "ParserSettings",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 80 \u6761\u5339\u914D\uFF085 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\ndemo/ReadText.Demo/Options.cs:46:                 yield return new Example(\u0022normal scenario\u0022, new HeadOptions { FileName = \u0022file.bin\u0022});\nd \u2026 ngs.cs:77:             Dispose(false);\nsrc/CommandLine/Text/Example.cs:13:     {\nsrc/CommandLine/Text/Example.cs:14:         private readonly string helpText;\r\n\u2026\uFF08\u7ED3\u679C\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u53EF\u7F29\u5C0F glob \u540E\u91CD\u8BD5\uFF09\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "glob_files",
+      "status": "ok",
+      "argsDigest": "**/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:glob_files]\nsrc/CommandLine/ParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserSettings.cs \u00B7 \u5171 252 \u884C \u00B7 \u672C\u6B21 1\u2013252\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in the pr \u2026                 // Do not dispose HelpWriter. It is the caller\u0027s responsibility.\n 247| \n 248|                 disposed = true;\n 249|             }\n 250|         }\n 251|     }\n 252| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\n\u672A\u66FF\u6362\u4EFB\u4F55\u5185\u5BB9\uFF1Anew_text \u91CC\u7684\u300Cprivate const int DefaultMaximumLength = 80; // default console width\u300D\u5DF2\u7ECF\u5B58\u5728\u4E8E src/CommandLine/ParserSettings.cs \u7684\u5176\u4ED6\u4F4D\u7F6E\uFF0C\u7591\u4F3C\u91CD\u590D\u6DFB\u52A0\u3002\u8BF7 read_file \u786E\u8BA4\uFF1B\u53EA\u8865\u7F3A\u5931\u7684\u90E8\u5206\uFF0C\u4E0D\u8981\u91CD\u590D\u5DF2\u6709\u6210\u5458\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "glob_files",
+      "status": "ok",
+      "argsDigest": "**/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:glob_files]\nsrc/CommandLine/ParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserSettings.cs \u00B7 \u5171 252 \u884C \u00B7 \u672C\u6B21 1\u2013252\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in the pr \u2026                 // Do not dispose HelpWriter. It is the caller\u0027s responsibility.\n 247| \n 248|                 disposed = true;\n 249|             }\n 250|         }\n 251|     }\n 252| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\n\u672A\u66FF\u6362\u4EFB\u4F55\u5185\u5BB9\uFF1A\u5728 src/CommandLine/ParserSettings.cs \u4E2D\u627E\u4E0D\u5230 old_text\u3002\u8BF7\u91CD\u65B0 read_file\uFF0C\u5E76\u4FDD\u8BC1 old_text \u4E0E\u6587\u4EF6\u5185\u5BB9\u9010\u5B57\u7B26\u4E00\u81F4\uFF08\u542B\u7F29\u8FDB\u548C\u7A7A\u884C\uFF09\u3002\n\u6700\u63A5\u8FD1\u7684\u4F4D\u7F6E\u5728\u7B2C 28 \u884C\uFF1A\n26|         private CultureInfo parsingCulture;\n27|         private Maybe\u003Cbool\u003E enableDashDash;\n28|         private int maximumDisplayWidth;\n29|         private Maybe\u003Cbool\u003E allowMultiInstance;\n30|         private bool getoptMode;\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserSettings.cs \u00B7 \u5171 252 \u884C \u00B7 \u672C\u6B21 1\u2013252\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in the pr \u2026                 // Do not dispose HelpWriter. It is the caller\u0027s responsibility.\n 247| \n 248|                 disposed = true;\n 249|             }\n 250|         }\n 251|     }\n 252| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\n\u672A\u66FF\u6362\u4EFB\u4F55\u5185\u5BB9\uFF1A\u5728 src/CommandLine/ParserSettings.cs \u4E2D\u627E\u4E0D\u5230 old_text\u3002\u8BF7\u91CD\u65B0 read_file\uFF0C\u5E76\u4FDD\u8BC1 old_text \u4E0E\u6587\u4EF6\u5185\u5BB9\u9010\u5B57\u7B26\u4E00\u81F4\uFF08\u542B\u7F29\u8FDB\u548C\u7A7A\u884C\uFF09\u3002\n\u6700\u63A5\u8FD1\u7684\u4F4D\u7F6E\u5728\u7B2C 28 \u884C\uFF1A\n26|         private CultureInfo parsingCulture; \u2026 int maximumDisplayWidth;\n29|         private Maybe\u003Cbool\u003E allowMultiInstance;\n30|         private bool getoptMode;\n[\u5BBF\u4E3B\u63D0\u793A] \u5DF2\u8FDE\u7EED\u5931\u8D25 2 \u6B21\u3002\u4E0D\u8981\u518D\u8C03\u7528\u672C\u5DE5\u5177\uFF1B\u8BF7\u6539\u7528 replace_text \u7CBE\u786E\u66FF\u6362\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\nreplace_text \u5DF2\u5728\u672C\u6B21\u751F\u6210\u4E2D\u8FDE\u7EED\u5931\u8D25 2 \u6B21\uFF0C\u672C\u8F6E\u7981\u7528\uFF1B\u8BF7\u6539\u7528 apply_patch\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\uFF1B\u4E5F\u53EF\u4EE5\u5148\u7528\u6587\u672C\u8BF4\u660E\u5361\u5728\u54EA\u91CC\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "apply_patch",
+      "status": "ok",
+      "argsDigest": "sha256:ac6e2a43\uFF08946 \u5B57\u7B26\uFF09",
+      "summary": "[TOOL_RESULT_BEGIN:apply_patch]\n\u672A\u5199\u5165\u4EFB\u4F55\u6587\u4EF6\uFF1A\nsrc/CommandLine/ParserSettings.cs\uFF1A\u7B2C 1 \u4E2A hunk \u672A\u5339\u914D\u3002\n\u6700\u8FD1\u76F8\u4F3C\u7684\u7247\u6BB5\uFF08\u7B2C 26\u201343 \u884C\uFF09\uFF1A\n26|         private CultureInfo parsingCulture;\n27|         private Maybe\u003Cbool\u003E enableDas \u2026             autoVersion = true;\n42|             parsingCulture = CultureInfo.InvariantCulture;\n43|             maximumDisplayWidth = GetWindowWidth();\n\u5EFA\u8BAE\u5148 read_file \u67E5\u770B\u5F53\u524D\u5185\u5BB9\uFF0C\u518D\u6309\u65B0\u5185\u5BB9\u751F\u6210\u8865\u4E01\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserSettings.cs \u00B7 \u5171 252 \u884C \u00B7 \u672C\u6B21 1\u2013252\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in the pr \u2026                 // Do not dispose HelpWriter. It is the caller\u0027s responsibility.\n 247| \n 248|                 disposed = true;\n 249|             }\n 250|         }\n 251|     }\n 252| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "apply_patch",
+      "status": "ok",
+      "argsDigest": "sha256:cc019ff6\uFF08946 \u5B57\u7B26\uFF09",
+      "summary": "[TOOL_RESULT_BEGIN:apply_patch]\n\u672A\u5199\u5165\u4EFB\u4F55\u6587\u4EF6\uFF1A\nsrc/CommandLine/ParserSettings.cs\uFF1A\u7B2C 1 \u4E2A hunk \u672A\u5339\u914D\u3002\n\u6700\u8FD1\u76F8\u4F3C\u7684\u7247\u6BB5\uFF08\u7B2C 26\u201343 \u884C\uFF09\uFF1A\n26|         private CultureInfo parsingCulture;\n27|         private Maybe\u003Cbool\u003E enableDas \u2026 ureInfo.InvariantCulture;\n43|             maximumDisplayWidth = GetWindowWidth();\n\u5EFA\u8BAE\u5148 read_file \u67E5\u770B\u5F53\u524D\u5185\u5BB9\uFF0C\u518D\u6309\u65B0\u5185\u5BB9\u751F\u6210\u8865\u4E01\u3002\n[\u5BBF\u4E3B\u63D0\u793A] \u5DF2\u8FDE\u7EED\u5931\u8D25 2 \u6B21\u3002\u4E0D\u8981\u518D\u8C03\u7528\u672C\u5DE5\u5177\uFF1B\u8BF7\u6539\u7528 replace_text \u7CBE\u786E\u66FF\u6362\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u672A\u5199\u5165 src/CommandLine/ParserSettings.cs\uFF1A\u65B0\u5185\u5BB9\u53EA\u6709 1915 \u5B57\u7B26\uFF0C\u539F\u6587\u4EF6 9441 \u5B57\u7B26\uFF0C\u7591\u4F3C\u6574\u6587\u4EF6\u91CD\u5199\u4E22\u5931\u5185\u5BB9\u3002\u8BF7\u7528 replace_text \u6216 apply_patch \u53EA\u6539\u9700\u8981\u7684\u884C\uFF1B\u5982\u679C\u786E\u5B9E\u8981\u6574\u4F53\u91CD\u5199\uFF0C\u5148 read_file \u5B8C\u6574\u5185\u5BB9\u5E76\u4FDD\u7559\u672A\u4FEE\u6539\u90E8\u5206\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserSettings.cs \u00B7 \u5171 252 \u884C \u00B7 \u672C\u6B21 1\u2013252\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in the pr \u2026                 // Do not dispose HelpWriter. It is the caller\u0027s responsibility.\n 247| \n 248|                 disposed = true;\n 249|             }\n 250|         }\n 251|     }\n 252| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\nreplace_text \u5DF2\u5728\u672C\u6B21\u751F\u6210\u4E2D\u8FDE\u7EED\u5931\u8D25 2 \u6B21\uFF0C\u672C\u8F6E\u7981\u7528\uFF1B\u8BF7\u6539\u7528 apply_patch\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\uFF1B\u4E5F\u53EF\u4EE5\u5148\u7528\u6587\u672C\u8BF4\u660E\u5361\u5728\u54EA\u91CC\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "apply_patch",
+      "status": "ok",
+      "argsDigest": "sha256:cc019ff6\uFF08946 \u5B57\u7B26\uFF09",
+      "summary": "[TOOL_RESULT_BEGIN:apply_patch]\napply_patch \u5DF2\u5728\u672C\u6B21\u751F\u6210\u4E2D\u8FDE\u7EED\u5931\u8D25 2 \u6B21\uFF0C\u672C\u8F6E\u7981\u7528\uFF1B\u8BF7\u6539\u7528 replace_text \u7CBE\u786E\u66FF\u6362\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\uFF1B\u4E5F\u53EF\u4EE5\u5148\u7528\u6587\u672C\u8BF4\u660E\u5361\u5728\u54EA\u91CC\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\nreplace_text \u5DF2\u5728\u672C\u6B21\u751F\u6210\u4E2D\u8FDE\u7EED\u5931\u8D25 2 \u6B21\uFF0C\u672C\u8F6E\u7981\u7528\uFF1B\u8BF7\u6539\u7528 apply_patch\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\uFF1B\u4E5F\u53EF\u4EE5\u5148\u7528\u6587\u672C\u8BF4\u660E\u5361\u5728\u54EA\u91CC\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u672A\u5199\u5165 src/CommandLine/ParserSettings.cs\uFF1A\u65B0\u5185\u5BB9\u53EA\u6709 1915 \u5B57\u7B26\uFF0C\u539F\u6587\u4EF6 9441 \u5B57\u7B26\uFF0C\u7591\u4F3C\u6574\u6587\u4EF6\u91CD\u5199\u4E22\u5931\u5185\u5BB9\u3002\u8BF7\u7528 replace_text \u6216 apply_patch \u53EA\u6539\u9700\u8981\u7684\u884C\uFF1B\u5982\u679C\u786E\u5B9E\u8981\u6574\u4F53\u91CD\u5199\uFF0C\u5148 read_file \u5B8C\u6574\u5185\u5BB9\u5E76\u4FDD\u7559\u672A\u4FEE\u6539\u90E8\u5206\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\n\u672A\u66FF\u6362\u4EFB\u4F55\u5185\u5BB9\uFF1AParserSettings.cs \u4E0D\u5B58\u5728\uFF0C\u8BF7\u5148 read_file \u6216\u786E\u8BA4\u8DEF\u5F84\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "glob_files",
+      "status": "ok",
+      "argsDigest": "**/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:glob_files]\nsrc/CommandLine/ParserSettings.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserSettings.cs \u00B7 \u5171 252 \u884C \u00B7 \u672C\u6B21 1\u2013252\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in the pr \u2026                 // Do not dispose HelpWriter. It is the caller\u0027s responsibility.\n 247| \n 248|                 disposed = true;\n 249|             }\n 250|         }\n 251|     }\n 252| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\n\u672A\u66FF\u6362\u4EFB\u4F55\u5185\u5BB9\uFF1A\u5728 src/CommandLine/ParserSettings.cs \u4E2D\u627E\u4E0D\u5230 old_text\u3002\u8BF7\u91CD\u65B0 read_file\uFF0C\u5E76\u4FDD\u8BC1 old_text \u4E0E\u6587\u4EF6\u5185\u5BB9\u9010\u5B57\u7B26\u4E00\u81F4\uFF08\u542B\u7F29\u8FDB\u548C\u7A7A\u884C\uFF09\u3002\n\u6700\u63A5\u8FD1\u7684\u4F4D\u7F6E\u5728\u7B2C 28 \u884C\uFF1A\n26|         private CultureInfo parsingCulture; \u2026 int maximumDisplayWidth;\n29|         private Maybe\u003Cbool\u003E allowMultiInstance;\n30|         private bool getoptMode;\n[\u5BBF\u4E3B\u63D0\u793A] \u5DF2\u8FDE\u7EED\u5931\u8D25 2 \u6B21\u3002\u4E0D\u8981\u518D\u8C03\u7528\u672C\u5DE5\u5177\uFF1B\u8BF7\u6539\u7528 replace_text \u7CBE\u786E\u66FF\u6362\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserSettings.cs \u00B7 \u5171 252 \u884C \u00B7 \u672C\u6B21 20\u201369 \u00B7 \u63A5\u7EED\u7528 offset=70\n  20|         private bool caseSensitive;\n  21|         private bool caseInsensitiveEnumValues;\n  \u2026 mNotSupportedException || e is ArgumentOutOfRangeException)\n  66|             {\n  67|                width = DefaultMaximumLength;\n  68|             }\n  69|             return width;\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\nreplace_text \u5DF2\u5728\u672C\u6B21\u751F\u6210\u4E2D\u8FDE\u7EED\u5931\u8D25 2 \u6B21\uFF0C\u672C\u8F6E\u7981\u7528\uFF1B\u8BF7\u6539\u7528 apply_patch\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\uFF1B\u4E5F\u53EF\u4EE5\u5148\u7528\u6587\u672C\u8BF4\u660E\u5361\u5728\u54EA\u91CC\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "apply_patch",
+      "status": "ok",
+      "argsDigest": "sha256:c3128825\uFF081669 \u5B57\u7B26\uFF09",
+      "summary": "[TOOL_RESULT_BEGIN:apply_patch]\n\u672A\u5199\u5165\u4EFB\u4F55\u6587\u4EF6\uFF1A\nsrc/CommandLine/ParserSettings.cs\uFF1A\u7B2C 2 \u4E2A hunk \u672A\u5339\u914D\u3002\n\u6700\u8FD1\u76F8\u4F3C\u7684\u7247\u6BB5\uFF08\u7B2C 89\u2013106 \u884C\uFF09\uFF1A\n89|         /// assigned to them (for example, enum parsing).\n90|         /// \u003C/summary\u003E \u2026  return caseInsensitiveEnumValues; }\n104|             set { PopsicleSetter.Set(Consumed, ref caseInsensitiveEnumValues, value); }\n105|         }\n106| \n\u5EFA\u8BAE\u5148 read_file \u67E5\u770B\u5F53\u524D\u5185\u5BB9\uFF0C\u518D\u6309\u65B0\u5185\u5BB9\u751F\u6210\u8865\u4E01\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserSettings.cs \u00B7 \u5171 252 \u884C \u00B7 \u672C\u6B21 30\u201379 \u00B7 \u63A5\u7EED\u7528 offset=80\n  30|         private bool getoptMode;\n  31|         private Maybe\u003Cbool\u003E posixlyCorrect;\n  32| \n  \u2026  \u003Csee cref=\u0022CommandLine.ParserSettings\u0022/\u003E class.\n  74|         /// \u003C/summary\u003E\n  75|         ~ParserSettings()\n  76|         {\n  77|             Dispose(false);\n  78|         }\n  79| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "apply_patch",
+      "status": "ok",
+      "argsDigest": "sha256:70e828ce\uFF081427 \u5B57\u7B26\uFF09",
+      "summary": "[TOOL_RESULT_BEGIN:apply_patch]\n\u672A\u5199\u5165\u4EFB\u4F55\u6587\u4EF6\uFF1A\nsrc/CommandLine/ParserSettings.cs\uFF1A\u7B2C 1 \u4E2A hunk \u672A\u5339\u914D\u3002\n\u6700\u8FD1\u76F8\u4F3C\u7684\u7247\u6BB5\uFF08\u7B2C 36\u201359 \u884C\uFF09\uFF1A\n36|         public ParserSettings()\n37|         {\n38|             caseSensitive = true;\n3 \u2026            try\n58|             {\n59|                 width = Console.WindowWidth;\n\u5EFA\u8BAE\u5148 read_file \u67E5\u770B\u5F53\u524D\u5185\u5BB9\uFF0C\u518D\u6309\u65B0\u5185\u5BB9\u751F\u6210\u8865\u4E01\u3002\n[\u5BBF\u4E3B\u63D0\u793A] \u5DF2\u8FDE\u7EED\u5931\u8D25 2 \u6B21\u3002\u4E0D\u8981\u518D\u8C03\u7528\u672C\u5DE5\u5177\uFF1B\u8BF7\u6539\u7528 replace_text \u7CBE\u786E\u66FF\u6362\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserSettings.cs \u00B7 \u5171 252 \u884C \u00B7 \u672C\u6B21 40\u201389 \u00B7 \u63A5\u7EED\u7528 offset=90\n  40|             autoHelp = true;\n  41|             autoVersion = true;\n  42|             parsin \u2026 c bool CaseSensitive\n  86|         {\n  87|             get { return caseSensitive; }\n  88|             set { PopsicleSetter.Set(Consumed, ref caseSensitive, value); }\n  89|         }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\nreplace_text \u5DF2\u5728\u672C\u6B21\u751F\u6210\u4E2D\u8FDE\u7EED\u5931\u8D25 2 \u6B21\uFF0C\u672C\u8F6E\u7981\u7528\uFF1B\u8BF7\u6539\u7528 apply_patch\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\uFF1B\u4E5F\u53EF\u4EE5\u5148\u7528\u6587\u672C\u8BF4\u660E\u5361\u5728\u54EA\u91CC\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "apply_patch",
+      "status": "ok",
+      "argsDigest": "sha256:d9184831\uFF081162 \u5B57\u7B26\uFF09",
+      "summary": "[TOOL_RESULT_BEGIN:apply_patch]\napply_patch \u5DF2\u5728\u672C\u6B21\u751F\u6210\u4E2D\u8FDE\u7EED\u5931\u8D25 2 \u6B21\uFF0C\u672C\u8F6E\u7981\u7528\uFF1B\u8BF7\u6539\u7528 replace_text \u7CBE\u786E\u66FF\u6362\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\uFF1B\u4E5F\u53EF\u4EE5\u5148\u7528\u6587\u672C\u8BF4\u660E\u5361\u5728\u54EA\u91CC\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/ParserSettings.cs \u00B7 \u5171 252 \u884C \u00B7 \u672C\u6B21 40\u201389 \u00B7 \u63A5\u7EED\u7528 offset=90\n  40|             autoHelp = true;\n  41|             autoVersion = true;\n  42|             parsin \u2026 c bool CaseSensitive\n  86|         {\n  87|             get { return caseSensitive; }\n  88|             set { PopsicleSetter.Set(Consumed, ref caseSensitive, value); }\n  89|         }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "replace_text",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:replace_text]\nreplace_text \u5DF2\u5728\u672C\u6B21\u751F\u6210\u4E2D\u8FDE\u7EED\u5931\u8D25 2 \u6B21\uFF0C\u672C\u8F6E\u7981\u7528\uFF1B\u8BF7\u6539\u7528 apply_patch\uFF0C\u6216 write_file \u91CD\u5199\u6574\u4E2A\u6587\u4EF6\uFF1B\u4E5F\u53EF\u4EE5\u5148\u7528\u6587\u672C\u8BF4\u660E\u5361\u5728\u54EA\u91CC\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "write_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:write_file]\n\u672A\u5199\u5165 src/CommandLine/ParserSettings.cs\uFF1A\u65B0\u5185\u5BB9\u53EA\u6709 2686 \u5B57\u7B26\uFF0C\u539F\u6587\u4EF6 9441 \u5B57\u7B26\uFF0C\u7591\u4F3C\u6574\u6587\u4EF6\u91CD\u5199\u4E22\u5931\u5185\u5BB9\u3002\u8BF7\u7528 replace_text \u6216 apply_patch \u53EA\u6539\u9700\u8981\u7684\u884C\uFF1B\u5982\u679C\u786E\u5B9E\u8981\u6574\u4F53\u91CD\u5199\uFF0C\u5148 read_file \u5B8C\u6574\u5185\u5BB9\u5E76\u4FDD\u7559\u672A\u4FEE\u6539\u90E8\u5206\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/ParserSettings.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    }
+  ]
+}
