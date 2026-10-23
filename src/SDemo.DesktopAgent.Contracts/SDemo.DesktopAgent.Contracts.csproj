@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 纯契约层：模型 / 设置 DTO / 跨模块接口。
+         不允许引用任何 AI SDK、UI 框架或平台 API；只依赖沙箱契约。 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SDemo.DesktopAgent</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent.Contracts</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SDemo.DesktopAgent.Core.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -2,21 +2,6 @@ using SDemo.DesktopAgent.Models;
 
 namespace SDemo.DesktopAgent.Context;
 
-/// <summary>P6 双模：完整工具面 / 精简工具面。</summary>
-public enum AgentMode
-{
-    Full,
-    Compact
-}
-
-/// <summary>用户偏好；Auto 时按模型档案推断。</summary>
-public enum AgentModePreference
-{
-    Auto,
-    Full,
-    Compact
-}
-
 /// <summary>
 /// 模式判定：显式覆盖优先；8K / 16K 窗口、无工具能力、小模型名称标记都判为 Compact。
 /// 这里只做判定，不读文件、不调模型。

@@ -22,6 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 契约层：模型 / 设置 DTO / 跨模块接口（不含任何实现）。 -->
+    <ProjectReference Include="..\SDemo.DesktopAgent.Contracts\SDemo.DesktopAgent.Contracts.csproj" />
     <!-- 沙箱契约：纯 record / enum / 协议常量，无平台 API。 -->
     <ProjectReference Include="..\SDemo.DesktopAgent.Sandbox.Contracts\SDemo.DesktopAgent.Sandbox.Contracts.csproj" />
   </ItemGroup>

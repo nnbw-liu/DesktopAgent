@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace SDemo.DesktopAgent.Execution;
 
 /// <summary>一次构建 / 测试的验证结果（P4 §3.6）。解析失败时 Errors = -1。</summary>

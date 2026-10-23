@@ -2,22 +2,6 @@ using SDemo.DesktopAgent.Models;
 
 namespace SDemo.DesktopAgent.Execution;
 
-/// <summary>自动续跑设置（P5 §3.2）。</summary>
-public sealed class VerificationSettings
-{
-    public bool AutoVerifyAfterEdit { get; set; } = true;
-
-    public int MaxAutoContinue { get; set; } = 1;
-}
-
-/// <summary>checkpoint 设置（P5 §3.3）。</summary>
-public sealed class CheckpointSettings
-{
-    public bool Enabled { get; set; } = true;
-
-    public int Keep { get; set; } = 20;
-}
-
 /// <summary>是否追加一次宿主验证提示（user 角色，不伪造 tool 消息）。</summary>
 public sealed record AutoContinueDecision(bool Continue, string? Prompt, int MaxAttempts);
 

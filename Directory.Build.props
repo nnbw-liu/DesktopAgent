@@ -1,0 +1,18 @@
+<Project>
+
+  <!--
+    全解决方案共享的编译属性。TFM / OutputType / UseWPF 等仍由各工程自己声明，
+    这里只放「所有工程必须一致」的部分：语言版本、可空、版本号。
+    版本号统一在这里维护：PluginHostVersion 读的是宿主程序集版本，
+    各模块程序集版本必须与宿主一致，minHostVersion 才能正确比较。
+  -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>1.0.0</Version>
+    <Company>SDemo</Company>
+    <Product>SDemo DesktopAgent</Product>
+  </PropertyGroup>
+
+</Project>

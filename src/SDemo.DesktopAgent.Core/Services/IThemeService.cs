@@ -1,23 +1,6 @@
 namespace SDemo.DesktopAgent.Services;
 
 /// <summary>
-/// 应用主题。取值与系统设置一致：浅色 / 深色。
-/// </summary>
-public enum AppTheme
-{
-    Light,
-    Dark
-}
-
-/// <summary>外观偏好：跟随系统 / 浅色 / 深色。</summary>
-public enum ThemePreference
-{
-    System,
-    Light,
-    Dark
-}
-
-/// <summary>
 /// 系统主题来源。WPF 与 Blazor 两侧都从这里读取，保证界面配色一致。
 /// </summary>
 public interface IThemeService
