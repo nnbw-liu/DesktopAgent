@@ -12,9 +12,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
-    <!-- Agent 运行时：Microsoft Agent Framework（OpenAI 兼容 provider） -->
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.25.0" />
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.25.0" />
+    <!-- 中立 AI 抽象（IChatClient / ChatMessage / AITool）；具体 SDK 在 Agents 工程。 -->
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
     <!-- Markdown 渲染：CommonMark + GFM 表格 / 任务列表 / 自动链接等扩展 -->
     <PackageReference Include="Markdig" Version="1.4.0" />
     <!-- 会话持久化：一个工作区一个 SQLite 文件，历史聊天一个文件 -->
@@ -22,6 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- AI 接入层：MAF / OpenAI 的唯一出入口。 -->
+    <ProjectReference Include="..\SDemo.DesktopAgent.Agents\SDemo.DesktopAgent.Agents.csproj" />
     <!-- 契约层：模型 / 设置 DTO / 跨模块接口（不含任何实现）。 -->
     <ProjectReference Include="..\SDemo.DesktopAgent.Contracts\SDemo.DesktopAgent.Contracts.csproj" />
     <!-- 沙箱契约：纯 record / enum / 协议常量，无平台 API。 -->

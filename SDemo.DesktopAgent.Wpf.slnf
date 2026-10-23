@@ -4,6 +4,7 @@
     "projects": [
       "src\\SDemo.DesktopAgent.Sandbox.Contracts\\SDemo.DesktopAgent.Sandbox.Contracts.csproj",
       "src\\SDemo.DesktopAgent.Contracts\\SDemo.DesktopAgent.Contracts.csproj",
+      "src\\SDemo.DesktopAgent.Agents\\SDemo.DesktopAgent.Agents.csproj",
       "src\\SDemo.DesktopAgent.Core\\SDemo.DesktopAgent.Core.csproj",
       "src\\SDemo.DesktopAgent.UI\\SDemo.DesktopAgent.UI.csproj",
       "src\\SDemo.DesktopAgent.Windows\\SDemo.DesktopAgent.Windows.csproj",

@@ -1,13 +1,10 @@
-using System.ClientModel;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
-using OpenAI;
-using OpenAI.Chat;
+using SDemo.DesktopAgent.Agents;
 using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Editing;
 using SDemo.DesktopAgent.Models;
@@ -62,6 +59,7 @@ public sealed class AgentChatService : IAgentChatService
     private readonly IToolAuditLog _audit;
     private readonly IAppPaths _paths;
     private readonly IFileReadRegistry _reads;
+    private readonly IAgentRuntime _runtime;
 
     public AgentChatService(
         AgentToolRegistry tools,
@@ -71,7 +69,8 @@ public sealed class AgentChatService : IAgentChatService
         ISandboxJobService sandbox,
         IToolAuditLog audit,
         IAppPaths paths,
-        IFileReadRegistry reads)
+        IFileReadRegistry reads,
+        IAgentRuntime runtime)
     {
         _tools = tools;
         _workspace = workspace;
@@ -81,6 +80,7 @@ public sealed class AgentChatService : IAgentChatService
         _audit = audit;
         _paths = paths;
         _reads = reads;
+        _runtime = runtime;
     }
 
     public async IAsyncEnumerable<AgentDelta> RunAsync(
@@ -138,50 +138,55 @@ public sealed class AgentChatService : IAgentChatService
             plan.Metrics.Guard.Limit = toolCallLimit;
         }
 
-        var agent = CreateAgent(plan.Provider, plan.ModelId, tools, plan.Context, telemetry, toolCallLimit);
+        var invocation = CreateInvocation(plan.Provider, plan.ModelId, tools, plan.Context, telemetry, toolCallLimit);
 
         var pendingCalls = new Dictionary<string, (string Name, string? Digest)>(StringComparer.Ordinal);
+        var text = new StringBuilder();
+        var reasoning = new StringBuilder();
 
-        await foreach (var update in agent.RunStreamingAsync(plan.Context.Messages, cancellationToken: cancellationToken))
+        await foreach (var evt in _runtime.StreamAsync(invocation, cancellationToken))
         {
-            var text = new StringBuilder();
-            var reasoning = new StringBuilder();
-
-            foreach (var content in update.Contents)
+            switch (evt)
             {
-                switch (content)
-                {
-                    case UsageContent { Details: { } usage }:
-                        plan.Metrics?.AddUsage(usage);
-                        break;
-                    case TextReasoningContent { Text: { Length: > 0 } chain }:
-                        reasoning.Append(chain);
-                        break;
-                    case TextContent { Text: { Length: > 0 } chunk } when content is not TextReasoningContent:
-                        text.Append(chunk);
-                        break;
-                    case FunctionCallContent call:
-                        pendingCalls[call.CallId] = (call.Name, DigestArguments(call.Arguments));
-                        break;
-                    case FunctionResultContent result:
-                        plan.Metrics?.RecordToolTrace(BuildTraceEntry(result, pendingCalls));
-                        break;
-                }
+                case AgentStreamEvent.Usage usage:
+                    plan.Metrics?.AddUsage(new UsageDetails
+                    {
+                        InputTokenCount = usage.InputTokens,
+                        OutputTokenCount = usage.OutputTokens
+                    });
+                    break;
+
+                case AgentStreamEvent.Reasoning delta:
+                    reasoning.Append(delta.Value);
+                    break;
+
+                case AgentStreamEvent.Text delta:
+                    text.Append(delta.Value);
+                    break;
+
+                case AgentStreamEvent.FunctionCall call:
+                    pendingCalls[call.CallId] = (call.Name, DigestArguments(call.Arguments));
+                    break;
+
+                case AgentStreamEvent.FunctionResult result:
+                    plan.Metrics?.RecordToolTrace(BuildTraceEntry(result.CallId, result.Result, pendingCalls));
+                    break;
             }
 
             if (text.Length > 0 || reasoning.Length > 0)
             {
                 yield return new AgentDelta(text.ToString(), reasoning.ToString());
+                text.Clear();
+                reasoning.Clear();
             }
         }
     }
 
     /// <summary>
-    /// 把 provider 配置映射成 MAF 的 AIAgent。
-    /// 中间插一层 <see cref="ContextBudgetChatClient"/>：FICC 在外层做工具循环，
-    /// 每次 LLM 请求都会经过装饰器，因此能在循环内部裁剪（§3.7 分支 A）。
+    /// 把 provider 配置映射成一次运行时调用。中间裁剪层以 <c>Decorate</c> 注入：
+    /// FICC 由运行时套在外层，每次 LLM 请求都会经过装饰器，因此能在工具循环内部裁剪（§3.7 分支 A）。
     /// </summary>
-    private AIAgent CreateAgent(
+    private AgentInvocation CreateInvocation(
         ModelProvider provider,
         string modelId,
         IReadOnlyList<AITool> tools,
@@ -189,17 +194,6 @@ public sealed class AgentChatService : IAgentChatService
         ContextRunTelemetry telemetry,
         int toolCallLimit)
     {
-        var options = new OpenAIClientOptions
-        {
-            Endpoint = new Uri(provider.BaseUrl, UriKind.Absolute)
-        };
-
-        // 本地服务可能不需要 Key，但 OpenAI SDK 要求非空凭证。
-        var credential = new ApiKeyCredential(
-            string.IsNullOrWhiteSpace(provider.ApiKey) ? "not-required" : provider.ApiKey);
-
-        var chatClient = new OpenAIClient(credential, options).GetChatClient(modelId);
-
         var settings = _settings.Current.Context ?? new ContextSettings();
         var budgetOptions = new ContextBudgetChatOptions(
             Enabled: settings.Enabled && settings.MidTurnTrim,
@@ -210,31 +204,25 @@ public sealed class AgentChatService : IAgentChatService
             ToolResultChars: settings.MidTurnToolResultChars,
             MaxOutputTokens: Math.Clamp(plan.Profile.MaxOutputTokens, 128, 8192));
 
-        // AsIChatClient() 是 OpenAI ChatClient → IChatClient 的桥；装饰器加在 AsAIAgent 之前，
-        // 保证 FICC 在它外层（见 MidTurnPipelineSpikeTests）。
-        var guarded = new ContextBudgetChatClient(chatClient.AsIChatClient(), budgetOptions, telemetry);
-
-        // P6：把工具循环显式收口。MAF 默认的上限远大于本应用的「每轮工具调用」预算；
-        // 小模型被 Block 后仍会继续发工具调用（实测 4B 在 6 次上限后仍调了 30+ 次），
-        // 所以用 FICC 的请求轮数上限兜底：允许的次数 + 2 次收尾。
-        var invoking = new FunctionInvokingChatClient(guarded)
-        {
-            MaximumIterationsPerRequest = toolCallLimit + 2
-        };
-
-        return invoking.AsAIAgent(
-            instructions: plan.Instructions,
-            name: "SDemo Agent",
-            tools: tools.Count == 0 ? null : tools.ToList());
+        return new AgentInvocation(
+            new Uri(provider.BaseUrl, UriKind.Absolute),
+            provider.ApiKey,
+            modelId,
+            plan.Instructions,
+            plan.Messages,
+            tools,
+            // 允许的次数 + 2 次收尾，和小模型被 Block 后的收尾行为保持一致。
+            toolCallLimit + 2,
+            Decorate: inner => new ContextBudgetChatClient(inner, budgetOptions, telemetry));
     }
 
     private static ToolTraceEntry BuildTraceEntry(
-        FunctionResultContent result,
+        string callId,
+        string? text,
         IReadOnlyDictionary<string, (string Name, string? Digest)> pending)
     {
-        var name = pending.TryGetValue(result.CallId, out var call) ? call.Name : "tool";
-        var digest = pending.TryGetValue(result.CallId, out var value) ? value.Digest : null;
-        var text = result.Result?.ToString();
+        var name = pending.TryGetValue(callId, out var call) ? call.Name : "tool";
+        var digest = pending.TryGetValue(callId, out var value) ? value.Digest : null;
 
         var (status, exitCode) = Classify(text);
 

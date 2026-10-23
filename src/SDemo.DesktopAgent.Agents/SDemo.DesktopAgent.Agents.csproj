@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- AI 接入层：Microsoft Agent Framework + OpenAI 兼容协议的唯一出入口。
+         其它工程不允许直接引用 MAF / OpenAI SDK。 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SDemo.DesktopAgent</RootNamespace>
+    <AssemblyName>SDemo.DesktopAgent.Agents</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <!-- Agent 运行时：Microsoft Agent Framework（OpenAI 兼容 provider） -->
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.25.0" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.25.0" />
+    <!-- 只用到 IChatClient / AITool / ChatMessage 这些中立抽象 -->
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SDemo.DesktopAgent.Contracts\SDemo.DesktopAgent.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SDemo.DesktopAgent.Core.Tests" />
+  </ItemGroup>
+
+</Project>

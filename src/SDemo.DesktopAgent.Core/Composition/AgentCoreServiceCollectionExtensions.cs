@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using SDemo.DesktopAgent.Agents;
 using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Editing;
 using SDemo.DesktopAgent.Plugins;
@@ -17,7 +18,7 @@ public static class AgentCoreServiceCollectionExtensions
     {
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IThemeService, ThemeService>();
-        services.AddSingleton<IModelCatalogService, ModelCatalogService>();
+        services.AddDesktopAgentAgents();
         services.AddSingleton<ISearchService, SearchService>();
         services.AddSingleton<IToolApprovalService, ToolApprovalService>();
         services.AddSingleton<IToolAuditLog, JsonlToolAuditLog>();
@@ -50,7 +51,6 @@ public static class AgentCoreServiceCollectionExtensions
         // P2 压缩与工作记忆：摘要（模型 + 兜底）、压缩编排、状态包。
         services.AddSingleton<IWorkspaceTreeScanner, FileSystemWorkspaceTreeScanner>();
         services.AddSingleton<WorkspaceStateProvider>();
-        services.AddSingleton<ISummaryChatTransport, OpenAiSummaryChatTransport>();
         services.AddSingleton<IContextSummarizer, LlmContextSummarizer>();
         services.AddSingleton<ExtractiveContextSummarizer>();
         services.AddSingleton(sp => new ContextCompactor(
