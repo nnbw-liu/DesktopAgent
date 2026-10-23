@@ -1,0 +1,35 @@
+diff --git a/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs b/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
+index 7e878f3..44c48e2 100644
+--- a/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
++++ b/tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections.Generic;
+@@ -317,6 +317,24 @@ namespace CommandLine.Tests.Unit
+             var args = command.SplitArgs(true);
+             args.Should().BeEquivalentTo(expectedArgs);
+         }
++
++        [Fact]
++        public static void AgentEval_SplitArgs_EmptyInput()
++        {
++            "".SplitArgs().Should().BeEmpty();
++        }
++
++        [Fact]
++        public static void AgentEval_SplitArgs_KeepsQuotedSpace()
++        {
++            "\"a b\" c".SplitArgs().Should().BeEquivalentTo(new[] { "a b", "c" });
++        }
++
++        [Fact]
++        public static void AgentEval_SplitArgs_KeepQuote()
++        {
++            "\"a b\" c".SplitArgs(true).Should().BeEquivalentTo(new[] { "\"a b\"", "c" });
++        }
+         #endregion
+         class Option_Int_Nullable
+         {

@@ -300,6 +300,14 @@ internal static class Program
 
     private static async Task EnsureModelLoadedAsync(string baseUrl, string modelId)
     {
+        // 只有本地 LM Studio 需要预先加载；云端 /models 可能需要鉴权，且没有“加载”概念。
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var endpoint)
+            || (!string.Equals(endpoint.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(endpoint.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         var uri = baseUrl.TrimEnd('/') + "/models";
         try

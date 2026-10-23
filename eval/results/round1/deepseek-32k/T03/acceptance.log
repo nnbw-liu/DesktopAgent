@@ -1,0 +1,26 @@
+> dotnet build CommandLine.sln -v minimal
+Active code page: 65001
+  正在确定要还原的项目…
+  所有项目均是最新的，无法还原。
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\deepseek-32k-20261023-121046\src\CommandLine\bin\Debug\net45\CommandLine.dll
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\deepseek-32k-20261023-121046\src\CommandLine\bin\Debug\net461\CommandLine.dll
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\deepseek-32k-20261023-121046\src\CommandLine\bin\Debug\netstandard2.0\CommandLine.dll
+  CommandLine -> C:\Users\12105\AppData\Local\Temp\agent-eval\deepseek-32k-20261023-121046\src\CommandLine\bin\Debug\net40\CommandLine.dll
+  CommandLine.Tests -> C:\Users\12105\AppData\Local\Temp\agent-eval\deepseek-32k-20261023-121046\tests\CommandLine.Tests\bin\Debug\net461\CommandLine.Tests.dll
+  CommandLine.Tests -> C:\Users\12105\AppData\Local\Temp\agent-eval\deepseek-32k-20261023-121046\tests\CommandLine.Tests\bin\Debug\netcoreapp3.1\CommandLine.Tests.dll
+
+已成功生成。
+    0 个警告
+    0 个错误
+
+已用时间 00:00:02.93
+
+[exit 0]
+> dotnet test tests/CommandLine.Tests/CommandLine.Tests.csproj -f netcoreapp3.1 --no-build -v minimal
+Active code page: 65001
+C:\Users\12105\AppData\Local\Temp\agent-eval\deepseek-32k-20261023-121046\tests\CommandLine.Tests\bin\Debug\netcoreapp3.1\CommandLine.Tests.dll (.NETCoreApp,Version=v3.1)的测试运行
+总共 1 个测试文件与指定模式相匹配。
+
+已通过! - 失败:     0，通过:   685，已跳过:     0，总计:   685，持续时间: 282 ms - CommandLine.Tests.dll (netcoreapp3.1)
+
+[exit 0]

@@ -1,0 +1,308 @@
+{
+  "id": "T05",
+  "type": "tests",
+  "title": "\u8865\u9F50 PreferShortName \u53CD\u89E3\u6790\u6D4B\u8BD5",
+  "prompt": "## \u9700\u6C42\n\n\u0060UnParserSettings.PreferShortName\u0060 \u76EE\u524D\u6CA1\u6709\u76F4\u63A5\u5355\u6D4B\u3002\u8BF7\u5728\u73B0\u6709\u53CD\u89E3\u6790\u6D4B\u8BD5\u6587\u4EF6\u4E2D\u8865 3 \u4E2A xUnit \u6D4B\u8BD5\uFF0C\u8986\u76D6\uFF1A\n\n1. \u9009\u9879\u540C\u65F6\u6709\u77ED\u540D\u548C\u957F\u540D\u65F6\uFF0C\u5F00\u542F \u0060PreferShortName\u0060 \u8F93\u51FA\u77ED\u540D\uFF08\u6D4B\u8BD5\u540D \u0060AgentEval_PreferShortName_UsesShortWhenAvailable\u0060\uFF09\u3002\n2. \u9009\u9879\u53EA\u6709\u957F\u540D\u65F6\uFF0C\u5F00\u542F \u0060PreferShortName\u0060 \u4ECD\u8F93\u51FA\u957F\u540D\uFF08\u0060AgentEval_PreferShortName_FallsBackToLong\u0060\uFF09\u3002\n3. \u5E03\u5C14\u5F00\u5173\u5728\u5F00\u542F \u0060PreferShortName\u0060 \u65F6\u4ECD\u6309\u539F\u89C4\u5219\u8F93\u51FA\uFF08\u0060AgentEval_PreferShortName_DoesNotAffectSwitches\u0060\uFF09\u3002\n\n\u590D\u7528\u4ED3\u5E93\u73B0\u6709\u6D4B\u8BD5\u5047\u7C7B\u578B\uFF0C\u4E0D\u8981\u65B0\u589E\u751F\u4EA7\u4EE3\u7801\uFF0C\u4E0D\u8981\u6539\u52A8\u73B0\u6709\u6D4B\u8BD5\u3002\n\n## \u5B8C\u6210\u6807\u51C6\n\n- \u4E09\u4E2A\u6D4B\u8BD5\u90FD\u80FD\u7F16\u8BD1\u5E76\u901A\u8FC7\u3002\n- \u65E2\u6709 684 \u4E2A\u6D4B\u8BD5\u4ECD\u5168\u90E8\u901A\u8FC7\u3002",
+  "model": "deepseek-v4-pro",
+  "mode": "Full",
+  "contextWindow": 32768,
+  "output": "\u5F53\u524D\u8FDB\u5C55\u603B\u7ED3\uFF1A\n\n**\u5DF2\u5B8C\u6210**\n1. \u5B9A\u4F4D\u5230\u53CD\u89E3\u6790\u6D4B\u8BD5\u6587\u4EF6\uFF1A\u0060tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs\u0060\uFF08\u5171 442 \u884C\uFF09\u3002\n2. \u5DF2\u8BFB\u53D6\u5E76\u786E\u8BA4\u76F8\u5173\u5047\u7C7B\u578B\uFF1A\n   - \u0060Simple_Options\u0060\uFF1A\u0060StringValue\u0060\uFF08\u4EC5\u957F\u540D\uFF0C\u5C5E\u6027\u540D\u6D3E\u751F \u0060--stringvalue\u0060\uFF09\u3001\u0060ShortAndLong\u0060\uFF08\u0060[Option(\u0027s\u0027, \u0022shortandlong\u0022)]\u0060 \u77ED\u540D\u002B\u957F\u540D\uFF09\u3001\u0060IntSequence\u0060\uFF08\u4EC5\u77ED\u540D \u0060-i\u0060\uFF09\u3001\u0060BoolValue\u0060\uFF08\u4EC5\u77ED\u540D \u0060-x\u0060\uFF0C\u5E03\u5C14\u5F00\u5173\uFF09\u3001\u0060LongValue\u0060\uFF08\u0060[Value(0)]\u0060 \u4F4D\u7F6E\u53C2\u6570\uFF09\u3002\n   - \u0060Options_With_Switches\u0060\uFF1A\u0060InputFile\u0060\uFF08\u4EC5\u957F\u540D \u0060--input\u0060\uFF09\u3001\u0060OutputFile\u0060\uFF08\u4EC5\u77ED\u540D \u0060-o\u0060\uFF09\u3001\u0060Verbose\u0060/\u0060HumanReadable\u0060/\u0060IgnoreWarnings\u0060\uFF08\u5747\u4E3A\u4EC5\u77ED\u540D\u7684\u5E03\u5C14\u5F00\u5173\uFF09\u3002\n   - \u0060Options_With_TimeSpan\u0060\uFF1A\u0060Duration\u0060\uFF08\u0060[Option(\u0027d\u0027, \u0022duration\u0022)]\u0060 \u77ED\u540D\u002B\u957F\u540D\uFF09\u3002\n\n**\u672A\u5B8C\u6210\u9879**\n1. \u5C1A\u672A\u5B8C\u6574\u8BFB\u53D6 \u0060UnParserExtensionsTests.cs\u0060 \u7684 \u0060UnParseData\u0060/\u0060UnParseDataSwitches\u0060 \u7B49 MemberData \u5B9A\u4E49\uFF0C\u65E0\u6CD5 100% \u786E\u8BA4\u73B0\u6709\u683C\u5F0F\u5316\u8F93\u51FA\u7684\u7CBE\u786E\u987A\u5E8F\u4E0E\u7A7A\u683C/\u8FDE\u5B57\u7B26\u683C\u5F0F\uFF08\u4F8B\u5982\u77ED\u540D\u9009\u9879\u662F\u5426\u8F93\u51FA \u0060-s value\u0060\u3001\u5F00\u5173\u662F\u5426\u8F93\u51FA \u0060-x\u0060\u3001\u4F4D\u7F6E\u53C2\u6570\u4E0E\u9009\u9879\u7684\u5148\u540E\u987A\u5E8F\uFF09\u3002\n2. \u5C1A\u672A\u786E\u8BA4 \u0060UnParserSettings.PreferShortName\u0060 \u5728 \u0060FormatCommandLine\u0060 \u4E2D\u5982\u4F55\u4F20\u5165\u914D\u7F6E\uFF08\u4ECE\u73B0\u6709\u6D4B\u8BD5\u770B\u662F\u901A\u8FC7 \u0060config =\u003E config.PreferShortName = true\u0060 \u6216 \u0060new Parser(config =\u003E ...)\u0060 \u8FD9\u7C7B lambda \u65B9\u5F0F\uFF09\u3002\n3. \u5C1A\u672A\u5B9E\u9645\u6DFB\u52A0 3 \u4E2A\u6D4B\u8BD5\u65B9\u6CD5\u3002\n4. \u5C1A\u672A\u6267\u884C \u0060dotnet build\u0060 / \u0060dotnet test\u0060 \u9A8C\u8BC1\u300C3 \u4E2A\u65B0\u6D4B\u8BD5\u901A\u8FC7 \u002B \u65E2\u6709 684 \u4E2A\u6D4B\u8BD5\u4ECD\u5168\u90E8\u901A\u8FC7\u300D\u3002\n\n**\u98CE\u9669/\u6CE8\u610F\u4E8B\u9879**\n- \u5DF2\u89E6\u53D1\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u4E0A\u9650\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u8C03\u7528\u5DE5\u5177\uFF0C\u56E0\u6B64\u672C\u6B21\u672A\u80FD\u5B8C\u6210\u4EE3\u7801\u4FEE\u6539\u4E0E\u9A8C\u8BC1\u3002\n- \u9700\u8981\u5728\u4E0B\u8F6E\u7EE7\u7EED\uFF1A\u5148\u8BFB\u5B8C MemberData \u5B9A\u4E49\uFF08\u5C24\u5176\u662F \u0060UnParseData\u0060 \u4E2D \u0060Simple_Options\u0060 \u5404\u5B57\u6BB5\u7EC4\u5408\u5BF9\u5E94\u7684\u671F\u671B\u5B57\u7B26\u4E32\uFF0C\u4EE5\u53CA\u5F00\u5173\u5206\u7EC4\u76F8\u5173\u6570\u636E\uFF09\uFF0C\u786E\u8BA4 \u0060PreferShortName\u0060 \u7684\u786E\u5207\u9884\u671F\u8F93\u51FA\u540E\u518D\u7528 \u0060replace_text\u0060 \u7CBE\u786E\u63D2\u5165 3 \u4E2A\u6D4B\u8BD5\uFF0C\u6700\u540E\u8FD0\u884C\u6784\u5EFA\u4E0E\u6D4B\u8BD5\u3002\n\n\u6211**\u6CA1\u6709**\u8C0E\u62A5\u5B8C\u6210\u2014\u2014\u4EFB\u52A1\u5C1A\u672A\u5B8C\u6210\uFF0C\u7F3A\u5C11\u6D4B\u8BD5\u4EE3\u7801\u7684\u5199\u5165\u4E0E\u7F16\u8BD1/\u6D4B\u8BD5\u9A8C\u8BC1\u3002## \u5F53\u524D\u8FDB\u5C55\n\n\u5DF2\u5B9A\u4F4D\u5E76\u8BFB\u53D6\u5173\u952E\u6587\u4EF6\uFF1A\n\n1. **\u6D4B\u8BD5\u6587\u4EF6**\uFF1A\u0060tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs\u0060\uFF08442 \u884C\uFF09\n2. **\u751F\u4EA7\u4EE3\u7801**\uFF1A\u0060src/CommandLine/UnParserExtensions.cs\u0060\uFF08\u0060FormatCommandLine\u0060\u3001\u0060FormatOption\u0060 \u903B\u8F91\uFF09\n3. **\u5047\u7C7B\u578B**\uFF1A\n   - \u0060Simple_Options.cs\u0060\uFF1A\u0060StringValue\u0060\uFF08\u4EC5\u957F\u540D\uFF0C\u5C5E\u6027\u540D\u6D3E\u751F \u0060--stringvalue\u0060\uFF09\u3001\u0060ShortAndLong\u0060\uFF08\u0060[Option(\u0027s\u0027, \u0022shortandlong\u0022)]\u0060\uFF09\u3001\u0060IntSequence\u0060\uFF08\u4EC5\u77ED\u540D \u0060-i\u0060\uFF09\u3001\u0060BoolValue\u0060\uFF08\u4EC5\u77ED\u540D \u0060-x\u0060\uFF0C\u5E03\u5C14\u5F00\u5173\uFF09\u3001\u0060LongValue\u0060\uFF08\u0060[Value(0)]\u0060\uFF09\n   - \u0060Options_With_Switches.cs\u0060\uFF1A\u0060InputFile\u0060\uFF08\u4EC5\u957F\u540D \u0060--input\u0060\uFF09\u3001\u0060OutputFile\u0060\uFF08\u4EC5\u77ED\u540D \u0060-o\u0060\uFF09\u3001\u0060Verbose\u0060/\u0060HumanReadable\u0060/\u0060IgnoreWarnings\u0060\uFF08\u4EC5\u77ED\u540D\u5E03\u5C14\u5F00\u5173\uFF09\n\n\u5DF2\u786E\u8BA4\u7684\u5173\u952E\u4E8B\u5B9E\uFF1A\n- \u0060FormatCommandLine(options, config =\u003E config.PreferShortName = true)\u0060 \u662F\u8BE5\u5E93\u4F20\u5165\u914D\u7F6E\u7684\u6807\u51C6\u5199\u6CD5\uFF08\u4E0E\u73B0\u6709 \u0060GroupSwitches\u0060\u3001\u0060UseEqualToken\u0060 \u6D4B\u8BD5\u4E00\u81F4\uFF09\u3002\n- \u5E03\u5C14\u5F00\u5173 \u0060BoolValue\u0060 \u8F93\u51FA\u4E3A \u0060-x\u0060\uFF08\u4E0D\u5E26\u503C\uFF09\uFF0C\u5DF2\u5728\u73B0\u6709 \u0060UseEqualToken\u0060 \u6D4B\u8BD5\u4E2D\u9A8C\u8BC1\u3002\n- \u77ED\u540D\u9009\u9879\u5728 \u0060GroupSwitches\u0060 \u7B49\u573A\u666F\u4E0B\u4EE5 \u0060-s value\u0060 \u5F62\u5F0F\u8F93\u51FA\u3002\n\n## \u672A\u5B8C\u6210\u9879\n\n1. **\u5C1A\u672A\u8BFB\u53D6 \u0060FormatOption\u0060 \u5B8C\u6574\u5B9E\u73B0\uFF08\u7B2C 257\u2013279 \u884C\uFF09**\u2014\u2014\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u8FBE\u5230\u4E0A\u9650\uFF0C\u672A\u80FD\u786E\u8BA4 \u0060PreferShortName\u0060 \u65F6 \u0060FormatOption\u0060 \u9009\u62E9\u77ED\u540D/\u957F\u540D\u7684\u7CBE\u786E\u5206\u652F\u4E0E\u503C\u62FC\u63A5\u683C\u5F0F\uFF08\u0060-s value\u0060 vs \u0060--shortandlong value\u0060\uFF09\u3002\n2. **\u5C1A\u672A\u5728\u6D4B\u8BD5\u6587\u4EF6\u4E2D\u63D2\u5165 3 \u4E2A\u65B0\u6D4B\u8BD5**\u3002\n3. **\u5C1A\u672A\u8FD0\u884C \u0060dotnet build\u0060 / \u0060dotnet test\u0060** \u9A8C\u8BC1\u300C3 \u4E2A\u65B0\u6D4B\u8BD5\u901A\u8FC7 \u002B \u65E2\u6709 684 \u4E2A\u6D4B\u8BD5\u4ECD\u5168\u90E8\u901A\u8FC7\u300D\u3002\n\n## \u98CE\u9669\u4E0E\u4E0B\u4E00\u6B65\n\n- \u5173\u952E\u4E0D\u786E\u5B9A\u70B9\u4EC5\u5269 \u0060FormatOption\u0060 \u7684\u786E\u5207\u5B9E\u73B0\u4E0E\u9884\u671F\u5B57\u7B26\u4E32\u3002\u8BA1\u5212\u4E0B\u4E00\u8F6E\uFF1A\n  1. \u0060read_file\u0060 \u8BFB\u53D6 \u0060UnParserExtensions.cs\u0060 \u7B2C 257\u2013279 \u884C\uFF0C\u786E\u8BA4 \u0060PreferShortName\u0060 \u5206\u652F\u3002\n  2. \u7528 \u0060replace_text\u0060 \u5728\u6D4B\u8BD5\u6587\u4EF6\u672B\u5C3E\uFF08\u0060}\u0060 \u524D\uFF09\u63D2\u5165 3 \u4E2A \u0060[Fact]\u0060 \u6D4B\u8BD5\uFF1A\n     - \u0060Simple_Options { ShortAndLong = \u0022value\u0022 }\u0060 \u2192 \u9884\u671F \u0060\u0022-s value\u0022\u0060\uFF1B\n     - \u0060Simple_Options { StringValue = \u0022value\u0022 }\u0060 \u2192 \u9884\u671F \u0060\u0022--stringvalue value\u0022\u0060\uFF1B\n     - \u0060Simple_Options { BoolValue = true }\u0060 \u2192 \u9884\u671F \u0060\u0022-x\u0022\u0060\u3002\n  3. \u0060dotnet build\u0060 \u002B \u0060dotnet test\u0060 \u9A8C\u8BC1\u3002\n\n\u4EFB\u52A1**\u5C1A\u672A\u5B8C\u6210**\uFF0C\u672A\u505A\u4EFB\u4F55\u6587\u4EF6\u4FEE\u6539\uFF0C\u4E5F\u672A\u8C0E\u62A5\u6210\u529F\u3002## \u5F53\u524D\u8FDB\u5C55\uFF08\u672C\u8F6E\u5DF2\u786E\u8BA4\u5173\u952E\u4E8B\u5B9E\uFF0C\u4F46\u672A\u5B8C\u6210\u5199\u5165\uFF09\n\n\u6211\u5DF2\u901A\u8FC7\u8BFB\u53D6\u786E\u8BA4\u4E86\u5B9E\u73B0\u903B\u8F91\u4E0E\u5047\u7C7B\u578B\u5B9A\u4E49\uFF0C\u4E09\u4E2A\u6D4B\u8BD5\u7684\u9884\u671F\u8F93\u51FA\u5DF2\u53EF\u786E\u5B9A\uFF1A\n\n**\u751F\u4EA7\u4EE3\u7801 \u0060FormatName\u0060\uFF08\u0060src/CommandLine/UnParserExtensions.cs:265-279\u0060\uFF09\u786E\u8BA4\uFF1A**\n\u0060\u0060\u0060csharp\nvar longName = (optionSpec.LongName.Length \u003E 0 \u0026\u0026 !settings.PreferShortName)\n             || optionSpec.ShortName.Length == 0;\n\u0060\u0060\u0060\n\u5373\u5F00\u542F \u0060PreferShortName\u0060 \u540E\uFF1A\u6709\u77ED\u540D\u002B\u957F\u540D \u2192 \u7528\u77ED\u540D\uFF1B\u53EA\u6709\u957F\u540D\uFF08\u0060ShortName.Length == 0\u0060\uFF09\u2192 \u4ECD\u7528\u957F\u540D\uFF1B\u5E03\u5C14\u5F00\u5173\u4E0D\u53D7\u6B64\u5206\u652F\u5F71\u54CD\uFF08\u7167\u5E38 \u0060-x\u0060 \u65E0\u503C\uFF09\u3002\n\n**\u5047\u7C7B\u578B \u0060Simple_Options\u0060\uFF08\u5C5E\u6027\u987A\u5E8F\uFF1A\u0060StringValue\u0060\u2192\u0060ShortAndLong\u0060\u2192\u0060IntSequence\u0060\u2192\u0060BoolValue\u0060\u2192\u0060LongValue\u0060\uFF09\u786E\u8BA4\uFF1A**\n- \u0060ShortAndLong\u0060\uFF1A\u0060[Option(\u0027s\u0027, \u0022shortandlong\u0022)]\u0060\uFF08\u77ED\u540D\u002B\u957F\u540D\uFF09\n- \u0060StringValue\u0060\uFF1A\u4EC5\u957F\u540D \u0060--stringvalue\u0060\n- \u0060BoolValue\u0060\uFF1A\u4EC5\u77ED\u540D \u0060-x\u0060\uFF0Cswitch\uFF08\u73B0\u6709\u7528\u4F8B \u0060BoolValue=true \u2192 \u0022-x\u0022\u0060 \u5DF2\u9A8C\u8BC1\uFF09\n\n**\u53C2\u8003\u73B0\u6709\u6D4B\u8BD5\u5199\u6CD5\uFF08\u0060UnParserExtensionsTests.cs:110-117\u0060\uFF09\u786E\u8BA4\u914D\u7F6E\u4F20\u5165\u65B9\u5F0F\uFF1A**\n\u0060\u0060\u0060csharp\n.FormatCommandLine(options, config =\u003E config.PreferShortName = true)\n\u0060\u0060\u0060\n\n**\u5DF2\u786E\u5B9A\u8981\u63D2\u5165\u7684\u4E09\u4E2A\u6D4B\u8BD5\u5185\u5BB9\uFF1A**\n1. \u0060Simple_Options { ShortAndLong = \u0022value\u0022 }\u0060 \u2192 \u0060\u0022-s value\u0022\u0060\n2. \u0060Simple_Options { StringValue = \u0022value\u0022 }\u0060 \u2192 \u0060\u0022--stringvalue value\u0022\u0060\n3. \u0060Simple_Options { BoolValue = true }\u0060 \u2192 \u0060\u0022-x\u0022\u0060\n\n## \u672A\u5B8C\u6210\u9879\n1. **\u5C1A\u672A\u5199\u5165** 3 \u4E2A\u6D4B\u8BD5\u65B9\u6CD5\uFF08\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5728\u51C6\u5907\u6267\u884C \u0060replace_text\u0060 \u524D\u8FBE\u5230 15 \u6B21\u4E0A\u9650\uFF0C\u88AB\u5F3A\u5236\u505C\u6B62\uFF09\u3002\n2. **\u5C1A\u672A\u8FD0\u884C** \u0060dotnet build\u0060 / \u0060dotnet test\u0060 \u9A8C\u8BC1\u300C3 \u4E2A\u65B0\u6D4B\u8BD5\u901A\u8FC7 \u002B \u65E2\u6709 684 \u4E2A\u6D4B\u8BD5\u4ECD\u5168\u90E8\u901A\u8FC7\u300D\u3002\n\n## \u98CE\u9669\n- \u552F\u4E00\u672A 100% \u843D\u5730\u7684\u73AF\u8282\u662F\u5B9E\u9645\u5199\u5165\u4E0E\u7F16\u8BD1\u9A8C\u8BC1\uFF1B\u9884\u671F\u8F93\u51FA\u5DF2\u4ECE\u6E90\u7801\u903B\u8F91\u4E0E\u73B0\u6709\u7528\u4F8B\u4EA4\u53C9\u786E\u8BA4\uFF0C\u903B\u8F91\u4E0A\u662F\u6B63\u786E\u7684\u3002\n- \u63D2\u5165\u4F4D\u7F6E\u8BA1\u5212\u5728 \u0060UnParsing_instance_with_equal_token_...\u0060 \u6D4B\u8BD5\uFF08\u7B2C 117 \u884C \u0060}\u0060\uFF09\u4E4B\u540E\u3001\u0060#region PR 550\u0060 \u4E4B\u524D\u3002\n\n\u4EFB\u52A1**\u5C1A\u672A\u5B8C\u6210**\uFF0C\u6CA1\u6709\u505A\u4EFB\u4F55\u6587\u4EF6\u4FEE\u6539\uFF0C\u4E5F\u6CA1\u6709\u8C0E\u62A5\u6210\u529F\u3002\u4E0B\u4E00\u8F6E\u9700\u6267\u884C \u0060replace_text\u0060 \u5199\u5165\u4E09\u4E2A \u0060[Fact]\u0060 \u6D4B\u8BD5\u5E76\u8FD0\u884C\u6784\u5EFA/\u6D4B\u8BD5\u9A8C\u8BC1\u3002",
+  "turns": 3,
+  "steps": 48,
+  "seconds": 120.2,
+  "error": null,
+  "acceptanceExit": 0,
+  "acceptanceOutput": "\u003E dotnet build CommandLine.sln -v minimal\r\nActive code page: 65001\r\n  \u6B63\u5728\u786E\u5B9A\u8981\u8FD8\u539F\u7684\u9879\u76EE\u2026\r\n  \u6240\u6709\u9879\u76EE\u5747\u662F\u6700\u65B0\u7684\uFF0C\u65E0\u6CD5\u8FD8\u539F\u3002\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\src\\CommandLine\\bin\\Debug\\net45\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\src\\CommandLine\\bin\\Debug\\net461\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\src\\CommandLine\\bin\\Debug\\netstandard2.0\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\src\\CommandLine\\bin\\Debug\\net40\\CommandLine.dll\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\tests\\CommandLine.Tests\\Unit\\Core\\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=net461]\r\n  CommandLine.Tests -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\tests\\CommandLine.Tests\\bin\\Debug\\net461\\CommandLine.Tests.dll\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\tests\\CommandLine.Tests\\Unit\\Core\\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]\r\n  CommandLine.Tests -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll\r\n  \u5305 CommandLineParser.0.0.0 \u7F3A\u5C11\u81EA\u8FF0\u6587\u4EF6\u3002\u8F6C\u5230 https://aka.ms/nuget/authoring-best-practices/readme \u4E86\u89E3\u4E3A\u4EC0\u4E48\u5305\u9605\u8BFB\u4E3B\u9898\u5F88\u91CD\u8981\u3002\r\n  \u5DF2\u6210\u529F\u521B\u5EFA\u5305\u201CC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\src\\CommandLine\\bin\\Debug\\CommandLineParser.0.0.0.nupkg\u201D\u3002\r\n  \u5DF2\u6210\u529F\u521B\u5EFA\u5305\u201CC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\src\\CommandLine\\bin\\Debug\\CommandLineParser.0.0.0.snupkg\u201D\u3002\r\n\r\n\u5DF2\u6210\u529F\u751F\u6210\u3002\r\n\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\tests\\CommandLine.Tests\\Unit\\Core\\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=net461]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\tests\\CommandLine.Tests\\Unit\\Core\\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]\r\n    2 \u4E2A\u8B66\u544A\r\n    0 \u4E2A\u9519\u8BEF\r\n\r\n\u5DF2\u7528\u65F6\u95F4 00:00:04.45\r\n\r\n[exit 0]\r\n\u003E dotnet test tests/CommandLine.Tests/CommandLine.Tests.csproj -f netcoreapp3.1 --no-build -v minimal\r\nActive code page: 65001\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-32k-20261023-122339\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll (.NETCoreApp,Version=v3.1)\u7684\u6D4B\u8BD5\u8FD0\u884C\r\n\u603B\u5171 1 \u4E2A\u6D4B\u8BD5\u6587\u4EF6\u4E0E\u6307\u5B9A\u6A21\u5F0F\u76F8\u5339\u914D\u3002\r\n\r\n\u5DF2\u901A\u8FC7! - \u5931\u8D25:     0\uFF0C\u901A\u8FC7:   684\uFF0C\u5DF2\u8DF3\u8FC7:     0\uFF0C\u603B\u8BA1:   684\uFF0C\u6301\u7EED\u65F6\u95F4: 346 ms - CommandLine.Tests.dll (netcoreapp3.1)\r\n\r\n[exit 0]\r\n",
+  "checkFailure": "\u6587\u4EF6 tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u672A\u5305\u542B\u9A8C\u6536\u6A21\u5F0F\uFF1AAgentEval_PreferShortName_UsesShortWhenAvailable",
+  "failureClass": "F6 \u5FAA\u73AF",
+  "trace": [
+    {
+      "toolId": "list_tree",
+      "status": "ok",
+      "argsDigest": ".",
+      "summary": "[TOOL_RESULT_BEGIN:list_tree]\nart/\n  art/CommandLine.png\n  art/CommandLine20.png\n  art/CommandLineNuGet.png\n  art/CommandLinePreRelNuGet.png\n  art/resharper-logo.png\ndemo/\n  demo/ReadText.Demo/\n  demo \u2026 rc/\n  src/CommandLine/\ntests/\n  tests/CommandLine.Tests/\n.editorconfig\n.gitignore\nappveyor.yml\nCHANGELOG.md\nCommandLine.sln\nCommandLine.snk\nDirectory.Build.props\nLicense.md\nREADME.md\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "list_tree",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests",
+      "summary": "[TOOL_RESULT_BEGIN:list_tree]\ntests/CommandLine.Tests/Fakes/\n  tests/CommandLine.Tests/Fakes/CustomAttribute.cs\n  tests/CommandLine.Tests/Fakes/Custom_Struct.cs\n  tests/CommandLine.Tests/Fakes/HelpTex \u2026 andLine.Tests/Unit/VerbAttributeTests.cs\ntests/CommandLine.Tests/CommandLine.Tests.csproj\ntests/CommandLine.Tests/CultureInfoExtensions.cs\ntests/CommandLine.Tests/StringExtensions.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "UnParserSettings",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 2 \u6761\u5339\u914D\uFF081 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\ntests/CommandLine.Tests/Fakes/Help_Fakes.cs:90:                 yield return new Example(\u0022Logging warnings\u0022, UnParserSettings.WithGroupSwit \u2026  errors\u0022, new[] { UnParserSettings.WithGroupSwitchesOnly(), UnParserSettings.WithUseEqualTokenOnly() }, new Options_With_Usage_Attribute { InputFile = \u0022file.bin\u0022, LogError = true });\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 1\u2013400 \u00B7 \u63A5\u7EED\u7528 offset=401\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All ri \u2026  \u0022mysource.cs\u0022 }, \u0022add --patch mysource.cs\u0022 };\n 400|                 yield return new object[] { new Add_Verb { Force = true, FileName = \u0022mysource.fs\u0022 }, \u0022add --force mysource.fs\u0022 };\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 1\u2013442\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. Se \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 1\u2013160 \u00B7 \u63A5\u7EED\u7528 offset=161\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All ri \u2026        #endregion\n 156| \n 157|         #region PR 550\n 158| \n 159|         [Fact]\n 160|         public static void UnParsing_instance_with_default_values_when_skip_default_is_false()\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 27\u201386 \u00B7 \u63A5\u7EED\u7528 offset=87\n  27|         [Theory]\n  28|         [MemberData(nameof(UnParseData))]\n  29 \u2026 on options, bool showHidden, string result)\n  84|         {\n  85|             new Parser()\n  86|                 .FormatCommandLine(options, config =\u003E config.ShowHidden = showHidden)\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 49\u201378 \u00B7 \u63A5\u7EED\u7528 offset=79\n  49|         {\n  50|             new Parser()\n  51|                 .Forma \u2026 tions options, string result)\n  75|         {\n  76|             new Parser()\n  77|                 .FormatCommandLine(options)\n  78|                 .Should().BeEquivalentTo(result);\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 79\u2013108 \u00B7 \u63A5\u7EED\u7528 offset=109\n  79|         }\n  80| \n  81|         [Theory]\n  82|         [MemberData(n \u2026 er()\n 106|                 .FormatCommandLine(options, config =\u003E config.GroupSwitches = true)\n 107|                 .Should().BeEquivalentTo(\u0022-hi --input input.bin\u0022);\n 108|         }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 109\u2013138 \u00B7 \u63A5\u7EED\u7528 offset=139\n 109| \n 110|         [Fact]\n 111|         public static void UnParsing_i \u2026 lentTo(\u0022\u0022);\n 135|         }\n 136| \n 137|         [Fact]\n 138|         public static void UnParsing_instance_with_dash_in_value_and_dashdash_disabled_returns_command_line_with_value()\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 139\u2013178 \u00B7 \u63A5\u7EED\u7528 offset=179\n 139|         {\n 140|             var options = new Simple_Options_With_ \u2026      new Parser()\n 175|                 .FormatCommandLine(options, x =\u003E x.SkipDefault = skipDefault)\n 176|                 .Should().BeEquivalentTo(expected);\n 177|         }\n 178| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Fakes/Simple_Options.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Fakes/Simple_Options.cs \u00B7 \u5171 24 \u884C \u00B7 \u672C\u6B21 1\u201324\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License. \u2026      public bool BoolValue { get; set; }\n  20| \n  21|         [Value(0, HelpText = \u0022Define a long value here.\u0022)]\n  22|         public long LongValue { get; set; }\n  23|     }\n  24| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Fakes/Options_With_Switches.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Fakes/Options_With_Switches.cs \u00B7 \u5171 22 \u884C \u00B7 \u672C\u6B21 1\u201322\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See L \u2026      [Option(\u0027h\u0027)]\n  17|         public bool HumanReadable { get; set; }\n  18| \n  19|         [Option(\u0027i\u0027)]\n  20|         public bool IgnoreWarnings { get; set; }\n  21|     }\n  22| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Fakes/Options_With_TimeSpan.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Fakes/Options_With_TimeSpan.cs \u00B7 \u5171 12 \u884C \u00B7 \u672C\u6B21 1\u201312\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See L \u2026 akes\n   6| {\n   7|     public class Options_With_TimeSpan\n   8|     {\n   9|         [Option(\u0027d\u0027, \u0022duration\u0022)]\n  10|         public TimeSpan Duration { get; set; }\n  11|     }\n  12| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 179\u2013218 \u00B7 \u63A5\u7EED\u7528 offset=219\n 179|         [Theory]\n 180|         [InlineData(true, \u0022--p2 xyz\u0022)]\n 181 \u2026 ;\n 214|             var result = new Parser()\n 215|                 .FormatCommandLine(options)\n 216|                 .Should().MatchRegex(\u0022--start\\\\s\\\u0022.\u002B\\\u0022\u0022);\n 217|         }\n 218| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 1\u2013400 \u00B7 \u63A5\u7EED\u7528 offset=401\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All ri \u2026  \u0022mysource.cs\u0022 }, \u0022add --patch mysource.cs\u0022 };\n 400|                 yield return new object[] { new Add_Verb { Force = true, FileName = \u0022mysource.fs\u0022 }, \u0022add --force mysource.fs\u0022 };\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 280\u2013442\n 280|             var options = new Option_Nullable_Enum { Shape = shape };\n 281|         \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 80 \u6761\u5339\u914D\uFF0813 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\nsrc/CommandLine/Text/HelpText.cs:740:                             {\nsrc/CommandLine/Text/HelpText.cs:741:                                 \u2026                      IntSequence = Enumerable.Empty\u003Cint\u003E(),\ntests/CommandLine.Tests/Unit/GetoptParserTests.cs:43:                         StringValue = \u0022foo\u0022,\r\n\u2026\uFF08\u7ED3\u679C\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u53EF\u7F29\u5C0F glob \u540E\u91CD\u8BD5\uFF09\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 80 \u6761\u5339\u914D\uFF082 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\ntests/CommandLine.Tests/Unit/Core/InstanceBuilderTests.cs:325:         public void Parse_values_partitioned_between_sequence_and_scalar()\n \u2026 rserTests.cs:76:                         ShortAndLong = \u0022bar\u0022,\ntests/CommandLine.Tests/Unit/GetoptParserTests.cs:77:                         BoolValue = true,\r\n\u2026\uFF08\u7ED3\u679C\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u53EF\u7F29\u5C0F glob \u540E\u91CD\u8BD5\uFF09\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 100\u2013279 \u00B7 \u63A5\u7EED\u7528 offset=280\n 100| \n 101|         [Fact]\n 102|         public static void UnParsing_i \u2026 Square, \u0022--shape Square\u0022)]\n 277|         [InlineData(null, \u0022\u0022)]\n 278|         public static void UnParsing_instance_with_nullable_enum(Shapes? shape, string expected)\n 279|         {\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Fakes",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 16 \u6761\u5339\u914D\uFF0813 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\ntests/CommandLine.Tests/Fakes/Help_Fakes.cs:8:     class Simple_Options_Without_HelpText\ntests/CommandLine.Tests/Fakes/Help_Fakes.cs:20:  \u2026 quired_OptionGroup.cs:3:     public class Simple_Options_With_Required_OptionGroup\ntests/CommandLine.Tests/Fakes/Simple_Options_With_Values.cs:7:     class Simple_Options_With_Values\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Fakes/Simple_Options.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Fakes/Simple_Options.cs \u00B7 \u5171 24 \u884C \u00B7 \u672C\u6B21 1\u201324\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License. \u2026      public bool BoolValue { get; set; }\n  20| \n  21|         [Value(0, HelpText = \u0022Define a long value here.\u0022)]\n  22|         public long LongValue { get; set; }\n  23|     }\n  24| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Fakes/Options_With_Switches.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Fakes/Options_With_Switches.cs \u00B7 \u5171 22 \u884C \u00B7 \u672C\u6B21 1\u201322\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See L \u2026      [Option(\u0027h\u0027)]\n  17|         public bool HumanReadable { get; set; }\n  18| \n  19|         [Option(\u0027i\u0027)]\n  20|         public bool IgnoreWarnings { get; set; }\n  21|     }\n  22| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 1\u2013340\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in th \u2026 im(\u0027\u0022\u0027))\n 333|                 .Where(x =\u003E !string.IsNullOrWhiteSpace(x))\n 334|                 .ToArray();\n 335|         }\n 336| \n 337|         #endregion\n 338| \n 339|     }\n 340| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 200\u2013319 \u00B7 \u63A5\u7EED\u7528 offset=320\n 200|             return builder\n 201|                 .ToString().TrimEnd(\u0027 \u0027);\n 202|     \u2026 rns\u003Ea string array that contains the substrings in this instance\u003C/returns\u003E\n 318|         public static string[] SplitArgs(this string command, bool keepQuote = false)\n 319|         {\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 120\u2013279 \u00B7 \u63A5\u7EED\u7528 offset=280\n 120|         /// \u003C/summary\u003E\n 121|         /// \u003Ctypeparam name=\u0022T\u0022\u003EType of \u003Cparamref name= \u2026 77|                     .ToString();\n 278|             return optionSpec.FlagCounter ? String.Join(\u0022 \u0022, Enumerable.Repeat(formattedName, (int)value)) : formattedName;\n 279|         }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 137\u2013256 \u00B7 \u63A5\u7EED\u7528 offset=257\n 137| \n 138|             type.GetVerbSpecification()\n 139|                 .MapValueOrDefa \u2026 {\n 253|             return (spec as OptionSpecification).ToMaybe()\n 254|                 .MapValueOrDefault(o =\u003E o.Separator != \u0027\\0\u0027 ? o.Separator : \u0027 \u0027, \u0027 \u0027);\n 255|         }\n 256| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 154\u2013253 \u00B7 \u63A5\u7EED\u7528 offset=254\n 154|             var allOptSpecs = from info in specs.Where(i =\u003E i.Specification.Tag == S \u2026 );\n 249|         }\n 250| \n 251|         private static char SeperatorOrSpace(this Specification spec)\n 252|         {\n 253|             return (spec as OptionSpecification).ToMaybe()\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 163\u2013242 \u00B7 \u63A5\u7EED\u7528 offset=243\n 163|             var shortSwitches = from info in allOptSpecs\n 164|                       \u2026  239|             string s = value.ToString();\n 240|             if (!string.IsNullOrEmpty(s) \u0026\u0026 !s.Contains(\u0022\\\u0022\u0022) \u0026\u0026 s.Contains(\u0022 \u0022))\n 241|                 return $\u0022\\\u0022{s}\\\u0022\u0022;\n 242| \n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 179\u2013233 \u00B7 \u63A5\u7EED\u7528 offset=234\n 179|             builder = settings.GroupSwitches \u0026\u0026 shortSwitches.Any()\n 180|            \u2026 30|                         builder.Append(format(e.Current)).Append(sep);\n 231|                     builder.TrimEndIfMatch(sep);\n 232|                     break;\n 233|             }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 240\u2013299 \u00B7 \u63A5\u7EED\u7528 offset=300\n 240|             if (!string.IsNullOrEmpty(s) \u0026\u0026 !s.Contains(\u0022\\\u0022\u0022) \u0026\u0026 s.Contains(\u0022 \u0022))\n 2 \u2026  \u0026\u0026 value.Equals(specification.DefaultValue.FromJust())) return true;\n 299|             if (Nullable.GetUnderlyingType(specification.ConversionType) != null) return false; //nullable\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 1\u2013120 \u00B7 \u63A5\u7EED\u7528 offset=121\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All ri \u2026    }\n 118| \n 119|         [Fact]\n 120|         public static void UnParsing_instance_with_dash_in_value_and_dashdash_enabled_returns_command_line_with_value_prefixed_with_dash_dash()\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 257\u2013296 \u00B7 \u63A5\u7EED\u7528 offset=297\n 257|         private static string FormatOption(OptionSpecification spec, object value, U \u2026 }\n 293| \n 294|         private static bool IsEmpty(this object value, Specification specification, bool skipDefault)\n 295|         {\n 296|             if (value == null) return true;\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "src/CommandLine",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 12 \u6761\u5339\u914D\uFF081 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\nsrc/CommandLine/UnParserExtensions.cs:257:         private static string FormatOption(OptionSpecification spec, object value, UnParserSett \u2026 tensions.cs:267:             // Have a long name and short name not preferred? Go with long! \nsrc/CommandLine/UnParserExtensions.cs:268:             // No short name? Has to be long!\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 80 \u6761\u5339\u914D\uFF085 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\ndemo/ReadText.Demo.VB/Options.vb:34:             Yield New Example(\u0022normal scenario\u0022, New HeadOptions With {.FileName = \u0022file.bin\u0022})\ndemo/ \u2026 s.cs:171:                 ? allOptSpecs.Where(info =\u003E !shortSwitches.Contains(info))\nsrc/CommandLine/UnParserExtensions.cs:172:                 : allOptSpecs;\r\n\u2026\uFF08\u7ED3\u679C\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u53EF\u7F29\u5C0F glob \u540E\u91CD\u8BD5\uFF09\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 265\u2013299 \u00B7 \u63A5\u7EED\u7528 offset=300\n 265|         private static string FormatName(this OptionSpecification optionSpec, object \u2026  \u0026\u0026 value.Equals(specification.DefaultValue.FromJust())) return true;\n 299|             if (Nullable.GetUnderlyingType(specification.ConversionType) != null) return false; //nullable\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 80 \u6761\u5339\u914D\uFF085 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\ndemo/ReadText.Demo.VB/Options.vb:32:     Public Shared ReadOnly Iterator Property IEnumerable() As IEnumerable(Of Example)\ndemo/ReadText.D \u2026     /// \u003Csummary\u003E\nsrc/CommandLine/UnParserExtensions.cs:53:         /// Gets or sets a value indicating whether unparsing process shall expose hidden options.\r\n\u2026\uFF08\u7ED3\u679C\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u53EF\u7F29\u5C0F glob \u540E\u91CD\u8BD5\uFF09\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 80 \u6761\u5339\u914D\uFF081 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\ntests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs:16:     public class UnParserExtensionsTests\ntests/CommandLine.Tests/Unit/UnParser \u2026 nParseData\ntests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs:368:         {\ntests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs:369:             get\r\n\u2026\uFF08\u7ED3\u679C\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u53EF\u7F29\u5C0F glob \u540E\u91CD\u8BD5\uFF09\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 348\u2013442\n 348|             [Option]\n 349|             public DateTime Start { get; set; }\n 350|    \u2026 on\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n 442| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 367\u2013441 \u00B7 \u63A5\u7EED\u7528 offset=442\n 367|         public static IEnumerable\u003Cobject[]\u003E UnParseData\n 368|      \u2026 harpOption\u003Cstring\u003E.Some(\u0022myfile.bin\u0022), Offset = FSharpOption\u003Cint\u003E.Some(123456789) }, \u0022--filename myfile.bin 123456789\u0022 };\n 438|             }\n 439|         }\n 440| #endif\n 441|     }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 100\u2013159 \u00B7 \u63A5\u7EED\u7528 offset=160\n 100| \n 101|         [Fact]\n 102|         public static void UnParsing_i \u2026 mmandLine(options)\n 153|                 .Should().Be(\u0022--duration 00:01:00\u0022);\n 154|         }\n 155|         #endregion\n 156| \n 157|         #region PR 550\n 158| \n 159|         [Fact]\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "glob_files",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Fakes/Simple_Options.cs",
+      "summary": "[TOOL_RESULT_BEGIN:glob_files]\ntests/CommandLine.Tests/Fakes/Simple_Options.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Fakes",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 48 \u6761\u5339\u914D\uFF0813 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\ntests/CommandLine.Tests/Fakes/Help_Fakes.cs:7: {\ntests/CommandLine.Tests/Fakes/Help_Fakes.cs:8:     class Simple_Options_Without_HelpText \u2026 alues.cs:6: {\ntests/CommandLine.Tests/Fakes/Simple_Options_With_Values.cs:7:     class Simple_Options_With_Values\ntests/CommandLine.Tests/Fakes/Simple_Options_With_Values.cs:8:     {\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Fakes/Simple_Options.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Fakes/Simple_Options.cs \u00B7 \u5171 24 \u884C \u00B7 \u672C\u6B21 1\u201324\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License. \u2026      public bool BoolValue { get; set; }\n  20| \n  21|         [Value(0, HelpText = \u0022Define a long value here.\u0022)]\n  22|         public long LongValue { get; set; }\n  23|     }\n  24| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Fakes/Options_With_Switches.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Fakes/Options_With_Switches.cs \u00B7 \u5171 22 \u884C \u00B7 \u672C\u6B21 1\u201322\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See L \u2026      [Option(\u0027h\u0027)]\n  17|         public bool HumanReadable { get; set; }\n  18| \n  19|         [Option(\u0027i\u0027)]\n  20|         public bool IgnoreWarnings { get; set; }\n  21|     }\n  22| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n\u672C\u8F6E\u5DE5\u5177\u8C03\u7528\u5DF2\u8FBE 15 \u6B21\u4E0A\u9650\uFF0C\u7981\u6B62\u7EE7\u7EED\u8C03\u7528\uFF1B\u8BF7\u7ACB\u5373\u7528\u6587\u672C\u603B\u7ED3\u5F53\u524D\u8FDB\u5C55\u3001\u672A\u5B8C\u6210\u9879\u4E0E\u98CE\u9669\u3002\n[TOOL_RESULT_END]"
+    }
+  ]
+}
