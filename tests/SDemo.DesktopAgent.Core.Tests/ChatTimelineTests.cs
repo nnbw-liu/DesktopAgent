@@ -59,6 +59,24 @@ public sealed class ChatTimelineTests
         Assert.Empty(ChatTimelineBuilder.FromTrace("想了想", "结果", trace));
     }
 
+    [Fact]
+    public void 还原的步骤带上调用id与分组()
+    {
+        var trace = new[]
+        {
+            new ToolTraceEntry("read_file", ToolTraceEntry.StatusOk, null, null, "读取", 10, DateTime.Now, null, 2, 1, "call-7")
+        };
+
+        var steps = ChatTimelineBuilder.FromTrace("先看。", "看完了。", trace);
+        var tool = Assert.Single(steps, step => step.Kind == ChatStepKind.Tool);
+
+        Assert.Equal("call-7", tool.CallId);
+        Assert.Equal(ChatGroupPart.Process, tool.Part);
+        Assert.All(
+            steps.Where(step => step.Kind == ChatStepKind.Text),
+            step => Assert.Equal(ChatGroupPart.Answer, step.Part));
+    }
+
     private static ToolTraceEntry Entry(string tool, int reasoningChars, int textChars) =>
         new(
             tool,

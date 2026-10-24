@@ -9,17 +9,28 @@ window.sdComposer = {
     _dragOver: null,
     _dragLeave: null,
     _drop: null,
+    // 输入框补全菜单是否打开：打开时方向键 / Enter / Tab / Esc 归菜单，不发送。
+    _menuOpen: false,
 
     attach: function (dotNetRef) {
         this.detach();
 
         this._handler = function (event) {
-            if (event.key !== 'Enter' || event.isComposing) {
+            var target = event.target;
+
+            // 菜单打开时按键归菜单：鼠标点过候选行之后焦点可能已经不在输入框里
+            // （行被移除时还会落到 body），此时若按「焦点必须在 .composer-text」筛掉，
+            // ↑↓ / Enter / Tab / Esc 就全部失灵，菜单也关不掉。
+            // 只接管「输入框内 / 焦点已丢失」这两种情形，别的输入控件不抢。
+            if (this._menuOpen && this._isMenuScope(target) && this._handleMenuKey(event, dotNetRef)) {
                 return;
             }
 
-            var target = event.target;
             if (!target || typeof target.closest !== 'function' || !target.closest('.composer-text')) {
+                return;
+            }
+
+            if (event.key !== 'Enter' || event.isComposing) {
                 return;
             }
 
@@ -45,7 +56,107 @@ window.sdComposer = {
         this._attachDrop();
     },
 
+    // 菜单打开时，这个按键该不该归菜单：输入框内、或者焦点已经丢了（行被移除后落到 body）。
+    // 焦点在别的输入控件里就不抢——用户可能已经离开输入框了。
+    _isMenuScope: function (target) {
+        if (!target || target === document.body) {
+            return true;
+        }
+
+        return typeof target.closest === 'function' && !!target.closest('.composer');
+    },
+
+    // 返回 true 表示这个键已经被菜单吃掉。
+    _handleMenuKey: function (event, dotNetRef) {
+        switch (event.key) {
+            case 'ArrowDown':
+            case 'ArrowUp':
+                event.preventDefault();
+                dotNetRef.invokeMethodAsync('MenuMoveAsync', event.key === 'ArrowDown' ? 1 : -1);
+                return true;
+            case 'Enter':
+            case 'Tab':
+                if (event.isComposing) {
+                    return false;
+                }
+
+                event.preventDefault();
+                dotNetRef.invokeMethodAsync('MenuCommitAsync');
+                return true;
+            case 'Escape':
+                event.preventDefault();
+                dotNetRef.invokeMethodAsync('MenuDismissAsync');
+                return true;
+            default:
+                return false;
+        }
+    },
+
+    setMenuOpen: function (open) {
+        this._menuOpen = !!open;
+    },
+
+    caretOf: function (element) {
+        return element && typeof element.selectionStart === 'number' ? element.selectionStart : 0;
+    },
+
+    // 把输入框的文本与光标同步到宿主算好的结果。
+    //
+    // 文本**只由 C# 决定**（界面、测试、回灌拿到同一份），JS 不再按 start/end 做二次插入：
+    // 之前用 setRangeText 在这里又插了一遍，而 Blazor 的重渲染已经把 textarea 更新成新文本，
+    // 于是 Tab/Enter 确认候选后会出现「@文件 文件」这种重复尾巴。
+    //
+    // text 传 null 表示不动文本，只摆光标（普通插入之后用得到）。
+    applyText: function (element, value, caret) {
+        if (!element) {
+            return;
+        }
+
+        if (typeof value === 'string' && element.value !== value) {
+            element.value = value;
+        }
+
+        if (document.activeElement !== element) {
+            element.focus({ preventScroll: true });
+        }
+
+        var length = typeof element.value === 'string' ? element.value.length : 0;
+        var position = typeof caret === 'number' && caret >= 0 ? Math.min(caret, length) : length;
+        element.setSelectionRange(position, position);
+    },
+
+    // 把焦点还给输入框：用鼠标点候选行会先把焦点给到按钮，行一消失焦点就落到 body，
+    // 之后 Enter 既不是「发送」也不是「确认」。已经在输入框里时什么都不做，
+    // 避免把光标从中间位置拽到末尾。
+    focusInput: function (element) {
+        if (!element || document.activeElement === element) {
+            return;
+        }
+
+        element.focus({ preventScroll: true });
+
+        var end = typeof element.value === 'string' ? element.value.length : 0;
+        element.setSelectionRange(end, end);
+    },
+
+    // 输入框滚动时，高亮层跟着滚；出现滚动条时再补上右侧留白，两边的换行位置才对得上。
+    syncScroll: function (element, highlight) {
+        if (!element || !highlight) {
+            return;
+        }
+
+        highlight.scrollTop = element.scrollTop;
+        highlight.scrollLeft = element.scrollLeft;
+
+        // offsetWidth - clientWidth 就是竖向滚动条宽度（没有滚动条时是 0）。
+        var gutter = element.offsetWidth - element.clientWidth;
+        highlight.style.paddingRight = gutter > 0 ? (16 + gutter) + 'px' : '';
+    },
+
     detach: function () {
+        // 组件卸载时菜单状态跟着复位：否则下一个输入框会以为菜单还开着，把 Enter 吃掉。
+        this._menuOpen = false;
+
         if (this._handler) {
             document.removeEventListener('keydown', this._handler, true);
             this._handler = null;

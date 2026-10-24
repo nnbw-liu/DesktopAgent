@@ -1228,6 +1228,128 @@ a {
     color: var(--muted);
 }
 
+/* 输入框补全菜单：贴在输入区上方，浮在消息区之上 */
+.composer {
+    position: relative;
+}
+
+.composer-menu {
+    position: absolute;
+    bottom: calc(100% - 4px);
+    left: 12px;
+    right: 12px;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    max-height: 280px;
+    padding: 4px;
+    overflow-y: auto;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface, var(--panel, #1b1b1b));
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+}
+
+.composer-menu-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-size: 12.5px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.composer-menu-row.is-active {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--text);
+}
+
+.composer-menu-icon {
+    flex: 0 0 auto;
+    width: 10px;
+    color: var(--muted);
+    font-size: 10px;
+    text-align: center;
+}
+
+.composer-menu-label {
+    overflow: hidden;
+    font-family: "Cascadia Code", "Consolas", "Microsoft YaHei UI", monospace;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.composer-menu-hint {
+    padding: 4px 8px 2px;
+    color: var(--muted);
+    font-size: 10.5px;
+}
+
+.composer-menu-desc {
+    overflow: hidden;
+    margin-left: auto;
+    padding-left: 8px;
+    color: var(--muted);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------- 输入框高亮层：@引用 / /命令 的选中样式 ---------- */
+.composer-input {
+    position: relative;
+    display: block;
+}
+
+.composer-highlight {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    padding: 14px 16px 6px;
+    color: transparent;
+    font-family: inherit;
+    font-size: 13.5px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    pointer-events: none;
+    user-select: none;
+}
+
+.composer-input .composer-text {
+    position: relative;
+    background: transparent;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* token 只画底色：文字仍由输入框本身绘制，不会被镜像层重影 */
+.composer-token {
+    border-radius: 4px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+.composer-token--mention {
+    background: color-mix(in srgb, #7c6cf0 24%, transparent);
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, #7c6cf0 55%, transparent);
+}
+
+.composer-token--command {
+    background: color-mix(in srgb, #d99a2b 24%, transparent);
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, #d99a2b 55%, transparent);
+}
+
+
+
 .composer-footer {
     display: flex;
     align-items: center;
@@ -5044,6 +5166,167 @@ a {
     border-left: 2px dashed var(--border-strong);
     color: var(--muted);
     font-size: 11.5px;
+}
+
+/* ---------- 过程组：可折叠的过程，答案永远在组外 ---------- */
+.process-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.process-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 2px 4px 2px 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 11.5px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.process-head:hover {
+    color: var(--text);
+}
+
+.process-caret {
+    flex: 0 0 auto;
+    font-size: 9px;
+    opacity: .6;
+    transition: transform .12s ease;
+}
+
+.process-caret.is-open {
+    transform: rotate(90deg);
+}
+
+.process-title {
+    flex: 0 0 auto;
+    color: var(--text);
+}
+
+.process-group:not(.is-open) .process-title {
+    font-weight: 500;
+}
+
+.process-meta {
+    flex: 0 0 auto;
+    padding: 0 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    font-size: 10.5px;
+    line-height: 16px;
+}
+
+.process-preview {
+    overflow: hidden;
+    color: var(--muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.process-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-left: 6px;
+    border-left: 1px solid var(--border);
+}
+
+.timeline-answer {
+    margin-top: 2px;
+}
+
+/* 工具行：可点开看参数与结果预览 */
+.timeline-tool-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+.timeline-tool-row:not(:disabled) {
+    cursor: pointer;
+}
+
+.timeline-tool-row:not(:disabled):hover .timeline-tool-name {
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+
+.timeline-tool-caret.is-open {
+    transform: rotate(90deg);
+}
+
+.timeline-tool-duration {
+    flex: 0 0 auto;
+    margin-left: auto;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.timeline-tool-detail {
+    margin: 4px 0 2px 18px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-2, rgba(127, 127, 127, .06));
+}
+
+.timeline-tool-target {
+    margin-bottom: 4px;
+    color: var(--text);
+    font-family: "Cascadia Code", "Consolas", "Microsoft YaHei UI", monospace;
+    font-size: 11px;
+    word-break: break-all;
+}
+
+.timeline-tool-section {
+    margin: 6px 0 2px;
+    color: var(--muted);
+    font-size: 10.5px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.timeline-tool-args,
+.timeline-tool-result {
+    max-height: 180px;
+    margin: 0;
+    overflow: auto;
+    color: var(--text);
+    font-family: "Cascadia Code", "Consolas", "Microsoft YaHei UI", monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.timeline-tool-edits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.timeline-tool-edit {
+    display: inline-flex;
+    gap: 4px;
+    font-family: "Cascadia Code", "Consolas", "Microsoft YaHei UI", monospace;
+    font-size: 11px;
 }
 
 /* ---------- 沙箱结果的副作用提示 ---------- */

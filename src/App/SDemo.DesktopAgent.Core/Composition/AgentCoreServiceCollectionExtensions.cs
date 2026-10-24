@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SDemo.DesktopAgent.Agents;
 using SDemo.DesktopAgent.Context;
+using SDemo.DesktopAgent.Core.Services;
 using SDemo.DesktopAgent.Editing;
 using SDemo.DesktopAgent.Plugins;
 using SDemo.DesktopAgent.Plugins.Summarize;
@@ -53,6 +54,8 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<SkillCatalog>();
         // M2：技能库的契约视图，供工具包（load_skill）与上下文层共用。
         services.AddSingleton<ISkillLibrary>(sp => sp.GetRequiredService<SkillCatalog>());
+        // P0.5：输入框 `@` 补全的工作区路径索引（只给路径、30 秒缓存）。
+        services.AddSingleton<IComposerReferenceIndex, WorkspaceReferenceIndex>();
 
         // M3：工作区知识库索引 + 归档编排（索引落在各工作区 DB 的 FTS5 表里）。
         services.AddSingleton<IWorkspaceMemory>(sp =>

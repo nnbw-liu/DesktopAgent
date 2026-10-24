@@ -837,7 +837,165 @@ public interface IInputTriggerSource
 token 计量         ctx.tokenMeter              → ContextReport（已有，够用；补每段归因）
 ```
 
-## 8. 参考（证据位置）
+## 8. P0 实施记录（2026-10-24）
+
+状态：✅ 已落地。WPF 解决方案 0 警告 0 错误；Core 717、UI 87、Sandbox 219 测试全绿。
+
+### 落地形态
+
+| 计划项 | 实现 |
+|---|---|
+| 步骤模型 | `ChatStep` 增加 `StepIndex` / `CallId` / `StartedAt` / `EndedAt`，并新增**计算属性** `Part`（`Text → Answer`，其余 `Process`）——不用给生产者加字段，也不用迁移存量 JSON |
+| 步骤持久化 | `ChatMessage.Steps` → `messages.StepsJson`（新迁移 `20261024133546_AddMessageSteps`）；`StepsFor` 优先读结构化步骤，旧消息仍回退 `ChatTimelineBuilder.FromTrace`（顺带补上 `CallId`） |
+| 过程组 | `ChatTimeline.razor` 拆成「过程组 + 组外答案」：过程组只装思考/工具/宿主追问，**正文（答案）永远在组外**；组头显示 `过程 · 12.4 s` 与 `N 步 · M 次工具 · 失败 K`，收起时贴一行最新思考 |
+| 四档显隐 | `ProcessDisplayMode` + `ProcessDisplayPolicy`（四个开关 + 收起时机）落在 Contracts，`ChatPresentationSettings` 进 `AppSettings.Chat`；设置页「通用 → 对话」两个下拉 |
+| 工具行/卡片 | `ToolPresentation`（客户端派生）+ `ChatStepRow.razor`：单行 `名称 · 状态 · 摘要 · 耗时`，点开看目标 / 参数 / 编辑行 / 结果预览；未知工具回落 generic |
+| 工具轨迹补数据 | 记录轨迹时算好 `Title`（命令+前两参数 / 路径 / 模式）、`ArgsJson`（截断 512）、`DurationMs`、`ResultPreview`（前 200 字）；running 条目也带标题，工具一开跑就能看出在做什么 |
+| 计时 | Turn 级：组头用 `ChatMessage.DurationMs`，工具行用 `ToolTraceEntry.DurationMs`。**没有做**逐行思考计时（DSH 也没有，见 §3.1-(5)） |
+
+### 与计划的偏差（取舍）
+
+1. **答案 = 所有 Text 步骤的拼接**（DSH 的做法），不是「最后一段连续正文」。代价是中途说的话（"我先看一下"）会被提升到答案区；换来的是**不需要任何边界启发式**，折叠永远不会藏住回答。原有的交错顺序在「完全展开」档完整保留。
+2. **只要还有 running 的工具，这一轮就不收起**。DSH 用 `turn.status === open` 表达同一件事；我们的工具可能比流更晚结束，所以在 `CanFoldProcess` 里显式判断。
+3. **`LiveProcessDetail` 暂未参与渲染**：运行中的轮次一律展开（用户要看着它跑）。字段保留，等有"简洁档也要运行细节"的需求再接。
+4. **思考正文的可替换渲染（§3.1-(7)）没做**：`ChatStepRow` 已独立成组件，将来抽 `RenderFragment` 只改一处。
+5. **每轮用量页脚（§3.1-(8)）没做**：依赖 `UsageDetails.CachedInputTokenCount`，属 P2a 的测量项。
+
+### 测试
+
+- 新增 `ProcessDisplayTests`（档位映射、Part、合并规则）、`AgentChatServicePresentationTests`（标题/参数/预览）、`ToolPresentationTests`（形态映射、状态与耗时文案、HasDetail）。
+- `ChatRoomPresentationTests` 增 4 条：标准档合成一组且保留答案、点组头展开、详细档默认展开、切档保留手动展开；工具卡展开断言参数与结果。
+- `ChatStoreContextTests` 增步骤落库往返；`ChatTimelineTests` 增 `CallId`/`Part` 断言。
+- `ChatRoomStreamFailureTests` 覆盖「流中途失败」：错误提示必须落成一步，否则按步骤拼出来的答案会漏掉它。
+- 另用 `SDEMO_UI_BASELINE=1` 渲染了一份临时 HTML 逐项核对过（过程组只含过程、答案在组外、工具卡能展开到参数/结果）；截图基线的 PNG 管线在本次 checkout 里缺 `tools/ui-baseline`，所以没有提交新的基线产物。
+
+## 9. P0.5 实施记录（已完成：`@` 文件、`/` 命令、`/` 技能）
+
+状态：三条管线全部落地。构建 0 警告 0 错误；Core 758、UI 102 测试全绿。
+
+### 已落地
+
+| 计划项 | 实现 |
+|---|---|
+| 触发语法 | `ComposerTriggers.Detect(text, caret)`：`@` 只认行首/空白之后，`/` 只认行首；`@"带 空格"` 允许空格直到闭合引号；`foo@bar` 与「和/或」不误触发 |
+| 候选排序 | `ComposerMatch`：大小写不敏感的有序子序列，路径段前缀优先，其次匹配间隙、再按候选长度、最后保持宿主顺序 |
+| 路径索引 | `WorkspaceReferenceIndex`：广度优先、深度 8、上限 4000 条、复用状态包的排除表（bin/obj/node_modules…）、30 秒缓存 + `Invalidate()` |
+| 菜单交互 | `sdComposer` 接管菜单开合：`↑↓` 移动、`Enter`/`Tab` 确认、`Esc` 关闭；菜单打开时 Enter 不再发送 |
+| `@` 插入 | 只插**纯文本** `@path` / `@"带 空格"`；目录补成 `@"dir/` 并保持菜单（下一次输入自动下钻）；文件插入后补一个空格并关闭 |
+| **选中样式** | `ComposerTokens.Scan` 扫已落下的 token（`@` 引用、行首 `/` 命令），`ToHighlightHtml` 输出转义后的高亮层；透明镜像层画 token 底色（紫=引用、琥珀=命令），输入框文字保持可见，滚动由 `sdComposer.syncScroll` 同步 |
+| `/` 命令 | `ComposerCommands`：严格语法（首字节 `/` + 小写名 + 空白/行尾）、未知命令拒绝；`/compact`（转 `CompactNowAsync`）、`/model`（打开模型设置）、`/index`（重建知识库）、`/help`；命令**不进模型**，执行后清空输入 |
+| `/` 技能 | 同一 `/` 菜单：命令在前、技能在后，**同名时命令赢**；点选插入 `/name `，提交时 `ComposerSubmission.InvokedSkill` 带上技能名；手打 `/name` 同样识别（任何空白分隔处），正文由现有 `SkillName`/`SkillText` 通道全文注入 |
+| 防重复加载 | 技能全文注入时提示词里加一句「不要再调用 load_skill 加载同名技能」 |
+| 权限位 | 技能 frontmatter 新增 `disable-model-invocation`：不进索引、`load_skill` 拒绝、只能 `/name` 加载 |
+
+### 与计划的偏差
+
+1. **文本在 C# 里算、JS 只改 DOM**：`replaceRange` 不再返回新文本，避免界面/测试/回灌三条路径拿到不同结果。
+2. **目录下钻靠「让 input 事件重新识别」**：插入 `@"dir/` 后不主动查询，交给下一次 `HandleInput` 重算，代码里只有一条识别路径。
+3. **键盘仲裁放在 JS**：沿用现有 `sdComposer` 的 document 捕获监听（Enter 一直是 JS 管的），菜单只是多一种「吃掉按键」的状态，不引入第二套 keydown 监听。
+4. **高亮层用「透明镜像 + 底色」而不是把文字也画在高亮层**：输入框自己画字，中文输入法的组合态才不会消失；token 只贡献背景与下划线，避免字形重影。
+5. **`/技能` 的识别范围比 `/命令` 宽**：命令只认行首（避免「和/或」误触发），技能按 DSH 的手势规则认任意空白分隔处。
+6. **`/new` 没做**：新建会话要新的宿主回调（AppShell 目前没把「新建」暴露给 ChatRoom），留到补回调时一起做。
+7. 测试里用 bUnit 的 `JSInterop.Setup<int>("sdComposer.caretOf", invocation => true)`（带 matcher 的重载才匹配带参数的调用），并避开 `RefreshableElementCollection` 的索引器（bUnit 1.40 与仓库里 AngleSharp 1.8.5 不兼容，会抛 `MissingMethodException`）。
+
+### 测试
+
+- 契约：`ComposerTriggerTests`（语法/格式化）、`ComposerTokenTests`（扫描/高亮/技能识别/命令行解析）。
+- Core：`ComposerReferenceTests`（枚举/排除/缓存/排序）、`SkillCatalogTests`（`disable-model-invocation` 解析）、`SkillIndexBuilderTests`（禁用技能不进索引）、`SkillToolPackTests`（`load_skill` 拒绝）。
+- UI：`ChatComposerMentionTests`（`@` 弹菜单/方向键/下钻/关闭）、`ChatComposerCommandTests`（命令在前、执行不发送、技能插入、手打识别、未知命令转交宿主、高亮 token）、`ChatRoomCommandTests`（未知命令只提示、`/compact` 打到服务、`/help` 列表、无工作区时 `/index` 提示）。
+
+### 修补（2026-10-24）：鼠标点选候选后键盘失效
+
+现象：`@` / `/` 候选区用鼠标点选之后，Enter 不再发送、Tab 不再有反应、Esc 也关不掉菜单。
+
+根因有两条，第一条是主因：
+
+1. **`@for` 的循环变量被所有候选行共享**。`@onclick="() => CommitAsync(index)"` 捕获的是同一个 `index`，
+   循环结束时它已经等于 `_items.Count`——**鼠标点任何一行都会越界**，`CommitAsync` 直接 return，
+   菜单既不插入也不关闭，行还在原地并拿到了焦点。
+2. keydown 监听的第二道判断是 `event.target.closest('.composer-text')`。鼠标点过按钮后焦点在按钮上，
+   于是 ↑↓ / Enter / Tab / Esc 全被挡掉，菜单再也关不掉（而且 JS 的 `_menuOpen` 还是 true）。
+
+修法（三层一起，任何一层单独都够挡住复现）：
+
+- 每轮拷一份 `var itemIndex = index;` 再进 lambda（`ChatComposer.razor`）。
+- 候选行加 `tabindex="-1"` 与 `@onmousedown:preventDefault`：鼠标按下不转移焦点，Tab 也不会落到行上。
+- `sdComposer` 的 keydown 改为**菜单打开时按键归菜单**（只接管「输入框内 / 焦点已丢失」两种情形，
+  不抢别的输入控件），不再要求焦点一定在 textarea 里。
+- 菜单关闭后用 `sdComposer.focusInput` 把焦点还给输入框（已经在输入框时不动光标）。
+- C# 侧留一份 `_menuOpen` 镜像，`CloseMenuAsync` / 切换会话时与 JS 对齐，避免「看不见的菜单吃掉按键」。
+- `CommitAsync` 越界时顺手关菜单自愈，而不是静默 return。
+
+测试：`ChatComposerMentionTests` 新增「鼠标点选后插入路径、关菜单、还焦点」「候选行不进 Tab 顺序」
+「没有候选时确认只复位不发送」「鼠标移上去高亮那一行」四条。
+
+### 修补（2026-10-24）：确认候选后文本被插了两遍
+
+现象：`@` 菜单里按 **Tab / Enter** 确认（鼠标点选同样）之后，输入框里出现两份文件名——
+高亮 token 之后多出一截 `物业交割单.docx `。
+
+根因是文本有两条写入路径：C# 先改 `Text` 并触发 `TextChanged`，Blazor 的重渲染**已经把
+`<textarea>` 的值换成了新文本**；紧接着 JS 的 `sdComposer.replaceRange` 又在 `[start, end)`
+上做了一次 `setRangeText`，于是插入内容被叠到已更新的文本上（它想替换的 `@` 已经不在原位）。
+bUnit 里 `TextChanged` 没人接、组件不重渲染，所以测试一直是绿的，真机上才复现。
+
+修法（三条一起，任何一条单独都够）：
+
+- **JS 不再按区间插入**：只保留 `sdComposer.applyText(element, value, caret)`——文本由 C#
+  算好后原样落到 DOM，顺带摆光标。文本永远只有一份来源，插几次都不会叠。
+- **光标在渲染之后才摆**：`OnAfterRenderAsync` 里消费 `_pendingCaret`。另外位置要在
+  `StateHasChanged()` **之前**存进局部变量——这次渲染可能同步执行，`OnAfterRender` 会立刻把
+  `_pendingCaret` 清掉（目录下钻一开始就是栽在这里：拿回的光标是 -1，识别不出下一层）。
+- **目录下钻不再依赖 JS 补发的 `input` 事件**：插入后直接 `RefreshMenuAsync(caret)` 算下一层，
+  否则去掉 input 事件之后菜单要等用户再敲一个字才刷新。
+
+测试：`ChatComposerMentionTests` 新增「确认候选只插入一次文本_光标落在插入之后」（断言最终文本、
+`TextChanged` 的回灌值、以及不存在第二条按区间插入的互操作），并把「选目录后菜单保持打开继续下钻」
+改成断言下一层候选**立刻**出现。
+
+## 10. P1a 实施记录（内置工具循环）
+
+状态：✅ 已落地，**默认关闭**（`AgentSettings.NativeLoop`）。WPF 解决方案 0 警告 0 错误（Debug / Release 均通过）；Core 768、UI 106 测试全绿。
+
+### 落地形态
+
+| 计划项 | 实现 |
+|---|---|
+| 自建循环 | 新增 `Agents/NativeAgentLoop.cs`；`MafAgentRuntime` 按 `AgentInvocation.NativeLoop` 二选一，两条路径共用同一条客户端链（`OpenAI → Decorate`）与同一份 `ChatOptions` |
+| 真工具消息入历史 | 每步结束后把整条 assistant 消息（正文 + `tool_calls`）与逐条 `ChatRole.Tool` 消息写进本次调用的消息表；下一步原样回放，不再压成 `[工具轨迹]` 文本 |
+| step 事件 | `AgentStreamEvent.StepStarted(step, maxSteps)` / `StepCompleted(step)`；`FunctionCall` / `FunctionResult` 带上 `Step` |
+| 每步用量 | 每次请求的 `UsageContent` 各自透出（FICC 里也是每次都报，这里语义一致） |
+| 收尾 | 最后一次请求摘掉工具（`ChatOptions.Clone()` 后 `Tools=null` + `ToolMode=None`），模型必须把已有结果写成正文——照抄 FICC 的 `MaximumIterationsPerRequest` 行为 |
+| 工具失败 | 未知工具 / 异常都回「结果文本」而不是抛异常；未知工具带 `[TOOL_STATUS:error]`，模型下一轮能看见原因 |
+| 接上界面 | `AgentDelta.Step`（-1 = 运行时看不到 step）→ `ChatRoom` 用 `stepBase` 偏移成整条回合的序号，`ChatStep.StepIndex` 第一次真正表示「第几次模型请求」 |
+| 开关 | `AgentSettings.NativeLoop` + 设置页「工具预算与路由 → 内置工具循环（P1a，实验）」；默认关 |
+
+### 与计划的偏差（取舍）
+
+1. **`FunctionCall` 事件比 FICC 晚一点点**：流式 delta 里的工具参数是分片到达的，逐块解析只能拿到半截 JSON，
+   所以工具调用在流结束后从 `updates.ToChatResponse()` 整条取（FICC 的流式实现也是这么做的）。执行紧随其后，用户无感。
+2. **串行执行，不做并发**：FICC 的 `AllowConcurrentInvocation` 默认就是 false，并发写文件本来也是风险。
+3. **默认关闭**：按 §6.1，先做一个开关、新旧都能跑，用 `tools/AgentEval` 对比后再翻默认。本机没有可用模型端点，
+   所以这一步留给评测。
+4. **`ContextBudgetChatClient` 仍在循环内侧**：每次 `GetStreamingResponseAsync` 前都会裁剪一次，语义与 FICC 时期一致，
+   循环中途不触发压缩（那是 P2b 的事务语义）。
+5. **reasoning 的回放交给 provider**：assistant 消息里的 reasoning 照 FICC 一样进历史，OpenAI 兼容适配器只序列化
+   `content` / `tool_calls`，所以实测不会把思维链重复发回端点。
+
+### 测试
+
+- `NativeAgentLoopTests`（假 SSE 端点）：工具调用/结果作为真实消息回灌（断言第二次请求体里有 `tool_calls`、`role:tool`、
+  `tool_call_id` 与工具输出）、一次响应里的两个工具按顺序配对、最后一轮不再声明工具、未知工具只回错误结果、
+  参数不是合法 JSON 时不炸整轮、没有工具调用时只有一步、没有声明工具时幻觉调用只回一次错误、上下文裁剪装饰器每次请求都运行。
+- `AgentChatServiceToolExposureTests`：step 边界跟着增量透传（0 → 1）、设置打开时 `NativeLoop` 进到 `AgentInvocation`。
+- 原来的假端点抽成 `FakeOpenAiServer`，FICC 与内置循环两条路径共用。
+
+### 下一步（P1b 的前置）
+
+- 跑 `tools/AgentEval` + `eval/routing/cases.json` 对比两条路径，再决定是否把 `NativeLoop` 改成默认。
+- 循环里已经握着工具表：「本轮补工具」只需要在 `InvokeAsync` 命中「未暴露」时追加工具并重发一次请求，不需要等下一轮。
+
+## 11. 参考（证据位置）
 
 DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat/lib/client.js`，`TOOL` = `dsh-client-ui-tool/lib/client.js`）：
 
@@ -869,6 +1027,12 @@ DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat
 
 本仓库：
 
+- `src/Agents/SDemo.DesktopAgent.Agents/AgentRuntime.cs`（`AgentInvocation.NativeLoop`、step 事件、`FunctionCall/Result.Step`）
+- `src/Agents/SDemo.DesktopAgent.Agents/NativeAgentLoop.cs`（P1a 自建循环：真工具消息、最后一轮摘工具、未知工具/异常兜底）
+- `src/Agents/SDemo.DesktopAgent.Agents/MafAgentRuntime.cs`（两条循环的分叉点、客户端链与 `ChatOptions` 共用）
+- `src/App/SDemo.DesktopAgent.Core/Services/AgentChatService.cs`（step 跟踪、`AgentDelta.Step`、`NativeLoop` 透传）
+- `src/Contracts/SDemo.DesktopAgent.Contracts/Models/AgentSettings.cs`（`NativeLoop` 开关，默认关）
+- `src/App/SDemo.DesktopAgent.UI/Components/Settings/ToolsSettings.razor`（「内置工具循环」开关）
 - `src/Agents/SDemo.DesktopAgent.Agents/MafAgentRuntime.cs:32-46,59-90`（FICC 与事件映射）
 - `src/App/SDemo.DesktopAgent.Core/Services/AgentChatService.cs:174-230`（合并 delta、轨迹记录）
 - `src/Context/SDemo.DesktopAgent.Context/SystemPrompts.cs:10-24`（PLAN 指令）
@@ -880,6 +1044,8 @@ DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat
 - `src/Context/SDemo.DesktopAgent.Context/ContextCompactor.cs:67-215`、`ContextBudgetChatClient.cs:74-75,199-261`、`ContextTrimmer.cs:104-148`
 - `src/Context/SDemo.DesktopAgent.Context/State/StatePackFormatter.cs:21-59,61-144`（god-renderer 与写死的截断顺序）、`State/WorkspaceState.cs:6-13`（数据源）
 - `src/Context/SDemo.DesktopAgent.Context/AgentInstructions.cs:9-19`（死代码；静态沙箱文案）
-- `src/App/SDemo.DesktopAgent.UI/Components/Chat/ChatComposer.razor:39-43,360,556`（textarea + 只有文本/附件的提交）、`Contracts/Models/ComposerSubmission.cs`（当前只有两个字段）
-- `src/Context/SDemo.DesktopAgent.Context/SkillCatalog.cs`、`SkillIndexBuilder.cs:15-91`、`Tools.Skills/SkillToolPack.cs`（技能索引 / `load_skill` / frontmatter 解析）
+- `src/App/SDemo.DesktopAgent.UI/Components/Chat/ChatComposer.razor`（触发菜单、命令路由、`/技能` 点名、高亮层）、`ChatRoom.razor`（`HandleComposerCommandAsync`、`_turnSkill`）
+- `Contracts/Models/ComposerTrigger.cs`、`ComposerTokens.cs`、`ComposerCommands.cs`、`ComposerMatch.cs`（语法、扫描、命令目录、排序）
+- `src/App/SDemo.DesktopAgent.Core/Services/WorkspaceReferenceIndex.cs`（`@` 路径索引）
+- `src/Context/SDemo.DesktopAgent.Context/SkillCatalog.cs`（`disable-model-invocation` 解析）、`SkillIndexBuilder.cs`、`Tools.Skills/SkillToolPack.cs`（索引过滤与 `load_skill` 拒绝）
 - `src/App/SDemo.DesktopAgent.UI/Components/Chat/ContextBreakdown.razor`、`ContextMeter.razor`（现有分解面板与环形；P2a 加段后只需改数据源）；`Contracts/Context/ContextReport.cs`（段定义）
