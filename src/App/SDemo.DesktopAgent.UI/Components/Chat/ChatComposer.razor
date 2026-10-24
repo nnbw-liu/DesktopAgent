@@ -3,6 +3,7 @@
 @using SDemo.DesktopAgent.Models
 @inject IJSRuntime Js
 @inject AttachmentStore AttachmentStore
+@inject IComposerReferenceIndex References
 @implements IAsyncDisposable
 
 @* 组合输入框：Header（工作区 / 附件） / 文本输入 / 上传 + 技能 + 搜索 + 模型 + 发送 *@
@@ -36,11 +37,47 @@
         </div>
     }
 
-    <textarea class="composer-text"
-              rows="1"
-              placeholder="@Placeholder"
-              value="@Text"
-              @oninput="HandleInput"></textarea>
+    @if (_trigger is not null && _items.Count > 0)
+    {
+        <div class="composer-menu" role="listbox" aria-label="@MenuLabel">
+            @for (var index = 0; index < _items.Count; index++)
+            {
+                var item = _items[index];
+                var selected = index == _selected;
+
+                <button type="button"
+                        class="composer-menu-row @(selected ? "is-active" : null)"
+                        role="option"
+                        aria-selected="@(selected ? "true" : "false")"
+                        @onclick="() => CommitAsync(index)">
+                    <span class="composer-menu-icon" aria-hidden="true">@ItemGlyph(item)</span>
+                    <span class="composer-menu-label">@item.Label</span>
+                    @if (!string.IsNullOrWhiteSpace(item.Description))
+                    {
+                        <span class="composer-menu-desc">@item.Description</span>
+                    }
+                </button>
+            }
+
+            <div class="composer-menu-hint">↑↓ 选择 · Enter 确认 · Esc 关闭</div>
+        </div>
+    }
+
+    @* 高亮层：正文透明地镜像输入框文本，已落下的 @引用 / /命令 在它上面着色。
+       输入框本身保持正常文字（中文输入法的候选才看得见）。 *@
+    <div class="composer-input">
+        <div @ref="_highlightRef" class="composer-highlight" aria-hidden="true">
+            @((MarkupString)ComposerTokens.ToHighlightHtml(Text))
+        </div>
+
+        <textarea @ref="_inputRef"
+                  class="composer-text"
+                  rows="1"
+                  placeholder="@Placeholder"
+                  value="@Text"
+                  @oninput="HandleInput"
+                  @onscroll="SyncScrollAsync"></textarea>
+    </div>
 
     <div class="composer-footer">
         <div class="composer-tools">
@@ -354,8 +391,16 @@
     [Parameter]
     public string SessionId { get; set; } = string.Empty;
 
+    /// <summary>当前工作区根目录；<c>@</c> 补全只在这个目录里找路径。</summary>
+    [Parameter]
+    public string? WorkspaceRoot { get; set; }
+
     [Parameter]
     public string Placeholder { get; set; } = "描述你的任务，Enter 发送，Shift + Enter 换行…";
+
+    /// <summary>执行 `/命令`：命令不进模型，整行交给宿主处理。</summary>
+    [Parameter]
+    public EventCallback<string> OnCommand { get; set; }
 
     private readonly List<ChatAttachment> _attachments = [];
     private string _sessionId = string.Empty;
@@ -363,6 +408,24 @@
     private bool _pluginMoreOpen;
     private string? _uploadError;
     private DotNetObjectReference<ChatComposer>? _selfReference;
+    private ElementReference _inputRef;
+    private ElementReference _highlightRef;
+
+    /// <summary>菜单最多显示几条候选。</summary>
+    private const int MaxMenuItems = 8;
+
+    /// <summary>当前正在输入的触发 token；null 表示菜单关着。</summary>
+    private ComposerTrigger? _trigger;
+
+    private IReadOnlyList<ComposerMenuItem> _items = [];
+
+    private int _selected;
+
+    /// <summary>刚插入过一次引用：不要让紧接着的 input 事件再把菜单弹出来。</summary>
+    private bool _suppressTrigger;
+
+    /// <summary>本次发送由 `/技能` 点名的技能；提交后清空。</summary>
+    private string? _invokedSkill;
 
     private IEnumerable<SkillInfo> VisibleSkills => Skills.Take(VisibleSkillCount);
 
@@ -420,6 +483,9 @@
         _moreOpen = false;
         _pluginMoreOpen = false;
         _uploadError = null;
+        _invokedSkill = null;
+        _trigger = null;
+        _items = [];
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -434,9 +500,233 @@
         await Js.InvokeVoidAsync("sdComposer.attach", _selfReference);
     }
 
-    /// <summary>Enter 键触发：与点击发送按钮走同一条路径。</summary>
+    /// <summary>Enter 键触发：菜单打开时由 <see cref="MenuCommitAsync"/> 吃掉，这里只处理普通发送。</summary>
     [JSInvokable]
-    public Task HandleEnterAsync() => HandlePrimaryAction();
+    public async Task HandleEnterAsync()
+    {
+        await CloseMenuAsync();
+        await HandlePrimaryAction();
+    }
+
+    /// <summary>菜单方向键：在候选里上下移动。</summary>
+    [JSInvokable]
+    public void MenuMoveAsync(int delta)
+    {
+        if (_items.Count == 0)
+        {
+            return;
+        }
+
+        _selected = ((_selected + delta) % _items.Count + _items.Count) % _items.Count;
+        StateHasChanged();
+    }
+
+    /// <summary>菜单确认：文件插入、目录下钻、命令执行、技能点名。</summary>
+    [JSInvokable]
+    public Task MenuCommitAsync() => CommitAsync(_selected);
+
+    /// <summary>菜单关闭。</summary>
+    [JSInvokable]
+    public Task MenuDismissAsync() => CloseMenuAsync();
+
+    private string MenuLabel => _trigger?.Kind == ComposerTriggerKind.Command ? "命令与技能" : "文件引用";
+
+    private bool IsSkillName(string name) =>
+        Skills.Any(skill => string.Equals(skill.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    private static string ItemGlyph(ComposerMenuItem item) => item.Kind switch
+    {
+        ComposerMenuKind.Command => "/",
+        ComposerMenuKind.Skill => "✦",
+        _ => item.IsDirectory ? "▸" : "·"
+    };
+
+    private async Task CommitAsync(int index)
+    {
+        if (_trigger is not { } trigger || index < 0 || index >= _items.Count)
+        {
+            return;
+        }
+
+        var item = _items[index];
+
+        switch (item.Kind)
+        {
+            case ComposerMenuKind.Command:
+                await CloseMenuAsync();
+                await ReplaceRangeAsync(0, Text.Length, string.Empty);
+                await OnCommand.InvokeAsync("/" + item.Value);
+                return;
+
+            case ComposerMenuKind.Skill:
+                _invokedSkill = item.Value;
+                _suppressTrigger = true;
+                await ReplaceRangeAsync(trigger.Start, trigger.Caret, "/" + item.Value + " ");
+                await CloseMenuAsync();
+                return;
+
+            default:
+                var isDirectory = item.IsDirectory;
+                var insert = isDirectory
+                    ? ComposerTriggers.FormatDirectoryMention(item.Value)
+                    : ComposerTriggers.FormatMention(item.Value) + " ";
+
+                // 目录保留菜单：让 input 事件重新识别 `@"dir/`，直接进入下一层。
+                _suppressTrigger = !isDirectory;
+
+                await ReplaceRangeAsync(trigger.Start, trigger.Caret, insert);
+
+                if (!isDirectory)
+                {
+                    await CloseMenuAsync();
+                }
+
+                return;
+        }
+    }
+
+    private async Task ReplaceRangeAsync(int start, int end, string text)
+    {
+        // 文本在 C# 里算：界面、测试、回灌都拿到同一份结果，不依赖 JS 的返回值。
+        var from = Math.Clamp(start, 0, Text.Length);
+        var to = Math.Clamp(end, from, Text.Length);
+
+        Text = string.Concat(Text.AsSpan(0, from), text, Text.AsSpan(to));
+
+        if (TextChanged.HasDelegate)
+        {
+            await TextChanged.InvokeAsync(Text);
+        }
+
+        try
+        {
+            await Js.InvokeVoidAsync("sdComposer.replaceRange", _inputRef, from, to, text);
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView 已释放：文本已经更新，DOM 同步跳过。
+        }
+    }
+
+    private async Task CloseMenuAsync()
+    {
+        if (_trigger is null && _items.Count == 0)
+        {
+            return;
+        }
+
+        _trigger = null;
+        _items = [];
+        _selected = 0;
+        await SetMenuOpenAsync(false);
+        StateHasChanged();
+    }
+
+    private async Task SetMenuOpenAsync(bool open)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("sdComposer.setMenuOpen", open);
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView 已释放。
+        }
+    }
+
+    private async Task SyncScrollAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("sdComposer.syncScroll", _inputRef, _highlightRef);
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView 已释放。
+        }
+    }
+
+    /// <summary>按光标位置重算候选：`@` 给文件、`/` 给命令与技能；没有触发符就关菜单。</summary>
+    private async Task RefreshMenuAsync()
+    {
+        if (_suppressTrigger)
+        {
+            _suppressTrigger = false;
+            return;
+        }
+
+        int caret;
+
+        try
+        {
+            caret = await Js.InvokeAsync<int>("sdComposer.caretOf", _inputRef);
+        }
+        catch (JSDisconnectedException)
+        {
+            return;
+        }
+
+        var trigger = ComposerTriggers.Detect(Text, caret);
+
+        if (trigger is null)
+        {
+            await CloseMenuAsync();
+            return;
+        }
+
+        var items = trigger.Kind == ComposerTriggerKind.Mention
+            ? FileItems(trigger.Query)
+            : CommandItems(trigger.Query);
+
+        _trigger = trigger;
+        _items = items;
+        _selected = Math.Clamp(_selected, 0, Math.Max(0, items.Count - 1));
+
+        await SetMenuOpenAsync(items.Count > 0);
+        StateHasChanged();
+    }
+
+    private IReadOnlyList<ComposerMenuItem> FileItems(string query)
+    {
+        var candidates = References.List(WorkspaceRoot);
+
+        // 输入里带 `/` 时按前缀下钻，别让子序列把别的目录也算进来。
+        if (query.Contains('/'))
+        {
+            candidates = candidates
+                .Where(item => item.StartsWith(query, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        }
+
+        return ComposerMatch.Rank(candidates, item => item, query, MaxMenuItems)
+            .Select(path => new ComposerMenuItem(
+                ComposerMenuKind.File,
+                path,
+                path,
+                IsDirectory: path.EndsWith('/')))
+            .ToArray();
+    }
+
+    /// <summary>命令在前、技能在后；同名时命令赢（技能那条不出现）。</summary>
+    private IReadOnlyList<ComposerMenuItem> CommandItems(string query)
+    {
+        var commands = ComposerMatch.Rank(ComposerCommands.All, command => command.Name, query, MaxMenuItems)
+            .Select(command => new ComposerMenuItem(
+                ComposerMenuKind.Command,
+                command.Name,
+                "/" + command.Name,
+                command.Description));
+
+        var skills = ComposerMatch.Rank(Skills, skill => skill.Name, query, MaxMenuItems)
+            .Where(skill => !ComposerCommands.IsKnown(skill.Name))
+            .Select(skill => new ComposerMenuItem(
+                ComposerMenuKind.Skill,
+                skill.Name,
+                "/" + skill.Name,
+                skill.Description));
+
+        return commands.Concat(skills).Take(MaxMenuItems).ToArray();
+    }
 
     private async Task HandleInput(ChangeEventArgs args)
     {
@@ -446,6 +736,9 @@
         {
             await TextChanged.InvokeAsync(Text);
         }
+
+        await RefreshMenuAsync();
+        await SyncScrollAsync();
     }
 
     private async Task HandleFilesSelected(InputFileChangeEventArgs args)
@@ -547,14 +840,34 @@
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(Text) && _attachments.Count == 0)
+        var trimmed = Text.Trim();
+
+        // `/命令`：整行归命令，不进模型、不花 token；未知命令也走这条（宿主负责拒绝），
+        // 但 `/技能` 除外——技能名进的是模型，只是要带上 InvokedSkill。
+        if (ComposerCommands.TryParseLine(trimmed, out var lineName, out _)
+            && (ComposerCommands.IsKnown(lineName) || !IsSkillName(lineName)))
+        {
+            await CloseMenuAsync();
+            await ReplaceRangeAsync(0, Text.Length, string.Empty);
+            await OnCommand.InvokeAsync(trimmed);
+            return;
+        }
+
+        if (trimmed.Length == 0 && _attachments.Count == 0)
         {
             return;
         }
 
+        // 发送前一定收起补全菜单，否则下一条消息的第一次输入会带着旧候选。
+        await CloseMenuAsync();
+
+        // 手打的 `/技能` 与菜单点选等价：取第一个命中本地技能的 token。
+        _invokedSkill ??= ComposerTokens.FindInvokedSkill(trimmed, Skills.Select(skill => skill.Name));
+
         // 先清空附件再提交：生成期间切换会话 / 销毁组件时，不会把已发送的文件删掉。
-        var submission = new ComposerSubmission(Text.Trim(), _attachments.ToList());
+        var submission = new ComposerSubmission(trimmed, _attachments.ToList(), _invokedSkill);
         _attachments.Clear();
+        _invokedSkill = null;
         _moreOpen = false;
         StateHasChanged();
 
@@ -576,4 +889,19 @@
         ClearAttachments();
         _selfReference?.Dispose();
     }
+
+    /// <summary>补全菜单里的一条候选。</summary>
+    private enum ComposerMenuKind
+    {
+        File,
+        Command,
+        Skill
+    }
+
+    private sealed record ComposerMenuItem(
+        ComposerMenuKind Kind,
+        string Value,
+        string Label,
+        string? Description = null,
+        bool IsDirectory = false);
 }

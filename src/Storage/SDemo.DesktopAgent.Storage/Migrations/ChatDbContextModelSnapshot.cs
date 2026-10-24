@@ -77,6 +77,9 @@ namespace SDemo.DesktopAgent.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("StepsJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ToolCallsJson")
                         .HasColumnType("TEXT");
 

@@ -151,13 +151,17 @@
                             // 老消息没有步骤时回退成「思考 / 工具 / 正文」分组显示。
                             var steps = isUser ? Array.Empty<ChatStep>() : StepsFor(message);
                             var hasTimeline = !isUser && steps.Count > 0;
+                            var processPolicy = ProcessDisplayPolicy.From(Settings.Current.Chat);
                         }
 
                         @if (hasTimeline)
                         {
                             <ChatTimeline Steps="steps"
                                           Trace="message.ToolTrace"
-                                          IsLive="@(thinking && _isGenerating)" />
+                                          IsLive="@(thinking && _isGenerating)"
+                                          Foldable="@CanFoldProcess(message, processPolicy)"
+                                          ElapsedMs="message.DurationMs"
+                                          Policy="processPolicy" />
                         }
                         else
                         {
@@ -440,6 +444,7 @@
 
         <ChatComposer @bind-Text="_draft"
                       SessionId="@Session.Id"
+                      WorkspaceRoot="@WorkspaceContext.RootPath"
                       IsGenerating="_isGenerating"
                       Skills="_skills"
                       SelectedSkill="@_selectedSkill"
@@ -455,6 +460,7 @@
                       OnSelectMount="SelectMount"
                       OnParameterChanged="ChangeParameter"
                       OnSend="HandleSend"
+                      OnCommand="HandleComposerCommandAsync"
                       OnStop="HandleStop">
             <HeaderContent>
                 @* 新聊天室（空会话）才需要归属工作区：放在 Header 里，贴左对齐输入文字 *@
@@ -751,6 +757,9 @@
 
     /// <summary>当前选中的技能名（为空表示不套用技能）。</summary>
     private string? _selectedSkill;
+
+    /// <summary>本轮由 `/技能` 一次性点名的技能；不写回输入框的 chip。</summary>
+    private string? _turnSkill;
 
     /// <summary>本轮启用的工具包 id（多选；最终仍以 chip 的可用性为准）。</summary>
     private readonly HashSet<string> _enabledToolPacks = new(StringComparer.Ordinal);
@@ -1215,6 +1224,78 @@
         }
 
         return text.Length <= 400 ? text : string.Concat(text.AsSpan(0, 400), "…");
+    }
+
+    /// <summary>
+    /// 执行输入框里的 <c>/命令</c>。命令走界面：不进模型、不产生消息；
+    /// 未知命令只提示，绝不退化成用户提示词。
+    /// </summary>
+    private async Task HandleComposerCommandAsync(string line)
+    {
+        if (!ComposerCommands.TryParseLine(line, out var name, out _))
+        {
+            return;
+        }
+
+        if (!ComposerCommands.IsKnown(name))
+        {
+            _contextNotice = $"未知命令：/{name}。可用：{string.Join("、", ComposerCommands.All.Select(command => "/" + command.Name))}";
+            StateHasChanged();
+            return;
+        }
+
+        switch (name.ToLowerInvariant())
+        {
+            case "compact":
+                if (_isGenerating)
+                {
+                    _contextNotice = "正在生成，稍后再压缩。";
+                    StateHasChanged();
+                    return;
+                }
+
+                await CompactNowAsync();
+                return;
+
+            case "model":
+                await OnOpenModelSettings.InvokeAsync();
+                return;
+
+            case "index":
+                RebuildWorkspaceIndex();
+                return;
+
+            default:
+                _contextNotice = "可用命令："
+                    + string.Join("、", ComposerCommands.All.Select(command => $"/{command.Name}（{command.Description}）"));
+                StateHasChanged();
+                return;
+        }
+    }
+
+    /// <summary>`/index`：重建当前工作区的知识库索引（只影响检索，不改会话）。</summary>
+    private void RebuildWorkspaceIndex()
+    {
+        var workspaceId = CurrentWorkspace()?.Id ?? Session.WorkspaceId;
+
+        if (string.IsNullOrWhiteSpace(workspaceId))
+        {
+            _contextNotice = "这个聊天室还没有归属工作区，无法重建索引。";
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            Memory.Rebuild(workspaceId);
+            _contextNotice = "已重建工作区知识库索引。";
+        }
+        catch (Exception ex)
+        {
+            _contextNotice = $"重建索引失败：{ex.Message}";
+        }
+
+        StateHasChanged();
     }
 
     /// <summary>手动压缩：走与自动压缩相同的增量逻辑，失败走兜底并提示。</summary>
@@ -1792,6 +1873,10 @@
 
         await OnSend.InvokeAsync(submission);
         _draft = string.Empty;
+
+        // `/技能` 是一次性的：只影响这一轮，不改输入框上的技能 chip。
+        _turnSkill = string.IsNullOrWhiteSpace(submission.InvokedSkill) ? null : submission.InvokedSkill;
+
         RememberSelection();
 
         var option = _modelOptions.FirstOrDefault(item => item.Key == _selectedKey);
@@ -1947,7 +2032,7 @@
                             option.Provider,
                             option.ModelId,
                             enabledPacks,
-                            _selectedSkill,
+                            _turnSkill ?? _selectedSkill,
                             Session.Id,
                             metrics,
                             Session: Session,
@@ -1956,9 +2041,10 @@
                         cts.Token),
                     telemetry,
                     metrics,
-                    baseline);
+                    baseline,
+                    rounds);
 
-                ApplyMetrics(reply, metrics, startedAt, baseline, accumulate: rounds > 0);
+                ApplyMetrics(reply, metrics, startedAt, baseline, accumulate: rounds > 0, rounds);
                 rounds++;
 
                 if (rounds > MaxHostRounds || cts.IsCancellationRequested)
@@ -1977,7 +2063,7 @@
                 {
                     _noEditRepromptAttempts++;
                     pendingPrompts.Add(new ChatMessage(ChatMessageRole.User, noEditPrompt));
-                    await AppendHostPromptAsync(reply, noEditPrompt);
+                    await AppendHostPromptAsync(reply, noEditPrompt, rounds);
                     continue;
                 }
 
@@ -1986,7 +2072,7 @@
                 {
                     _autoContinued = true;
                     pendingPrompts.Add(new ChatMessage(ChatMessageRole.User, autoPrompt));
-                    await AppendHostPromptAsync(reply, autoPrompt);
+                    await AppendHostPromptAsync(reply, autoPrompt, rounds);
                     continue;
                 }
 
@@ -2003,6 +2089,7 @@
 
             _isGenerating = false;
             _cts = null;
+            _turnSkill = null;
             _contextPreview = telemetry.Report ?? _contextPreview;
             _contextNotice = telemetry.ContextNotice;
             await SetGeneratingAsync(false);
@@ -2109,7 +2196,7 @@
         }
         finally
         {
-            ApplyMetrics(reply, metrics, startedAt, traceBaseline: 0, accumulate: false);
+            ApplyMetrics(reply, metrics, startedAt, traceBaseline: 0, accumulate: false, stepIndex: 0);
 
             // 对标 DSH：思考结束后默认收起思维链，只留一行摘要；用户自己点开过的不动。
             if (!_manualReasoning.Contains(reply.Id))
@@ -2248,7 +2335,8 @@
         IAsyncEnumerable<AgentDelta> stream,
         ContextRunTelemetry telemetry,
         AgentRunMetrics metrics,
-        int traceBaseline)
+        int traceBaseline,
+        int stepIndex)
     {
         try
         {
@@ -2257,17 +2345,17 @@
                 if (delta.Text.Length > 0)
                 {
                     reply.Content += delta.Text;
-                    AppendStep(reply, ChatStepKind.Text, delta.Text);
+                    AppendStep(reply, ChatStepKind.Text, delta.Text, stepIndex);
                 }
 
                 if (delta.Reasoning.Length > 0)
                 {
                     reply.Reasoning += delta.Reasoning;
-                    AppendStep(reply, ChatStepKind.Reasoning, delta.Reasoning);
+                    AppendStep(reply, ChatStepKind.Reasoning, delta.Reasoning, stepIndex);
                 }
 
                 // 工具轨迹边跑边同步：「工具调用 N 次」和文件改动面板在生成过程中就能看到。
-                SyncTrace(reply, metrics, traceBaseline);
+                SyncTrace(reply, metrics, traceBaseline, stepIndex);
 
                 // 中途裁剪 / 中途提示需要让用户看到，但仍不进模型上下文。
                 if (!string.IsNullOrWhiteSpace(telemetry.ContextNotice))
@@ -2295,7 +2383,12 @@
         catch (Exception ex)
         {
             var prefix = string.IsNullOrWhiteSpace(reply.Content) ? string.Empty : "\n\n";
-            reply.Content += $"{prefix}调用失败：{ex.Message}";
+            var message = $"{prefix}调用失败：{ex.Message}";
+
+            reply.Content += message;
+
+            // 走时间线时正文是按步骤拼出来的：错误也必须落成一步，否则会被组外答案漏掉。
+            AppendStep(reply, ChatStepKind.Text, message, stepIndex);
         }
     }
 
@@ -2304,7 +2397,8 @@
         AgentRunMetrics metrics,
         long startedAt,
         int traceBaseline,
-        bool accumulate)
+        bool accumulate,
+        int stepIndex)
     {
         var duration = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
 
@@ -2320,7 +2414,7 @@
         }
 
         // 回合末再同步一次：补上中途没推到的条目，并把还在 running 的轨迹收成最终状态。
-        SyncTrace(reply, metrics, traceBaseline);
+        SyncTrace(reply, metrics, traceBaseline, stepIndex);
 
         foreach (var citation in metrics.Citations)
         {
@@ -2330,6 +2424,36 @@
                 reply.MemoryCitations.Add(citation);
             }
         }
+    }
+
+    /// <summary>
+    /// 完成态的消息是否把过程组默认收起来。
+    /// <para>
+    /// 三条规则：档位要求收起；这一轮已经不在生成（正在跑的一律展开）；收起时机是「下一条输入」时，
+    /// 最后一条助手消息保持展开，直到用户又发了新消息。
+    /// </para>
+    /// </summary>
+    private bool CanFoldProcess(ChatMessage message, ProcessDisplayPolicy policy)
+    {
+        if (!policy.FoldCompletedTurns || policy.Grouping != ProcessGrouping.Collapsed)
+        {
+            return false;
+        }
+
+        if (IsThinking(message))
+        {
+            return false;
+        }
+
+        if (policy.CollapseTiming == ProcessCollapseTiming.NextInput
+            && ReferenceEquals(message, Session.Messages.LastOrDefault(item => item.Role == ChatMessageRole.Assistant)))
+        {
+            return false;
+        }
+
+        // 还在跑的工具等于「这一轮没结束」：不让进行中的过程被收起。
+        return !message.ToolTrace.Any(entry =>
+            string.Equals(entry.Status, ToolTraceEntry.StatusRunning, StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -2349,7 +2473,7 @@
     }
 
     /// <summary>把一段增量并进当前步骤；类型不同就开新的一步（思考 → 工具 → 思考 …）。</summary>
-    private static void AppendStep(ChatMessage reply, ChatStepKind kind, string delta)
+    private static void AppendStep(ChatMessage reply, ChatStepKind kind, string delta, int stepIndex)
     {
         if (delta.Length == 0)
         {
@@ -2362,12 +2486,13 @@
             return;
         }
 
-        reply.Steps.Add(new ChatStep(kind, delta));
+        reply.Steps.Add(new ChatStep(kind, delta, StepIndex: stepIndex, StartedAt: DateTimeOffset.Now));
     }
 
     /// <summary>把本轮的实时工具轨迹同步到消息上，生成过程中就能看到调用了什么。</summary>
     /// <param name="baseline">这一轮开始时消息上已有的轨迹条数（宿主追问会开新一轮，但不该重复插步骤）。</param>
-    private static void SyncTrace(ChatMessage reply, AgentRunMetrics metrics, int baseline)
+    /// <param name="stepIndex">这一轮是第几次模型请求；工具步骤按它归组。</param>
+    private static void SyncTrace(ChatMessage reply, AgentRunMetrics metrics, int baseline, int stepIndex)
     {
         // 工具开始 / 结束时都会推一次增量：已有条目原地更新（running → 成功 / 失败），
         // 新条目才追加，这样「运行中」能立刻出现在时间线里。
@@ -2387,14 +2512,20 @@
             }
 
             reply.ToolTrace.Add(entry);
-            reply.Steps.Add(new ChatStep(ChatStepKind.Tool, string.Empty, reply.ToolTrace.Count - 1));
+            reply.Steps.Add(new ChatStep(
+                ChatStepKind.Tool,
+                string.Empty,
+                reply.ToolTrace.Count - 1,
+                stepIndex,
+                entry.CallId,
+                DateTimeOffset.Now));
         }
     }
 
     /// <summary>把宿主追问插进当前回合（只发给模型，不新开一条回复）。</summary>
-    private async Task AppendHostPromptAsync(ChatMessage reply, string prompt)
+    private async Task AppendHostPromptAsync(ChatMessage reply, string prompt, int stepIndex)
     {
-        reply.Steps.Add(new ChatStep(ChatStepKind.HostPrompt, prompt));
+        reply.Steps.Add(new ChatStep(ChatStepKind.HostPrompt, prompt, StepIndex: stepIndex));
         StateHasChanged();
         await NotifySessionChangedAsync();
     }
