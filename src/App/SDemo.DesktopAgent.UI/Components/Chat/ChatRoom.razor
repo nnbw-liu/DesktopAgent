@@ -2370,6 +2370,13 @@
                     AppendStep(reply, ChatStepKind.Reasoning, delta.Reasoning, step);
                 }
 
+                // P1b：宿主在本轮内补了工具（search_capabilities 的闭环）。落成过程组里的一行，
+                // 让用户看见「为什么突然多了一个工具」；这一行不进模型上下文。
+                if (delta.Notice is { Length: > 0 } notice)
+                {
+                    AppendStep(reply, ChatStepKind.HostPrompt, notice, step);
+                }
+
                 // 工具轨迹边跑边同步：「工具调用 N 次」和文件改动面板在生成过程中就能看到。
                 SyncTrace(reply, metrics, traceBaseline, step);
 

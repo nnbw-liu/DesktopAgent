@@ -11,6 +11,7 @@ public sealed class AgentRunMetrics
     private readonly Dictionary<string, int> _toolCalls = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ToolTraceEntry> _toolTrace = [];
     private readonly List<MemoryCitation> _citations = [];
+    private readonly List<string> _toolExpansions = [];
     private int _rejectedToolCalls;
     private int _failedToolCalls;
     private int _approvalCount;
@@ -56,6 +57,22 @@ public sealed class AgentRunMetrics
 
     /// <summary>M4：本轮采用的能力路由（暴露集合 / 上限 / 来源）。插件等未路由的路径为 null。</summary>
     public Context.RoutingDecision? Routing { get; private set; }
+
+    /// <summary>P1b：本轮内补进来的工具（<c>search_capabilities</c> 命中后由宿主补的）。</summary>
+    public IReadOnlyList<string> ToolExpansions => _toolExpansions;
+
+    /// <summary>记录本轮内补充的工具；重复的只记一次。</summary>
+    public void RecordToolExpansion(IEnumerable<string>? tools)
+    {
+        foreach (var name in tools ?? [])
+        {
+            if (!string.IsNullOrWhiteSpace(name)
+                && !_toolExpansions.Contains(name, StringComparer.Ordinal))
+            {
+                _toolExpansions.Add(name);
+            }
+        }
+    }
 
     /// <summary>记录本轮路由；实际调用统计仍由 <see cref="RecordToolCall"/> 记录。</summary>
     public void RecordRouting(Context.RoutingDecision decision) => Routing = decision;

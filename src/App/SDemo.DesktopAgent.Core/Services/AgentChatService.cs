@@ -18,7 +18,14 @@ namespace SDemo.DesktopAgent.Services;
 /// 这一段属于第几次模型请求（P1a）。<c>-1</c> 表示运行时没给出 step 边界（FICC），
 /// 界面按「本回合第几轮」兜底。
 /// </param>
-public readonly record struct AgentDelta(string Text, string Reasoning, int Step = -1);
+/// <param name="Notice">
+/// 给用户看的一行宿主提示（P1b：本轮补了哪些工具）。不进模型，只落成过程组里的一步。
+/// </param>
+public readonly record struct AgentDelta(
+    string Text,
+    string Reasoning,
+    int Step = -1,
+    string? Notice = null);
 
 /// <summary>
 /// 一次生成所需的全部输入：已由 <see cref="ContextBuilder"/> 裁剪好的上下文、
@@ -69,6 +76,9 @@ public sealed class AgentChatService : IAgentChatService
     private readonly IAgentRuntime _runtime;
     private readonly ISkillLibrary? _skills;
     private readonly IWorkspaceMemory? _memory;
+
+    /// <summary>P1b：本轮内最多补几个工具（只补一次，避免变成「边跑边全量暴露」）。</summary>
+    private const int MaxInTurnExpandedTools = 3;
 
     public AgentChatService(
         AgentToolRegistry tools,
@@ -134,7 +144,70 @@ public sealed class AgentChatService : IAgentChatService
         var decision = plan.Context.Report.Routing ?? ResolveRouting(plan, available, agentSettings, agentMode);
 
         // M1：每轮只路由一次；工具集合 = 核心集 + 选中包（+ 兜底入口），不再全量灌给模型。
-        var (tools, measuredSchemaTokens) = CreateExposedTools(context, plan, decision);
+        // P1b：兜底入口命中「本轮未暴露」的工具时，宿主在本轮内补一次（闭包 Expand 见下）。
+        CapabilitySearchOutcome? capabilitySearch = null;
+        var (tools, measuredSchemaTokens) = CreateExposedTools(
+            context, plan, decision, outcome => capabilitySearch = outcome);
+
+        // 本轮内补工具的账：名称去重 + schema 预算，补进来的工具也算进本轮工具面。
+        var expandedNames = new HashSet<string>(decision.ExposedTools, StringComparer.Ordinal);
+        var schemaLimit = Math.Min(plan.Context.Budget.ToolSchemaLimit, plan.Context.Budget.Total);
+        var usedSchemaTokens = measuredSchemaTokens;
+
+        IReadOnlyList<AITool> Expand(AgentToolCallRequest call)
+        {
+            if (!string.Equals(call.ToolName, CapabilityRouter.EscapeHatchTool, StringComparison.Ordinal)
+                || capabilitySearch is not { } outcome)
+            {
+                return [];
+            }
+
+            var wanted = outcome.Unexposed
+                .Where(name => !expandedNames.Contains(name))
+                .Take(MaxInTurnExpandedTools)
+                .ToArray();
+
+            if (wanted.Length == 0)
+            {
+                return [];
+            }
+
+            var candidates = _tools.CreateExposed(
+                context,
+                plan.ToolPacks,
+                new HashSet<string>(wanted, StringComparer.Ordinal),
+                plan.Metrics);
+
+            var accepted = new List<AITool>();
+            var counter = new HeuristicTokenCounter();
+
+            foreach (var tool in candidates)
+            {
+                var cost = MeasureToolSchema([tool], counter);
+
+                // 至少补一个：否则「补了等于没补」，模型下一轮还得再查一次。
+                if (accepted.Count > 0 && usedSchemaTokens + cost > schemaLimit)
+                {
+                    break;
+                }
+
+                accepted.Add(tool);
+                usedSchemaTokens += cost;
+            }
+
+            if (accepted.Count == 0)
+            {
+                return [];
+            }
+
+            foreach (var tool in accepted)
+            {
+                expandedNames.Add(tool.Name);
+            }
+
+            // 记账统一在收到 ToolsExpanded 时做（见下面的 switch），这里只返回工具本身。
+            return accepted;
+        }
 
         // M4：把本轮路由记进 metrics，流结束后可算「暴露 N 个 / 实际调用 M 个 / 未用 K 个」。
         plan.Metrics?.RecordRouting(decision);
@@ -165,7 +238,8 @@ public sealed class AgentChatService : IAgentChatService
             telemetry,
             toolCallLimit,
             ResolveInstructions(plan, decision),
-            plan.Scope);
+            plan.Scope,
+            Expand);
 
         var pendingCalls = new Dictionary<string, PendingToolCall>(StringComparer.Ordinal);
         var text = new StringBuilder();
@@ -177,6 +251,9 @@ public sealed class AgentChatService : IAgentChatService
 
         // P1a：内置循环会带来显式的 step；-1 表示这个运行时看不到 step 边界（FICC）。
         var currentStep = -1;
+
+        // P1b：本轮补工具的宿主提示；下一条增量把它带出去，落成过程组里的一行。
+        string? notice = null;
 
         try
         {
@@ -250,13 +327,21 @@ public sealed class AgentChatService : IAgentChatService
                         emittedText));
                     toolChanged = true;
                     break;
+
+                // P1b：宿主按 search_capabilities 的命中结果补了工具，下一步请求就会带上它们。
+                case AgentStreamEvent.ToolsExpanded expanded:
+                    plan.Metrics?.RecordToolExpansion(expanded.Tools);
+                    notice = expanded.Reason;
+                    toolChanged = true;
+                    break;
             }
 
             if (text.Length > 0 || reasoning.Length > 0 || toolChanged)
             {
-                    yield return new AgentDelta(text.ToString(), reasoning.ToString(), currentStep);
+                    yield return new AgentDelta(text.ToString(), reasoning.ToString(), currentStep, notice);
                     text.Clear();
                     reasoning.Clear();
+                    notice = null;
                 }
             }
         }
@@ -282,8 +367,11 @@ public sealed class AgentChatService : IAgentChatService
             return RoutingDecision.Empty;
         }
 
-        var userInput = plan.Context.Messages
-            .LastOrDefault(message => message.Role == ChatRole.User)?.Text ?? string.Empty;
+        var userInputs = plan.Context.Messages
+            .Where(message => message.Role == ChatRole.User)
+            .Select(message => message.Text ?? string.Empty)
+            .ToArray();
+        var userInput = userInputs.Length > 0 ? userInputs[^1] : string.Empty;
         var recent = plan.Metrics?.ToolTrace.Select(entry => entry.ToolId).TakeLast(6).ToArray() ?? [];
 
         return CapabilityRouter.Route(new CapabilityRoutingInput(
@@ -293,7 +381,8 @@ public sealed class AgentChatService : IAgentChatService
             mode,
             agentSettings.ResolveMaxExposedTools(plan.Context.Profile.ContextWindow, mode),
             agentSettings.SearchCapabilitiesEnabled,
-            agentSettings.ExposeAllTools));
+            agentSettings.ExposeAllTools,
+            PreviousUserInputs: CapabilityRouter.PreviousUserInputs(userInputs)));
     }
 
     /// <summary>
@@ -303,7 +392,8 @@ public sealed class AgentChatService : IAgentChatService
     private (IReadOnlyList<AITool> Tools, int SchemaTokens) CreateExposedTools(
         ToolContext context,
         AgentRunPlan plan,
-        RoutingDecision decision)
+        RoutingDecision decision,
+        Action<CapabilitySearchOutcome>? onCapabilitySearch = null)
     {
         if (decision.Count == 0)
         {
@@ -312,7 +402,13 @@ public sealed class AgentChatService : IAgentChatService
 
         var exposed = new HashSet<string>(decision.ExposedTools, StringComparer.Ordinal);
         var tools = _tools
-            .CreateExposed(context, plan.ToolPacks, exposed, plan.Metrics, decision.EscapeHatch)
+            .CreateExposed(
+                context,
+                plan.ToolPacks,
+                exposed,
+                plan.Metrics,
+                decision.EscapeHatch,
+                onCapabilitySearch)
             .ToList();
 
         var counter = new HeuristicTokenCounter();
@@ -371,7 +467,8 @@ public sealed class AgentChatService : IAgentChatService
         ContextRunTelemetry telemetry,
         int toolCallLimit,
         string instructions,
-        EffectiveSettings? scope)
+        EffectiveSettings? scope,
+        Func<AgentToolCallRequest, IReadOnlyList<AITool>>? expandTools = null)
     {
         var settings = scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
         var agent = scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
@@ -397,7 +494,9 @@ public sealed class AgentChatService : IAgentChatService
             // 模型档案里配了思考强度才发送 reasoning_effort（none = 显式关闭）；没配就保持服务端默认。
             ReasoningEffort: plan.Profile.ReasoningEffort,
             // P1a：工具循环由谁跑，只在设置里显式打开时换成内置循环（默认仍是 FICC）。
-            NativeLoop: agent.NativeLoop);
+            NativeLoop: agent.NativeLoop,
+            // P1b：本轮内补工具只在自建循环里成立（FICC 的轮次对宿主不可见）。
+            ExpandTools: agent.NativeLoop ? expandTools : null);
     }
 
     private static ToolTraceEntry BuildTraceEntry(

@@ -58,7 +58,7 @@ public sealed class ContextBuilder
             : Math.Clamp(request.Routing.EstimatedSchemaTokens, 0, budget.ToolSchemaLimit);
 
         var (instructions, systemTokens, skillTokens, knowledgeTokens, skillTruncated) =
-            BuildInstructions(request, budget, calibrationFactor, mode);
+            BuildInstructions(request, budget, calibrationFactor, mode, profile.SupportsReasoning);
 
         // 插件 Run：不做预算裁剪（输入上限由 PluginRunner 单独把关），但同样经过这里，
         // 保证「所有请求只从 ContextBuilder 出去」且报告口径一致。
@@ -256,16 +256,17 @@ public sealed class ContextBuilder
             ContextBuildRequest request,
             ContextBudget budget,
             double calibrationFactor,
-            AgentMode mode)
+            AgentMode mode,
+            bool supportsReasoning)
     {
         var baseInstructions = request.InstructionsOverride
-                               ?? SelectBasePrompt(request.Routing, mode);
+                               ?? SelectBasePrompt(request.Routing, mode, supportsReasoning);
 
         // 把「这一轮是什么类型」显式写给模型：提示词里只有规则，路由结果才是本轮的结论。
         // 只有真的要工具时才写；否则会和对话提示词的「不要调用工具」互相打架。
         if (request.InstructionsOverride is null && request.Routing is { NeedsTools: true } routing)
         {
-            baseInstructions += IntentHint(routing.Intent);
+            baseInstructions += IntentHint(routing.Intent, supportsReasoning);
         }
 
         var systemTokens = _counter.CountMessage("system", baseInstructions);
@@ -358,29 +359,35 @@ public sealed class ContextBuilder
 
     /// <summary>
     /// 先看「这一轮要不要工具」：路由判定为对话轮（或没有可用工具）时用
-    /// <see cref="SystemPrompts.Chat"/>，否则再按窗口 / 模型大小选 Full 或 Compact。
+    /// <see cref="SystemPrompts.Chat"/>，否则按窗口 / 模型大小选 Full 或 Compact。
     /// 没有路由结果（插件、单测等旧路径）时保持按模式选择。
     /// </summary>
-    private static string SelectBasePrompt(RoutingDecision? routing, AgentMode mode)
+    /// <param name="supportsReasoning">
+    /// 模型有没有思考通道（P1b §3.2.5）：有就不要再逼它在正文里写一行 PLAN。
+    /// </param>
+    private static string SelectBasePrompt(RoutingDecision? routing, AgentMode mode, bool supportsReasoning)
     {
         if (routing is { NeedsTools: false })
         {
             return SystemPrompts.Chat;
         }
 
-        return mode == AgentMode.Compact ? SystemPrompts.Compact : SystemPrompts.Full;
+        return mode == AgentMode.Compact
+            ? SystemPrompts.Compact
+            : SystemPrompts.FullFor(supportsReasoning);
     }
 
     /// <summary>
     /// 本轮类型的显式声明（只加几行，不重复提示词规则）：
-    /// 问答轮先直接回答，任务轮才按 PLAN 动手。
+    /// 问答轮先直接回答，任务轮才动手。有思考通道时不再要求 PLAN。
     /// </summary>
-    private static string IntentHint(TurnIntent intent) => intent switch
+    private static string IntentHint(TurnIntent intent, bool supportsReasoning) => intent switch
     {
         TurnIntent.Answer =>
             "\n\n本轮类型：问答。先直接回答；只有需要确认具体文件内容时才调用只读工具，不要顺手改文件或执行命令。",
-        TurnIntent.Task =>
-            "\n\n本轮类型：任务。按 PLAN 逐步执行；改文件前先读，完成后给出结论。",
+        TurnIntent.Task => supportsReasoning
+            ? "\n\n本轮类型：任务。先在思考里想清步骤再动手；改文件前先读，完成后给出结论。"
+            : "\n\n本轮类型：任务。按 PLAN 逐步执行；改文件前先读，完成后给出结论。",
         _ => string.Empty
     };
 

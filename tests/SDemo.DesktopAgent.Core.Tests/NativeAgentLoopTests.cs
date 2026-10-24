@@ -187,11 +187,76 @@ public sealed class NativeAgentLoopTests
         Assert.Contains("本轮没有提供工具", result.Result, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task 本轮内补工具后下一步请求就带上新工具()
+    {
+        using var server = new FakeOpenAiServer();
+        server.Respond(ToolCall("call_1", "search_capabilities", """{"query":"pdf"}"""));
+        server.Respond(ToolCall("call_2", "pdf_read", """{"path":"a.pdf"}"""));
+        server.Respond(Text("读完了。"));
+
+        var search = AIFunctionFactory.Create(
+            (string query) => "匹配：pdf_read（本轮未暴露）", "search_capabilities", "查能力");
+        var pdf = AIFunctionFactory.Create((string path) => $"PDF 文本 {path}", "pdf_read", "读 PDF");
+
+        var expandedCalls = 0;
+
+        var events = await StreamAsync(
+            server,
+            [search],
+            maxToolIterations: 4,
+            expandTools: call =>
+            {
+                expandedCalls++;
+
+                return call.ToolName == "search_capabilities" ? [pdf] : [];
+            });
+
+        // 宿主把「补了哪个工具」告诉界面（过程组里的一行），而不是静默换牌。
+        var expanded = Assert.Single(events.OfType<AgentStreamEvent.ToolsExpanded>());
+        Assert.Equal(["pdf_read"], expanded.Tools);
+
+        // 同一轮、下一步请求就声明了新工具，而且模型真的用上了。
+        Assert.Equal(3, server.RequestBodies.Count);
+        Assert.Contains("pdf_read", server.RequestBodies[1], StringComparison.Ordinal);
+        Assert.Contains("PDF 文本 a.pdf", server.RequestBodies[2], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 本轮补工具只补一次()
+    {
+        using var server = new FakeOpenAiServer();
+        server.Respond(ToolCall("call_1", "search_capabilities", """{"query":"pdf"}"""));
+        server.Respond(ToolCall("call_2", "search_capabilities", """{"query":"pdf"}"""));
+        server.Respond(Text("还是用它吧。"));
+
+        var search = AIFunctionFactory.Create(
+            (string query) => "匹配：pdf_read（本轮未暴露）", "search_capabilities", "查能力");
+        var pdf = AIFunctionFactory.Create((string path) => $"PDF 文本 {path}", "pdf_read", "读 PDF");
+
+        var expandedCalls = 0;
+
+        var events = await StreamAsync(
+            server,
+            [search],
+            maxToolIterations: 5,
+            expandTools: call =>
+            {
+                expandedCalls++;
+                return call.ToolName == "search_capabilities" ? [pdf] : [];
+            });
+
+        // 有界：一次轮次里只补一次，避免「边跑边全量暴露」。
+        Assert.Equal(1, expandedCalls);
+        Assert.Single(events.OfType<AgentStreamEvent.ToolsExpanded>());
+    }
+
     private static async Task<List<AgentStreamEvent>> StreamAsync(
         FakeOpenAiServer server,
         IReadOnlyList<AITool> tools,
         int maxToolIterations,
-        Func<IChatClient, IChatClient>? decorate = null)
+        Func<IChatClient, IChatClient>? decorate = null,
+        Func<AgentToolCallRequest, IReadOnlyList<AITool>>? expandTools = null)
     {
         var runtime = new MafAgentRuntime();
         var invocation = new AgentInvocation(
@@ -203,7 +268,8 @@ public sealed class NativeAgentLoopTests
             tools,
             maxToolIterations,
             Decorate: decorate,
-            NativeLoop: true);
+            NativeLoop: true,
+            ExpandTools: expandTools);
 
         var events = new List<AgentStreamEvent>();
 
