@@ -837,7 +837,39 @@ public interface IInputTriggerSource
 token 计量         ctx.tokenMeter              → ContextReport（已有，够用；补每段归因）
 ```
 
-## 8. 参考（证据位置）
+## 8. P0 实施记录（2026-10-24）
+
+状态：✅ 已落地。WPF 解决方案 0 警告 0 错误；Core 717、UI 87、Sandbox 219 测试全绿。
+
+### 落地形态
+
+| 计划项 | 实现 |
+|---|---|
+| 步骤模型 | `ChatStep` 增加 `StepIndex` / `CallId` / `StartedAt` / `EndedAt`，并新增**计算属性** `Part`（`Text → Answer`，其余 `Process`）——不用给生产者加字段，也不用迁移存量 JSON |
+| 步骤持久化 | `ChatMessage.Steps` → `messages.StepsJson`（新迁移 `20261024133546_AddMessageSteps`）；`StepsFor` 优先读结构化步骤，旧消息仍回退 `ChatTimelineBuilder.FromTrace`（顺带补上 `CallId`） |
+| 过程组 | `ChatTimeline.razor` 拆成「过程组 + 组外答案」：过程组只装思考/工具/宿主追问，**正文（答案）永远在组外**；组头显示 `过程 · 12.4 s` 与 `N 步 · M 次工具 · 失败 K`，收起时贴一行最新思考 |
+| 四档显隐 | `ProcessDisplayMode` + `ProcessDisplayPolicy`（四个开关 + 收起时机）落在 Contracts，`ChatPresentationSettings` 进 `AppSettings.Chat`；设置页「通用 → 对话」两个下拉 |
+| 工具行/卡片 | `ToolPresentation`（客户端派生）+ `ChatStepRow.razor`：单行 `名称 · 状态 · 摘要 · 耗时`，点开看目标 / 参数 / 编辑行 / 结果预览；未知工具回落 generic |
+| 工具轨迹补数据 | 记录轨迹时算好 `Title`（命令+前两参数 / 路径 / 模式）、`ArgsJson`（截断 512）、`DurationMs`、`ResultPreview`（前 200 字）；running 条目也带标题，工具一开跑就能看出在做什么 |
+| 计时 | Turn 级：组头用 `ChatMessage.DurationMs`，工具行用 `ToolTraceEntry.DurationMs`。**没有做**逐行思考计时（DSH 也没有，见 §3.1-(5)） |
+
+### 与计划的偏差（取舍）
+
+1. **答案 = 所有 Text 步骤的拼接**（DSH 的做法），不是「最后一段连续正文」。代价是中途说的话（"我先看一下"）会被提升到答案区；换来的是**不需要任何边界启发式**，折叠永远不会藏住回答。原有的交错顺序在「完全展开」档完整保留。
+2. **只要还有 running 的工具，这一轮就不收起**。DSH 用 `turn.status === open` 表达同一件事；我们的工具可能比流更晚结束，所以在 `CanFoldProcess` 里显式判断。
+3. **`LiveProcessDetail` 暂未参与渲染**：运行中的轮次一律展开（用户要看着它跑）。字段保留，等有"简洁档也要运行细节"的需求再接。
+4. **思考正文的可替换渲染（§3.1-(7)）没做**：`ChatStepRow` 已独立成组件，将来抽 `RenderFragment` 只改一处。
+5. **每轮用量页脚（§3.1-(8)）没做**：依赖 `UsageDetails.CachedInputTokenCount`，属 P2a 的测量项。
+
+### 测试
+
+- 新增 `ProcessDisplayTests`（档位映射、Part、合并规则）、`AgentChatServicePresentationTests`（标题/参数/预览）、`ToolPresentationTests`（形态映射、状态与耗时文案、HasDetail）。
+- `ChatRoomPresentationTests` 增 4 条：标准档合成一组且保留答案、点组头展开、详细档默认展开、切档保留手动展开；工具卡展开断言参数与结果。
+- `ChatStoreContextTests` 增步骤落库往返；`ChatTimelineTests` 增 `CallId`/`Part` 断言。
+- `ChatRoomStreamFailureTests` 覆盖「流中途失败」：错误提示必须落成一步，否则按步骤拼出来的答案会漏掉它。
+- 另用 `SDEMO_UI_BASELINE=1` 渲染了一份临时 HTML 逐项核对过（过程组只含过程、答案在组外、工具卡能展开到参数/结果）；截图基线的 PNG 管线在本次 checkout 里缺 `tools/ui-baseline`，所以没有提交新的基线产物。
+
+## 9. 参考（证据位置）
 
 DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat/lib/client.js`，`TOOL` = `dsh-client-ui-tool/lib/client.js`）：
 

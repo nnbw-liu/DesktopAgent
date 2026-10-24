@@ -1,0 +1,195 @@
+@using SDemo.DesktopAgent.Context
+@using SDemo.DesktopAgent.Models
+
+@* 步骤时间线的一行：思考 / 工具 / 宿主追问 / 正文。纯呈现，开合状态由自己持有。 *@
+@if (Step.Kind == ChatStepKind.Reasoning)
+{
+    <div class="timeline-step timeline-step--reasoning @(IsThinking ? "is-thinking" : null)">
+        <button type="button"
+                class="reasoning-toggle"
+                aria-expanded="@(_reasoningOpen ? "true" : "false")"
+                @onclick="() => _reasoningOpen = !_reasoningOpen">
+            <span class="reasoning-caret @(_reasoningOpen ? "is-open" : null)">▸</span>
+            <span class="reasoning-summary">@(IsThinking ? "思考中…" : $"思考 · {Step.Text.Length:N0} 字")</span>
+            @if (!_reasoningOpen && PreviewEnabled)
+            {
+                <span class="reasoning-preview">@ReasoningPreview(Step.Text)</span>
+            }
+        </button>
+
+        @if (_reasoningOpen)
+        {
+            <pre class="reasoning-body">@Step.Text</pre>
+        }
+    </div>
+}
+else if (Step.Kind == ChatStepKind.Tool)
+{
+    var card = Entry is null ? null : ToolPresentation.Describe(Entry);
+
+    <div class="timeline-step timeline-step--tool @StatusClass @(card is { HasDetail: true } ? "is-expandable" : null)">
+        <button type="button"
+                class="timeline-tool-row"
+                disabled="@(card is null || !card.HasDetail)"
+                aria-expanded="@(_toolOpen ? "true" : "false")"
+                title="@(card?.Summary ?? ToolName)"
+                @onclick="() => _toolOpen = !_toolOpen">
+            <span class="timeline-tool-caret @(_toolOpen ? "is-open" : null)">▸</span>
+            <span class="timeline-tool-name">@ToolName</span>
+            @if (StatusText is { Length: > 0 } status)
+            {
+                <span class="timeline-tool-status">@status</span>
+            }
+            <span class="timeline-tool-summary">@SummaryText</span>
+            @if (DurationText.Length > 0)
+            {
+                <span class="timeline-tool-duration">@DurationText</span>
+            }
+        </button>
+
+        @if (_toolOpen && card is { HasDetail: true })
+        {
+            <div class="timeline-tool-detail">
+                @if (!string.IsNullOrWhiteSpace(card.Title) && card.Title != ToolName)
+                {
+                    <div class="timeline-tool-target">@card.Title</div>
+                }
+
+                @if (card.Edits is { Count: > 0 } edits)
+                {
+                    <div class="timeline-tool-edits">
+                        @foreach (var edit in edits)
+                        {
+                            <span class="timeline-tool-edit">
+                                <span class="edit-path">@edit.Path</span>
+                                <span class="edit-added">+@edit.Added</span>
+                                <span class="edit-removed">-@edit.Removed</span>
+                            </span>
+                        }
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(card.ArgsJson))
+                {
+                    <div class="timeline-tool-section">参数</div>
+                    <pre class="timeline-tool-args">@card.ArgsJson</pre>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(card.ResultPreview))
+                {
+                    <div class="timeline-tool-section">结果</div>
+                    <pre class="timeline-tool-result">@card.ResultPreview</pre>
+                }
+            </div>
+        }
+    </div>
+}
+else if (Step.Kind == ChatStepKind.HostPrompt)
+{
+    <div class="timeline-step timeline-step--host" title="@Step.Text">
+        <span class="host-prompt-label">宿主追问</span>
+        <span class="host-prompt-text">@HostPreview(Step.Text)</span>
+    </div>
+}
+else
+{
+    <div class="msg-body msg-body--markdown timeline-step timeline-step--text">
+        @((MarkupString)MarkdownRenderer.ToHtml(Step.Text))
+    </div>
+}
+
+@code {
+    /// <summary>这一步。</summary>
+    [Parameter, EditorRequired] public ChatStep Step { get; set; } = new(ChatStepKind.Text, string.Empty);
+
+    /// <summary>步骤里的 Tool 步骤按索引取这里的条目。</summary>
+    [Parameter] public IReadOnlyList<ToolTraceEntry> Trace { get; set; } = [];
+
+    /// <summary>这一步还在生成：思考行显示「思考中…」。</summary>
+    [Parameter] public bool IsThinking { get; set; }
+
+    /// <summary>收起时是否贴一行思考预览（由展示档位决定）。</summary>
+    [Parameter] public bool PreviewEnabled { get; set; } = true;
+
+    private bool _reasoningOpen;
+    private bool _toolOpen;
+
+    private string ToolName => Entry?.ToolId ?? "tool";
+
+    /// <summary>优先按 CallId 找轨迹（压缩 / 重排后下标会漂），老数据回退到下标。</summary>
+    private ToolTraceEntry? Entry
+    {
+        get
+        {
+            if (Step.Kind != ChatStepKind.Tool)
+            {
+                return null;
+            }
+
+            if (!string.IsNullOrEmpty(Step.CallId))
+            {
+                foreach (var entry in Trace)
+                {
+                    if (string.Equals(entry.CallId, Step.CallId, StringComparison.Ordinal))
+                    {
+                        return entry;
+                    }
+                }
+            }
+
+            return Step.ToolIndex >= 0 && Step.ToolIndex < Trace.Count ? Trace[Step.ToolIndex] : null;
+        }
+    }
+
+    private string StatusClass => Entry is null ? "is-ok" : ToolPresentation.StatusClass(Entry.Status);
+
+    private string? StatusText => Entry is null ? null : ToolPresentation.StatusText(Entry);
+
+    private string DurationText => Entry is null ? string.Empty : ToolPresentation.DurationText(Entry);
+
+    private string SummaryText
+    {
+        get
+        {
+            if (Entry is null)
+            {
+                return string.Empty;
+            }
+
+            var text = (Entry.Summary ?? ToolPresentation.Describe(Entry).Title).ReplaceLineEndings(" ").Trim();
+
+            if (text.Length == 0)
+            {
+                return Entry.OutputChars > 0 ? $"输出 {Entry.OutputChars} 字符" : string.Empty;
+            }
+
+            return text.Length <= 90 ? text : string.Concat(text.AsSpan(0, 90), "…");
+        }
+    }
+
+    /// <summary>
+    /// 每帧都渲染：工具轨迹条目按 CallId 原地替换，<see cref="Trace"/> 的引用没变但内容变了，
+    /// 默认的参数比较会让「运行中 → 成功」这类状态更新被跳过。
+    /// </summary>
+    protected override bool ShouldRender() => true;
+
+    private static string HostPreview(string text)
+    {
+        const string prefix = "[宿主提示]";
+        var content = text.StartsWith(prefix, StringComparison.Ordinal) ? text[prefix.Length..].Trim() : text.Trim();
+        var firstLine = content.Split('\n')[0].Trim();
+
+        return firstLine.Length <= 72 ? firstLine : string.Concat(firstLine.AsSpan(0, 72), "…");
+    }
+
+    private static string ReasoningPreview(string text)
+    {
+        var last = text
+            .Split('\n')
+            .LastOrDefault(line => !string.IsNullOrWhiteSpace(line))?
+            .Trim() ?? string.Empty;
+
+        return last.Length <= 72 ? last : string.Concat(last.AsSpan(0, 72), "…");
+    }
+}
+

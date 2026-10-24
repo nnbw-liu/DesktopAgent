@@ -161,7 +161,7 @@ public sealed class AgentChatService : IAgentChatService
             ResolveInstructions(plan, decision),
             plan.Scope);
 
-        var pendingCalls = new Dictionary<string, (string Name, string? Digest)>(StringComparer.Ordinal);
+        var pendingCalls = new Dictionary<string, PendingToolCall>(StringComparer.Ordinal);
         var text = new StringBuilder();
         var reasoning = new StringBuilder();
 
@@ -193,7 +193,12 @@ public sealed class AgentChatService : IAgentChatService
 
                 case AgentStreamEvent.FunctionCall call:
                     var digest = DigestArguments(call.Arguments);
-                    pendingCalls[call.CallId] = (call.Name, digest);
+                    pendingCalls[call.CallId] = new PendingToolCall(
+                        call.Name,
+                        digest,
+                        DescribeArguments(call.Arguments),
+                        BuildTitle(call.Name, call.Arguments),
+                        DateTimeOffset.Now);
 
                     // 工具一开始执行就落到轨迹里；结果回来时按 CallId 原地替换成最终状态。
                     plan.Metrics?.BeginToolTrace(new ToolTraceEntry(
@@ -206,7 +211,9 @@ public sealed class AgentChatService : IAgentChatService
                         DateTime.Now,
                         ReasoningChars: emittedReasoning,
                         TextChars: emittedText,
-                        CallId: call.CallId));
+                        CallId: call.CallId,
+                        ArgsJson: pendingCalls[call.CallId].ArgsJson,
+                        Title: pendingCalls[call.CallId].Title));
                     toolChanged = true;
                     break;
 
@@ -369,12 +376,13 @@ public sealed class AgentChatService : IAgentChatService
     private static ToolTraceEntry BuildTraceEntry(
         string callId,
         string? text,
-        IReadOnlyDictionary<string, (string Name, string? Digest)> pending,
+        IReadOnlyDictionary<string, PendingToolCall> pending,
         int reasoningChars = -1,
         int textChars = -1)
     {
-        var name = pending.TryGetValue(callId, out var call) ? call.Name : "tool";
-        var digest = pending.TryGetValue(callId, out var value) ? value.Digest : null;
+        var hasCall = pending.TryGetValue(callId, out var call);
+        var name = hasCall ? call!.Name : "tool";
+        var digest = hasCall ? call!.Digest : null;
 
         var (status, exitCode) = Classify(text);
 
@@ -389,8 +397,102 @@ public sealed class AgentChatService : IAgentChatService
             ParseEdits(text),
             reasoningChars,
             textChars,
-            callId);
+            callId,
+            ArgsJson: hasCall ? call!.ArgsJson : null,
+            Title: hasCall ? call!.Title : null,
+            DurationMs: hasCall
+                ? (int)Math.Max(0, (DateTimeOffset.Now - call!.StartedAt).TotalMilliseconds)
+                : -1,
+            ResultPreview: Preview(text));
     }
+
+    /// <summary>一次已发出、尚未拿到结果的工具调用；用于在结果回来时补齐耗时与展示信息。</summary>
+    private sealed record PendingToolCall(
+        string Name,
+        string? Digest,
+        string? ArgsJson,
+        string? Title,
+        DateTimeOffset StartedAt);
+
+    /// <summary>工具卡的标题：优先取最有辨识度的参数，其次退回工具名。</summary>
+    internal static string? BuildTitle(string name, IDictionary<string, object?>? arguments)
+    {
+        if (arguments is null || arguments.Count == 0)
+        {
+            return null;
+        }
+
+        static string? Read(IDictionary<string, object?> source, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (source.TryGetValue(key, out var value) && value?.ToString() is { Length: > 0 } text)
+                {
+                    return text;
+                }
+            }
+
+            return null;
+        }
+
+        var title = name switch
+        {
+            "run_command" or "run_powershell" => ComposeCommand(arguments),
+            "read_file" or "write_file" or "replace_text" or "apply_patch" or "list_tree" or "list_dir"
+                => Read(arguments, "path", "file", "directory"),
+            "search_files" or "glob_files" => Read(arguments, "pattern", "query"),
+            "web_search" => Read(arguments, "query", "q"),
+            "load_skill" => Read(arguments, "name"),
+            "todo_write" => null,
+            _ => Read(arguments, "path", "file", "query", "pattern", "command")
+        };
+
+        return title is null ? null : Clip(title, 120);
+    }
+
+    /// <summary>命令类工具的标题：命令 + 最多两个参数（够看出在构建什么，不必背整行脚本）。</summary>
+    private static string? ComposeCommand(IDictionary<string, object?> arguments)
+    {
+        if (!arguments.TryGetValue("command", out var command) || command?.ToString() is not { Length: > 0 } executable)
+        {
+            return null;
+        }
+
+        if (!arguments.TryGetValue("args", out var args) || args?.ToString() is not { Length: > 0 } rest)
+        {
+            return executable;
+        }
+
+        var head = string.Join(' ', rest.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2));
+
+        return head.Length == 0 ? executable : $"{executable} {head}";
+    }
+
+    /// <summary>参数原文（截断到 512 字符）：只给界面算卡片，不进入模型上下文。</summary>
+    internal static string? DescribeArguments(IDictionary<string, object?>? arguments)
+    {
+        if (arguments is null || arguments.Count == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Clip(JsonSerializer.Serialize(arguments), 512);
+        }
+        catch (NotSupportedException)
+        {
+            // 参数里有不可序列化的值：宁可不给卡片，也不要打断工具调用。
+            return null;
+        }
+    }
+
+    /// <summary>结果预览（首 200 字符），供工具卡展开时先看。</summary>
+    internal static string? Preview(string? text) =>
+        string.IsNullOrWhiteSpace(text) ? null : Clip(text, 200);
+
+    private static string Clip(string text, int max) =>
+        text.Length <= max ? text : string.Concat(text.AsSpan(0, max), "…");
 
     /// <summary>从工具结果末尾的 <c>[EDIT] 路径 +N -M</c> 行汇总本次改动，供消息下方展示。</summary>
     internal static IReadOnlyList<EditedFile>? ParseEdits(string? text)

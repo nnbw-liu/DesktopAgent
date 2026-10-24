@@ -58,6 +58,8 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         message.Property(record => record.PluginJson);
         message.Property(record => record.DerivedJson);
         message.Property(record => record.ToolTraceJson);
+        // P0：步骤时间线（只服务界面，不进入上下文）。
+        message.Property(record => record.StepsJson);
         // M3：知识库引用（只用于界面跳转，不进入上下文）。
         message.Property(record => record.MemoryCitationsJson);
         message.Property(record => record.IsPinned);
@@ -161,6 +163,9 @@ public sealed class MessageRecord
 
     /// <summary>工具轨迹（ToolTraceEntry[]）的 JSON。</summary>
     public string? ToolTraceJson { get; set; }
+
+    /// <summary>步骤时间线（ChatStep[]）的 JSON；P0 起写入，只服务界面。</summary>
+    public string? StepsJson { get; set; }
 
     /// <summary>知识库引用（MemoryCitation[]）的 JSON；M3。</summary>
     public string? MemoryCitationsJson { get; set; }

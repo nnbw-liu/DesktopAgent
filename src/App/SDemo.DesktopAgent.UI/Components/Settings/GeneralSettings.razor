@@ -50,6 +50,37 @@
             </span>
             <input type="checkbox" class="switch" checked="@_continueOnSwitch" @onchange="HandleContinueOnSwitchChanged" />
         </label>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">过程展示</span>
+                <span class="settings-row-hint">
+                    控制「思考 / 工具」这些过程记录的显隐；最终答案永远显示。
+                    @ProcessModeHint
+                </span>
+            </span>
+
+            <select class="field-input field-input--select" value="@_processMode" @onchange="HandleProcessModeChanged">
+                @foreach (var option in ProcessModeOptions)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </select>
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">过程收起时机</span>
+                <span class="settings-row-hint">「下一条输入」会保留刚结束那一轮的过程，方便回看它想了什么。</span>
+            </span>
+
+            <select class="field-input field-input--select" value="@_collapseTiming" @onchange="HandleCollapseTimingChanged">
+                @foreach (var option in CollapseTimingOptions)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </select>
+        </div>
     </section>
 
     <section class="settings-section">
@@ -84,6 +115,8 @@
 @code {
     private string _language = "zh-CN";
     private bool _continueOnSwitch;
+    private string _processMode = "Standard";
+    private string _collapseTiming = "Completion";
 
     private static readonly (ThemePreference Value, string Key, string Label, string Description)[] ThemeOptions =
     [
@@ -92,10 +125,59 @@
         (ThemePreference.Dark, "dark", "深色", "始终使用深色")
     ];
 
+    private static readonly (string Value, string Label, string Hint)[] ProcessModeOptions =
+    [
+        ("Compact", "简洁", "只留答案和一行过程摘要"),
+        ("Standard", "标准", "完成的过程收成一行，点开才看细节"),
+        ("Detailed", "详细", "过程逐行可见，仍可手动收起"),
+        ("Expanded", "完全展开", "不分过程组，按真实顺序平铺")
+    ];
+
+    private static readonly (string Value, string Label)[] CollapseTimingOptions =
+    [
+        ("Completion", "生成结束即收起"),
+        ("NextInput", "等下一条输入")
+    ];
+
+    private string ProcessModeHint =>
+        ProcessModeOptions.FirstOrDefault(option => option.Value == _processMode).Hint ?? string.Empty;
+
     protected override void OnInitialized()
     {
         _language = Settings.Current.Language;
         _continueOnSwitch = Settings.Current.ContinueGenerationOnChatSwitch;
+        _processMode = Settings.Current.Chat.ProcessMode.ToString();
+        _collapseTiming = Settings.Current.Chat.CollapseTiming.ToString();
+    }
+
+    private void HandleProcessModeChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? nameof(ProcessDisplayMode.Standard);
+
+        if (!Enum.TryParse<ProcessDisplayMode>(value, ignoreCase: true, out var mode))
+        {
+            _processMode = Settings.Current.Chat.ProcessMode.ToString();
+            return;
+        }
+
+        _processMode = mode.ToString();
+        Settings.Current.Chat.ProcessMode = mode;
+        Settings.Save();
+    }
+
+    private void HandleCollapseTimingChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? nameof(ProcessCollapseTiming.Completion);
+
+        if (!Enum.TryParse<ProcessCollapseTiming>(value, ignoreCase: true, out var timing))
+        {
+            _collapseTiming = Settings.Current.Chat.CollapseTiming.ToString();
+            return;
+        }
+
+        _collapseTiming = timing.ToString();
+        Settings.Current.Chat.CollapseTiming = timing;
+        Settings.Save();
     }
 
     private void HandleContinueOnSwitchChanged(ChangeEventArgs args)
