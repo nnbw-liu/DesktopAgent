@@ -432,6 +432,8 @@ DSH 把"思考正文"做成单值 slot（`conversation.chat.reasoning.body`）�
 
 ### 3.2 P1：把"选工具"从宿主猜换成模型判（核心）
 
+> 实施情况：§3.2.1 见 §10（P1a 已落地），§3.2.2–§3.2.5 见 §11（P1b 已落地）。
+
 #### 3.2.1 先说实话：这一步的前提是拿回循环
 
 DSH 那套"模型自己用 CoT 选工具"能成立，靠的是**模型看得到完整决策依据**：真工具结果在历史里、工具描述带策略、曝光面稳定。我们现在三样都缺，而且缺的根因是同一个：
@@ -795,15 +797,15 @@ public interface IInputTriggerSource
 
 ## 5. 落地顺序与工时
 
-| 阶段 | 内容 | 工时 | 依赖 | 风险 |
-|---|---|---|---|---|
-| **P0** | 步骤模型（含 `GroupPart`）+ 过程组 + 工具行/卡片 + 四档配置对象 + `StepsJson` | 3–4 天 | 无 | 低（纯 UI + 存储列） |
-| **P0.5** | 输入框 `@文件`（1.5–2d）+ `/` 命令（1–1.5d）+ `/` 技能（1–1.5d，含 `disable-model-invocation`） | 4–5 天 | 无 | 低（新功能，不碰引擎） |
-| **P1a** | 自建 `AgentLoop` 替换 FICC，真工具消息入历史，step 事件 | 3–4 天 | 无 | **中**：FICC 现有行为（重试、非法参数修复、并行）要一一补齐 |
-| **P1b** | 工具描述改造 + 曝光面按任务档稳定 + 同轮补齐 + 删 PLAN | 2 天 | P1a | 中：需要评测集重跑 |
-| **P2a** | 上下文段注册表（含新增 `policy` / `time` 段）+ 尾部快照消息 + `CacheHitTokens` 测量 | 2–3 天 | 无 | 低 |
-| **P2b** | 压缩补三性质 | 1–2 天 | P2a | 中：涉及会话状态迁移 |
-| **P2c** | 大输出落盘 | 1 天 | 无 | 低 |
+| 阶段 | 内容 | 工时 | 依赖 | 风险 | 状态 |
+|---|---|---|---|---|---|
+| **P0** | 步骤模型（含 `GroupPart`）+ 过程组 + 工具行/卡片 + 四档配置对象 + `StepsJson` | 3–4 天 | 无 | 低（纯 UI + 存储列） | ✅ §8 |
+| **P0.5** | 输入框 `@文件`（1.5–2d）+ `/` 命令（1–1.5d）+ `/` 技能（1–1.5d，含 `disable-model-invocation`） | 4–5 天 | 无 | 低（新功能，不碰引擎） | ✅ §9 |
+| **P1a** | 自建 `AgentLoop` 替换 FICC，真工具消息入历史，step 事件 | 3–4 天 | 无 | **中**：FICC 现有行为（重试、非法参数修复、并行）要一一补齐 | ✅ §10 |
+| **P1b** | 工具描述改造 + 曝光面按任务档稳定 + 同轮补齐 + 删 PLAN | 2 天 | P1a | 中：需要评测集重跑 | ✅ §11 |
+| **P2a** | 上下文段注册表（含新增 `policy` / `time` 段）+ 尾部快照消息 + `CacheHitTokens` 测量 | 2–3 天 | 无 | 低 | 待做 |
+| **P2b** | 压缩补三性质 | 1–2 天 | P2a | 中：涉及会话状态迁移 | 待做 |
+| **P2c** | 大输出落盘 | 1 天 | 无 | 低 | 待做 |
 
 建议排期：**P0 → P0.5 → P2a → P1a → P1b → P2b → P2c**。先把"看得见的推理"做好，再补输入框，然后动上下文，最后才动循环（要评测兜底）。
 
@@ -820,12 +822,16 @@ public interface IInputTriggerSource
 ```
 思考              reasoning-delta(index)     → AgentStreamEvent.Reasoning（已有，缺 index/step）
 工具调用           tool/call event            → ToolTraceEntry + ChatStep(Tool)（已有，缺 StepIndex/CallId）
-步骤边界           step/start … step/end      → ChatStep.StepIndex（P1）
-工具消息入历史      assistant/message + tool/result → ChatRole.Tool 消息（P1，现在压成文本）
+步骤边界           step/start … step/end      → ChatStep.StepIndex（P1a 已落地）
+工具消息入历史      assistant/message + tool/result → ChatRole.Tool 消息（P1a 已落地）
 工具行             tool.call.toolview 键控    → IToolViewRegistry + ToolPresentation（P0）
 工具卡             client-derived props       → 同上，从 ArgsJson/结果现场算（P0）
 过程组             group part reasoning/response → ChatGroupPart + ProcessGroup.razor（P0）
 四档显隐           display policy 对象        → ProcessDisplayPolicy（P0）
+工具描述           描述即决策规则（何时用/换谁）→ ToolPlaybooks 拼进 description（P1b）
+曝光面             稳定（不随每轮关键词抖动） → ToolTaskProfile 任务档 + 只增不减（P1b）
+同轮补工具         （不需要：不裁工具）        → search_capabilities 闭环：本轮补 ≤3 个并重发（P1b）
+PLAN 强制          （没有：/plan 是独立模式）  → FullFor(SupportsReasoning) 按能力分叉（P1b）
 上下文段           systemPrompt.context({name,order,required}) → IAgentContextSection 注册表（P2a）
 运行时快照         user 消息 + source 归因    → 历史末尾的单条 snapshot 消息（P2a）
 时间上下文         time-context 三行读数       → `time` 段（IANA 时区 + 相对时长 + 缺失指令）（P2a）
@@ -995,7 +1001,47 @@ bUnit 里 `TextChanged` 没人接、组件不重渲染，所以测试一直是�
 - 跑 `tools/AgentEval` + `eval/routing/cases.json` 对比两条路径，再决定是否把 `NativeLoop` 改成默认。
 - 循环里已经握着工具表：「本轮补工具」只需要在 `InvokeAsync` 命中「未暴露」时追加工具并重发一次请求，不需要等下一轮。
 
-## 11. 参考（证据位置）
+## 11. P1b 实施记录（工具描述 / 曝光面 / 同轮补齐 / 删 PLAN）
+
+状态：✅ 已落地。WPF 解决方案 0 警告 0 错误（Debug / Release）；Core 784、UI 108、Sandbox 219（1 跳过）测试全绿；
+`tools/routing-eval --mode rules` **28/28（100%）**。
+
+### 落地形态
+
+| 计划项 | 实现 |
+|---|---|
+| §3.2.2 工具描述带决策规则 | 新增 `Tools.Abstractions/ToolPlaybooks.cs`：一张「工具名 → 决策规则」表（20 个工具），`InstrumentedAIFunction.Description` = 功能说明 + 规则；幂等，嵌套包装不会重复追加 |
+| §3.2.3 曝光面按任务档稳定 | 新增 `Contracts/Context/ToolTaskProfile.cs`（General / Read / Edit / Run / Shell / Document / Web / Memory / Plan）；`CapabilityRouter.ResolveProfile`（本句有任务信号用它，否则沿用最近一条用户输入）→ **Full = 核心集 + 任务档工具 + 本句意图工具 + 最近工具**；`RoutingDecision.Profile/ProfileInherited` 进报告与 Reason |
+| 只增不减 | 任务档内工具集固定；`PreviousUserInputs` 从会话历史取最近 4 条（跳过 `[宿主提示]`），Runner 与 ChatService 两条路由路径都传 |
+| §3.2.4 同轮补工具 | `search_capabilities` 执行时回调 `CapabilitySearchOutcome`（命中 + 未暴露）→ `AgentChatService` 在本轮内补最多 3 个、**只补一次**、受 schema 预算约束 → `AgentInvocation.ExpandTools` → `NativeAgentLoop` 扩充 `ChatOptions.Tools` 重发，并透出 `AgentStreamEvent.ToolsExpanded` |
+| 补工具可见 | `AgentDelta.Notice` → `ChatRoom` 落成 `ChatStepKind.HostPrompt` 一步（过程组内，标签「宿主提示」）；`AgentRunMetrics.ToolExpansions` 记账 |
+| §3.2.5 删 PLAN | `SystemPrompts.FullWithReasoning` / `FullWithPlanLine` + `FullFor(ModelProfile.SupportsReasoning)`；`ContextBuilder.SelectBasePrompt` 与 `IntentHint(Task)` 按能力分叉 |
+| 评测 | `eval/routing/cases.json` 24 → 28 条（新增 4 条带 `history` 的随访 / 换话题用例）；`tools/routing-eval` 支持 `history` 字段 |
+
+### 与计划的偏差（取舍）
+
+1. **决策规则集中在一张表，而不是改 9 个工具包的 `description`**：成对关系（`read_file` ↔ `search_files`、
+   `run_command` ↔ `run_powershell`、三种写文件工具）写在一处才不会互相矛盾；模型看到的仍是同一条 description，
+   `MeasureToolSchema` 量到的也是拼好后的文本（预算不会漏算）。代价是规则与工具实现分处两个文件。
+2. **「只增不减」靠任务档粘性实现，不靠记住上一轮曝光集合**：不需要给 Runner 加会话级状态；
+   派生自消息历史 → 同一份历史必得同一份决策，可复现、可测试。换话题时任务档合法地换掉旧工具。
+3. **补工具只补一次、最多 3 个**：无界补充等于「边跑边全量暴露」；`AgentSettings.NativeLoop` 关闭时（FICC）
+   不传 `ExpandTools`，因为那时宿主看不到 step 边界。
+4. **界面复用 `HostPrompt` 步骤，不新增 `Retry` 类型**：P0 的步骤枚举已经有「宿主追问」，把标签改成「宿主提示」即可同时承载两类提示。
+5. **`R11` 是顺带修的关键词缺口**：P1b 之前这批用例实际是 23/24（`R11`「看看工作区目录结构」一直 MISS）；
+   `ReadWords` 补「目录结构 / 看目录」后 28/28。
+
+### 测试
+
+- 契约 / 路由：`ToolExposureProfileTests`（追问沿用编辑档、无历史只给核心集、换话题换档、本句优先于历史、
+  `PreviousUserInputs` 取值与宿主提示过滤、描述拼接与幂等、关键工具规则互相指路）。
+- 注册表：`AgentToolRegistryTests` 增「兜底入口把命中但未暴露的工具报给宿主」「模型看到的描述里带决策规则」。
+- 循环：`NativeAgentLoopTests` 增「本轮内补工具后下一步请求就带上新工具」（3 次请求体断言）「本轮补工具只补一次」。
+- 提示词：`FullPromptTests` / `CompactPromptTests` 覆盖两种 Full 变体与 `SupportsReasoning` 分叉。
+- 界面：`ChatRoomToolExpansionTests`（补工具提示落成宿主提示步骤、答案不受影响）。
+- 评测：`tools/routing-eval --mode rules` → 28/28。
+
+## 12. 参考（证据位置）
 
 DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat/lib/client.js`，`TOOL` = `dsh-client-ui-tool/lib/client.js`）：
 
@@ -1035,12 +1081,12 @@ DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat
 - `src/App/SDemo.DesktopAgent.UI/Components/Settings/ToolsSettings.razor`（「内置工具循环」开关）
 - `src/Agents/SDemo.DesktopAgent.Agents/MafAgentRuntime.cs:32-46,59-90`（FICC 与事件映射）
 - `src/App/SDemo.DesktopAgent.Core/Services/AgentChatService.cs:174-230`（合并 delta、轨迹记录）
-- `src/Context/SDemo.DesktopAgent.Context/SystemPrompts.cs:10-24`（PLAN 指令）
+- `src/Context/SDemo.DesktopAgent.Context/SystemPrompts.cs:11-47`（`TaskRules` 共用规则、`FullWithPlanLine` / `FullWithReasoning`、`FullFor(SupportsReasoning)`）
 - `src/Context/SDemo.DesktopAgent.Context/ContextBuilder.cs:60-79,416-479`（提示词拼装与注入块）
 - `src/Context/SDemo.DesktopAgent.Context/AgentMessageMapper.cs:70-72,195-208`（`[工具轨迹]` 文本块）
 - `src/Contracts/SDemo.DesktopAgent.Contracts/Models/ChatTimeline.cs:16-48`、`Context/ToolTraceModels.cs:16-21`（字符边界还原）
 - `src/App/SDemo.DesktopAgent.UI/Components/Chat/ChatTimeline.razor:14-62`（运行中 17-29、默认收起 78）、`ChatRoom.razor:935-945,162-202,2255-2278,2339-2392`
-- `src/Tools/SDemo.DesktopAgent.Tools.Abstractions/CapabilityRouter.cs:107-176`、`TurnClassifier.cs:54-81`
+- `src/Tools/SDemo.DesktopAgent.Tools.Abstractions/CapabilityRouter.cs`（`Route`、`ResolveProfile` / `ToolsOfProfile`、`PreviousUserInputs`、`HostPromptPrefix`）、`ToolPlaybooks.cs`（模型看到的决策规则表）、`TurnClassifier.cs:54-81`
 - `src/Context/SDemo.DesktopAgent.Context/ContextCompactor.cs:67-215`、`ContextBudgetChatClient.cs:74-75,199-261`、`ContextTrimmer.cs:104-148`
 - `src/Context/SDemo.DesktopAgent.Context/State/StatePackFormatter.cs:21-59,61-144`（god-renderer 与写死的截断顺序）、`State/WorkspaceState.cs:6-13`（数据源）
 - `src/Context/SDemo.DesktopAgent.Context/AgentInstructions.cs:9-19`（死代码；静态沙箱文案）

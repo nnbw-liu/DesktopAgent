@@ -56,6 +56,12 @@ internal static class Program
                 : AgentMode.Full;
             var settings = new AgentSettings();
             var maxTools = settings.ResolveMaxExposedTools(testCase.Window, mode);
+
+            // P1b：历史轮（旧→新）用来判「任务档」。没有历史时与 M4 的判定完全一致。
+            var previousInputs = testCase.History is { Length: > 0 } history
+                ? CapabilityRouter.PreviousUserInputs([.. history, testCase.Prompt])
+                : null;
+
             var input = new CapabilityRoutingInput(
                 testCase.Prompt,
                 [],
@@ -63,7 +69,8 @@ internal static class Program
                 mode,
                 maxTools,
                 EscapeHatch: true,
-                ExposeAll: false);
+                ExposeAll: false,
+                PreviousUserInputs: previousInputs);
 
             var rule = CapabilityRouter.Route(input);
             var final = rule;
@@ -299,7 +306,8 @@ internal static class Program
         int Window,
         string[] ExpectedTools,
         string[] ForbiddenTools,
-        string? Note);
+        string? Note,
+        string[]? History = null);
 
     private sealed record CaseResult(
         string Id,

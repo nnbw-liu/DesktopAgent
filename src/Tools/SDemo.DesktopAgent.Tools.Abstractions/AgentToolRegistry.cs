@@ -5,6 +5,23 @@ using SDemo.DesktopAgent.Context;
 namespace SDemo.DesktopAgent.Services;
 
 /// <summary>
+/// <c>search_capabilities</c> 的一次命中结果（P1b §3.2.4）。
+/// <para>
+/// 兜底入口原来只回一段文本、让模型「下一轮再说」。有了这份结构化结果，宿主就能在
+/// **同一轮内**把命中的工具补进曝光面再发一次请求——模型的推理产生了动作，宿主不能装作没听见。
+/// </para>
+/// </summary>
+/// <param name="Query">模型给的关键词。</param>
+/// <param name="Fallback">命中为空、退回了「全部可用工具」。</param>
+/// <param name="Matched">命中（或退回全集）的工具名。</param>
+/// <param name="Unexposed">其中本轮尚未暴露的部分，按命中顺序排列。</param>
+public sealed record CapabilitySearchOutcome(
+    string Query,
+    bool Fallback,
+    IReadOnlyList<string> Matched,
+    IReadOnlyList<string> Unexposed);
+
+/// <summary>
 /// 工具包注册表：唯一决定“哪些包在当前平台可见、本轮哪些包可以交给模型”。
 /// 平台过滤（<see cref="AgentToolPackDescriptor.WindowsOnly"/>）在这里做，
 /// 所以 Android 即使误注册了 PowerShell 包也不会暴露给模型。
@@ -72,12 +89,16 @@ public sealed class AgentToolRegistry
     /// M1：只生成路由选中的工具（核心集 + 选中包），并可附加 <c>search_capabilities</c> 兜底入口。
     /// 仍然只从「平台支持 ∩ 用户启用」的包里生成，路由结果不会绕过开关。
     /// </summary>
+    /// <param name="onCapabilitySearch">
+    /// 兜底入口被调用时回调一次命中结果；宿主据此在**本轮内**补工具（P1b §3.2.4）。
+    /// </param>
     public IReadOnlyList<AITool> CreateExposed(
         ToolContext context,
         IReadOnlySet<string> enabledPackIds,
         IReadOnlySet<string> exposedToolNames,
         AgentRunMetrics? metrics = null,
-        bool escapeHatch = false)
+        bool escapeHatch = false,
+        Action<CapabilitySearchOutcome>? onCapabilitySearch = null)
     {
         var tools = Create(context, enabledPackIds, metrics)
             .Where(tool => exposedToolNames.Contains(tool.Name, StringComparer.Ordinal))
@@ -85,7 +106,8 @@ public sealed class AgentToolRegistry
 
         if (escapeHatch && ToolNames(enabledPackIds).Count > 0)
         {
-            tools.Add(Instrument(CreateEscapeHatch(enabledPackIds, exposedToolNames), metrics));
+            tools.Add(Instrument(
+                CreateEscapeHatch(enabledPackIds, exposedToolNames, onCapabilitySearch), metrics));
         }
 
         return tools;
@@ -104,7 +126,8 @@ public sealed class AgentToolRegistry
     /// </summary>
     private AITool CreateEscapeHatch(
         IReadOnlySet<string> enabledPackIds,
-        IReadOnlySet<string> exposedToolNames)
+        IReadOnlySet<string> exposedToolNames,
+        Action<CapabilitySearchOutcome>? onSearch)
     {
         var entries = EnabledPacks(enabledPackIds)
             .SelectMany(pack => pack.Descriptor.Functions
@@ -112,7 +135,7 @@ public sealed class AgentToolRegistry
             .ToArray();
 
         return AIFunctionFactory.Create(
-            (string query) => SearchCapabilities(entries, exposedToolNames, query),
+            (string query) => SearchCapabilities(entries, exposedToolNames, query, onSearch),
             name: CapabilityRouter.EscapeHatchTool,
             description: "按关键词查找当前会话可用的工具与技能；返回名字、所属分组与用途。");
     }
@@ -120,7 +143,8 @@ public sealed class AgentToolRegistry
     private string SearchCapabilities(
         IReadOnlyList<(AgentToolPackDescriptor Pack, AgentToolFunctionDescriptor Function)> entries,
         IReadOnlySet<string> exposedToolNames,
-        string query)
+        string query,
+        Action<CapabilitySearchOutcome>? onSearch)
     {
         var normalized = (query ?? string.Empty).Trim().ToLowerInvariant();
 
@@ -151,9 +175,20 @@ public sealed class AgentToolRegistry
             lines.Add($"- {function.Id}（{pack.Name}）：{pack.Description} [{state}]");
         }
 
-        lines.Add("提示：本轮未暴露的工具不会交给模型；如需使用，请在下一轮明确说明用途，宿主会重新路由。");
+        lines.Add("提示：带「本轮未暴露」的工具，宿主会在本轮内补一次（最多一次）；补上之后直接调用即可，不必等到下一轮。");
 
         AppendSkills(lines, normalized);
+
+        // 把「命中且本轮没暴露」的工具报给宿主：补哪些、要不要受预算约束由宿主决定。
+        onSearch?.Invoke(new CapabilitySearchOutcome(
+            normalized,
+            fallback,
+            matches.Select(match => match.Function.Id).Distinct(StringComparer.Ordinal).ToArray(),
+            matches
+                .Select(match => match.Function.Id)
+                .Where(name => !exposedToolNames.Contains(name, StringComparer.Ordinal))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray()));
 
         return string.Join('\n', lines);
     }
@@ -209,7 +244,11 @@ public sealed class AgentToolRegistry
 
         public override string Name => inner.Name;
 
-        public override string Description => inner.Description;
+        /// <summary>
+        /// 模型看到的是「功能说明 + 决策规则」（<see cref="ToolPlaybooks"/>）：
+        /// 选择用哪个工具的先验写在描述里，而不是只写在宿主的路由代码里。
+        /// </summary>
+        public override string Description => ToolPlaybooks.Compose(inner.Name, inner.Description);
 
         public override JsonElement JsonSchema => inner.JsonSchema;
 

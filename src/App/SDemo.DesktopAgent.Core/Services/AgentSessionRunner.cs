@@ -593,7 +593,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             request.ModelId,
             request.Messages));
         var mode = AgentModeResolver.Resolve(profile, request.ModelId, agent.Mode);
-        var (userInput, recent) = RoutingInputs(request);
+        var (userInput, recent, previousInputs) = RoutingInputs(request);
 
         var input = new CapabilityRoutingInput(
             userInput,
@@ -603,7 +603,8 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             agent.ResolveMaxExposedTools(profile.ContextWindow, mode),
             agent.SearchCapabilitiesEnabled,
             agent.ExposeAllTools,
-            HasSelectedSkill: !string.IsNullOrWhiteSpace(request.SkillName));
+            HasSelectedSkill: !string.IsNullOrWhiteSpace(request.SkillName),
+            PreviousUserInputs: previousInputs);
 
         var rule = CapabilityRouter.Route(input);
 
@@ -663,7 +664,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         var profile = _builder.ResolveProfile(build);
         var agent = request.Scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
         var mode = AgentModeResolver.Resolve(profile, request.ModelId, agent.Mode);
-        var (userInput, recent) = RoutingInputs(request);
+        var (userInput, recent, previousInputs) = RoutingInputs(request);
 
         return CapabilityRouter.Route(new CapabilityRoutingInput(
             userInput,
@@ -673,18 +674,27 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             agent.ResolveMaxExposedTools(profile.ContextWindow, mode),
             agent.SearchCapabilitiesEnabled,
             agent.ExposeAllTools,
-            HasSelectedSkill: !string.IsNullOrWhiteSpace(request.SkillName)));
+            HasSelectedSkill: !string.IsNullOrWhiteSpace(request.SkillName),
+            PreviousUserInputs: previousInputs));
     }
 
-    private static (string UserInput, string[] RecentToolIds) RoutingInputs(AgentRunRequest request)
+    private static (string UserInput, string[] RecentToolIds, string[] PreviousInputs) RoutingInputs(
+        AgentRunRequest request)
     {
-        var userInput = request.Messages
-            .LastOrDefault(message => message.Role == ChatMessageRole.User)?.Content ?? string.Empty;
+        // 用户输入按时间顺序取全：最后一条是本轮，之前的交给任务档（P1b §3.2.3）判「是不是同一个任务」。
+        var userInputs = request.Messages
+            .Where(message => message.Role == ChatMessageRole.User)
+            .Select(message => message.Content ?? string.Empty)
+            .ToArray();
+
+        var userInput = userInputs.Length > 0 ? userInputs[^1] : string.Empty;
+        var previousInputs = CapabilityRouter.PreviousUserInputs(userInputs);
         var recent = request.Metrics?.ToolTrace
             .Select(entry => entry.ToolId)
             .TakeLast(6)
             .ToArray() ?? [];
-        return (userInput, recent);
+
+        return (userInput, recent, [.. previousInputs]);
     }
 
     /// <summary>小模型看到的工具清单：只含「平台支持 ∩ 用户启用」的包，不实例化工具。</summary>
