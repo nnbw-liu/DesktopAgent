@@ -98,7 +98,7 @@ window.sdComposer = {
         return element.value;
     },
 
-    // 输入框滚动时，高亮层跟着滚，避免长文本时 token 底色错位。
+    // 输入框滚动时，高亮层跟着滚；出现滚动条时再补上右侧留白，两边的换行位置才对得上。
     syncScroll: function (element, highlight) {
         if (!element || !highlight) {
             return;
@@ -106,6 +106,10 @@ window.sdComposer = {
 
         highlight.scrollTop = element.scrollTop;
         highlight.scrollLeft = element.scrollLeft;
+
+        // offsetWidth - clientWidth 就是竖向滚动条宽度（没有滚动条时是 0）。
+        var gutter = element.offsetWidth - element.clientWidth;
+        highlight.style.paddingRight = gutter > 0 ? (16 + gutter) + 'px' : '';
     },
 
     detach: function () {
