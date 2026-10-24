@@ -635,10 +635,20 @@ a {
     transition: opacity .12s ease, background .12s ease, color .12s ease;
 }
 
-.msg-action:hover {
+.msg-action:hover:not(:disabled) {
     background: var(--surface-hover);
     color: var(--text);
     opacity: 1;
+}
+
+.msg-action:disabled {
+    opacity: .3;
+    cursor: not-allowed;
+}
+
+.msg-action--danger:hover:not(:disabled) {
+    background: rgba(214, 69, 69, .12);
+    color: #d64545;
 }
 
 .msg-action-icon {
@@ -969,23 +979,21 @@ a {
     padding-right: 8px;
 }
 
-/* Header 里的模型选择器 */
+/* 输入框里的模型选择器：按提供商分组，可收起 */
 .model-picker {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 8px;
     min-width: 0;
 }
 
-.model-picker-label {
-    flex: 0 0 auto;
-    color: var(--muted);
-    font-size: 11px;
-}
-
-.model-picker-select {
+.model-picker-trigger {
+    display: flex;
+    align-items: center;
+    gap: 5px;
     min-width: 0;
-    max-width: 190px;
+    max-width: 210px;
     padding: 3px 8px;
     border: 1px solid var(--border);
     border-radius: 7px;
@@ -993,14 +1001,143 @@ a {
     color: var(--text-dim);
     font-family: inherit;
     font-size: 11.5px;
-    outline: none;
     cursor: pointer;
-    text-overflow: ellipsis;
 }
 
-.model-picker-select:disabled {
+.model-picker-trigger:hover:not(:disabled),
+.model-picker.is-open .model-picker-trigger {
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+
+.model-picker-trigger:disabled {
     opacity: .6;
     cursor: not-allowed;
+}
+
+.model-picker-current {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.model-picker-caret {
+    flex: 0 0 auto;
+    font-size: 9px;
+    opacity: .65;
+}
+
+.model-picker-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+}
+
+.model-picker-menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
+    z-index: 30;
+    width: 280px;
+    max-height: min(420px, 55vh);
+    padding: 4px;
+    overflow-y: auto;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: var(--composer-shadow);
+}
+
+.model-picker-group + .model-picker-group {
+    margin-top: 2px;
+    border-top: 1px solid var(--border);
+}
+
+.model-picker-group-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.model-picker-group-head:hover {
+    background: var(--surface-hover);
+}
+
+.model-picker-group-caret {
+    flex: 0 0 auto;
+    width: 10px;
+    font-size: 9px;
+    opacity: .65;
+    transition: transform .12s ease;
+}
+
+.model-picker-group:not(.is-collapsed) .model-picker-group-caret {
+    transform: rotate(90deg);
+}
+
+.model-picker-group-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 11.5px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.model-picker-group-count {
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.model-picker-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 10px 7px 27px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.model-picker-option:hover {
+    background: var(--surface-hover);
+}
+
+.model-picker-option.is-selected {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+}
+
+.model-picker-option-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.model-picker-check {
+    flex: 0 0 auto;
+    font-size: 10.5px;
 }
 
 .model-picker-empty {
@@ -2511,6 +2648,28 @@ a {
 }
 
 .primary-button:disabled {
+    background: var(--surface-hover);
+    color: var(--muted);
+    cursor: not-allowed;
+}
+
+.danger-button {
+    flex: 0 0 auto;
+    padding: 7px 14px;
+    border: 0;
+    border-radius: 8px;
+    background: #d64545;
+    color: #fff;
+    font-family: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+}
+
+.danger-button:hover:not(:disabled) {
+    filter: brightness(1.08);
+}
+
+.danger-button:disabled {
     background: var(--surface-hover);
     color: var(--muted);
     cursor: not-allowed;

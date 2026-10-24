@@ -332,6 +332,18 @@
                                 }
                             </button>
 
+                            <button type="button"
+                                    class="msg-action msg-action--danger"
+                                    title="@(_isGenerating ? "生成中不能删除消息" : "删除这条消息")"
+                                    disabled="@_isGenerating"
+                                    @onclick="() => RequestDeleteMessage(message)"
+                                    @onclick:stopPropagation="true">
+                                <svg class="msg-action-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                    <path d="M3 4.5h10M6.2 4.5V3.2h3.6v1.3M4.4 4.5l.5 8.1h6.2l.5-8.1M6.6 7.2v3.4M9.4 7.2v3.4"
+                                          fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </button>
+
                             @if (!isUser)
                             {
                                 <button type="button"
@@ -430,17 +442,60 @@
             <FooterContent>
                 @if (_modelOptions.Count > 0)
                 {
-                    <div class="model-picker">
-                        <select class="model-picker-select"
+                    <div class="model-picker @(_modelMenuOpen ? "is-open" : null)">
+                        <button type="button"
+                                class="model-picker-trigger"
                                 title="选择模型"
-                                value="@_selectedKey"
+                                aria-haspopup="menu"
+                                aria-expanded="@(_modelMenuOpen ? "true" : "false")"
                                 disabled="@_isGenerating"
-                                @onchange="HandleModelChanged">
-                            @foreach (var option in _modelOptions)
-                            {
-                                <option value="@option.Key">@option.Text</option>
-                            }
-                        </select>
+                                @onclick="ToggleModelMenu">
+                            <span class="model-picker-current">@CurrentModelLabel()</span>
+                            <span class="model-picker-caret" aria-hidden="true">▾</span>
+                        </button>
+
+                        @if (_modelMenuOpen)
+                        {
+                            <div class="model-picker-backdrop" @onclick="CloseModelMenu"></div>
+                            <div class="model-picker-menu" role="menu" aria-label="选择模型">
+                                @foreach (var group in _modelGroups)
+                                {
+                                    var collapsed = _collapsedProviders.Contains(group.ProviderId);
+
+                                    <div class="model-picker-group @(collapsed ? "is-collapsed" : null)">
+                                        <button type="button"
+                                                class="model-picker-group-head"
+                                                aria-expanded="@(collapsed ? "false" : "true")"
+                                                @onclick="() => ToggleProvider(group.ProviderId)">
+                                            <span class="model-picker-group-caret" aria-hidden="true">▸</span>
+                                            <span class="model-picker-group-name">@group.ProviderName</span>
+                                            <span class="model-picker-group-count">@group.Options.Count</span>
+                                        </button>
+
+                                        @if (!collapsed)
+                                        {
+                                            @foreach (var option in group.Options)
+                                            {
+                                                var selected = string.Equals(option.Key, _selectedKey, StringComparison.Ordinal);
+
+                                                <button type="button"
+                                                        class="model-picker-option @(selected ? "is-selected" : null)"
+                                                        role="menuitemradio"
+                                                        aria-checked="@(selected ? "true" : "false")"
+                                                        title="@($"{option.ProviderName} · {option.ModelName}")"
+                                                        @onclick="() => SelectModel(option)">
+                                                    <span class="model-picker-option-name">@option.ModelName</span>
+                                                    @if (selected)
+                                                    {
+                                                        <span class="model-picker-check" aria-hidden="true">✓</span>
+                                                    }
+                                                </button>
+                                            }
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
                     </div>
                 }
                 else
@@ -529,6 +584,24 @@
             </div>
         </div>
     }
+
+    @* 删除单条消息：不可撤销，并从后续上下文中移除。 *@
+    @if (_messagePendingDelete is { } pendingDelete)
+    {
+        <div class="modal-backdrop">
+            <div class="modal" role="dialog" aria-modal="true" aria-label="删除消息">
+                <h2 class="modal-title">删除这条消息？</h2>
+                <p class="modal-sub">
+                    @(pendingDelete.Role == ChatMessageRole.User ? "你发送的消息" : "AI 回复")
+                    会从当前聊天记录和后续上下文中移除，且无法恢复。
+                </p>
+                <div class="modal-actions">
+                    <button type="button" class="ghost-button" @onclick="CancelDeleteMessage">取消</button>
+                    <button type="button" class="danger-button" @onclick="ConfirmDeleteMessageAsync">删除</button>
+                </div>
+            </div>
+        </div>
+    }
 </section>
 
 @code {
@@ -538,7 +611,14 @@
     /// <summary>单张卡片的文本上限，超过就截断。</summary>
     private const int MaxArtifactTextChars = 32_000;
 
-    private sealed record ModelOption(string Key, string Text, ModelProvider Provider, string ModelId);
+    private sealed record ModelOption(
+        string Key,
+        string ProviderName,
+        string ModelName,
+        ModelProvider Provider,
+        string ModelId);
+
+    private sealed record ModelGroup(string ProviderId, string ProviderName, IReadOnlyList<ModelOption> Options);
 
     [Parameter, EditorRequired]
     public ChatSession Session { get; set; } = default!;
@@ -597,7 +677,15 @@
     private ElementReference _scrollElement;
 
     private List<ModelOption> _modelOptions = [];
+    private List<ModelGroup> _modelGroups = [];
     private string? _selectedKey;
+    private bool _modelMenuOpen;
+
+    /// <summary>模型选择器里被用户收起的提供商；默认全部展开。</summary>
+    private readonly HashSet<string> _collapsedProviders = new(StringComparer.Ordinal);
+
+    /// <summary>等待确认删除的消息。</summary>
+    private ChatMessage? _messagePendingDelete;
     private CancellationTokenSource? _cts;
     private bool _autoContinued;
     private int _noEditRepromptAttempts;
@@ -731,6 +819,8 @@
             _contextNotice = null;
             _sessionMenuOpen = false;
             _showCompacted = false;
+            _modelMenuOpen = false;
+            _messagePendingDelete = null;
             RefreshContextPreview();
         }
         else
@@ -866,13 +956,21 @@
             {
                 options.Add(new ModelOption(
                     $"{provider.Id}|{model.Id}",
-                    $"{provider.Name} · {model.Name}",
+                    provider.Name,
+                    model.Name,
                     provider,
                     model.Id));
             }
         }
 
         _modelOptions = options;
+        _modelGroups = options
+            .GroupBy(option => option.Provider.Id, StringComparer.Ordinal)
+            .Select(group => new ModelGroup(
+                group.Key,
+                group.First().ProviderName,
+                group.ToList()))
+            .ToList();
 
         if (_selectedKey is not null && options.Any(option => option.Key == _selectedKey))
         {
@@ -887,12 +985,37 @@
         _selectedKey = remembered?.Key ?? options.FirstOrDefault()?.Key;
     }
 
-    private void HandleModelChanged(ChangeEventArgs args)
+    private void ToggleModelMenu()
     {
-        _selectedKey = args.Value?.ToString();
+        _modelMenuOpen = !_modelMenuOpen;
+    }
+
+    private void CloseModelMenu()
+    {
+        _modelMenuOpen = false;
+    }
+
+    private void ToggleProvider(string providerId)
+    {
+        if (!_collapsedProviders.Remove(providerId))
+        {
+            _collapsedProviders.Add(providerId);
+        }
+    }
+
+    private void SelectModel(ModelOption option)
+    {
+        _selectedKey = option.Key;
+        _modelMenuOpen = false;
         RememberSelection();
         _contextNotice = null;
         RefreshContextPreview();
+    }
+
+    private string CurrentModelLabel()
+    {
+        var option = CurrentModelOption();
+        return option is null ? "选择模型" : $"{option.ProviderName} · {option.ModelName}";
     }
 
     /// <summary>选择技能：再次点击同一个则取消。</summary>
@@ -1420,6 +1543,59 @@
 
         var name = Registry.DisplayName(info.PluginId);
         return string.IsNullOrWhiteSpace(name) ? $"{info.PluginId} · SDemo" : $"{name} · SDemo";
+    }
+
+    /// <summary>点垃圾桶：先让用户确认，删除不可撤销。</summary>
+    private void RequestDeleteMessage(ChatMessage message)
+    {
+        if (_isGenerating)
+        {
+            return;
+        }
+
+        _messagePendingDelete = message;
+    }
+
+    private void CancelDeleteMessage() => _messagePendingDelete = null;
+
+    /// <summary>删除单条消息，并同步收缩摘要边界，避免后续压缩引用错位。</summary>
+    private async Task ConfirmDeleteMessageAsync()
+    {
+        var message = _messagePendingDelete;
+        _messagePendingDelete = null;
+
+        if (message is null)
+        {
+            return;
+        }
+
+        var index = Session.Messages.IndexOf(message);
+        if (index < 0)
+        {
+            return;
+        }
+
+        Session.Messages.RemoveAt(index);
+        _openReasoning.Remove(message.Id);
+        _manualReasoning.Remove(message.Id);
+
+        if (Session.HasSummary && index < Session.SummaryThroughOrder)
+        {
+            Session.SummaryThroughOrder--;
+
+            if (Session.SummaryThroughOrder <= 0)
+            {
+                Session.Summary = null;
+                Session.SummaryThroughOrder = 0;
+                Session.SummaryUpdatedAt = null;
+                Session.SummaryTokens = 0;
+                Session.SummaryIsFallback = false;
+            }
+        }
+
+        await NotifySessionChangedAsync();
+        RefreshContextPreview();
+        StateHasChanged();
     }
 
     /// <summary>复制消息纯文本到剪贴板，短暂显示对勾。</summary>
