@@ -53,6 +53,61 @@ public sealed class ChatStoreContextTests : IDisposable
     }
 
     [Fact]
+    public async Task 步骤时间线落库后能按原顺序读回()
+    {
+        var store = new ChatStore(_root);
+        var session = new ChatSession
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = "带步骤的会话",
+            UpdatedAt = DateTime.Now
+        };
+
+        session.Messages.Add(new ChatMessage(ChatMessageRole.User, "看看 README"));
+
+        var reply = new ChatMessage(ChatMessageRole.Assistant, "看完了")
+        {
+            Reasoning = "先看目录。再看文件。",
+            DurationMs = 4200
+        };
+
+        reply.ToolTrace.Add(new ToolTraceEntry(
+            "read_file",
+            ToolTraceEntry.StatusOk,
+            null,
+            "README.md",
+            "读取 120 行",
+            3200,
+            DateTime.Now,
+            ReasoningChars: 5,
+            TextChars: 0,
+            CallId: "call-1",
+            ArgsJson: "{\"path\":\"README.md\"}",
+            Title: "README.md",
+            DurationMs: 120,
+            ResultPreview: "# SDemo"));
+
+        reply.Steps.Add(new ChatStep(ChatStepKind.Reasoning, "先看目录。", StepIndex: 0));
+        reply.Steps.Add(new ChatStep(ChatStepKind.Tool, string.Empty, 0, 0, "call-1"));
+        reply.Steps.Add(new ChatStep(ChatStepKind.Reasoning, "再看文件。", StepIndex: 0));
+        reply.Steps.Add(new ChatStep(ChatStepKind.Text, "看完了", StepIndex: 0));
+        session.Messages.Add(reply);
+
+        await store.SaveSessionAsync(session);
+
+        var loaded = Assert.Single(await store.LoadAllAsync([]));
+        var steps = loaded.Messages[1].Steps;
+
+        Assert.Equal(
+            [ChatStepKind.Reasoning, ChatStepKind.Tool, ChatStepKind.Reasoning, ChatStepKind.Text],
+            steps.Select(step => step.Kind));
+        Assert.Equal("call-1", steps[1].CallId);
+        Assert.Equal(ChatGroupPart.Answer, steps[3].Part);
+        Assert.Equal("README.md", loaded.Messages[1].ToolTrace[0].Title);
+        Assert.Equal(120, loaded.Messages[1].ToolTrace[0].DurationMs);
+    }
+
+    [Fact]
     public async Task 老库自动补摘要与轨迹列()
     {
         var databasePath = Path.Combine(_root, "workspaces", "legacy.db");

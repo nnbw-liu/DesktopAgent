@@ -61,4 +61,7 @@ public sealed class AppSettings
 
     /// <summary>小模型 / 工具面（P6）。</summary>
     public AgentSettings Agent { get; set; } = new();
+
+    /// <summary>对话呈现：过程展示档位与收起时机（P0）。</summary>
+    public ChatPresentationSettings Chat { get; set; } = new();
 }

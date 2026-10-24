@@ -313,6 +313,10 @@ public sealed class ChatStore
             messageRecord.ToolTraceJson = message.ToolTrace.Count == 0
                 ? null
                 : JsonSerializer.Serialize(message.ToolTrace, JsonOptions);
+            // P0：步骤时间线（思考 / 工具 / 正文的真实顺序）。只服务界面，不进入上下文。
+            messageRecord.StepsJson = message.Steps.Count == 0
+                ? null
+                : JsonSerializer.Serialize(message.Steps, JsonOptions);
             messageRecord.MemoryCitationsJson = message.MemoryCitations.Count == 0
                 ? null
                 : JsonSerializer.Serialize(message.MemoryCitations, JsonOptions);
@@ -484,9 +488,26 @@ public sealed class ChatStore
         }
     }
 
-    /// <summary>工具轨迹：坏数据降级成空列表；超过上限的只保留最近的部分。</summary>
-    private static List<ToolTraceEntry> DeserializeToolTrace(string? json)
+    /// <summary>步骤时间线：坏数据降级成空列表，界面自动回退到「按轨迹边界还原」。</summary>
+    private static List<ChatStep> DeserializeSteps(string? json)
     {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<ChatStep>>(json, JsonOptions) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>工具轨迹：坏数据降级成空列表；超过上限的只保留最近的部分。</summary>
+    private static List<ToolTraceEntry> DeserializeToolTrace(string? json)    {
         if (string.IsNullOrWhiteSpace(json))
         {
             return [];
@@ -622,6 +643,7 @@ public sealed class ChatStore
                     Plugin = DeserializePlugin(message.PluginJson),
                     Derived = DeserializeDerived(message.DerivedJson),
                     ToolTrace = DeserializeToolTrace(message.ToolTraceJson),
+                    Steps = DeserializeSteps(message.StepsJson),
                     MemoryCitations = DeserializeCitations(message.MemoryCitationsJson),
                     ProviderId = message.ProviderId,
                     ModelId = message.ModelId,
