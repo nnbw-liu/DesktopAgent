@@ -17,11 +17,16 @@ window.sdComposer = {
 
         this._handler = function (event) {
             var target = event.target;
-            if (!target || typeof target.closest !== 'function' || !target.closest('.composer-text')) {
+
+            // 菜单打开时按键归菜单：鼠标点过候选行之后焦点可能已经不在输入框里
+            // （行被移除时还会落到 body），此时若按「焦点必须在 .composer-text」筛掉，
+            // ↑↓ / Enter / Tab / Esc 就全部失灵，菜单也关不掉。
+            // 只接管「输入框内 / 焦点已丢失」这两种情形，别的输入控件不抢。
+            if (this._menuOpen && this._isMenuScope(target) && this._handleMenuKey(event, dotNetRef)) {
                 return;
             }
 
-            if (this._menuOpen && this._handleMenuKey(event, dotNetRef)) {
+            if (!target || typeof target.closest !== 'function' || !target.closest('.composer-text')) {
                 return;
             }
 
@@ -49,6 +54,16 @@ window.sdComposer = {
 
         document.addEventListener('keydown', this._handler, true);
         this._attachDrop();
+    },
+
+    // 菜单打开时，这个按键该不该归菜单：输入框内、或者焦点已经丢了（行被移除后落到 body）。
+    // 焦点在别的输入控件里就不抢——用户可能已经离开输入框了。
+    _isMenuScope: function (target) {
+        if (!target || target === document.body) {
+            return true;
+        }
+
+        return typeof target.closest === 'function' && !!target.closest('.composer');
     },
 
     // 返回 true 表示这个键已经被菜单吃掉。
@@ -98,6 +113,20 @@ window.sdComposer = {
         return element.value;
     },
 
+    // 把焦点还给输入框：用鼠标点候选行会先把焦点给到按钮，行一消失焦点就落到 body，
+    // 之后 Enter 既不是「发送」也不是「确认」。已经在输入框里时什么都不做，
+    // 避免把光标从中间位置拽到末尾。
+    focusInput: function (element) {
+        if (!element || document.activeElement === element) {
+            return;
+        }
+
+        element.focus({ preventScroll: true });
+
+        var end = typeof element.value === 'string' ? element.value.length : 0;
+        element.setSelectionRange(end, end);
+    },
+
     // 输入框滚动时，高亮层跟着滚；出现滚动条时再补上右侧留白，两边的换行位置才对得上。
     syncScroll: function (element, highlight) {
         if (!element || !highlight) {
@@ -113,6 +142,9 @@ window.sdComposer = {
     },
 
     detach: function () {
+        // 组件卸载时菜单状态跟着复位：否则下一个输入框会以为菜单还开着，把 Enter 吃掉。
+        this._menuOpen = false;
+
         if (this._handler) {
             document.removeEventListener('keydown', this._handler, true);
             this._handler = null;

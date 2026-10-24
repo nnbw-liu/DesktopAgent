@@ -45,11 +45,18 @@
                 var item = _items[index];
                 var selected = index == _selected;
 
+                @* for 的循环变量只有一个实例：lambda 里直接用 index 会全部读到 _items.Count，
+                   鼠标点任何一行都会越界。必须每轮拷一份。 *@
+                var itemIndex = index;
+
                 <button type="button"
                         class="composer-menu-row @(selected ? "is-active" : null)"
                         role="option"
                         aria-selected="@(selected ? "true" : "false")"
-                        @onclick="() => CommitAsync(index)">
+                        tabindex="-1"
+                        @onmousedown:preventDefault
+                        @onmouseenter="() => SelectItem(itemIndex)"
+                        @onclick="() => CommitAsync(itemIndex)">
                     <span class="composer-menu-icon" aria-hidden="true">@ItemGlyph(item)</span>
                     <span class="composer-menu-label">@item.Label</span>
                     @if (!string.IsNullOrWhiteSpace(item.Description))
@@ -424,6 +431,9 @@
     /// <summary>刚插入过一次引用：不要让紧接着的 input 事件再把菜单弹出来。</summary>
     private bool _suppressTrigger;
 
+    /// <summary>组件认为菜单是打开的（JS 侧 <c>_menuOpen</c> 的镜像，避免重复互操作）。</summary>
+    private bool _menuOpen;
+
     /// <summary>本次发送由 `/技能` 点名的技能；提交后清空。</summary>
     private string? _invokedSkill;
 
@@ -471,7 +481,7 @@
 
     private bool CanSubmit => IsGenerating || !string.IsNullOrWhiteSpace(Text) || _attachments.Count > 0;
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
         if (_sessionId == SessionId)
         {
@@ -484,8 +494,18 @@
         _pluginMoreOpen = false;
         _uploadError = null;
         _invokedSkill = null;
+
+        var menuWasOpen = _trigger is not null || _items.Count > 0;
         _trigger = null;
         _items = [];
+        _selected = 0;
+
+        if (menuWasOpen)
+        {
+            // 切换会话时菜单已经不在 DOM 里，JS 的「菜单打开」状态必须一起复位，
+            // 否则 Enter / Esc 会被一个看不见的菜单吃掉。
+            await SetMenuOpenAsync(false);
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -525,6 +545,18 @@
     [JSInvokable]
     public Task MenuCommitAsync() => CommitAsync(_selected);
 
+    /// <summary>鼠标移到候选行上时把高亮移过去：点和确认落在同一行上，不会「点的是这行、确认的是那行」。</summary>
+    private void SelectItem(int index)
+    {
+        if (index < 0 || index >= _items.Count || _selected == index)
+        {
+            return;
+        }
+
+        _selected = index;
+        StateHasChanged();
+    }
+
     /// <summary>菜单关闭。</summary>
     [JSInvokable]
     public Task MenuDismissAsync() => CloseMenuAsync();
@@ -545,6 +577,8 @@
     {
         if (_trigger is not { } trigger || index < 0 || index >= _items.Count)
         {
+            // 没有候选却收到确认（例如 JS 的菜单状态比组件晚一拍）：顺手复位，别让按键白吃。
+            await CloseMenuAsync();
             return;
         }
 
@@ -612,6 +646,8 @@
     {
         if (_trigger is null && _items.Count == 0)
         {
+            // 组件早就关了菜单，但 JS 可能还停在「打开」：这里补一次复位，按键不受影响。
+            await SetMenuOpenAsync(false);
             return;
         }
 
@@ -620,13 +656,36 @@
         _selected = 0;
         await SetMenuOpenAsync(false);
         StateHasChanged();
+
+        // 鼠标点选时焦点会被按钮带走（行移除后落到 body）：不还回去，Enter 就不再是发送。
+        await FocusInputAsync();
     }
 
     private async Task SetMenuOpenAsync(bool open)
     {
+        if (_menuOpen == open)
+        {
+            return;
+        }
+
+        _menuOpen = open;
+
         try
         {
             await Js.InvokeVoidAsync("sdComposer.setMenuOpen", open);
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView 已释放。
+        }
+    }
+
+    /// <summary>把焦点放回输入框；已经在输入框里时不做任何事（不动光标）。</summary>
+    private async Task FocusInputAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("sdComposer.focusInput", _inputRef);
         }
         catch (JSDisconnectedException)
         {

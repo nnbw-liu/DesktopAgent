@@ -1,4 +1,5 @@
 using Bunit;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using SDemo.DesktopAgent.Components.Chat;
 using SDemo.DesktopAgent.Models;
@@ -112,6 +113,75 @@ public sealed class ChatComposerMentionTests : TestContext
         cut.InvokeAsync(() => cut.Instance.MenuDismissAsync());
 
         Assert.Empty(cut.FindAll(".composer-menu"));
+    }
+
+    [Fact]
+    public async Task 鼠标点选候选后插入路径_关菜单_并把焦点还给输入框()
+    {
+        _references.Items = ["src/Program.cs"];
+        JSInterop.Setup<int>("sdComposer.caretOf", invocation => true).SetResult(4);
+
+        var cut = RenderComposer();
+
+        cut.Find("textarea").Input("@Pro");
+
+        // 走真实 DOM 事件（onclick），而不是直接调组件方法：鼠标点选就是这条路径。
+        var row = cut.Find(".composer-menu-row");
+        await cut.InvokeAsync(() => row.TriggerEventAsync("onclick", new MouseEventArgs()));
+
+        Assert.Equal("@src/Program.cs ", cut.Instance.Text);
+        Assert.Empty(cut.FindAll(".composer-menu"));
+
+        // 鼠标点行会把焦点给到按钮（行移除后落到 body）：必须还回去，否则 Enter 不再发送。
+        JSInterop.VerifyInvoke("sdComposer.focusInput");
+    }
+
+    [Fact]
+    public void 候选行不进入Tab顺序_避免焦点被行抢走()
+    {
+        _references.Items = ["src/Program.cs"];
+        JSInterop.Setup<int>("sdComposer.caretOf", invocation => true).SetResult(1);
+
+        var cut = RenderComposer();
+        cut.Find("textarea").Input("@");
+
+        Assert.Equal("-1", cut.Find(".composer-menu-row").GetAttribute("tabindex"));
+    }
+
+    [Fact]
+    public async Task 鼠标移上去就高亮那一行_点和确认落在同一行()
+    {
+        _references.Items = ["a.cs", "b.cs"];
+        JSInterop.Setup<int>("sdComposer.caretOf", invocation => true).SetResult(1);
+
+        var cut = RenderComposer();
+        cut.Find("textarea").Input("@");
+
+        // 注意：bUnit 1.40 的 RefreshableElementCollection 索引器与 AngleSharp 1.8.5 不兼容，用 ElementAt。
+        await cut.FindAll(".composer-menu-row").ElementAt(1).TriggerEventAsync("onmouseenter", new MouseEventArgs());
+
+        var rows = cut.FindAll(".composer-menu-row").ToArray();
+        Assert.False(rows[0].ClassList.Contains("is-active"));
+        Assert.True(rows[1].ClassList.Contains("is-active"));
+    }
+
+    [Fact]
+    public void 没有候选时确认只复位_不发送()
+    {
+        var sent = 0;
+        JSInterop.Setup<int>("sdComposer.caretOf", invocation => true).SetResult(0);
+
+        var cut = RenderComponent<ChatComposer>(parameters => parameters
+            .Add(component => component.SessionId, "composer-test")
+            .Add(component => component.WorkspaceRoot, _temp.Root)
+            .Add(component => component.Text, "hello")
+            .Add(component => component.OnSend, (ComposerSubmission _) => sent++));
+
+        cut.InvokeAsync(() => cut.Instance.MenuCommitAsync());
+
+        // JS 的菜单状态比组件晚一拍时，Enter 不能变成「发送一条空消息」或抛异常。
+        Assert.Equal(0, sent);
+        Assert.Equal("hello", cut.Instance.Text);
     }
 
     private IRenderedComponent<ChatComposer> RenderComposer() =>
