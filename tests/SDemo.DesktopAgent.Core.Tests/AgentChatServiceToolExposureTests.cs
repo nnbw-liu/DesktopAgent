@@ -193,6 +193,80 @@ public sealed class AgentChatServiceToolExposureTests
         Assert.Equal(0, telemetry.Report.ToolSchemaTokens);
     }
 
+    [Fact]
+    public async Task 内置循环的_step_边界会跟着增量透传给界面()
+    {
+        _settings.Current.Agent.Mode = AgentModePreference.Full;
+        using var temp = new TempDirectory();
+        var paths = new StubAppPaths(temp.Root);
+        var registry = new AgentToolRegistry([new FileToolPack()]);
+
+        var runtime = new StepRuntime();
+        var service = new AgentChatService(
+            registry,
+            new WorkspaceContext(paths),
+            _settings,
+            new ToolApprovalService(),
+            new StubSandboxJobService(),
+            new NullAuditLog(),
+            paths,
+            new FileReadRegistry(),
+            runtime);
+
+        var builder = new ContextBuilder(_counter, _settings);
+        var context = builder.Build(new ContextBuildRequest(Provider(), "m", [Message()]));
+        var plan = new AgentRunPlan(
+            Provider(), "m", context, new HashSet<string> { "files" },
+            SessionId: "s1", Metrics: new AgentRunMetrics());
+
+        var steps = new List<int>();
+
+        await foreach (var delta in service.RunAsync(plan))
+        {
+            if (delta.Text.Length > 0 || delta.Reasoning.Length > 0)
+            {
+                steps.Add(delta.Step);
+            }
+        }
+
+        // 两步的思考与正文各自归到自己的 step 上，而不是全算成「本轮」。
+        Assert.Equal([0, 1], steps);
+    }
+
+    [Fact]
+    public async Task 设置里打开内置循环时调用会带上_NativeLoop()
+    {
+        _settings.Current.Agent.Mode = AgentModePreference.Full;
+        _settings.Current.Agent.NativeLoop = true;
+        using var temp = new TempDirectory();
+        var paths = new StubAppPaths(temp.Root);
+        var registry = new AgentToolRegistry([new FileToolPack()]);
+
+        var runtime = new RecordingRuntime();
+        var service = new AgentChatService(
+            registry,
+            new WorkspaceContext(paths),
+            _settings,
+            new ToolApprovalService(),
+            new StubSandboxJobService(),
+            new NullAuditLog(),
+            paths,
+            new FileReadRegistry(),
+            runtime);
+
+        var builder = new ContextBuilder(_counter, _settings);
+        var context = builder.Build(new ContextBuildRequest(Provider(), "m", [Message()]));
+        var plan = new AgentRunPlan(
+            Provider(), "m", context, new HashSet<string> { "files" },
+            SessionId: "s1", Metrics: new AgentRunMetrics());
+
+        await foreach (var _ in service.RunAsync(plan))
+        {
+        }
+
+        Assert.True(runtime.Invocation!.NativeLoop);
+    }
+
     private static ChatMessage Message() => new(ChatMessageRole.User, "看一下这个文件");
 
     private static ModelProvider Provider() => new()
@@ -217,6 +291,23 @@ public sealed class AgentChatServiceToolExposureTests
                 new Dictionary<string, object?> { ["path"] = "README.md" });
             yield return new AgentStreamEvent.FunctionResult("call-1", "[TOOL_STATUS:ok]\n读取完成");
             yield return new AgentStreamEvent.Text("完成");
+        }
+    }
+
+    /// <summary>模拟内置循环的两步：第一步思考，第二步才给正文。</summary>
+    private sealed class StepRuntime : IAgentRuntime
+    {
+        public async IAsyncEnumerable<AgentStreamEvent> StreamAsync(
+            AgentInvocation invocation,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            yield return new AgentStreamEvent.StepStarted(0, 3, DateTimeOffset.Now);
+            yield return new AgentStreamEvent.Reasoning("先看文件。");
+            yield return new AgentStreamEvent.StepCompleted(0, DateTimeOffset.Now);
+            yield return new AgentStreamEvent.StepStarted(1, 3, DateTimeOffset.Now);
+            yield return new AgentStreamEvent.Text("看完了。");
+            yield return new AgentStreamEvent.StepCompleted(1, DateTimeOffset.Now);
         }
     }
 

@@ -78,6 +78,16 @@ public sealed class AgentSettings
     /// </summary>
     public int FullMaxToolCalls { get; set; } = 8;
 
+    /// <summary>
+    /// P1a：工具循环由宿主自己跑（<c>NativeAgentLoop</c>）而不是 MAF 的 FICC。
+    /// <para>
+    /// 打开后每次模型请求都是显式的 step：工具调用与结果作为真实的 <c>tool_calls</c> /
+    /// <c>tool</c> 消息回灌，界面上能按「第几步」归组。默认关闭——按迁移文档 §6.1，
+    /// 先用 <c>tools/AgentEval</c> 对比新旧两条路径，再决定是否改成默认。
+    /// </para>
+    /// </summary>
+    public bool NativeLoop { get; set; }
+
     /// <summary>复制一份用于按作用域合并；属性都是值类型，浅拷贝即可。</summary>
     public AgentSettings Clone() => (AgentSettings)MemberwiseClone();
 

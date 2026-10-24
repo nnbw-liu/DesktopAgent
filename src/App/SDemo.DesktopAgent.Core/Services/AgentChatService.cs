@@ -12,7 +12,13 @@ using SDemo.DesktopAgent.Models;
 namespace SDemo.DesktopAgent.Services;
 
 /// <summary>流式增量：正文与思维链分开返回。</summary>
-public readonly record struct AgentDelta(string Text, string Reasoning);
+/// <param name="Text">正文增量。</param>
+/// <param name="Reasoning">思维链增量。</param>
+/// <param name="Step">
+/// 这一段属于第几次模型请求（P1a）。<c>-1</c> 表示运行时没给出 step 边界（FICC），
+/// 界面按「本回合第几轮」兜底。
+/// </param>
+public readonly record struct AgentDelta(string Text, string Reasoning, int Step = -1);
 
 /// <summary>
 /// 一次生成所需的全部输入：已由 <see cref="ContextBuilder"/> 裁剪好的上下文、
@@ -169,6 +175,9 @@ public sealed class AgentChatService : IAgentChatService
         var emittedText = 0;
         var emittedReasoning = 0;
 
+        // P1a：内置循环会带来显式的 step；-1 表示这个运行时看不到 step 边界（FICC）。
+        var currentStep = -1;
+
         try
         {
             await foreach (var evt in _runtime.StreamAsync(invocation, cancellationToken))
@@ -179,6 +188,21 @@ public sealed class AgentChatService : IAgentChatService
             {
                 case AgentStreamEvent.Usage usage:
                     plan.Metrics?.AddUsage(usage.InputTokens, usage.OutputTokens);
+                    break;
+
+                // 上一步攒下的文本必须按旧 step 先落地，否则最后一句会挂到下一步的序号上。
+                case AgentStreamEvent.StepStarted started:
+                    if (text.Length > 0 || reasoning.Length > 0)
+                    {
+                        yield return new AgentDelta(text.ToString(), reasoning.ToString(), currentStep);
+                        text.Clear();
+                        reasoning.Clear();
+                    }
+
+                    currentStep = started.Step;
+                    break;
+
+                case AgentStreamEvent.StepCompleted:
                     break;
 
                 case AgentStreamEvent.Reasoning delta:
@@ -230,7 +254,7 @@ public sealed class AgentChatService : IAgentChatService
 
             if (text.Length > 0 || reasoning.Length > 0 || toolChanged)
             {
-                    yield return new AgentDelta(text.ToString(), reasoning.ToString());
+                    yield return new AgentDelta(text.ToString(), reasoning.ToString(), currentStep);
                     text.Clear();
                     reasoning.Clear();
                 }
@@ -350,6 +374,7 @@ public sealed class AgentChatService : IAgentChatService
         EffectiveSettings? scope)
     {
         var settings = scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
+        var agent = scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
         var budgetOptions = new ContextBudgetChatOptions(
             Enabled: settings.Enabled && settings.MidTurnTrim,
             Budget: plan.Budget,
@@ -370,7 +395,9 @@ public sealed class AgentChatService : IAgentChatService
             toolCallLimit + 2,
             Decorate: inner => new ContextBudgetChatClient(inner, budgetOptions, telemetry),
             // 模型档案里配了思考强度才发送 reasoning_effort（none = 显式关闭）；没配就保持服务端默认。
-            ReasoningEffort: plan.Profile.ReasoningEffort);
+            ReasoningEffort: plan.Profile.ReasoningEffort,
+            // P1a：工具循环由谁跑，只在设置里显式打开时换成内置循环（默认仍是 FICC）。
+            NativeLoop: agent.NativeLoop);
     }
 
     private static ToolTraceEntry BuildTraceEntry(

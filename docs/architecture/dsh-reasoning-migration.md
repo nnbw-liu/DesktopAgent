@@ -904,7 +904,74 @@ token 计量         ctx.tokenMeter              → ContextReport（已有，�
 - Core：`ComposerReferenceTests`（枚举/排除/缓存/排序）、`SkillCatalogTests`（`disable-model-invocation` 解析）、`SkillIndexBuilderTests`（禁用技能不进索引）、`SkillToolPackTests`（`load_skill` 拒绝）。
 - UI：`ChatComposerMentionTests`（`@` 弹菜单/方向键/下钻/关闭）、`ChatComposerCommandTests`（命令在前、执行不发送、技能插入、手打识别、未知命令转交宿主、高亮 token）、`ChatRoomCommandTests`（未知命令只提示、`/compact` 打到服务、`/help` 列表、无工作区时 `/index` 提示）。
 
-## 10. 参考（证据位置）
+### 修补（2026-10-24）：鼠标点选候选后键盘失效
+
+现象：`@` / `/` 候选区用鼠标点选之后，Enter 不再发送、Tab 不再有反应、Esc 也关不掉菜单。
+
+根因有两条，第一条是主因：
+
+1. **`@for` 的循环变量被所有候选行共享**。`@onclick="() => CommitAsync(index)"` 捕获的是同一个 `index`，
+   循环结束时它已经等于 `_items.Count`——**鼠标点任何一行都会越界**，`CommitAsync` 直接 return，
+   菜单既不插入也不关闭，行还在原地并拿到了焦点。
+2. keydown 监听的第二道判断是 `event.target.closest('.composer-text')`。鼠标点过按钮后焦点在按钮上，
+   于是 ↑↓ / Enter / Tab / Esc 全被挡掉，菜单再也关不掉（而且 JS 的 `_menuOpen` 还是 true）。
+
+修法（三层一起，任何一层单独都够挡住复现）：
+
+- 每轮拷一份 `var itemIndex = index;` 再进 lambda（`ChatComposer.razor`）。
+- 候选行加 `tabindex="-1"` 与 `@onmousedown:preventDefault`：鼠标按下不转移焦点，Tab 也不会落到行上。
+- `sdComposer` 的 keydown 改为**菜单打开时按键归菜单**（只接管「输入框内 / 焦点已丢失」两种情形，
+  不抢别的输入控件），不再要求焦点一定在 textarea 里。
+- 菜单关闭后用 `sdComposer.focusInput` 把焦点还给输入框（已经在输入框时不动光标）。
+- C# 侧留一份 `_menuOpen` 镜像，`CloseMenuAsync` / 切换会话时与 JS 对齐，避免「看不见的菜单吃掉按键」。
+- `CommitAsync` 越界时顺手关菜单自愈，而不是静默 return。
+
+测试：`ChatComposerMentionTests` 新增「鼠标点选后插入路径、关菜单、还焦点」「候选行不进 Tab 顺序」
+「没有候选时确认只复位不发送」「鼠标移上去高亮那一行」四条。
+
+## 10. P1a 实施记录（内置工具循环）
+
+状态：✅ 已落地，**默认关闭**（`AgentSettings.NativeLoop`）。WPF 解决方案 0 警告 0 错误（Debug / Release 均通过）；Core 768、UI 106 测试全绿。
+
+### 落地形态
+
+| 计划项 | 实现 |
+|---|---|
+| 自建循环 | 新增 `Agents/NativeAgentLoop.cs`；`MafAgentRuntime` 按 `AgentInvocation.NativeLoop` 二选一，两条路径共用同一条客户端链（`OpenAI → Decorate`）与同一份 `ChatOptions` |
+| 真工具消息入历史 | 每步结束后把整条 assistant 消息（正文 + `tool_calls`）与逐条 `ChatRole.Tool` 消息写进本次调用的消息表；下一步原样回放，不再压成 `[工具轨迹]` 文本 |
+| step 事件 | `AgentStreamEvent.StepStarted(step, maxSteps)` / `StepCompleted(step)`；`FunctionCall` / `FunctionResult` 带上 `Step` |
+| 每步用量 | 每次请求的 `UsageContent` 各自透出（FICC 里也是每次都报，这里语义一致） |
+| 收尾 | 最后一次请求摘掉工具（`ChatOptions.Clone()` 后 `Tools=null` + `ToolMode=None`），模型必须把已有结果写成正文——照抄 FICC 的 `MaximumIterationsPerRequest` 行为 |
+| 工具失败 | 未知工具 / 异常都回「结果文本」而不是抛异常；未知工具带 `[TOOL_STATUS:error]`，模型下一轮能看见原因 |
+| 接上界面 | `AgentDelta.Step`（-1 = 运行时看不到 step）→ `ChatRoom` 用 `stepBase` 偏移成整条回合的序号，`ChatStep.StepIndex` 第一次真正表示「第几次模型请求」 |
+| 开关 | `AgentSettings.NativeLoop` + 设置页「工具预算与路由 → 内置工具循环（P1a，实验）」；默认关 |
+
+### 与计划的偏差（取舍）
+
+1. **`FunctionCall` 事件比 FICC 晚一点点**：流式 delta 里的工具参数是分片到达的，逐块解析只能拿到半截 JSON，
+   所以工具调用在流结束后从 `updates.ToChatResponse()` 整条取（FICC 的流式实现也是这么做的）。执行紧随其后，用户无感。
+2. **串行执行，不做并发**：FICC 的 `AllowConcurrentInvocation` 默认就是 false，并发写文件本来也是风险。
+3. **默认关闭**：按 §6.1，先做一个开关、新旧都能跑，用 `tools/AgentEval` 对比后再翻默认。本机没有可用模型端点，
+   所以这一步留给评测。
+4. **`ContextBudgetChatClient` 仍在循环内侧**：每次 `GetStreamingResponseAsync` 前都会裁剪一次，语义与 FICC 时期一致，
+   循环中途不触发压缩（那是 P2b 的事务语义）。
+5. **reasoning 的回放交给 provider**：assistant 消息里的 reasoning 照 FICC 一样进历史，OpenAI 兼容适配器只序列化
+   `content` / `tool_calls`，所以实测不会把思维链重复发回端点。
+
+### 测试
+
+- `NativeAgentLoopTests`（假 SSE 端点）：工具调用/结果作为真实消息回灌（断言第二次请求体里有 `tool_calls`、`role:tool`、
+  `tool_call_id` 与工具输出）、一次响应里的两个工具按顺序配对、最后一轮不再声明工具、未知工具只回错误结果、
+  参数不是合法 JSON 时不炸整轮、没有工具调用时只有一步、没有声明工具时幻觉调用只回一次错误、上下文裁剪装饰器每次请求都运行。
+- `AgentChatServiceToolExposureTests`：step 边界跟着增量透传（0 → 1）、设置打开时 `NativeLoop` 进到 `AgentInvocation`。
+- 原来的假端点抽成 `FakeOpenAiServer`，FICC 与内置循环两条路径共用。
+
+### 下一步（P1b 的前置）
+
+- 跑 `tools/AgentEval` + `eval/routing/cases.json` 对比两条路径，再决定是否把 `NativeLoop` 改成默认。
+- 循环里已经握着工具表：「本轮补工具」只需要在 `InvokeAsync` 命中「未暴露」时追加工具并重发一次请求，不需要等下一轮。
+
+## 11. 参考（证据位置）
 
 DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat/lib/client.js`，`TOOL` = `dsh-client-ui-tool/lib/client.js`）：
 
@@ -936,6 +1003,12 @@ DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat
 
 本仓库：
 
+- `src/Agents/SDemo.DesktopAgent.Agents/AgentRuntime.cs`（`AgentInvocation.NativeLoop`、step 事件、`FunctionCall/Result.Step`）
+- `src/Agents/SDemo.DesktopAgent.Agents/NativeAgentLoop.cs`（P1a 自建循环：真工具消息、最后一轮摘工具、未知工具/异常兜底）
+- `src/Agents/SDemo.DesktopAgent.Agents/MafAgentRuntime.cs`（两条循环的分叉点、客户端链与 `ChatOptions` 共用）
+- `src/App/SDemo.DesktopAgent.Core/Services/AgentChatService.cs`（step 跟踪、`AgentDelta.Step`、`NativeLoop` 透传）
+- `src/Contracts/SDemo.DesktopAgent.Contracts/Models/AgentSettings.cs`（`NativeLoop` 开关，默认关）
+- `src/App/SDemo.DesktopAgent.UI/Components/Settings/ToolsSettings.razor`（「内置工具循环」开关）
 - `src/Agents/SDemo.DesktopAgent.Agents/MafAgentRuntime.cs:32-46,59-90`（FICC 与事件映射）
 - `src/App/SDemo.DesktopAgent.Core/Services/AgentChatService.cs:174-230`（合并 delta、轨迹记录）
 - `src/Context/SDemo.DesktopAgent.Context/SystemPrompts.cs:10-24`（PLAN 指令）

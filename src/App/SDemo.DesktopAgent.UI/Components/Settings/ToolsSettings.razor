@@ -147,6 +147,20 @@
 
         <label class="settings-row settings-row--toggle">
             <span class="settings-row-text">
+                <span class="settings-row-title">内置工具循环（P1a，实验）</span>
+                <span class="settings-row-hint">
+                    宿主自己跑「请求 → 工具 → 结果回灌 → 再请求」：工具调用与结果按真实消息进历史，
+                    界面能按「第几步」归组；关闭时仍走 MAF 的 FunctionInvokingChatClient。
+                </span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@Settings.Current.Agent.NativeLoop"
+                   @onchange="ToggleNativeLoop" />
+        </label>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
                 <span class="settings-row-title">提供 search_capabilities 兜底入口</span>
                 <span class="settings-row-hint">模型可自查当前会话可用的工具；默认开启，只影响 Full 模式。</span>
             </span>
@@ -917,6 +931,13 @@
     private void ToggleSearchCapabilities(ChangeEventArgs args)
     {
         Settings.Current.Agent.SearchCapabilitiesEnabled = args.Value is true;
+        Settings.Save();
+    }
+
+    /// <summary>P1a：切到内置工具循环；默认关闭，评测对比后再决定是否改默认。</summary>
+    private void ToggleNativeLoop(ChangeEventArgs args)
+    {
+        Settings.Current.Agent.NativeLoop = args.Value is true;
         Settings.Save();
     }
 

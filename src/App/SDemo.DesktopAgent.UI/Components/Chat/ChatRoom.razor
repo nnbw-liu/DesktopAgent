@@ -1999,6 +1999,9 @@
         var pendingPrompts = new List<ChatMessage>();
         var rounds = 0;
 
+        // 整条回合的模型请求序号：内置循环报的是「本次调用第几步」，要接着往下排。
+        var stepBase = 0;
+
         try
         {
             // 一次发送 = 一个回合；宿主追问在同一回合里继续生成，不再新建回复。
@@ -2024,7 +2027,7 @@
                 var startedAt = Stopwatch.GetTimestamp();
                 var baseline = reply.ToolTrace.Count;
 
-                await ConsumeAsync(
+                stepBase = await ConsumeAsync(
                     reply,
                     Runner.StreamAsync(
                         new AgentRunRequest(
@@ -2042,9 +2045,9 @@
                     telemetry,
                     metrics,
                     baseline,
-                    rounds);
+                    stepBase);
 
-                ApplyMetrics(reply, metrics, startedAt, baseline, accumulate: rounds > 0, rounds);
+                ApplyMetrics(reply, metrics, startedAt, baseline, accumulate: rounds > 0, Math.Max(0, stepBase - 1));
                 rounds++;
 
                 if (rounds > MaxHostRounds || cts.IsCancellationRequested)
@@ -2063,7 +2066,7 @@
                 {
                     _noEditRepromptAttempts++;
                     pendingPrompts.Add(new ChatMessage(ChatMessageRole.User, noEditPrompt));
-                    await AppendHostPromptAsync(reply, noEditPrompt, rounds);
+                    await AppendHostPromptAsync(reply, noEditPrompt, stepBase);
                     continue;
                 }
 
@@ -2072,7 +2075,7 @@
                 {
                     _autoContinued = true;
                     pendingPrompts.Add(new ChatMessage(ChatMessageRole.User, autoPrompt));
-                    await AppendHostPromptAsync(reply, autoPrompt, rounds);
+                    await AppendHostPromptAsync(reply, autoPrompt, stepBase);
                     continue;
                 }
 
@@ -2330,32 +2333,45 @@
     }
 
     /// <summary>普通对话的流式累积：正文原样追加，出错追加可读提示。</summary>
-    private async Task ConsumeAsync(
+    /// <param name="reply">正在生成的助手消息。</param>
+    /// <param name="stream">增量流。</param>
+    /// <param name="telemetry">本轮上下文遥测。</param>
+    /// <param name="metrics">本轮指标（工具轨迹来源）。</param>
+    /// <param name="traceBaseline">这一轮开始时消息上已有的轨迹条数。</param>
+    /// <param name="stepBase">本轮第一次模型请求在整条回合里的序号。</param>
+    /// <returns>下一轮可用的步骤序号（本轮用掉的 step 数要接着往下排）。</returns>
+    private async Task<int> ConsumeAsync(
         ChatMessage reply,
         IAsyncEnumerable<AgentDelta> stream,
         ContextRunTelemetry telemetry,
         AgentRunMetrics metrics,
         int traceBaseline,
-        int stepIndex)
+        int stepBase)
     {
+        // 内置工具循环会报「第几步」：偏移到整条回合的序号上，宿主追问才不会和它撞号。
+        var nextStep = stepBase;
+
         try
         {
             await foreach (var delta in stream)
             {
+                var step = delta.Step >= 0 ? stepBase + delta.Step : stepBase;
+                nextStep = Math.Max(nextStep, step + 1);
+
                 if (delta.Text.Length > 0)
                 {
                     reply.Content += delta.Text;
-                    AppendStep(reply, ChatStepKind.Text, delta.Text, stepIndex);
+                    AppendStep(reply, ChatStepKind.Text, delta.Text, step);
                 }
 
                 if (delta.Reasoning.Length > 0)
                 {
                     reply.Reasoning += delta.Reasoning;
-                    AppendStep(reply, ChatStepKind.Reasoning, delta.Reasoning, stepIndex);
+                    AppendStep(reply, ChatStepKind.Reasoning, delta.Reasoning, step);
                 }
 
                 // 工具轨迹边跑边同步：「工具调用 N 次」和文件改动面板在生成过程中就能看到。
-                SyncTrace(reply, metrics, traceBaseline, stepIndex);
+                SyncTrace(reply, metrics, traceBaseline, step);
 
                 // 中途裁剪 / 中途提示需要让用户看到，但仍不进模型上下文。
                 if (!string.IsNullOrWhiteSpace(telemetry.ContextNotice))
@@ -2388,8 +2404,10 @@
             reply.Content += message;
 
             // 走时间线时正文是按步骤拼出来的：错误也必须落成一步，否则会被组外答案漏掉。
-            AppendStep(reply, ChatStepKind.Text, message, stepIndex);
+            AppendStep(reply, ChatStepKind.Text, message, stepBase);
         }
+
+        return nextStep;
     }
 
     private static void ApplyMetrics(
