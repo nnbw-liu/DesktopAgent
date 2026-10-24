@@ -51,6 +51,14 @@ public sealed class SkillToolPack : IAgentToolPack
             return "当前没有技能库；正文无法加载。";
         }
 
+        var entry = library.Index()
+            .FirstOrDefault(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        if (entry is { DisableModelInvocation: true })
+        {
+            return $"「{name}」只能由用户用 /{name} 显式调用，模型不能加载它。";
+        }
+
         var content = library.ReadContent(name);
 
         if (content is null)

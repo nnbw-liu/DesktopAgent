@@ -460,6 +460,7 @@
                       OnSelectMount="SelectMount"
                       OnParameterChanged="ChangeParameter"
                       OnSend="HandleSend"
+                      OnCommand="HandleComposerCommandAsync"
                       OnStop="HandleStop">
             <HeaderContent>
                 @* 新聊天室（空会话）才需要归属工作区：放在 Header 里，贴左对齐输入文字 *@
@@ -756,6 +757,9 @@
 
     /// <summary>当前选中的技能名（为空表示不套用技能）。</summary>
     private string? _selectedSkill;
+
+    /// <summary>本轮由 `/技能` 一次性点名的技能；不写回输入框的 chip。</summary>
+    private string? _turnSkill;
 
     /// <summary>本轮启用的工具包 id（多选；最终仍以 chip 的可用性为准）。</summary>
     private readonly HashSet<string> _enabledToolPacks = new(StringComparer.Ordinal);
@@ -1220,6 +1224,78 @@
         }
 
         return text.Length <= 400 ? text : string.Concat(text.AsSpan(0, 400), "…");
+    }
+
+    /// <summary>
+    /// 执行输入框里的 <c>/命令</c>。命令走界面：不进模型、不产生消息；
+    /// 未知命令只提示，绝不退化成用户提示词。
+    /// </summary>
+    private async Task HandleComposerCommandAsync(string line)
+    {
+        if (!ComposerCommands.TryParseLine(line, out var name, out _))
+        {
+            return;
+        }
+
+        if (!ComposerCommands.IsKnown(name))
+        {
+            _contextNotice = $"未知命令：/{name}。可用：{string.Join("、", ComposerCommands.All.Select(command => "/" + command.Name))}";
+            StateHasChanged();
+            return;
+        }
+
+        switch (name.ToLowerInvariant())
+        {
+            case "compact":
+                if (_isGenerating)
+                {
+                    _contextNotice = "正在生成，稍后再压缩。";
+                    StateHasChanged();
+                    return;
+                }
+
+                await CompactNowAsync();
+                return;
+
+            case "model":
+                await OnOpenModelSettings.InvokeAsync();
+                return;
+
+            case "index":
+                RebuildWorkspaceIndex();
+                return;
+
+            default:
+                _contextNotice = "可用命令："
+                    + string.Join("、", ComposerCommands.All.Select(command => $"/{command.Name}（{command.Description}）"));
+                StateHasChanged();
+                return;
+        }
+    }
+
+    /// <summary>`/index`：重建当前工作区的知识库索引（只影响检索，不改会话）。</summary>
+    private void RebuildWorkspaceIndex()
+    {
+        var workspaceId = CurrentWorkspace()?.Id ?? Session.WorkspaceId;
+
+        if (string.IsNullOrWhiteSpace(workspaceId))
+        {
+            _contextNotice = "这个聊天室还没有归属工作区，无法重建索引。";
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            Memory.Rebuild(workspaceId);
+            _contextNotice = "已重建工作区知识库索引。";
+        }
+        catch (Exception ex)
+        {
+            _contextNotice = $"重建索引失败：{ex.Message}";
+        }
+
+        StateHasChanged();
     }
 
     /// <summary>手动压缩：走与自动压缩相同的增量逻辑，失败走兜底并提示。</summary>
@@ -1797,6 +1873,10 @@
 
         await OnSend.InvokeAsync(submission);
         _draft = string.Empty;
+
+        // `/技能` 是一次性的：只影响这一轮，不改输入框上的技能 chip。
+        _turnSkill = string.IsNullOrWhiteSpace(submission.InvokedSkill) ? null : submission.InvokedSkill;
+
         RememberSelection();
 
         var option = _modelOptions.FirstOrDefault(item => item.Key == _selectedKey);
@@ -1952,7 +2032,7 @@
                             option.Provider,
                             option.ModelId,
                             enabledPacks,
-                            _selectedSkill,
+                            _turnSkill ?? _selectedSkill,
                             Session.Id,
                             metrics,
                             Session: Session,
@@ -2009,6 +2089,7 @@
 
             _isGenerating = false;
             _cts = null;
+            _turnSkill = null;
             _contextPreview = telemetry.Report ?? _contextPreview;
             _contextNotice = telemetry.ContextNotice;
             await SetGeneratingAsync(false);

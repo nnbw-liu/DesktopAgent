@@ -98,6 +98,16 @@ window.sdComposer = {
         return element.value;
     },
 
+    // 输入框滚动时，高亮层跟着滚，避免长文本时 token 底色错位。
+    syncScroll: function (element, highlight) {
+        if (!element || !highlight) {
+            return;
+        }
+
+        highlight.scrollTop = element.scrollTop;
+        highlight.scrollLeft = element.scrollLeft;
+    },
+
     detach: function () {
         if (this._handler) {
             document.removeEventListener('keydown', this._handler, true);

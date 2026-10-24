@@ -14,7 +14,9 @@ public sealed record SkillInfo(
     string Description,
     string Icon = "",
     string WhenToUse = "",
-    IReadOnlyList<string>? Tags = null)
+    IReadOnlyList<string>? Tags = null,
+    // frontmatter 的 disable-model-invocation：模型看不到、load_skill 也拒绝，只有 `/name` 能加载。
+    bool DisableModelInvocation = false)
 {
     /// <summary>输入框 chip 里显示的字形：优先用 authored 的 <c>icon</c>，缺省取名字首字。</summary>
     public string Glyph => GlyphOf(!string.IsNullOrWhiteSpace(Icon) ? Icon : Name);
@@ -79,7 +81,8 @@ public sealed class SkillCatalog : ISkillLibrary
                     metadata.Description,
                     metadata.Icon,
                     metadata.WhenToUse,
-                    metadata.Tags);
+                    metadata.Tags,
+                    metadata.DisableModelInvocation);
             })
             .ToList();
     }
@@ -91,7 +94,8 @@ public sealed class SkillCatalog : ISkillLibrary
                 skill.Name,
                 skill.Description,
                 string.IsNullOrWhiteSpace(skill.WhenToUse) ? skill.Description : skill.WhenToUse,
-                skill.TagList))
+                skill.TagList,
+                skill.DisableModelInvocation))
             .ToArray();
 
     /// <summary>读取技能全文；名字只取文件名，防止 ../ 越界。</summary>
@@ -112,7 +116,8 @@ public sealed class SkillCatalog : ISkillLibrary
         string Description,
         string Icon,
         string WhenToUse,
-        IReadOnlyList<string> Tags);
+        IReadOnlyList<string> Tags,
+        bool DisableModelInvocation);
 
     /// <summary>
     /// 技能摘要 + 图标 + 路由元数据：优先取 frontmatter；没有 frontmatter 时
@@ -133,6 +138,7 @@ public sealed class SkillCatalog : ISkillLibrary
                 var description = string.Empty;
                 var icon = string.Empty;
                 var whenToUse = string.Empty;
+                var disableModelInvocation = false;
                 IReadOnlyList<string> tags = [];
 
                 for (var i = 1; i < end; i++)
@@ -160,6 +166,10 @@ public sealed class SkillCatalog : ISkillLibrary
                     {
                         tags = ParseTags(line["tags:".Length..]);
                     }
+                    else if (IsDisableModelInvocationLine(line))
+                    {
+                        disableModelInvocation = true;
+                    }
                 }
 
                 if (description.Length == 0)
@@ -168,12 +178,39 @@ public sealed class SkillCatalog : ISkillLibrary
                         .FirstOrDefault(line => line.Length > 0 && !line.StartsWith('#')) ?? string.Empty;
                 }
 
-                return new Metadata(description, icon, whenToUse, tags);
+                return new Metadata(description, icon, whenToUse, tags, disableModelInvocation);
             }
         }
 
         var summary = lines.FirstOrDefault(line => line.Length > 0 && !line.StartsWith('#')) ?? string.Empty;
-        return new Metadata(summary, string.Empty, string.Empty, []);
+        return new Metadata(summary, string.Empty, string.Empty, [], false);
+    }
+
+    /// <summary>支持 <c>disable-model-invocation: true</c> 与裸键 <c>disable-model-invocation</c> 两种写法。</summary>
+    internal static bool IsDisableModelInvocationLine(string line)
+    {
+        const string key = "disable-model-invocation";
+        var trimmed = line.Trim();
+
+        if (!trimmed.StartsWith(key, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var rest = trimmed[key.Length..].TrimStart();
+
+        if (rest.Length == 0)
+        {
+            return true;
+        }
+
+        if (rest[0] != ':')
+        {
+            return false;
+        }
+
+        return !rest[1..].Trim().StartsWith("false", StringComparison.OrdinalIgnoreCase)
+            && !rest[1..].Trim().StartsWith("no", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>支持 <c>[a, b]</c> 与 <c>a, b</c> 两种写法；空值返回空列表。</summary>
@@ -200,3 +237,4 @@ public sealed class SkillCatalog : ISkillLibrary
 
     private static string Unquote(string value) => value.Trim().Trim('"', '\'', '“', '”');
 }
+

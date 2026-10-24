@@ -28,6 +28,19 @@ public sealed class SkillToolPackTests : IDisposable
     }
 
     [Fact]
+    public async Task 禁止模型调用的技能不给加载()
+    {
+        File.WriteAllText(
+            Path.Combine(_root, "重写.md"),
+            "---\ndescription: 整文件重写\ndisable-model-invocation: true\n---\n正文");
+
+        var result = await Load("重写");
+
+        Assert.Contains("只能由用户", result);
+        Assert.DoesNotContain("[SKILL_BEGIN", result);
+    }
+
+    [Fact]
     public async Task 技能不存在时列出可用技能()
     {
         File.WriteAllText(Path.Combine(_root, "总结.md"), "正文");

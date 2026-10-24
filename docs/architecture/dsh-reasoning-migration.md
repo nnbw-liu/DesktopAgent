@@ -869,9 +869,9 @@ token 计量         ctx.tokenMeter              → ContextReport（已有，�
 - `ChatRoomStreamFailureTests` 覆盖「流中途失败」：错误提示必须落成一步，否则按步骤拼出来的答案会漏掉它。
 - 另用 `SDEMO_UI_BASELINE=1` 渲染了一份临时 HTML 逐项核对过（过程组只含过程、答案在组外、工具卡能展开到参数/结果）；截图基线的 PNG 管线在本次 checkout 里缺 `tools/ui-baseline`，所以没有提交新的基线产物。
 
-## 9. P0.5 实施记录（进行中：`@` 文件引用已落地）
+## 9. P0.5 实施记录（已完成：`@` 文件、`/` 命令、`/` 技能）
 
-状态：`@` 切片完成。构建 0 警告 0 错误；Core 741、UI 92 测试全绿。`/` 命令与 `/` 技能尚未开始。
+状态：三条管线全部落地。构建 0 警告 0 错误；Core 758、UI 102 测试全绿。
 
 ### 已落地
 
@@ -880,21 +880,29 @@ token 计量         ctx.tokenMeter              → ContextReport（已有，�
 | 触发语法 | `ComposerTriggers.Detect(text, caret)`：`@` 只认行首/空白之后，`/` 只认行首；`@"带 空格"` 允许空格直到闭合引号；`foo@bar` 与「和/或」不误触发 |
 | 候选排序 | `ComposerMatch`：大小写不敏感的有序子序列，路径段前缀优先，其次匹配间隙、再按候选长度、最后保持宿主顺序 |
 | 路径索引 | `WorkspaceReferenceIndex`：广度优先、深度 8、上限 4000 条、复用状态包的排除表（bin/obj/node_modules…）、30 秒缓存 + `Invalidate()` |
-| 菜单交互 | `sdComposer` 接管菜单开合：`↑↓` 移动、`Enter`/`Tab` 插入、`Esc` 关闭；菜单打开时 Enter 不再发送 |
-| 插入语义 | 只插**纯文本** `@path` / `@"带 空格"`；目录补成 `@"dir/` 并保持菜单（下一次输入自动下钻）；文件插入后补一个空格并关闭 |
-| 接线 | `ChatComposer` 注入 `IComposerReferenceIndex`，`ChatRoom` 传入 `WorkspaceContext.RootPath`；DI 注册落在 `AddDesktopAgentCore` |
+| 菜单交互 | `sdComposer` 接管菜单开合：`↑↓` 移动、`Enter`/`Tab` 确认、`Esc` 关闭；菜单打开时 Enter 不再发送 |
+| `@` 插入 | 只插**纯文本** `@path` / `@"带 空格"`；目录补成 `@"dir/` 并保持菜单（下一次输入自动下钻）；文件插入后补一个空格并关闭 |
+| **选中样式** | `ComposerTokens.Scan` 扫已落下的 token（`@` 引用、行首 `/` 命令），`ToHighlightHtml` 输出转义后的高亮层；透明镜像层画 token 底色（紫=引用、琥珀=命令），输入框文字保持可见，滚动由 `sdComposer.syncScroll` 同步 |
+| `/` 命令 | `ComposerCommands`：严格语法（首字节 `/` + 小写名 + 空白/行尾）、未知命令拒绝；`/compact`（转 `CompactNowAsync`）、`/model`（打开模型设置）、`/index`（重建知识库）、`/help`；命令**不进模型**，执行后清空输入 |
+| `/` 技能 | 同一 `/` 菜单：命令在前、技能在后，**同名时命令赢**；点选插入 `/name `，提交时 `ComposerSubmission.InvokedSkill` 带上技能名；手打 `/name` 同样识别（任何空白分隔处），正文由现有 `SkillName`/`SkillText` 通道全文注入 |
+| 防重复加载 | 技能全文注入时提示词里加一句「不要再调用 load_skill 加载同名技能」 |
+| 权限位 | 技能 frontmatter 新增 `disable-model-invocation`：不进索引、`load_skill` 拒绝、只能 `/name` 加载 |
 
 ### 与计划的偏差
 
 1. **文本在 C# 里算、JS 只改 DOM**：`replaceRange` 不再返回新文本，避免界面/测试/回灌三条路径拿到不同结果。
 2. **目录下钻靠「让 input 事件重新识别」**：插入 `@"dir/` 后不主动查询，交给下一次 `HandleInput` 重算，代码里只有一条识别路径。
 3. **键盘仲裁放在 JS**：沿用现有 `sdComposer` 的 document 捕获监听（Enter 一直是 JS 管的），菜单只是多一种「吃掉按键」的状态，不引入第二套 keydown 监听。
-4. 测试里用 bUnit 的 `JSInterop.Setup<int>("sdComposer.caretOf", invocation => true)`（带 matcher 的重载才匹配带参数的调用），并避开 `RefreshableElementCollection` 的索引器（bUnit 1.40 与仓库里 AngleSharp 1.8.5 不兼容，会抛 `MissingMethodException`）。
+4. **高亮层用「透明镜像 + 底色」而不是把文字也画在高亮层**：输入框自己画字，中文输入法的组合态才不会消失；token 只贡献背景与下划线，避免字形重影。
+5. **`/技能` 的识别范围比 `/命令` 宽**：命令只认行首（避免「和/或」误触发），技能按 DSH 的手势规则认任意空白分隔处。
+6. **`/new` 没做**：新建会话要新的宿主回调（AppShell 目前没把「新建」暴露给 ChatRoom），留到补回调时一起做。
+7. 测试里用 bUnit 的 `JSInterop.Setup<int>("sdComposer.caretOf", invocation => true)`（带 matcher 的重载才匹配带参数的调用），并避开 `RefreshableElementCollection` 的索引器（bUnit 1.40 与仓库里 AngleSharp 1.8.5 不兼容，会抛 `MissingMethodException`）。
 
-### 待办
+### 测试
 
-- `/` 命令：注册表 + 严格语法 + 未知命令拒绝（`/compact`、`/new`、`/model`、`/index`）。
-- `/` 技能：`skills/list` 候选 + 命令优先裁决 + 复用 `SkillName`/`SkillText` 注入 + `disable-model-invocation`。
+- 契约：`ComposerTriggerTests`（语法/格式化）、`ComposerTokenTests`（扫描/高亮/技能识别/命令行解析）。
+- Core：`ComposerReferenceTests`（枚举/排除/缓存/排序）、`SkillCatalogTests`（`disable-model-invocation` 解析）、`SkillIndexBuilderTests`（禁用技能不进索引）、`SkillToolPackTests`（`load_skill` 拒绝）。
+- UI：`ChatComposerMentionTests`（`@` 弹菜单/方向键/下钻/关闭）、`ChatComposerCommandTests`（命令在前、执行不发送、技能插入、手打识别、未知命令转交宿主、高亮 token）、`ChatRoomCommandTests`（未知命令只提示、`/compact` 打到服务、`/help` 列表、无工作区时 `/index` 提示）。
 
 ## 10. 参考（证据位置）
 
@@ -939,6 +947,8 @@ DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat
 - `src/Context/SDemo.DesktopAgent.Context/ContextCompactor.cs:67-215`、`ContextBudgetChatClient.cs:74-75,199-261`、`ContextTrimmer.cs:104-148`
 - `src/Context/SDemo.DesktopAgent.Context/State/StatePackFormatter.cs:21-59,61-144`（god-renderer 与写死的截断顺序）、`State/WorkspaceState.cs:6-13`（数据源）
 - `src/Context/SDemo.DesktopAgent.Context/AgentInstructions.cs:9-19`（死代码；静态沙箱文案）
-- `src/App/SDemo.DesktopAgent.UI/Components/Chat/ChatComposer.razor:39-43,360,556`（textarea + 只有文本/附件的提交）、`Contracts/Models/ComposerSubmission.cs`（当前只有两个字段）
-- `src/Context/SDemo.DesktopAgent.Context/SkillCatalog.cs`、`SkillIndexBuilder.cs:15-91`、`Tools.Skills/SkillToolPack.cs`（技能索引 / `load_skill` / frontmatter 解析）
+- `src/App/SDemo.DesktopAgent.UI/Components/Chat/ChatComposer.razor`（触发菜单、命令路由、`/技能` 点名、高亮层）、`ChatRoom.razor`（`HandleComposerCommandAsync`、`_turnSkill`）
+- `Contracts/Models/ComposerTrigger.cs`、`ComposerTokens.cs`、`ComposerCommands.cs`、`ComposerMatch.cs`（语法、扫描、命令目录、排序）
+- `src/App/SDemo.DesktopAgent.Core/Services/WorkspaceReferenceIndex.cs`（`@` 路径索引）
+- `src/Context/SDemo.DesktopAgent.Context/SkillCatalog.cs`（`disable-model-invocation` 解析）、`SkillIndexBuilder.cs`、`Tools.Skills/SkillToolPack.cs`（索引过滤与 `load_skill` 拒绝）
 - `src/App/SDemo.DesktopAgent.UI/Components/Chat/ContextBreakdown.razor`、`ContextMeter.razor`（现有分解面板与环形；P2a 加段后只需改数据源）；`Contracts/Context/ContextReport.cs`（段定义）

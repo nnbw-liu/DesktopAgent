@@ -296,7 +296,8 @@ public sealed class ContextBuilder
             return (instructions, systemTokens, indexTokens, knowledgeTokens, false);
         }
 
-        var header = $"\n\n## 本轮使用的技能：{request.SkillName}\n请严格按以下技能说明执行任务：\n\n";
+        var header = $"\n\n## 本轮使用的技能：{request.SkillName}\n"
+            + "正文已经在本轮提供，不要再调用 load_skill 加载同名技能。请严格按以下技能说明执行任务：\n\n";
         var skillText = request.SkillText;
         var truncated = false;
 

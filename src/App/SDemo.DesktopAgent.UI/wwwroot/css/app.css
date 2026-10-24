@@ -1292,6 +1292,63 @@ a {
     font-size: 10.5px;
 }
 
+.composer-menu-desc {
+    overflow: hidden;
+    margin-left: auto;
+    padding-left: 8px;
+    color: var(--muted);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------- 输入框高亮层：@引用 / /命令 的选中样式 ---------- */
+.composer-input {
+    position: relative;
+    display: block;
+}
+
+.composer-highlight {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    padding: 14px 16px 6px;
+    color: transparent;
+    font-family: inherit;
+    font-size: 13.5px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    pointer-events: none;
+    user-select: none;
+}
+
+.composer-input .composer-text {
+    position: relative;
+    background: transparent;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* token 只画底色：文字仍由输入框本身绘制，不会被镜像层重影 */
+.composer-token {
+    border-radius: 4px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+.composer-token--mention {
+    background: color-mix(in srgb, #7c6cf0 24%, transparent);
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, #7c6cf0 55%, transparent);
+}
+
+.composer-token--command {
+    background: color-mix(in srgb, #d99a2b 24%, transparent);
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, #d99a2b 55%, transparent);
+}
+
+
 
 .composer-footer {
     display: flex;
