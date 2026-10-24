@@ -100,17 +100,29 @@ window.sdComposer = {
         return element && typeof element.selectionStart === 'number' ? element.selectionStart : 0;
     },
 
-    // 替换 [start, end) 为 text，并把光标放到末尾；返回替换后的完整文本。
-    replaceRange: function (element, start, end, text) {
+    // 把输入框的文本与光标同步到宿主算好的结果。
+    //
+    // 文本**只由 C# 决定**（界面、测试、回灌拿到同一份），JS 不再按 start/end 做二次插入：
+    // 之前用 setRangeText 在这里又插了一遍，而 Blazor 的重渲染已经把 textarea 更新成新文本，
+    // 于是 Tab/Enter 确认候选后会出现「@文件 文件」这种重复尾巴。
+    //
+    // text 传 null 表示不动文本，只摆光标（普通插入之后用得到）。
+    applyText: function (element, value, caret) {
         if (!element) {
-            return '';
+            return;
         }
 
-        element.focus();
-        element.setRangeText(text, start, end, 'end');
-        element.dispatchEvent(new Event('input', { bubbles: true }));
+        if (typeof value === 'string' && element.value !== value) {
+            element.value = value;
+        }
 
-        return element.value;
+        if (document.activeElement !== element) {
+            element.focus({ preventScroll: true });
+        }
+
+        var length = typeof element.value === 'string' ? element.value.length : 0;
+        var position = typeof caret === 'number' && caret >= 0 ? Math.min(caret, length) : length;
+        element.setSelectionRange(position, position);
     },
 
     // 把焦点还给输入框：用鼠标点候选行会先把焦点给到按钮，行一消失焦点就落到 body，

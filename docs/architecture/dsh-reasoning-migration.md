@@ -929,6 +929,30 @@ token 计量         ctx.tokenMeter              → ContextReport（已有，�
 测试：`ChatComposerMentionTests` 新增「鼠标点选后插入路径、关菜单、还焦点」「候选行不进 Tab 顺序」
 「没有候选时确认只复位不发送」「鼠标移上去高亮那一行」四条。
 
+### 修补（2026-10-24）：确认候选后文本被插了两遍
+
+现象：`@` 菜单里按 **Tab / Enter** 确认（鼠标点选同样）之后，输入框里出现两份文件名——
+高亮 token 之后多出一截 `物业交割单.docx `。
+
+根因是文本有两条写入路径：C# 先改 `Text` 并触发 `TextChanged`，Blazor 的重渲染**已经把
+`<textarea>` 的值换成了新文本**；紧接着 JS 的 `sdComposer.replaceRange` 又在 `[start, end)`
+上做了一次 `setRangeText`，于是插入内容被叠到已更新的文本上（它想替换的 `@` 已经不在原位）。
+bUnit 里 `TextChanged` 没人接、组件不重渲染，所以测试一直是绿的，真机上才复现。
+
+修法（三条一起，任何一条单独都够）：
+
+- **JS 不再按区间插入**：只保留 `sdComposer.applyText(element, value, caret)`——文本由 C#
+  算好后原样落到 DOM，顺带摆光标。文本永远只有一份来源，插几次都不会叠。
+- **光标在渲染之后才摆**：`OnAfterRenderAsync` 里消费 `_pendingCaret`。另外位置要在
+  `StateHasChanged()` **之前**存进局部变量——这次渲染可能同步执行，`OnAfterRender` 会立刻把
+  `_pendingCaret` 清掉（目录下钻一开始就是栽在这里：拿回的光标是 -1，识别不出下一层）。
+- **目录下钻不再依赖 JS 补发的 `input` 事件**：插入后直接 `RefreshMenuAsync(caret)` 算下一层，
+  否则去掉 input 事件之后菜单要等用户再敲一个字才刷新。
+
+测试：`ChatComposerMentionTests` 新增「确认候选只插入一次文本_光标落在插入之后」（断言最终文本、
+`TextChanged` 的回灌值、以及不存在第二条按区间插入的互操作），并把「选目录后菜单保持打开继续下钻」
+改成断言下一层候选**立刻**出现。
+
 ## 10. P1a 实施记录（内置工具循环）
 
 状态：✅ 已落地，**默认关闭**（`AgentSettings.NativeLoop`）。WPF 解决方案 0 警告 0 错误（Debug / Release 均通过）；Core 768、UI 106 测试全绿。

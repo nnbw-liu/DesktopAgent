@@ -71,20 +71,57 @@ public sealed class ChatComposerMentionTests : TestContext
     }
 
     [Fact]
-    public void 选目录后菜单保持打开继续下钻()
+    public async Task 选目录后菜单保持打开并立刻列出下一层()
     {
-        _references.Items = ["src/", "src/Program.cs"];
+        _references.Items = ["src/", "src/Program.cs", "src/Core/Budget.cs"];
         JSInterop.Setup<int>("sdComposer.caretOf", invocation => true).SetResult(3);
 
         var cut = RenderComposer();
 
         cut.Find("textarea").Input("@sr");
 
-        cut.InvokeAsync(() => cut.Instance.MenuCommitAsync());
+        await cut.InvokeAsync(() => cut.Instance.MenuCommitAsync());
 
-        // 目录：补成 `@src/` 并保留菜单（下一次输入会重新算下一层）。
+        // 目录：补成 `@src/` 并保留菜单，而且**马上**列出下一层（不依赖用户再敲一个字）。
         Assert.Equal("@src/", cut.Instance.Text);
-        Assert.NotEmpty(cut.FindAll(".composer-menu"));
+        var labels = cut.FindAll(".composer-menu-label").Select(element => element.TextContent).ToArray();
+        Assert.NotEmpty(labels);
+        Assert.Contains("src/Program.cs", labels);
+    }
+
+    [Fact]
+    public async Task 确认候选只插入一次文本_光标落在插入之后()
+    {
+        // 用户报的缺陷：Tab/Enter 选中 `物业交割单.docx ` 之后，高亮区域后面多出一截同样的文件名。
+        // 根因是 JS 在 Blazor 已经渲染过的新文本上又按 [start, end) 插了一遍。
+        _references.Items = ["物业交割单.docx"];
+        JSInterop.Setup<int>("sdComposer.caretOf", invocation => true).SetResult(1);
+
+        string? bound = null;
+        var cut = RenderComponent<ChatComposer>(parameters => parameters
+            .Add(component => component.SessionId, "composer-test")
+            .Add(component => component.WorkspaceRoot, _temp.Root)
+            .Add(component => component.Text, string.Empty)
+            .Add(component => component.TextChanged, (string value) => bound = value));
+
+        cut.Find("textarea").Input("@");
+        await cut.InvokeAsync(() => cut.Instance.MenuCommitAsync());
+
+        const string expected = "@物业交割单.docx ";
+        Assert.Equal(expected, cut.Instance.Text);
+        Assert.Equal(expected, bound);
+
+        // 文本只有一条写入路径：宿主算好后交给 applyText（顺带摆光标），
+        // 没有第二条「按区间再插一次」的互操作。
+        Assert.DoesNotContain(
+            JSInterop.Invocations,
+            invocation => invocation.Identifier == "sdComposer.replaceRange");
+
+        var apply = Assert.Single(
+            JSInterop.Invocations,
+            invocation => invocation.Identifier == "sdComposer.applyText");
+        Assert.Equal(expected, apply.Arguments[1]);
+        Assert.Equal(expected.Length, (int)apply.Arguments[2]!);
     }
 
     [Fact]

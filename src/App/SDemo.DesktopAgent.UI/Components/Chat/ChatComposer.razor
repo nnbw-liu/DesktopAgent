@@ -428,8 +428,8 @@
 
     private int _selected;
 
-    /// <summary>刚插入过一次引用：不要让紧接着的 input 事件再把菜单弹出来。</summary>
-    private bool _suppressTrigger;
+    /// <summary>宿主改过文本后要落到的光标位置；-1 表示没有待办。</summary>
+    private int _pendingCaret = -1;
 
     /// <summary>组件认为菜单是打开的（JS 侧 <c>_menuOpen</c> 的镜像，避免重复互操作）。</summary>
     private bool _menuOpen;
@@ -510,14 +510,38 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
+        if (firstRender)
+        {
+            // 键盘约定由 JS 处理（Enter 发送 / Shift、Ctrl+Enter 换行），这里注册回调。
+            _selfReference = DotNetObjectReference.Create(this);
+            await Js.InvokeVoidAsync("sdComposer.attach", _selfReference);
+        }
+
+        // 文本由 Blazor 渲染成权威版本，光标只能在渲染之后再摆：早于渲染会被
+        // 「把 value 赋回去」冲掉。
+        await ApplyPendingCaretAsync();
+    }
+
+    /// <summary>渲染完成后把光标放到宿主算好的位置。</summary>
+    private async Task ApplyPendingCaretAsync()
+    {
+        var caret = _pendingCaret;
+
+        if (caret < 0)
         {
             return;
         }
 
-        // 键盘约定由 JS 处理（Enter 发送 / Shift、Ctrl+Enter 换行），这里注册回调。
-        _selfReference = DotNetObjectReference.Create(this);
-        await Js.InvokeVoidAsync("sdComposer.attach", _selfReference);
+        _pendingCaret = -1;
+
+        try
+        {
+            await Js.InvokeVoidAsync("sdComposer.applyText", _inputRef, Text, caret);
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView 已释放：文本已经更新，光标同步跳过。
+        }
     }
 
     /// <summary>Enter 键触发：菜单打开时由 <see cref="MenuCommitAsync"/> 吃掉，这里只处理普通发送。</summary>
@@ -594,7 +618,6 @@
 
             case ComposerMenuKind.Skill:
                 _invokedSkill = item.Value;
-                _suppressTrigger = true;
                 await ReplaceRangeAsync(trigger.Start, trigger.Caret, "/" + item.Value + " ");
                 await CloseMenuAsync();
                 return;
@@ -605,41 +628,48 @@
                     ? ComposerTriggers.FormatDirectoryMention(item.Value)
                     : ComposerTriggers.FormatMention(item.Value) + " ";
 
-                // 目录保留菜单：让 input 事件重新识别 `@"dir/`，直接进入下一层。
-                _suppressTrigger = !isDirectory;
+                var caret = await ReplaceRangeAsync(trigger.Start, trigger.Caret, insert);
 
-                await ReplaceRangeAsync(trigger.Start, trigger.Caret, insert);
-
-                if (!isDirectory)
+                if (isDirectory)
                 {
-                    await CloseMenuAsync();
+                    // 目录保留菜单并立刻算下一层：以前靠 JS 补发的 input 事件重新识别，
+                    // 那条路径已经去掉了，这里显式按插入后的位置重算。
+                    await RefreshMenuAsync(caret);
+                    return;
                 }
 
+                await CloseMenuAsync();
                 return;
         }
     }
 
-    private async Task ReplaceRangeAsync(int start, int end, string text)
+    /// <summary>
+    /// 替换 [start, end) 为 text，返回插入后的光标位置。
+    /// <para>
+    /// 文本只有一份来源（这里的 <see cref="Text"/>）：DOM 交给 Blazor 重渲染，JS 只在渲染后
+    /// 摆光标。以前是先改 Text、再由 JS 按 start/end 插一遍——Blazor 已经把那一段换掉了，
+    /// 于是内容被插了两次（Tab/Enter 确认候选后多出一截重复文件名）。
+    /// </para>
+    /// </summary>
+    private async Task<int> ReplaceRangeAsync(int start, int end, string text)
     {
         // 文本在 C# 里算：界面、测试、回灌都拿到同一份结果，不依赖 JS 的返回值。
         var from = Math.Clamp(start, 0, Text.Length);
         var to = Math.Clamp(end, from, Text.Length);
+        var caret = from + text.Length;
 
         Text = string.Concat(Text.AsSpan(0, from), text, Text.AsSpan(to));
+        _pendingCaret = caret;
 
         if (TextChanged.HasDelegate)
         {
             await TextChanged.InvokeAsync(Text);
         }
 
-        try
-        {
-            await Js.InvokeVoidAsync("sdComposer.replaceRange", _inputRef, from, to, text);
-        }
-        catch (JSDisconnectedException)
-        {
-            // WebView 已释放：文本已经更新，DOM 同步跳过。
-        }
+        // StateHasChanged 可能同步渲染，渲染后的 OnAfterRender 会把 _pendingCaret 消费掉，
+        // 所以位置先存在局部变量里再返回。
+        StateHasChanged();
+        return caret;
     }
 
     private async Task CloseMenuAsync()
@@ -705,24 +735,30 @@
         }
     }
 
-    /// <summary>按光标位置重算候选：`@` 给文件、`/` 给命令与技能；没有触发符就关菜单。</summary>
-    private async Task RefreshMenuAsync()
+    /// <summary>
+    /// 按光标位置重算候选：`@` 给文件、`/` 给命令与技能；没有触发符就关菜单。
+    /// </summary>
+    /// <param name="caretOverride">
+    /// 已知的光标位置（宿主刚改过文本时用）：此时 DOM 还没渲染到最新，不能去问 JS。
+    /// </param>
+    private async Task RefreshMenuAsync(int? caretOverride = null)
     {
-        if (_suppressTrigger)
-        {
-            _suppressTrigger = false;
-            return;
-        }
-
         int caret;
 
-        try
+        if (caretOverride is { } known)
         {
-            caret = await Js.InvokeAsync<int>("sdComposer.caretOf", _inputRef);
+            caret = known;
         }
-        catch (JSDisconnectedException)
+        else
         {
-            return;
+            try
+            {
+                caret = await Js.InvokeAsync<int>("sdComposer.caretOf", _inputRef);
+            }
+            catch (JSDisconnectedException)
+            {
+                return;
+            }
         }
 
         var trigger = ComposerTriggers.Detect(Text, caret);
