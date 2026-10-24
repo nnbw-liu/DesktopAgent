@@ -44,9 +44,25 @@ public sealed class CapabilityRouterTests
     }
 
     [Fact]
-    public void 未知意图给保守四件套()
+    public void 纯对话不暴露任何工具()
     {
-        var selected = Select("嗯", AgentMode.Compact);
+        var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
+            "嗯",
+            [],
+            Available,
+            AgentMode.Compact,
+            MaxExposedTools: 12));
+
+        Assert.Empty(decision.ExposedTools);
+        Assert.Equal(TurnIntent.Chat, decision.Intent);
+        Assert.False(decision.NeedsTools);
+        Assert.Contains("意图=chat", decision.Reason);
+    }
+
+    [Fact]
+    public void 未知任务意图给保守四件套()
+    {
+        var selected = Select("处理一下那个东西", AgentMode.Compact);
 
         Assert.Equal(["list_tree", "read_file", "search_files", "run_command"], selected);
     }
@@ -67,7 +83,7 @@ public sealed class CapabilityRouterTests
         var union = core.Concat(available).ToArray();
 
         var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
-            "随便聊两句",
+            "帮我改一下这个文件",
             [],
             union,
             AgentMode.Full,
@@ -104,7 +120,7 @@ public sealed class CapabilityRouterTests
     public void Full模式提供兜底入口()
     {
         var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
-            "嗯",
+            "看一下这个文件",
             [],
             Available,
             AgentMode.Full,
@@ -129,6 +145,8 @@ public sealed class CapabilityRouterTests
         Assert.Equal(Available.Length, decision.Count);
         Assert.False(decision.Truncated);
         Assert.Equal(Available.Length, decision.MaxExposedTools);
+        // 全量暴露是排障逃生口：即使输入是寒暄，也按工具轮处理，不能又给工具又说「不要用工具」。
+        Assert.True(decision.NeedsTools);
     }
 
     [Fact]
@@ -151,7 +169,7 @@ public sealed class CapabilityRouterTests
         var available = Available.Concat(["load_skill"]).ToArray();
 
         var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
-            "随便聊两句",
+            "帮我改一下这个文件",
             [],
             available,
             AgentMode.Full,
@@ -171,11 +189,11 @@ public sealed class CapabilityRouterTests
         var available = Available.Concat(["load_skill"]).ToArray();
 
         var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
-            "嗯",
+            "看一下这个文件",
             [],
             available,
             AgentMode.Compact,
-            MaxExposedTools: 6));
+            MaxExposedTools: 12));
 
         Assert.Equal(CapabilityRouter.CompactMaxTools, decision.Count);
         Assert.Contains(CapabilityRouter.LoadSkillTool, decision.ExposedTools);
@@ -198,11 +216,10 @@ public sealed class CapabilityRouterTests
 
         Assert.Contains(CapabilityRouter.SearchMemoryTool, decision.ExposedTools);
         Assert.Contains(CapabilityRouter.ReadMemoryTool, decision.ExposedTools);
-        // 意图判定必须是 memory 而不是 shell；即使填充阶段带上了 run_powershell，memory 也排在前面。
+        // 意图判定必须是 memory 而不是 shell：无关的 run_powershell 不应因为「填满名额」被带上。
         Assert.Contains("意图=memory", decision.Reason);
-        Assert.True(
-            decision.ExposedTools.ToList().IndexOf(CapabilityRouter.SearchMemoryTool)
-            < decision.ExposedTools.ToList().IndexOf("run_powershell"));
+        Assert.DoesNotContain("run_powershell", decision.ExposedTools);
+        Assert.Equal(TurnIntent.Answer, decision.Intent);
     }
 
     [Fact]

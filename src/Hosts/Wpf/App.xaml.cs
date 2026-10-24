@@ -104,6 +104,7 @@ public partial class App : Application
         services.AddSingleton<ISystemThemeProvider, RegistrySystemThemeProvider>();
         services.AddSingleton<IAppEnvironmentService, WebView2EnvironmentService>();
         services.AddSingleton<IFolderPickerService, FolderPickerService>();
+        services.AddSingleton<IFileLauncherService, SDemo.DesktopAgent.Platform.Windows.Services.ShellFileLauncher>();
         services.AddSingleton<AttachmentStore>();
 
         // 平台无关：设置、主题、模型、会话、技能、Agent。

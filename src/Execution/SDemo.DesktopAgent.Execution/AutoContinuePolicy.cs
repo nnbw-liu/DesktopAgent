@@ -12,12 +12,14 @@ public static class AutoContinuePolicy
         string? buildCommand,
         string? testCommand,
         VerificationSettings settings,
-        int alreadyContinued)
+        int alreadyContinued,
+        bool hasNewEdits = true)
     {
         var gate = VerificationGate.Evaluate(session);
         var max = Math.Clamp(settings.MaxAutoContinue, 0, 1);
 
         if (!gate.Dirty
+            || !hasNewEdits
             || !settings.AutoVerifyAfterEdit
             || alreadyContinued >= max
             || (string.IsNullOrWhiteSpace(buildCommand) && string.IsNullOrWhiteSpace(testCommand)))

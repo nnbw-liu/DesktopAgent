@@ -1,6 +1,5 @@
 using System.ClientModel;
 using System.Runtime.CompilerServices;
-using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Chat;
@@ -9,9 +8,15 @@ namespace SDemo.DesktopAgent.Agents;
 
 /// <summary>
 /// 基于 Microsoft Agent Framework 的运行时实现。
-/// 装配顺序刻意固定：<c>OpenAI ChatClient → Decorate（上下文裁剪层）→ FunctionInvokingChatClient → AsAIAgent</c>。
+/// 装配顺序刻意固定：<c>OpenAI ChatClient → Decorate（上下文裁剪层）→ FunctionInvokingChatClient</c>。
 /// FICC 必须在装饰器外层，装饰器才能看到工具循环里的每一次请求（P1 §3.7 分支 A）。
 /// </summary>
+/// <remarks>
+/// 流式请求直接走 <see cref="FunctionInvokingChatClient.GetStreamingResponseAsync"/>：
+/// MAF 的 <c>AIAgent</c> 包装层会把 <c>ChatOptions</c>（推理强度）挡在外面，也拿不到
+/// <see cref="FunctionCallContent"/> / <see cref="FunctionResultContent"/> 这类过程内容，
+/// 界面上就看不到「调用了什么工具」。
+/// </remarks>
 public sealed class MafAgentRuntime : IAgentRuntime
 {
     public async IAsyncEnumerable<AgentStreamEvent> StreamAsync(
@@ -40,13 +45,19 @@ public sealed class MafAgentRuntime : IAgentRuntime
             MaximumIterationsPerRequest = Math.Max(1, invocation.MaxToolIterations)
         };
 
-        var agent = invoking.AsAIAgent(
-            instructions: invocation.Instructions,
-            name: invocation.AgentName,
-            tools: invocation.Tools.Count == 0 ? null : invocation.Tools.ToList());
+        var chatOptions = new ChatOptions
+        {
+            Instructions = invocation.Instructions,
+            Tools = invocation.Tools.Count == 0 ? null : [.. invocation.Tools]
+        };
 
-        await foreach (var update in agent
-                           .RunStreamingAsync(invocation.Messages, cancellationToken: cancellationToken)
+        if (ParseReasoningEffort(invocation.ReasoningEffort) is { } effort)
+        {
+            chatOptions.Reasoning = new ReasoningOptions { Effort = effort };
+        }
+
+        await foreach (var update in invoking
+                           .GetStreamingResponseAsync(invocation.Messages, chatOptions, cancellationToken)
                            .ConfigureAwait(false))
         {
             foreach (var content in update.Contents)
@@ -78,4 +89,18 @@ public sealed class MafAgentRuntime : IAgentRuntime
             }
         }
     }
+
+    /// <summary>
+    /// 把设置里的「思考强度」映射成 MEAI 的枚举；空 / 未知值表示不显式请求（用服务端默认）。
+    /// <c>none</c> 是显式关闭：不发这个字段时，端点默认值说了算（Qwen3 / Ollama 等默认就是思考），
+    /// 「不思考」只有显式传 <c>reasoning_effort: none</c> 才真的关得掉。
+    /// </summary>
+    internal static ReasoningEffort? ParseReasoningEffort(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        "none" => ReasoningEffort.None,
+        "low" => ReasoningEffort.Low,
+        "medium" => ReasoningEffort.Medium,
+        "high" => ReasoningEffort.High,
+        _ => null
+    };
 }

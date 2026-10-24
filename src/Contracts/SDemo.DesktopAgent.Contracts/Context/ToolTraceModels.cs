@@ -12,7 +12,11 @@ public sealed record ToolTraceEntry(
     string? Summary,
     int OutputChars,
     DateTime At,
-    IReadOnlyList<EditedFile>? Edits = null)
+    IReadOnlyList<EditedFile>? Edits = null,
+    // 这次工具调用发生时，已经产生了多少思维链 / 正文字符。用于重开会话时还原本「思考→工具→思考」的步骤顺序；
+    // -1 表示旧记录没有这个信息。
+    int ReasoningChars = -1,
+    int TextChars = -1)
 {
     public const string StatusOk = "ok";
     public const string StatusError = "error";

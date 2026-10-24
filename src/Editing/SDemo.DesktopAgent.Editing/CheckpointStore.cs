@@ -139,6 +139,72 @@ public sealed class CheckpointStore
         }
     }
 
+    /// <summary>
+    /// 取某个文件「这次改动前」的内容：从新到旧找第一个包含该路径的 checkpoint，
+    /// 读它备份的快照。用于界面上的 diff 预览，不改磁盘、不动快照。
+    /// </summary>
+    /// <param name="existed">当时文件是否存在；false 表示这是新建文件（改动前为空）。</param>
+    public bool TryReadBeforeContent(
+        string sessionId,
+        string relativePath,
+        out string content,
+        out bool existed)
+    {
+        content = string.Empty;
+        existed = false;
+
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return false;
+        }
+
+        var normalized = WorkspacePath.NormalizeRelative(relativePath);
+
+        lock (_sync)
+        {
+            foreach (var manifest in LoadSession(sessionId).OrderByDescending(item => item.At))
+            {
+                var file = manifest.Files.FirstOrDefault(item =>
+                    string.Equals(item.Path, normalized, StringComparison.OrdinalIgnoreCase));
+
+                if (file is null)
+                {
+                    continue;
+                }
+
+                existed = file.Existed;
+
+                if (!file.Existed)
+                {
+                    // 新建文件：改动前是空内容，diff 就是「全部新增」。
+                    return true;
+                }
+
+                var backup = Path.Combine(
+                    CheckpointDirectory(manifest),
+                    "files",
+                    normalized.Replace('/', Path.DirectorySeparatorChar));
+
+                if (!File.Exists(backup))
+                {
+                    return false;
+                }
+
+                try
+                {
+                    content = File.ReadAllText(backup);
+                    return true;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public IReadOnlyList<CheckpointManifest> List(string sessionId)
     {
         lock (_sync)

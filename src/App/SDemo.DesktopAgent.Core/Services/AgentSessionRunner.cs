@@ -599,7 +599,8 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             mode,
             agent.ResolveMaxExposedTools(profile.ContextWindow, mode),
             agent.SearchCapabilitiesEnabled,
-            agent.ExposeAllTools);
+            agent.ExposeAllTools,
+            HasSelectedSkill: !string.IsNullOrWhiteSpace(request.SkillName));
 
         var rule = CapabilityRouter.Route(input);
 
@@ -668,7 +669,8 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             mode,
             agent.ResolveMaxExposedTools(profile.ContextWindow, mode),
             agent.SearchCapabilitiesEnabled,
-            agent.ExposeAllTools));
+            agent.ExposeAllTools,
+            HasSelectedSkill: !string.IsNullOrWhiteSpace(request.SkillName)));
     }
 
     private static (string UserInput, string[] RecentToolIds) RoutingInputs(AgentRunRequest request)

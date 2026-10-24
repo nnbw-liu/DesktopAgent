@@ -49,9 +49,15 @@
                 </div>
             </div>
         }
-        else
+
+        @* 每个正在生成的会话保留自己的 ChatRoom 实例：切走后按设置决定中断还是后台继续。 *@
+        @foreach (var session in MountedSessions)
         {
-            <ChatRoom Session="_activeSession"
+            var isActive = _view == MainView.Chat && ReferenceEquals(session, _activeSession);
+
+            <ChatRoom @key="session.Id"
+                      Session="session"
+                      IsActive="isActive"
                       Workspaces="Workspaces"
                       OnSend="HandleSendMessage"
                       OnSessionChanged="PersistSession"
@@ -97,6 +103,29 @@
             .OrderByDescending(session => session.IsPinned)
             .ThenByDescending(session => session.UpdatedAt)
             .ToList();
+
+    /// <summary>
+    /// 需要挂载 ChatRoom 的会话：当前聊天室（仅聊天页）加上所有仍在生成的会话。
+    /// 生成中的隐藏实例继续消费流，切回来时不用重建，也不会丢进度。
+    /// </summary>
+    private IReadOnlyList<ChatSession> MountedSessions
+    {
+        get
+        {
+            var mounted = _sessions
+                .Where(session => session.IsGenerating)
+                .ToList();
+
+            if (_view == MainView.Chat
+                && _activeSession is not null
+                && !mounted.Contains(_activeSession))
+            {
+                mounted.Insert(0, _activeSession);
+            }
+
+            return mounted;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

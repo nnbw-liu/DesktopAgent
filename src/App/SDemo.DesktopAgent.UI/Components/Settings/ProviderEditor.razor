@@ -80,11 +80,27 @@
                                 <option value="@tier.Preset">@tier.Preset 窗口</option>
                             }
                         </select>
+                        <select class="field-input field-input--select model-effort"
+                                title="思考强度：不指定 = 不发 reasoning_effort，由端点默认决定；不思考 = 显式关闭；低/中/高 = 显式开启"
+                                value="@EffortFor(model)"
+                                @onchange="args => SetEffort(model, args)">
+                            <option value="">不指定（端点默认）</option>
+                            <option value="@ReasoningEffortOff" disabled="@IsThinkingOnlyModel(model)">不思考（显式关闭）</option>
+                            @foreach (var effort in ReasoningEffortOptions)
+                            {
+                                <option value="@effort.Value">@effort.Label</option>
+                            }
+                        </select>
                         <button type="button" class="chip-remove" title="移除" @onclick="() => RemoveModel(model)">✕</button>
                     </div>
                 }
             </div>
-            <p class="field-hint">窗口档位只影响预算与裁剪；选错只会更保守，不会发坏请求。</p>
+            <p class="field-hint">
+                窗口档位只影响预算与裁剪；选错只会更保守，不会发坏请求。
+                思考强度会作为 <code>reasoning_effort</code> 发给模型：DeepSeek 思考模型、qwen3 在 LM Studio 上都需要显式开启才会返回思维链；
+                「不思考」会显式发 <code>none</code>，因为不发这个字段时端点默认值说了算（Qwen3 在 vLLM / Ollama 上默认就是思考）。
+                名字带 thinking / reasoner 的模型是强制思考版本，「不思考」对它无效。
+            </p>
         }
 
         <div class="model-add">
@@ -136,6 +152,27 @@
     /// <summary>模型 ID → 窗口档位（"auto" 或 8K/32K/128K/200K）；不在这里的按自动处理。</summary>
     private readonly Dictionary<string, string> _tiers = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>模型 ID → 思考强度（none / low / medium / high）；不在这里表示不显式请求，用端点默认。</summary>
+    private readonly Dictionary<string, string> _efforts = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>「不思考」的落盘值：显式发 <c>reasoning_effort: none</c>，不能只靠省略字段。</summary>
+    private const string ReasoningEffortOff = "none";
+
+    private static readonly IReadOnlyList<(string Value, string Label)> ReasoningEffortOptions =
+    [
+        ("low", "思考 低"),
+        ("medium", "思考 中"),
+        ("high", "思考 高")
+    ];
+
+    /// <summary>
+    /// 名字里写死 thinking / reasoner 的模型是「只会思考」的构建：服务端没有任何关闭开关，
+    /// 传 none / enable_thinking=false / /no_think 都一样出思维链（LM Studio 实测）。
+    /// </summary>
+    private static bool IsThinkingOnlyModel(string modelId) =>
+        modelId.Contains("thinking", StringComparison.OrdinalIgnoreCase)
+        || modelId.Contains("reasoner", StringComparison.OrdinalIgnoreCase);
+
     private ElementReference _idInput;
 
     private bool IsEditing => Existing is not null;
@@ -156,11 +193,32 @@
         foreach (var model in Existing.Models)
         {
             _tiers[model.Id] = model.Profile?.Preset ?? ModelProfilePresets.Auto;
+
+            if (!string.IsNullOrWhiteSpace(model.Profile?.ReasoningEffort))
+            {
+                _efforts[model.Id] = model.Profile.ReasoningEffort!;
+            }
         }
     }
 
     private string TierFor(string modelId) =>
         _tiers.TryGetValue(modelId, out var tier) ? tier : ModelProfilePresets.Auto;
+
+    private string EffortFor(string modelId) =>
+        _efforts.TryGetValue(modelId, out var effort) ? effort : string.Empty;
+
+    private void SetEffort(string modelId, ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _efforts.Remove(modelId);
+            return;
+        }
+
+        _efforts[modelId] = value;
+    }
 
     private void SetTier(string modelId, ChangeEventArgs args)
     {
@@ -249,7 +307,36 @@
     {
         _models.Remove(model);
         _tiers.Remove(model);
+        _efforts.Remove(model);
         _error = null;
+    }
+
+    /// <summary>
+    /// 合并「窗口档位 + 思考强度 + 原档案」：档位和思考都没配时保持 null（自动），
+    /// 配了思考强度就必须落一份档案，否则设置存不下来。
+    /// 「不指定」落 null（不发字段），「不思考」落 <c>none</c>（显式关闭），两者不能混。
+    /// </summary>
+    private ModelProfile? BuildProfile(string modelId)
+    {
+        var tier = ModelProfilePresets.FromPreset(TierFor(modelId));
+        var effort = EffortFor(modelId);
+        var existing = Existing?.Models
+            .FirstOrDefault(item => string.Equals(item.Id, modelId, StringComparison.OrdinalIgnoreCase))
+            ?.Profile;
+
+        if (tier is null && effort.Length == 0)
+        {
+            return existing?.ReasoningEffort is null ? existing : existing with { ReasoningEffort = null };
+        }
+
+        var profile = tier ?? existing ?? ModelProfile.Unknown;
+        var reasoningOn = effort is "low" or "medium" or "high";
+
+        return profile with
+        {
+            ReasoningEffort = effort.Length == 0 ? null : effort,
+            SupportsReasoning = effort.Length == 0 ? profile.SupportsReasoning : reasoningOn
+        };
     }
 
     private void HandleModelKeyDown(KeyboardEventArgs args)
@@ -303,7 +390,7 @@
                 .Select(m => new ModelEntry
                 {
                     Id = m,
-                    Profile = ModelProfilePresets.FromPreset(TierFor(m))
+                    Profile = BuildProfile(m)
                 })
                 .ToList()
         };

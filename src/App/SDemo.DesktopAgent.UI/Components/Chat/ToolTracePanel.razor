@@ -1,0 +1,77 @@
+@using SDemo.DesktopAgent.Context
+
+@* 本条回复调用了哪些工具：默认折叠成一行，生成过程中展开，能直接看到每一步的结果。 *@
+@if (Trace.Count > 0)
+{
+    <details class="tool-trace" open="@IsLive">
+        <summary class="tool-trace-head">
+            <span class="tool-trace-title">工具调用 @Trace.Count 次</span>
+            @if (Failures > 0)
+            {
+                <span class="tool-trace-fail">失败 @Failures</span>
+            }
+            <span class="tool-trace-names">@Names</span>
+        </summary>
+
+        <div class="tool-trace-list">
+            @foreach (var entry in Trace)
+            {
+                <div class="tool-trace-row @StatusClass(entry.Status)">
+                    <span class="tool-trace-name" title="@entry.ToolId">@entry.ToolId</span>
+                    <span class="tool-trace-status">@StatusText(entry)</span>
+                    <span class="tool-trace-summary" title="@entry.Summary">@Summary(entry)</span>
+                </div>
+            }
+        </div>
+    </details>
+}
+
+@code {
+    /// <summary>本次回复的工具轨迹。</summary>
+    [Parameter] public IReadOnlyList<ToolTraceEntry> Trace { get; set; } = [];
+
+    /// <summary>还在生成：保持展开，用户能实时看到正在调什么。</summary>
+    [Parameter] public bool IsLive { get; set; }
+
+    private int Failures => Trace.Count(entry =>
+        entry.Status is ToolTraceEntry.StatusError or ToolTraceEntry.StatusDenied or ToolTraceEntry.StatusRejected);
+
+    /// <summary>去重后的工具名，折叠时也能一眼看出用了哪几类工具。</summary>
+    private string Names => string.Join(
+        "、",
+        Trace
+            .Select(entry => entry.ToolId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4))
+        + (Trace.Select(entry => entry.ToolId).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 4 ? "…" : string.Empty);
+
+    private static string StatusClass(string status) => status switch
+    {
+        ToolTraceEntry.StatusError => "is-error",
+        ToolTraceEntry.StatusDenied or ToolTraceEntry.StatusRejected => "is-rejected",
+        ToolTraceEntry.StatusCanceled => "is-canceled",
+        _ => "is-ok"
+    };
+
+    private static string StatusText(ToolTraceEntry entry) => entry.Status switch
+    {
+        ToolTraceEntry.StatusOk => entry.ExitCode is 0 or null ? "成功" : $"退出码 {entry.ExitCode}",
+        ToolTraceEntry.StatusError => entry.ExitCode is int code ? $"失败（{code}）" : "失败",
+        ToolTraceEntry.StatusRejected => "已拒绝",
+        ToolTraceEntry.StatusDenied => "未授权",
+        ToolTraceEntry.StatusCanceled => "已取消",
+        _ => entry.Status
+    };
+
+    /// <summary>有摘要用摘要，没有就退化成输出字数，至少能看出这次调用有没有结果。</summary>
+    private static string Summary(ToolTraceEntry entry)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.Summary))
+        {
+            var text = entry.Summary!.ReplaceLineEndings(" ").Trim();
+            return text.Length <= 90 ? text : text[..90] + "…";
+        }
+
+        return entry.OutputChars > 0 ? $"输出 {entry.OutputChars} 字符" : string.Empty;
+    }
+}

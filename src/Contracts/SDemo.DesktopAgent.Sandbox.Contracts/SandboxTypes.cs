@@ -126,4 +126,10 @@ public sealed record SandboxJobOutcome(
 
     /// <summary>删除类变更的回收站目录：<c>{sandbox}\trash\{jobId}</c>；不可用时为空。</summary>
     public string TrashDirectory { get; init; } = string.Empty;
+
+    /// <summary>按脚本内容与变更集推断出的副作用类别（只是提示，不是安全证明）。</summary>
+    public SandboxEffectReport Effects { get; init; } = SandboxEffectReport.None;
+
+    /// <summary>能否把脚本原样拿到真实工作区重跑：系统级操作一律不允许。</summary>
+    public bool CanReplayInWorkspace => Effects.CanReplayInWorkspace;
 }

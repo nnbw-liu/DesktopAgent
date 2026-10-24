@@ -1,8 +1,10 @@
 @using SDemo.DesktopAgent.Sandbox
 @using SDemo.DesktopAgent.Services
+@using SDemo.DesktopAgent.Editing
 @implements IDisposable
 @inject ISandboxJobService Sandbox
 @inject ChangeApplier Applier
+@inject CheckpointStore Checkpoints
 
 @* 沙箱作业完成后展示执行状态与工作区变更；应用动作只写回真实工作区，沙箱本身始终只碰副本。 *@
 @if (_outcome is not null)
@@ -17,6 +19,31 @@
             </div>
             <button type="button" class="sandbox-panel-close" title="收起" @onclick="Dismiss">×</button>
         </header>
+
+        @* 副作用分类：只是提示，真正的安全边界是审批。 *@
+        <div class="sandbox-effects">
+            @if (_outcome.Effects.HasFileChanges)
+            {
+                <span class="sandbox-effect">文件变更 @_changes.Count</span>
+            }
+            @if (_outcome.Effects.HasNetwork)
+            {
+                <span class="sandbox-effect sandbox-effect--network">脚本里有联网调用</span>
+            }
+            @if (_outcome.Effects.HasSystemLevel)
+            {
+                <span class="sandbox-effect sandbox-effect--danger">系统级操作</span>
+            }
+        </div>
+
+        @if (_outcome.Effects.HasSystemLevel)
+        {
+            <p class="sandbox-panel-warn">
+                脚本里出现了系统级操作（@string.Join("、", _outcome.Effects.Signals)）。
+                沙箱只验证了它在这里的行为，<strong>不会</strong>把它拿到工作区重放；
+                能应用的只有文件变更。
+            </p>
+        }
 
         @if (!string.IsNullOrWhiteSpace(_message))
         {
@@ -260,6 +287,14 @@
 
         try
         {
+            // 写回真实工作区之前先打检查点：应用完还能撤销（「本次改动」面板的撤销读的就是最近的检查点）。
+            var targets = _changes
+                .Where(change => _selected.Contains(change.RelativePath))
+                .Select(change => change.RelativePath)
+                .ToArray();
+
+            Checkpoints.Capture(outcome.SessionId, outcome.JobId, outcome.WorkspaceRoot, targets);
+
             var manifestPath = Path.Combine(outcome.JobDirectory, "manifest.json");
             var manifest = WorkspaceManifest.Load(manifestPath);
             var workDirectory = Path.Combine(outcome.JobDirectory, "work");
@@ -292,13 +327,14 @@
                            + (deletedApplied > 0
                                ? $"（其中删除 {deletedApplied} 项已移入 sandbox\\trash，可从那里找回）。"
                                : "。")
-                           + (result.Skipped.Count > 0 ? $" 跳过 {result.Skipped.Count} 项。" : string.Empty);
+                           + (result.Skipped.Count > 0 ? $" 跳过 {result.Skipped.Count} 项。" : string.Empty)
+                           + " 应用前已生成检查点，可在「本次改动」面板撤销。";
                 _messageIsError = result.Applied.Count == 0 && result.Skipped.Count > 0;
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException)
         {
-            _message = $"应用变更失败：{ex.Message}";
+            _message = $"应用变更失败（未写入任何文件）：{ex.Message}";
             _messageIsError = true;
         }
         finally

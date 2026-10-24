@@ -35,6 +35,8 @@ public static class MauiProgram
         // 沙箱骨架（S0）：Windows 用 AppContainer / Windows Sandbox 运行器，Android 用不可用实现。
 #if WINDOWS
         builder.Services.AddWindowsSandbox();
+        builder.Services.AddSingleton<IFileLauncherService,
+            SDemo.DesktopAgent.Platform.Windows.Services.ShellFileLauncher>();
 #else
         builder.Services.AddUnavailableSandbox();
 #endif

@@ -18,6 +18,12 @@ public sealed class ChatMessage(ChatMessageRole role, string content)
     /// <summary>思维链（reasoning_content），为空表示模型没有返回。</summary>
     public string Reasoning { get; set; } = string.Empty;
 
+    /// <summary>
+    /// 按顺序的步骤时间线（思考 / 工具 / 正文）。只用于界面呈现，不进入后续请求上下文；
+    /// 老消息没有这个字段时界面回退成「思考 → 工具 → 正文」的分组显示。
+    /// </summary>
+    public List<ChatStep> Steps { get; init; } = [];
+
     /// <summary>随这条消息一起发送的附件。</summary>
     public List<ChatAttachment> Attachments { get; init; } = [];
 

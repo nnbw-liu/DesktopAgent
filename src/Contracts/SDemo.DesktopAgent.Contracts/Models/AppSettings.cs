@@ -11,6 +11,12 @@ public sealed class AppSettings
     /// <summary>界面语言（目前只实现 zh-CN）。</summary>
     public string Language { get; set; } = "zh-CN";
 
+    /// <summary>
+    /// 切换聊天室时是否让正在生成的回复继续在后台跑。
+    /// 默认关闭：切走即中断，和旧行为一致。
+    /// </summary>
+    public bool ContinueGenerationOnChatSwitch { get; set; }
+
     /// <summary>模型提供商列表（只支持标准 OpenAI API）。</summary>
     public List<ModelProvider> Providers { get; set; } = [];
 

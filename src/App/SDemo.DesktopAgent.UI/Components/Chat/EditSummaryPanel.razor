@@ -1,12 +1,14 @@
+@using System.IO
 @using SDemo.DesktopAgent.Context
 @using SDemo.DesktopAgent.Editing
 @inject CheckpointStore Checkpoints
 @inject WorkspaceContext Workspace
+@inject IFileLauncherService Launcher
 
 @* P3：本次生成的文件改动，来自工具轨迹里的 [EDIT] 行，不额外扫描磁盘。 *@
 @if (!_summary.IsEmpty)
 {
-    <details class="edit-summary">
+    <details class="edit-summary" open="@_expanded">
         <summary class="edit-summary-head">
             <span class="edit-summary-title">本次改动 @_summary.Files.Count 个文件</span>
             <span class="edit-summary-diff">
@@ -18,15 +20,74 @@
         <div class="edit-summary-list">
             @foreach (var file in _summary.Files)
             {
-                <div class="edit-summary-row">
-                    <span class="edit-summary-path">@file.Path</span>
-                    <span class="edit-summary-counts">
-                        <span class="edit-added">+@file.Added</span>
-                        <span class="edit-removed">−@file.Removed</span>
+                <div class="edit-summary-row @(IsOpen(file.Path) ? "is-active" : null)">
+                    <button type="button"
+                            class="edit-summary-open"
+                            title="展开 / 收起这个文件的 diff"
+                            @onclick="() => ToggleDiff(file.Path)">
+                        <span class="edit-summary-caret @(IsOpen(file.Path) ? "is-open" : null)">▸</span>
+                        <span class="edit-summary-path" title="@file.Path">@file.Path</span>
+                        <span class="edit-summary-counts">
+                            <span class="edit-added">+@file.Added</span>
+                            <span class="edit-removed">−@file.Removed</span>
+                        </span>
+                    </button>
+
+                    <span class="edit-summary-file-actions">
+                        <button type="button" class="ghost-button ghost-button--tiny"
+                                title="用默认程序打开这个文件" @onclick="() => OpenAsync(file.Path)">
+                            打开
+                        </button>
+                        <button type="button" class="ghost-button ghost-button--tiny"
+                                title="在资源管理器里定位这个文件" @onclick="() => RevealAsync(file.Path)">
+                            定位
+                        </button>
                     </span>
                 </div>
+
+                @if (IsOpen(file.Path))
+                {
+                    <div class="edit-diff" role="region" aria-label="@($"{file.Path} 的改动")">
+                        @if (_diffFailed)
+                        {
+                            <p class="edit-diff-note">
+                                找不到这个文件改动前的快照（例如改动来自命令或沙箱），只能直接打开文件查看。
+                            </p>
+                        }
+                        else if (_diff is null || _diff.Lines.Count == 0)
+                        {
+                            <p class="edit-diff-note">@(_diff?.Note ?? "没有可显示的差异。")</p>
+                        }
+                        else
+                        {
+                            var diff = _diff!;
+
+                            <div class="edit-diff-body">
+                                @foreach (var line in diff.Lines)
+                                {
+                                    <div class="edit-diff-line @LineClass(line.Kind)">
+                                        <span class="edit-diff-num">@(line.OldLine?.ToString(System.Globalization.CultureInfo.InvariantCulture))</span>
+                                        <span class="edit-diff-num">@(line.NewLine?.ToString(System.Globalization.CultureInfo.InvariantCulture))</span>
+                                        <span class="edit-diff-sign">@Sign(line.Kind)</span>
+                                        <span class="edit-diff-text">@line.Text</span>
+                                    </div>
+                                }
+                            </div>
+
+                            @if (diff.Truncated)
+                            {
+                                <p class="edit-diff-note">@diff.Note</p>
+                            }
+                        }
+                    </div>
+                }
             }
         </div>
+
+        @if (_launcherMessage is not null)
+        {
+            <p class="edit-summary-note">@_launcherMessage</p>
+        }
 
         @if (_checkpoint is not null)
         {
@@ -65,12 +126,152 @@
     private bool _confirming;
     private IReadOnlyList<string> _conflicts = [];
     private string? _message;
+    private string? _launcherMessage;
+
+    /// <summary>当前展开 diff 的文件（同一时刻只展开一个，避免长列表滚不到头）。</summary>
+    private string? _diffPath;
+
+    private FileDiff? _diff;
+
+    /// <summary>没找到改动前快照时为 true：界面给出解释，而不是假装「没有差异」。</summary>
+    private bool _diffFailed;
+
+    private bool _expanded;
 
     protected override void OnParametersSet()
     {
         _summary = EditSummary.FromTrace(Trace);
         _checkpoint = string.IsNullOrWhiteSpace(SessionId) ? null : Checkpoints.Latest(SessionId);
+
+        // trace 变了（新的一次生成）就丢掉旧的 diff 缓存。
+        _diffPath = null;
+        _diff = null;
+        _diffFailed = false;
     }
+
+    private bool IsOpen(string path) =>
+        string.Equals(_diffPath, path, StringComparison.OrdinalIgnoreCase);
+
+    private void ToggleDiff(string path)
+    {
+        _launcherMessage = null;
+
+        if (IsOpen(path))
+        {
+            _diffPath = null;
+            _diff = null;
+            _diffFailed = false;
+            return;
+        }
+
+        _diffPath = path;
+        _diff = null;
+        _diffFailed = false;
+        _expanded = true;
+
+        var full = ResolvePath(path);
+        if (full is null)
+        {
+            _diffFailed = true;
+            return;
+        }
+
+        string after = string.Empty;
+
+        try
+        {
+            if (File.Exists(full))
+            {
+                after = File.ReadAllText(full);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _launcherMessage = $"读取文件失败：{ex.Message}";
+            return;
+        }
+
+        string before;
+        bool existed;
+
+        if (!string.IsNullOrWhiteSpace(SessionId)
+            && Checkpoints.TryReadBeforeContent(SessionId, path, out before, out existed))
+        {
+            _diff = FileDiffBuilder.Build(existed ? before : string.Empty, after);
+            return;
+        }
+
+        // 没有快照：如果是新建文件（磁盘上有内容、轨迹里也没有删除），至少能显示「全部新增」。
+        if (after.Length > 0)
+        {
+            _diff = FileDiffBuilder.Build(string.Empty, after);
+            _diffFailed = _diff.Lines.Count == 0;
+            return;
+        }
+
+        _diffFailed = true;
+    }
+
+    private async Task OpenAsync(string path)
+    {
+        _launcherMessage = null;
+        var full = ResolvePath(path);
+
+        if (full is null || !File.Exists(full))
+        {
+            _launcherMessage = "文件已经不在磁盘上，无法打开。";
+            return;
+        }
+
+        _launcherMessage = await Launcher.OpenFileAsync(full)
+            ? null
+            : "当前环境不支持打开文件，或没有关联的默认程序。";
+    }
+
+    private async Task RevealAsync(string path)
+    {
+        _launcherMessage = null;
+        var full = ResolvePath(path);
+
+        if (full is null || !File.Exists(full))
+        {
+            _launcherMessage = "文件已经不在磁盘上，无法定位。";
+            return;
+        }
+
+        _launcherMessage = await Launcher.RevealFileAsync(full)
+            ? null
+            : "当前环境不支持在资源管理器里定位文件。";
+    }
+
+    /// <summary>工作区相对路径 → 绝对路径；路径越界（../）返回 null。</summary>
+    private string? ResolvePath(string path)
+    {
+        try
+        {
+            return WorkspacePath.Resolve(Workspace.RootPath, path, allowRoot: false);
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private static string LineClass(DiffLineKind kind) => kind switch
+    {
+        DiffLineKind.Added => "is-added",
+        DiffLineKind.Removed => "is-removed",
+        DiffLineKind.Hunk => "is-hunk",
+        _ => "is-context"
+    };
+
+    private static string Sign(DiffLineKind kind) => kind switch
+    {
+        DiffLineKind.Added => "+",
+        DiffLineKind.Removed => "−",
+        DiffLineKind.Hunk => string.Empty,
+        _ => " "
+    };
 
     private void TryRestore()
     {
@@ -90,6 +291,8 @@
 
         _message = result.Success ? $"已恢复 {result.Restored.Count} 个文件。" : result.Conflicts.FirstOrDefault();
         _checkpoint = null;
+        _diffPath = null;
+        _diff = null;
     }
 
     private void CancelRestore()
@@ -106,5 +309,7 @@
         _confirming = false;
         _conflicts = [];
         _checkpoint = null;
+        _diffPath = null;
+        _diff = null;
     }
 }

@@ -27,6 +27,22 @@ public sealed class ModelProfileResolverTests
     }
 
     [Fact]
+    public void 显式关闭思考的档案解析后仍然保留_none()
+    {
+        // 「不思考」落的是 none 而不是 null：解析、夹取之后都不能被弄丢，否则请求又变成“端点默认”。
+        var entry = new ModelEntry
+        {
+            Id = "qwen3.5-4b",
+            Profile = ModelProfilePresets.FromPreset("32K")! with { ReasoningEffort = "none" }
+        };
+
+        var profile = ModelProfileResolver.ResolveConfigured(Provider(), "qwen3.5-4b", entry);
+
+        Assert.Equal("none", profile.ReasoningEffort);
+        Assert.Equal(32_768, profile.ContextWindow);
+    }
+
+    [Fact]
     public void 模型名里的档位优先于家族前缀()
     {
         var profile = ModelProfileResolver.ResolveConfigured(Provider(), "qwen2.5-32k-instruct");

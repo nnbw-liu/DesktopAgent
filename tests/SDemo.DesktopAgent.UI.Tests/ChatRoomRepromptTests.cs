@@ -48,14 +48,18 @@ public sealed class ChatRoomRepromptTests : TestContext
         // 初次 + 3 次回灌 = 4 次；第 4 次达到上限后不再追问。
         Assert.Equal(4, _runner.Calls);
 
-        var prompts = session.Messages
-            .Where(message => message.Role == ChatMessageRole.User
-                              && message.Content.StartsWith("[宿主提示]", StringComparison.Ordinal))
+        // 一次发送 = 一个回合：宿主追问不再新开回复，也不新增用户消息。
+        Assert.Equal(2, session.Messages.Count);
+        var reply = Assert.Single(session.Messages, message => message.Role == ChatMessageRole.Assistant);
+
+        var prompts = reply.Steps
+            .Where(step => step.Kind == ChatStepKind.HostPrompt)
             .ToList();
 
         Assert.Equal(3, prompts.Count);
-        Assert.Contains("本轮没有检测到任何文件修改", prompts[0].Content);
-        Assert.Contains("第 3/3 次提醒", prompts[2].Content);
+        Assert.Contains("本轮没有检测到任何文件修改", prompts[0].Text);
+        Assert.Contains("第 3/3 次提醒", prompts[2].Text);
+        Assert.Contains("已完成。", reply.Content, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -70,9 +74,9 @@ public sealed class ChatRoomRepromptTests : TestContext
         await cut.InvokeAsync(() => cut.Instance.SubmitForTestAsync(new ComposerSubmission("帮我修改 file.cs 里的 bug", [])));
 
         Assert.Equal(1, _runner.Calls);
-        Assert.DoesNotContain(
-            session.Messages,
-            message => message.Content.StartsWith("[宿主提示]", StringComparison.Ordinal));
+
+        var reply = Assert.Single(session.Messages, message => message.Role == ChatMessageRole.Assistant);
+        Assert.DoesNotContain(reply.Steps, step => step.Kind == ChatStepKind.HostPrompt);
     }
 
     [Fact]

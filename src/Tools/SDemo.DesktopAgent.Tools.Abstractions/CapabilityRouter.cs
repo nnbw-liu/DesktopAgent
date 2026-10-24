@@ -10,7 +10,8 @@ public sealed record CapabilityRoutingInput(
     AgentMode Mode,
     int MaxExposedTools,
     bool EscapeHatch = true,
-    bool ExposeAll = false);
+    bool ExposeAll = false,
+    bool HasSelectedSkill = false);
 
 /// <summary>
 /// 能力路由：成本档 0 的规则实现（M1–M3），外加成本档 1 的小模型建议落地（M4）。
@@ -106,13 +107,33 @@ public static class CapabilityRouter
     public static RoutingDecision Route(CapabilityRoutingInput input)
     {
         var available = Normalize(input.AvailableTools);
+        var intentKind = TurnClassifier.Classify(input.UserInput, input.HasSelectedSkill);
+
+        // 先决定「做什么」：纯对话轮不暴露任何工具（全量暴露是排障逃生口，优先于该判断）。
+        if (intentKind == TurnIntent.Chat && !input.ExposeAll)
+        {
+            return new RoutingDecision(
+                [],
+                [],
+                [],
+                MaxExposedTools: 0,
+                EstimatedSchemaTokens: 0,
+                EscapeHatch: false,
+                Truncated: false,
+                Reason: $"{input.Mode} · 意图=chat · 对话轮不调用工具")
+            {
+                Source = RoutingDecision.RulesSource,
+                Intent = TurnIntent.Chat
+            };
+        }
 
         if (available.Length == 0)
         {
             return RoutingDecision.Empty with
             {
                 MaxExposedTools = Math.Max(0, input.MaxExposedTools),
-                Reason = "没有可用工具"
+                Reason = "没有可用工具",
+                Intent = intentKind
             };
         }
 
@@ -136,7 +157,8 @@ public static class CapabilityRouter
         }
         else
         {
-            // Full：核心集永远先来，再按意图补包，最后按工具包 Order 填满剩余名额。
+            // Full：核心集先来，再按意图补包，最后接最近用过的工具。
+            // 不再用「全部可用工具」填满剩余名额：名额是上限，不是指标。
             AddCandidates(ordered, CoreTools, available);
             AddCandidates(ordered, intentTools, available);
 
@@ -147,11 +169,10 @@ public static class CapabilityRouter
                     ordered.Add(recent);
                 }
             }
-
-            AddCandidates(ordered, available, available);
         }
 
-        return Finalize(input, available, ordered, intent, RoutingDecision.RulesSource, advice: null);
+        return Finalize(
+            input, available, ordered, intent, RoutingDecision.RulesSource, advice: null, intentKind);
     }
 
     /// <summary>
@@ -165,6 +186,12 @@ public static class CapabilityRouter
         RoutingDecision fallback)
     {
         if (input.ExposeAll || advice.Tools.Count == 0)
+        {
+            return fallback;
+        }
+
+        // 对话轮已经判定「不需要工具」，小模型建议不能把它改回工具轮。
+        if (fallback.Intent == TurnIntent.Chat)
         {
             return fallback;
         }
@@ -201,7 +228,8 @@ public static class CapabilityRouter
             };
         }
 
-        // 建议只决定「优先顺序」；规则结果（核心集 / 最近工具 / 包 Order）补满剩余名额。
+        // 建议只决定「优先顺序」；规则结果（核心集 / 最近工具）补齐建议漏掉的部分；
+        // 最终仍由 Finalize 按上限截断，不再用全部可用工具填满。
         foreach (var name in fallback.ExposedTools)
         {
             if (!string.Equals(name, LoadSkillTool, StringComparison.Ordinal)
@@ -214,7 +242,14 @@ public static class CapabilityRouter
         }
 
         var intent = string.IsNullOrWhiteSpace(advice.Intent) ? "unknown" : advice.Intent.Trim();
-        return Finalize(input, available, ordered, intent, RoutingDecision.SmallModelSource, advice);
+        return Finalize(
+            input,
+            available,
+            ordered,
+            intent,
+            RoutingDecision.SmallModelSource,
+            advice,
+            TurnClassifier.Classify(input.UserInput, input.HasSelectedSkill));
     }
 
     /// <summary>规则意图的短标签（diagnostics / 测试用）。</summary>
@@ -236,7 +271,8 @@ public static class CapabilityRouter
     /// </summary>
     public static bool ShouldConsultAdvisor(CapabilityRoutingInput input, RoutingDecision rule)
     {
-        if (input.Mode != AgentMode.Full || input.ExposeAll || !rule.Truncated)
+        if (input.Mode != AgentMode.Full || input.ExposeAll || !rule.Truncated
+            || rule.Intent == TurnIntent.Chat)
         {
             return false;
         }
@@ -273,7 +309,8 @@ public static class CapabilityRouter
         IReadOnlyList<string> orderedCandidates,
         string intent,
         string source,
-        RoutingAdvice? advice)
+        RoutingAdvice? advice,
+        TurnIntent intentKind)
     {
         var limit = ResolveLimit(input, available.Count);
 
@@ -292,7 +329,9 @@ public static class CapabilityRouter
                 Truncated: false,
                 Reason: $"{input.Mode} · 全量暴露 · {all.Length} 个工具")
             {
-                Source = source
+                Source = source,
+                // 全量暴露是为了排障：对话轮也按工具轮处理，避免提示词说「不要用工具」却给了工具。
+                Intent = intentKind == TurnIntent.Chat ? TurnIntent.Task : intentKind
             };
         }
 
@@ -314,15 +353,6 @@ public static class CapabilityRouter
         foreach (var name in orderedCandidates)
         {
             if (Matches(name, realAvailable) && !ordered.Contains(name, StringComparer.Ordinal))
-            {
-                ordered.Add(name);
-            }
-        }
-
-        // 建议 / 规则都可能只覆盖一部分：按可用顺序补满，保证上限内尽量多给能力。
-        foreach (var name in realAvailable)
-        {
-            if (!ordered.Contains(name, StringComparer.Ordinal))
             {
                 ordered.Add(name);
             }
@@ -376,7 +406,8 @@ public static class CapabilityRouter
             Truncated: truncated,
             Reason: reason)
         {
-            Source = source
+            Source = source,
+            Intent = intentKind
         };
     }
 

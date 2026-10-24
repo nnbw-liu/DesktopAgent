@@ -15,4 +15,20 @@ public sealed class FullPromptTests
         Assert.Contains("不要把 write_file 当作补丁失败的默认兜底", SystemPrompts.Full);
         Assert.Contains("不要谎报成功", SystemPrompts.Full);
     }
+
+    [Fact]
+    public void Full提示词先判断任务类型再决定用不用工具()
+    {
+        Assert.Contains("先判断这一轮要做什么", SystemPrompts.Full);
+        Assert.Contains("不要调用工具", SystemPrompts.Full);
+        Assert.Contains("才调用工具", SystemPrompts.Full);
+    }
+
+    [Fact]
+    public void 对话提示词明确不调用工具()
+    {
+        Assert.Contains("这一轮不需要工具", SystemPrompts.Chat);
+        Assert.Contains("不要调用任何工具", SystemPrompts.Chat);
+        Assert.DoesNotContain("PLAN", SystemPrompts.Chat);
+    }
 }

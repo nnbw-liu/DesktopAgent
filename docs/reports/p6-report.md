@@ -101,6 +101,8 @@
 
 结论：**这个 `qwen3.5-4b` 构建不产生可见思考 token**。LM Studio 的 `/v1/models` 也只声明 `tool_use`，没有 reasoning 能力。设置里的 `supportsReasoning=false` 只是 UI/档案提示，不会改变请求；实际行为已经是“非 thinking”。因此不需要再“带着上下文”去规避思考预算。
 
+> **后续更正（P7 之后）**：上面的探测漏了 `reasoning_effort`。补测 `reasoning_effort: high` 后该模型返回 300 reasoning tokens / 835 字思维链（正文 0），说明它是**默认关的混合思考模型**，不是「不产生思考」。`enable_thinking` 与 `/think` 确实无效，能开也能关的只有 `reasoning_effort`（`none` 关闭、`low/medium/high` 开启）。因此设置页的「不思考」已从“省略字段”改为显式发 `none`。原结论保留作记录，但不要再据此判断模型没有思考能力。
+
 ## 7. 本轮修复（按失败倒推）
 
 1. **`replace_text` 新工具**：`old_text` / `new_text` 精确替换；读前写、审批、检查点、原子写；`old_text` 按 LF 匹配 CRLF 文件，写回原换行风格；缩进不一致时按逐行 `Trim` 兜底；拒绝“新内容已存在”和“重复声明成员”的插入，避免任务 A 的 `CS0102`。

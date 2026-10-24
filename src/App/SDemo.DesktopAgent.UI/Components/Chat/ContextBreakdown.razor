@@ -69,6 +69,10 @@
             }
         </p>
     }
+    else if (Report.Routing is { Intent: TurnIntent.Chat } chatRouting)
+    {
+        <p class="context-note">本轮类型：对话 · 不调用工具 · @chatRouting.Reason</p>
+    }
     @if (Report.OmittedMessages > 0)
     {
         <p class="context-note">已省略 @Report.OmittedMessages 条较早消息（约 @ContextMeter.Format(Report.OmittedTokens) token）</p>

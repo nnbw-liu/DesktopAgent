@@ -34,6 +34,18 @@ public sealed record RoutingDecision(
     /// </summary>
     public string Source { get; init; } = RulesSource;
 
+    /// <summary>
+    /// 本轮类型（先于选工具的一步）：对话 / 问答 / 任务。
+    /// <see cref="TurnIntent.Chat"/> 表示本轮不暴露工具，宿主改用对话提示词。
+    /// </summary>
+    public TurnIntent Intent { get; init; } = TurnIntent.Answer;
+
+    /// <summary>
+    /// 本轮是否真的需要工具。为 false 时运行时收到空工具集，系统提示词换成「直接回答」，
+    /// 宿主也不再因为「没有改文件」而追问。
+    /// </summary>
+    public bool NeedsTools => Intent != TurnIntent.Chat && ExposedTools.Count > 0;
+
     /// <summary>本轮没有可用工具（插件 Run / 用户全关工具包）。</summary>
     public static RoutingDecision Empty { get; } = new(
         [],

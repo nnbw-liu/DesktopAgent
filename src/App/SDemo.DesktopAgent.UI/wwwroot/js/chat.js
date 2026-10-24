@@ -1,8 +1,36 @@
 // 聊天区辅助脚本：滚动、复制。
 window.sdChat = {
+    // 贴底滚动：只有用户本来就在底部时才跟随新内容；手动往上翻后不再被拽回去。
     scrollToBottom: function (element) {
         if (!element) {
             return;
+        }
+
+        var state = element.__sdChatScroll;
+
+        if (!state) {
+            state = { stick: true, bound: false };
+            element.__sdChatScroll = state;
+
+            element.addEventListener('scroll', function () {
+                var distance = element.scrollHeight - element.scrollTop - element.clientHeight;
+                state.stick = distance <= 48;
+            }, { passive: true });
+        }
+
+        if (state.stick) {
+            element.scrollTop = element.scrollHeight;
+        }
+    },
+
+    // 显式跳到底部（例如用户发了新消息），并把贴底状态重新打开。
+    jumpToBottom: function (element) {
+        if (!element) {
+            return;
+        }
+
+        if (element.__sdChatScroll) {
+            element.__sdChatScroll.stick = true;
         }
 
         element.scrollTop = element.scrollHeight;

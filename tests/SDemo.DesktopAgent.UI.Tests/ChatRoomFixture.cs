@@ -120,6 +120,8 @@ internal static class ChatRoomFixture
         context.Services.AddSingleton(new CheckpointStore(Path.Combine(paths.DataRoot, "checkpoints"), audit));
         context.Services.AddSingleton(new AttachmentStore(paths.UploadsRoot));
         context.Services.AddSingleton(new ChangeApplier());
+        // 组件测试不起进程：打开 / 定位文件走兜底实现。
+        context.Services.AddSingleton<IFileLauncherService>(new NullFileLauncherService());
     }
 
     /// <summary>给设置页的模型目录填一个可用模型（组件渲染需要非空列表）。</summary>

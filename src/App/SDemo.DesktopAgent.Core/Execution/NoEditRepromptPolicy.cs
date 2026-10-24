@@ -34,6 +34,7 @@ public static class NoEditRepromptPolicy
         if (compact
             || alreadyAttempted >= max
             || string.IsNullOrWhiteSpace(assistantText)
+            || TurnClassifier.Classify(userInput) == TurnIntent.Chat
             || !LooksLikeEditTask(userInput)
             || metrics.ToolTrace.Count == 0
             || HasSuccessfulEdit(metrics.ToolTrace)
@@ -55,34 +56,38 @@ public static class NoEditRepromptPolicy
     }
 
     /// <summary>
-    /// 是否像“要动文件”的任务。先看明确的编辑动词；只有读 / 解释 / 检查类动词时不算，
-    /// 避免把“解释一下这个文件”也拽进编辑循环。
+    /// 是否像“要动文件”的任务。先看明确的动手指令；只在提问 / 解释 / 检查某一处「怎么改」时
+    /// 不算任务，避免把只读提问拽进编辑循环。泛泛提到「改」但没有指令语气也不追问。
     /// </summary>
     private static bool LooksLikeEditTask(string input)
     {
         var text = input.ToLowerInvariant();
 
-        string[] editWords =
-        [
-            "改", "修", "加", "新增", "添加", "实现", "写", "补", "删除", "替换", "重构", "优化"
-        ];
-        if (editWords.Any(word => text.Contains(word, StringComparison.Ordinal)))
+        // 动手指令优先；只有「怎么改」「改哪里」这类疑问才不算任务。
+        if (TurnClassifier.HasImperativeAction(text))
         {
             return true;
         }
 
-        string[] readOnlyWords =
-        [
-            "解释", "说明", "总结", "阅读", "看一下", "查看", "检查", "分析", "为什么", "是什么", "怎么理解",
-            "干什么", "做什么", "作用", "用途", "介绍", "讲讲", "怎么用", "对比一下"
-        ];
-        if (readOnlyWords.Any(word => text.Contains(word, StringComparison.Ordinal)))
+        if (IsReadOnlyQuestion(text))
         {
             return false;
         }
 
         return CapabilityRouter.LooksLikeTask(input);
     }
+
+    private static readonly string[] ReadOnlyWords =
+    [
+        "解释", "说明", "总结", "阅读", "看一下", "看看", "查看", "检查", "分析", "为什么", "是什么",
+        "怎么理解", "干什么", "做什么", "作用", "用途", "介绍", "讲讲", "怎么用", "对比", "哪里",
+        "是否", "能不能", "对不对", "行不行"
+    ];
+
+    private static bool IsReadOnlyQuestion(string text) =>
+        text.Contains('?', StringComparison.Ordinal)
+        || text.Contains('？', StringComparison.Ordinal)
+        || ReadOnlyWords.Any(word => text.Contains(word, StringComparison.Ordinal));
 
     /// <summary>成功编辑 = 编辑工具且轨迹状态为 ok，并且解析出了 [EDIT] 行。</summary>
     public static bool HasSuccessfulEdit(IReadOnlyList<ToolTraceEntry> trace) =>

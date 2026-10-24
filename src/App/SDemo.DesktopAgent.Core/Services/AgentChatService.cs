@@ -149,11 +149,22 @@ public sealed class AgentChatService : IAgentChatService
             plan.Metrics.Guard.Limit = toolCallLimit;
         }
 
-        var invocation = CreateInvocation(plan.Provider, plan.ModelId, tools, plan.Context, telemetry, toolCallLimit);
+        var invocation = CreateInvocation(
+            plan.Provider,
+            plan.ModelId,
+            tools,
+            plan.Context,
+            telemetry,
+            toolCallLimit,
+            ResolveInstructions(plan, decision));
 
         var pendingCalls = new Dictionary<string, (string Name, string? Digest)>(StringComparer.Ordinal);
         var text = new StringBuilder();
         var reasoning = new StringBuilder();
+
+        // 累计已经产生的字数：工具调用记录下来，重开会话时才能还原「思考→工具→思考」的顺序。
+        var emittedText = 0;
+        var emittedReasoning = 0;
 
         await foreach (var evt in _runtime.StreamAsync(invocation, cancellationToken))
         {
@@ -165,10 +176,12 @@ public sealed class AgentChatService : IAgentChatService
 
                 case AgentStreamEvent.Reasoning delta:
                     reasoning.Append(delta.Value);
+                    emittedReasoning += delta.Value.Length;
                     break;
 
                 case AgentStreamEvent.Text delta:
                     text.Append(delta.Value);
+                    emittedText += delta.Value.Length;
                     break;
 
                 case AgentStreamEvent.FunctionCall call:
@@ -176,7 +189,12 @@ public sealed class AgentChatService : IAgentChatService
                     break;
 
                 case AgentStreamEvent.FunctionResult result:
-                    plan.Metrics?.RecordToolTrace(BuildTraceEntry(result.CallId, result.Result, pendingCalls));
+                    plan.Metrics?.RecordToolTrace(BuildTraceEntry(
+                        result.CallId,
+                        result.Result,
+                        pendingCalls,
+                        emittedReasoning,
+                        emittedText));
                     break;
             }
 
@@ -276,13 +294,23 @@ public sealed class AgentChatService : IAgentChatService
     /// 把 provider 配置映射成一次运行时调用。中间裁剪层以 <c>Decorate</c> 注入：
     /// FICC 由运行时套在外层，每次 LLM 请求都会经过装饰器，因此能在工具循环内部裁剪（§3.7 分支 A）。
     /// </summary>
+    /// <summary>
+    /// 直连构造 plan 的路径（插件 / 旧调用点）没有经过 Runner 路由：如果这里补判出「对话轮」，
+    /// 提示词也要换成对话版，否则会出现「没有工具、提示词却要求每步调用工具」的矛盾。
+    /// </summary>
+    private static string ResolveInstructions(AgentRunPlan plan, RoutingDecision decision) =>
+        decision.NeedsTools || plan.Context.Report.Routing is not null
+            ? plan.Context.Instructions
+            : SystemPrompts.Chat;
+
     private AgentInvocation CreateInvocation(
         ModelProvider provider,
         string modelId,
         IReadOnlyList<AITool> tools,
         ContextPlan plan,
         ContextRunTelemetry telemetry,
-        int toolCallLimit)
+        int toolCallLimit,
+        string instructions)
     {
         var settings = _settings.Current.Context ?? new ContextSettings();
         var budgetOptions = new ContextBudgetChatOptions(
@@ -298,18 +326,22 @@ public sealed class AgentChatService : IAgentChatService
             new Uri(provider.BaseUrl, UriKind.Absolute),
             provider.ApiKey,
             modelId,
-            plan.Instructions,
+            instructions,
             plan.Messages,
             tools,
             // 允许的次数 + 2 次收尾，和小模型被 Block 后的收尾行为保持一致。
             toolCallLimit + 2,
-            Decorate: inner => new ContextBudgetChatClient(inner, budgetOptions, telemetry));
+            Decorate: inner => new ContextBudgetChatClient(inner, budgetOptions, telemetry),
+            // 模型档案里配了思考强度才发送 reasoning_effort（none = 显式关闭）；没配就保持服务端默认。
+            ReasoningEffort: plan.Profile.ReasoningEffort);
     }
 
     private static ToolTraceEntry BuildTraceEntry(
         string callId,
         string? text,
-        IReadOnlyDictionary<string, (string Name, string? Digest)> pending)
+        IReadOnlyDictionary<string, (string Name, string? Digest)> pending,
+        int reasoningChars = -1,
+        int textChars = -1)
     {
         var name = pending.TryGetValue(callId, out var call) ? call.Name : "tool";
         var digest = pending.TryGetValue(callId, out var value) ? value.Digest : null;
@@ -324,7 +356,9 @@ public sealed class AgentChatService : IAgentChatService
             Summarize(text),
             text?.Length ?? 0,
             DateTime.Now,
-            ParseEdits(text));
+            ParseEdits(text),
+            reasoningChars,
+            textChars);
     }
 
     /// <summary>从工具结果末尾的 <c>[EDIT] 路径 +N -M</c> 行汇总本次改动，供消息下方展示。</summary>

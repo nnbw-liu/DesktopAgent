@@ -112,6 +112,31 @@ public sealed class NoEditRepromptTests
     }
 
     [Fact]
+    public void 问怎么改不算改文件任务()
+    {
+        var metrics = new AgentRunMetrics();
+        metrics.RecordToolTrace(Entry("read_file", ToolTraceEntry.StatusOk));
+
+        var howTo = NoEditRepromptPolicy.Decide(
+            metrics,
+            "解释一下怎么改这段配置",
+            "把 appsettings.json 里的开关改成 true 即可。",
+            alreadyAttempted: 0,
+            compact: false);
+
+        Assert.False(howTo.Continue);
+
+        var where = NoEditRepromptPolicy.Decide(
+            metrics,
+            "这个文件改哪里了？",
+            "改动在 Configure 方法里。",
+            alreadyAttempted: 0,
+            compact: false);
+
+        Assert.False(where.Continue);
+    }
+
+    [Fact]
     public void 最多三次()
     {
         var metrics = new AgentRunMetrics();

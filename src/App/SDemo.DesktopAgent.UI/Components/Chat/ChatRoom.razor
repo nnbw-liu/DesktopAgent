@@ -21,7 +21,7 @@
 @implements IDisposable
 
 @* 聊天室：空会话（欢迎语 + 输入框，垂直居中）与有记录会话（标题 / 消息区 / 输入框）共用本组件 *@
-<section class="chat @(IsEmpty ? "chat--empty" : null)">
+<section class="chat @(IsEmpty ? "chat--empty" : null) @(IsActive ? null : "chat--hidden")">
     @if (IsEmpty)
     {
         <div class="welcome">
@@ -87,6 +87,11 @@
                 {
                     var message = Session.Messages[messageIndex];
                     var isUser = message.Role == ChatMessageRole.User;
+                    var isHostPrompt = IsHostPrompt(message);
+                    var isContinuation = !isHostPrompt
+                        && message.Role == ChatMessageRole.Assistant
+                        && PreviousRenderedIsAssistant(messageIndex);
+                    var thinking = !isHostPrompt && IsThinking(message);
 
                     @* 摘要覆盖到这条消息之前：插入「已压缩」分隔线（P2 §3.4）。 *@
                     @if (Session.HasSummary && messageIndex == Session.SummaryThroughOrder)
@@ -97,24 +102,76 @@
                                            OnOpen="OpenCompactedHistory" />
                     }
 
-                    <article class="msg @(isUser ? "msg--user" : "msg--assistant")">
-                        <span class="msg-role">@RoleLabel(message)</span>
-
-                        @if (!string.IsNullOrWhiteSpace(message.Reasoning))
+                    @* 宿主自动追加的「[宿主提示]」不是用户手打的，不占一个用户气泡，压成一行过程记录。 *@
+                    @if (isHostPrompt)
+                    {
+                        <div class="host-prompt" title="@message.Content">
+                            <span class="host-prompt-label">宿主追问</span>
+                            <span class="host-prompt-text">@HostPromptPreview(message.Content)</span>
+                        </div>
+                    }
+                    else
+                    {
+                    @* 普通气泡；续答（msg--cont）不重复角色名，视觉上并进上一块。 *@
+                    <article class="msg @(isUser ? "msg--user" : "msg--assistant") @(isContinuation ? "msg--cont" : null)">
+                        @if (!isContinuation)
                         {
-                            <div class="msg-reasoning">
-                                <button type="button"
-                                        class="reasoning-toggle"
-                                        @onclick="() => ToggleReasoning(message.Id)">
-                                    <span class="reasoning-caret @(IsReasoningOpen(message.Id) ? "is-open" : null)">▸</span>
-                                    <span>思考过程 · @message.Reasoning.Length 字</span>
-                                </button>
+                            <span class="msg-role">@RoleLabel(message)</span>
+                        }
 
-                                @if (IsReasoningOpen(message.Id))
-                                {
-                                    <pre class="reasoning-body">@message.Reasoning</pre>
-                                }
-                            </div>
+                        @{
+                            // 有步骤时间线就按真实顺序渲染（思考→工具→思考→…→正文）；
+                            // 老消息没有步骤时回退成「思考 / 工具 / 正文」分组显示。
+                            var steps = isUser ? Array.Empty<ChatStep>() : StepsFor(message);
+                            var hasTimeline = !isUser && steps.Count > 0;
+                        }
+
+                        @if (hasTimeline)
+                        {
+                            <ChatTimeline Steps="steps"
+                                          Trace="message.ToolTrace"
+                                          IsLive="@(thinking && _isGenerating)" />
+                        }
+                        else
+                        {
+                            @* 还没收到第一个增量：在回复里也给出「思考中」，而不是只在发送区显示停止按钮。 *@
+                            @if (thinking && string.IsNullOrWhiteSpace(message.Reasoning))
+                            {
+                                <div class="msg-thinking" role="status" aria-live="polite">
+                                    <span class="msg-thinking-dot"></span>
+                                    <span>思考中…</span>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(message.Reasoning))
+                            {
+                                var reasoningOpen = IsReasoningOpen(message.Id);
+
+                                <div class="msg-reasoning @(thinking ? "is-thinking" : null)">
+                                    <button type="button"
+                                            class="reasoning-toggle"
+                                            aria-expanded="@(reasoningOpen ? "true" : "false")"
+                                            @onclick="() => ToggleReasoning(message.Id)">
+                                        <span class="reasoning-caret @(reasoningOpen ? "is-open" : null)">▸</span>
+                                        <span class="reasoning-summary">@ReasoningSummary(message, thinking)</span>
+                                        @if (!reasoningOpen)
+                                        {
+                                            <span class="reasoning-preview">@ReasoningPreview(message.Reasoning)</span>
+                                        }
+                                    </button>
+
+                                    @if (reasoningOpen)
+                                    {
+                                        <pre class="reasoning-body">@message.Reasoning</pre>
+                                    }
+                                </div>
+                            }
+
+                            @* 本条回复调用过哪些工具：过程优先于结论，和 DSH 的工具行一致。 *@
+                            @if (message.ToolTrace.Count > 0)
+                            {
+                                <ToolTracePanel Trace="message.ToolTrace" IsLive="@(thinking && _isGenerating)" />
+                            }
                         }
 
                         @if (message.Plugin is { Segments.Count: > 0 } messagePlugin)
@@ -124,7 +181,7 @@
                                 <SegmentedOutput Segments="messagePlugin.Segments!" Mode="@ModeFor(messagePlugin.PluginId)" />
                             </div>
                         }
-                        else if (!string.IsNullOrWhiteSpace(message.Content))
+                        else if (!hasTimeline && !string.IsNullOrWhiteSpace(message.Content))
                         {
                             <div class="msg-body @(isUser ? null : "msg-body--markdown")">
                                 @if (isUser)
@@ -183,7 +240,10 @@
                         }
 
                         <div class="msg-meta">
-                            <span class="msg-time">@message.CreatedAt.ToString("HH:mm")</span>
+                            @if (!isContinuation)
+                            {
+                                <span class="msg-time">@message.CreatedAt.ToString("HH:mm")</span>
+                            }
 
                             @if (!isUser)
                             {
@@ -307,6 +367,7 @@
                             </div>
                         }
                     </article>
+                    }
                 }
 
                 @* 全部消息都被摘要覆盖（边界情况）：分隔线放在末尾。 *@
@@ -522,9 +583,17 @@
     [Parameter]
     public EventCallback<ChatSession> OnArchiveChanged { get; set; }
 
+    /// <summary>
+    /// 当前是否是用户正在看的聊天室。切走后组件仍保留（后台生成），
+    /// 但会按设置决定是否中止；隐藏时只通过 CSS 移出视图。
+    /// </summary>
+    [Parameter]
+    public bool IsActive { get; set; } = true;
+
     private string _draft = string.Empty;
     private bool _isGenerating;
     private string? _sessionId;
+    private ChatSession? _currentSession;
     private ElementReference _scrollElement;
 
     private List<ModelOption> _modelOptions = [];
@@ -605,6 +674,15 @@
     /// <summary>展开了思维链的消息 Id。</summary>
     private readonly HashSet<string> _openReasoning = [];
 
+    /// <summary>用户手动开合过思维链的消息：这一轮结束后不要替他收起来。</summary>
+    private readonly HashSet<string> _manualReasoning = [];
+
+    /// <summary>宿主动追问时，同一回合最多再生成几轮（3 次无修改回灌 + 1 次自动验证 + 余量）。</summary>
+    private const int MaxHostRounds = 5;
+
+    /// <summary>宿主自动追加的提示前缀；这类「用户消息」来自策略，不是用户手打的。</summary>
+    private const string HostPromptPrefix = "[宿主提示]";
+
     private bool IsEmpty => Session.Messages.Count == 0;
 
     protected override void OnInitialized()
@@ -626,13 +704,28 @@
         // 切换到另一个聊天室时清空草稿、取消上一轮生成；插件状态按会话恢复（不能一律清空）。
         if (_sessionId != Session.Id)
         {
+            var previous = _currentSession;
+
             _sessionId = Session.Id;
+            _currentSession = Session;
             _draft = string.Empty;
             _selectedSkill = null;
             _enabledToolPacks.Clear();
             _copiedMessageId = null;
-            _cts?.Cancel();
-            _isGenerating = false;
+
+            if (_isGenerating)
+            {
+                _cts?.Cancel();
+                _isGenerating = false;
+                _runningMountKey = null;
+
+                // 旧会话的「推理中」状态必须一起收回，否则左侧列表会一直转圈。
+                if (previous is not null)
+                {
+                    previous.IsGenerating = false;
+                }
+            }
+
             ApplyActiveMount(Session.ActiveMountId);
             RefreshToolPacks();
             _contextNotice = null;
@@ -640,14 +733,45 @@
             _showCompacted = false;
             RefreshContextPreview();
         }
+        else
+        {
+            _currentSession = Session;
+        }
+
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // 有消息后滚到底部（空态没有消息区，跳过）。
-        if (Session.Messages.Count > 0)
+        // 切到别的聊天室且设置为「中断」：取消本会话的生成，并立刻把状态还给侧栏。
+        if (!IsActive
+            && _isGenerating
+            && !Settings.Current.ContinueGenerationOnChatSwitch)
+        {
+            await StopForDeactivateAsync();
+            return;
+        }
+
+        // 有消息后滚到底部（空态没有消息区，跳过；后台生成的隐藏实例不调 JS）。
+        if (IsActive && Session.Messages.Count > 0)
         {
             await Js.InvokeVoidAsync("sdChat.scrollToBottom", _scrollElement);
+        }
+    }
+
+    /// <summary>
+    /// 切走后按设置中断生成：立即撤销侧栏状态，再等取消信号把已生成的部分收尾。
+    /// </summary>
+    private async Task StopForDeactivateAsync()
+    {
+        _cts?.Cancel();
+        _isGenerating = false;
+        _runningMountKey = null;
+        Session.IsGenerating = false;
+        await SetGeneratingAsync(false);
+
+        if (!_disposed)
+        {
+            StateHasChanged();
         }
     }
 
@@ -665,10 +789,69 @@
 
     private void ToggleReasoning(string messageId)
     {
+        _manualReasoning.Add(messageId);
+
         if (!_openReasoning.Remove(messageId))
         {
             _openReasoning.Add(messageId);
         }
+    }
+
+    /// <summary>这条消息是宿主自动追加的提示（无修改回灌 / 自动验证），不是用户输入。</summary>
+    private static bool IsHostPrompt(ChatMessage message) =>
+        message.Role == ChatMessageRole.User
+        && message.Content.StartsWith(HostPromptPrefix, StringComparison.Ordinal);
+
+    /// <summary>宿主提示压成一行：去掉前缀，只留第一行前 60 字。</summary>
+    private static string HostPromptPreview(string content)
+    {
+        var text = content.StartsWith(HostPromptPrefix, StringComparison.Ordinal)
+            ? content[HostPromptPrefix.Length..].Trim()
+            : content.Trim();
+
+        var firstLine = text.Split('\n')[0].Trim();
+
+        return firstLine.Length <= 60 ? firstLine : firstLine[..60] + "…";
+    }
+
+    /// <summary>上一条真正上屏的消息是不是助手消息（跳过往返的宿主提示），用来把续答并进同一块。</summary>
+    private bool PreviousRenderedIsAssistant(int index)
+    {
+        for (var cursor = index - 1; cursor >= 0; cursor--)
+        {
+            var previous = Session.Messages[cursor];
+
+            if (IsHostPrompt(previous))
+            {
+                continue;
+            }
+
+            return previous.Role == ChatMessageRole.Assistant;
+        }
+
+        return false;
+    }
+
+    /// <summary>正在生成、且就是最后一条的助手消息 → 思维链处于「思考中」状态。</summary>
+    private bool IsThinking(ChatMessage message) =>
+        _isGenerating
+        && message.Role == ChatMessageRole.Assistant
+        && Session.Messages.Count > 0
+        && ReferenceEquals(Session.Messages[^1], message);
+
+    /// <summary>DSH 风格的一行摘要：思考中显示「思考中…」，结束后收成「已思考 · N 字」。</summary>
+    private static string ReasoningSummary(ChatMessage message, bool thinking) =>
+        thinking
+            ? "思考中…"
+            : $"已思考 · {message.Reasoning.Length:N0} 字";
+
+    /// <summary>折叠时贴出的最后一行思维链（流式时跟着最新一行走）。</summary>
+    private static string ReasoningPreview(string reasoning)
+    {
+        var lines = reasoning.Split('\n');
+        var last = lines.LastOrDefault(line => !string.IsNullOrWhiteSpace(line))?.Trim() ?? string.Empty;
+
+        return last.Length <= 72 ? last : last[..72] + "…";
     }
 
     private Task SelectWorkspace(Workspace workspace) => OnWorkspaceChanged.InvokeAsync(workspace);
@@ -1290,10 +1473,15 @@
     private static string FormatDuration(long milliseconds) =>
         milliseconds < 1000 ? $"{milliseconds} ms" : $"{milliseconds / 1000.0:0.0} s";
 
-    private Task SetGeneratingAsync(bool isGenerating) =>
-        OnGeneratingChanged.HasDelegate
+    private Task SetGeneratingAsync(bool isGenerating)
+    {
+        // 会话状态由组件先落下，外层只负责让侧栏重渲染；这样即使回调缺失也不会一直转圈。
+        Session.IsGenerating = isGenerating;
+
+        return OnGeneratingChanged.HasDelegate
             ? OnGeneratingChanged.InvokeAsync((Session, isGenerating))
             : Task.CompletedTask;
+    }
 
     /// <summary>把当前选择写进设置，下次启动直接选中。</summary>
     private void RememberSelection()
@@ -1417,14 +1605,17 @@
         _pendingAfterPrivacy = null;
     }
 
-    /// <summary>用 Agent Framework 流式生成回复，边生成边写入会话。</summary>
-    private async Task GenerateAsync(ModelOption option, bool isAutoContinue = false)
+    /// <summary>
+    /// 用 Agent Framework 流式生成回复，边生成边写入会话。
+    /// <para>
+    /// 宿主追问（无修改回灌 / 自动验证）不再新开一条回复：它们作为步骤插进当前回合，
+    /// 用户看到的始终是「一次发送 = 一个回合」。
+    /// </para>
+    /// </summary>
+    private async Task GenerateAsync(ModelOption option)
     {
-        if (!isAutoContinue)
-        {
-            _autoContinued = false;
-            _noEditRepromptAttempts = 0;
-        }
+        _autoContinued = false;
+        _noEditRepromptAttempts = 0;
 
         _isGenerating = true;
         await SetGeneratingAsync(true);
@@ -1432,8 +1623,7 @@
         using var cts = new CancellationTokenSource();
         _cts = cts;
 
-        var history = Session.Messages.ToList();
-        var userInput = history.LastOrDefault(message => message.Role == ChatMessageRole.User)?.Content ?? string.Empty;
+        var userInput = Session.Messages.LastOrDefault(message => message.Role == ChatMessageRole.User)?.Content ?? string.Empty;
         var reply = new ChatMessage(ChatMessageRole.Assistant, string.Empty)
         {
             CreatedAt = DateTime.Now,
@@ -1448,67 +1638,115 @@
         _openReasoning.Add(reply.Id);
         StateHasChanged();
 
+        // 用户刚发完消息：无论之前翻到哪儿，都跳到底部跟新内容。
+        await Js.InvokeVoidAsync("sdChat.jumpToBottom", _scrollElement);
+
         // 搜索等外部工具按用户选择；文件 / PDF / PowerShell 是内置能力，自动交给模型。
         var enabledPacks = EffectiveToolPacks();
-        var metrics = new AgentRunMetrics();
-        var startedAt = Stopwatch.GetTimestamp();
         var telemetry = new ContextRunTelemetry();
         _contextNotice = null;
 
+        // 宿主提示只发给模型、不单独上屏：它作为步骤挂在当前回合里。
+        var pendingPrompts = new List<ChatMessage>();
+        var rounds = 0;
+
         try
         {
-            await ConsumeAsync(
-                reply,
-                Runner.StreamAsync(
-                    new AgentRunRequest(
-                        history,
-                        option.Provider,
-                        option.ModelId,
-                        enabledPacks,
-                        _selectedSkill,
-                        Session.Id,
-                        metrics,
-                        Session: Session),
+            // 一次发送 = 一个回合；宿主追问在同一回合里继续生成，不再新建回复。
+            while (true)
+            {
+                var history = new List<ChatMessage>();
+
+                foreach (var message in Session.Messages)
+                {
+                    // 第一轮不能把「空的助手消息」发给模型；后续轮次要把已生成的部分带上。
+                    if (rounds == 0 && ReferenceEquals(message, reply))
+                    {
+                        continue;
+                    }
+
+                    history.Add(message);
+                }
+
+                history.AddRange(pendingPrompts);
+                pendingPrompts.Clear();
+
+                var metrics = new AgentRunMetrics();
+                var startedAt = Stopwatch.GetTimestamp();
+                var baseline = reply.ToolTrace.Count;
+
+                await ConsumeAsync(
+                    reply,
+                    Runner.StreamAsync(
+                        new AgentRunRequest(
+                            history,
+                            option.Provider,
+                            option.ModelId,
+                            enabledPacks,
+                            _selectedSkill,
+                            Session.Id,
+                            metrics,
+                            Session: Session),
+                        telemetry,
+                        cts.Token),
                     telemetry,
-                    cts.Token),
-                telemetry);
+                    metrics,
+                    baseline);
 
-            var noEdit = NoEditRepromptPolicy.Decide(
-                metrics,
-                userInput,
-                reply.Content,
-                _noEditRepromptAttempts,
-                Settings.Current.Agent.Mode == AgentModePreference.Compact);
+                ApplyMetrics(reply, metrics, startedAt, baseline, accumulate: rounds > 0);
+                rounds++;
 
-            if (noEdit.Continue && noEdit.Prompt is not null)
-            {
-                _noEditRepromptAttempts++;
-                Session.Messages.Add(new ChatMessage(ChatMessageRole.User, noEdit.Prompt));
-                StateHasChanged();
-                await NotifySessionChangedAsync();
-                await GenerateAsync(option, isAutoContinue: true);
-                return;
-            }
+                if (rounds > MaxHostRounds || cts.IsCancellationRequested)
+                {
+                    break;
+                }
 
-            var auto = BuildAutoContinueDecision();
-            if (auto.Continue && !_autoContinued && auto.Prompt is not null)
-            {
-                _autoContinued = true;
-                Session.Messages.Add(new ChatMessage(ChatMessageRole.User, auto.Prompt));
-                StateHasChanged();
-                await NotifySessionChangedAsync();
-                await GenerateAsync(option, isAutoContinue: true);
+                var noEdit = NoEditRepromptPolicy.Decide(
+                    metrics,
+                    userInput,
+                    reply.Content,
+                    _noEditRepromptAttempts,
+                    Settings.Current.Agent.Mode == AgentModePreference.Compact);
+
+                if (noEdit.Continue && noEdit.Prompt is { } noEditPrompt)
+                {
+                    _noEditRepromptAttempts++;
+                    pendingPrompts.Add(new ChatMessage(ChatMessageRole.User, noEditPrompt));
+                    await AppendHostPromptAsync(reply, noEditPrompt);
+                    continue;
+                }
+
+                var auto = BuildAutoContinueDecision(metrics);
+                if (auto.Continue && !_autoContinued && auto.Prompt is { } autoPrompt)
+                {
+                    _autoContinued = true;
+                    pendingPrompts.Add(new ChatMessage(ChatMessageRole.User, autoPrompt));
+                    await AppendHostPromptAsync(reply, autoPrompt);
+                    continue;
+                }
+
+                break;
             }
         }
         finally
         {
-            ApplyMetrics(reply, metrics, startedAt);
+            // 对标 DSH：思考结束后默认收起思维链，只留一行摘要；用户自己点开过的不动。
+            if (!_manualReasoning.Contains(reply.Id))
+            {
+                _openReasoning.Remove(reply.Id);
+            }
+
             _isGenerating = false;
             _cts = null;
             _contextPreview = telemetry.Report ?? _contextPreview;
             _contextNotice = telemetry.ContextNotice;
             await SetGeneratingAsync(false);
-            StateHasChanged();
+
+            if (!_disposed)
+            {
+                StateHasChanged();
+            }
+
             await NotifySessionChangedAsync();
 
             // M3：归档会话继续对话时同步刷新索引，避免检索到旧内容。
@@ -1526,7 +1764,7 @@
         }
     }
 
-    private AutoContinueDecision BuildAutoContinueDecision()
+    private AutoContinueDecision BuildAutoContinueDecision(AgentRunMetrics metrics)
     {
         var workspace = Settings.Current.Workspaces.FirstOrDefault(item =>
             !string.IsNullOrWhiteSpace(item.Path)
@@ -1544,7 +1782,9 @@
             build,
             test,
             Settings.Current.Verification,
-            _autoContinued ? 1 : 0);
+            _autoContinued ? 1 : 0,
+            // 只有本轮真的改了文件才追问构建 / 测试；历史遗留的 dirty 不应该把聊天轮变成任务轮。
+            hasNewEdits: NoEditRepromptPolicy.HasSuccessfulEdit(metrics.ToolTrace));
     }
 
     /// <summary>插件 Run：单轮、默认无历史、无全局技能；产物是一条带 Plugin 归属的普通助手消息。</summary>
@@ -1604,11 +1844,23 @@
         }
         finally
         {
-            ApplyMetrics(reply, metrics, startedAt);
+            ApplyMetrics(reply, metrics, startedAt, traceBaseline: 0, accumulate: false);
+
+            // 对标 DSH：思考结束后默认收起思维链，只留一行摘要；用户自己点开过的不动。
+            if (!_manualReasoning.Contains(reply.Id))
+            {
+                _openReasoning.Remove(reply.Id);
+            }
+
             _isGenerating = false;
             _cts = null;
             await SetGeneratingAsync(false);
-            StateHasChanged();
+
+            if (!_disposed)
+            {
+                StateHasChanged();
+            }
+
             await NotifySessionChangedAsync();
         }
     }
@@ -1729,7 +1981,9 @@
     private async Task ConsumeAsync(
         ChatMessage reply,
         IAsyncEnumerable<AgentDelta> stream,
-        ContextRunTelemetry telemetry)
+        ContextRunTelemetry telemetry,
+        AgentRunMetrics metrics,
+        int traceBaseline)
     {
         try
         {
@@ -1738,12 +1992,17 @@
                 if (delta.Text.Length > 0)
                 {
                     reply.Content += delta.Text;
+                    AppendStep(reply, ChatStepKind.Text, delta.Text);
                 }
 
                 if (delta.Reasoning.Length > 0)
                 {
                     reply.Reasoning += delta.Reasoning;
+                    AppendStep(reply, ChatStepKind.Reasoning, delta.Reasoning);
                 }
+
+                // 工具轨迹边跑边同步：「工具调用 N 次」和文件改动面板在生成过程中就能看到。
+                SyncTrace(reply, metrics, traceBaseline);
 
                 // 中途裁剪 / 中途提示需要让用户看到，但仍不进模型上下文。
                 if (!string.IsNullOrWhiteSpace(telemetry.ContextNotice))
@@ -1775,27 +2034,102 @@
         }
     }
 
-    private static void ApplyMetrics(ChatMessage reply, AgentRunMetrics metrics, long startedAt)
+    private static void ApplyMetrics(
+        ChatMessage reply,
+        AgentRunMetrics metrics,
+        long startedAt,
+        int traceBaseline,
+        bool accumulate)
     {
-        reply.DurationMs = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
-        reply.InputTokens = metrics.InputTokens;
-        reply.OutputTokens = metrics.OutputTokens;
-        reply.ApprovalCount = metrics.ApprovalCount;
+        var duration = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
 
+        reply.DurationMs = accumulate ? reply.DurationMs + duration : duration;
+        reply.InputTokens = accumulate ? reply.InputTokens + metrics.InputTokens : metrics.InputTokens;
+        reply.OutputTokens = accumulate ? reply.OutputTokens + metrics.OutputTokens : metrics.OutputTokens;
+        reply.ApprovalCount += metrics.ApprovalCount;
+
+        // 同一回合里可能跑了几轮（宿主追问）：按轮累加，不互相覆盖。
         foreach (var pair in metrics.ToolCalls)
         {
-            reply.ToolCalls[pair.Key] = pair.Value;
+            reply.ToolCalls[pair.Key] = reply.ToolCalls.GetValueOrDefault(pair.Key) + pair.Value;
         }
 
-        if (metrics.ToolTrace.Count > 0)
+        // 流式过程中已经同步过的条目跳过，只补回合末才出现的。
+        for (var index = reply.ToolTrace.Count - traceBaseline; index < metrics.ToolTrace.Count; index++)
         {
-            reply.ToolTrace.AddRange(metrics.ToolTrace);
+            reply.ToolTrace.Add(metrics.ToolTrace[index]);
+            reply.Steps.Add(new ChatStep(ChatStepKind.Tool, string.Empty, reply.ToolTrace.Count - 1));
         }
 
-        if (metrics.Citations.Count > 0)
+        foreach (var citation in metrics.Citations)
         {
-            reply.MemoryCitations.AddRange(metrics.Citations);
+            if (!reply.MemoryCitations.Any(item =>
+                    string.Equals(item.SessionId, citation.SessionId, StringComparison.Ordinal)))
+            {
+                reply.MemoryCitations.Add(citation);
+            }
         }
+    }
+
+    /// <summary>
+    /// 一条消息的步骤时间线：生成中的消息直接读实时步骤；
+    /// 重开会话的历史消息没有实时步骤，就按工具轨迹里的字符边界还原。
+    /// </summary>
+    private static IReadOnlyList<ChatStep> StepsFor(ChatMessage message)
+    {
+        if (message.Steps.Count > 0)
+        {
+            return message.Steps;
+        }
+
+        return message.Role == ChatMessageRole.Assistant && message.ToolTrace.Count > 0
+            ? ChatTimelineBuilder.FromTrace(message.Reasoning, message.Content, message.ToolTrace)
+            : [];
+    }
+
+    /// <summary>把一段增量并进当前步骤；类型不同就开新的一步（思考 → 工具 → 思考 …）。</summary>
+    private static void AppendStep(ChatMessage reply, ChatStepKind kind, string delta)
+    {
+        if (delta.Length == 0)
+        {
+            return;
+        }
+
+        if (reply.Steps.Count > 0 && reply.Steps[^1].CanAppend(kind))
+        {
+            reply.Steps[^1] = reply.Steps[^1].Append(delta);
+            return;
+        }
+
+        reply.Steps.Add(new ChatStep(kind, delta));
+    }
+
+    /// <summary>把本轮的实时工具轨迹同步到消息上，生成过程中就能看到调用了什么。</summary>
+    /// <param name="baseline">这一轮开始时消息上已有的轨迹条数（宿主追问会开新一轮，但不该重复插步骤）。</param>
+    private static void SyncTrace(ChatMessage reply, AgentRunMetrics metrics, int baseline)
+    {
+        var target = baseline + metrics.ToolTrace.Count;
+
+        while (reply.ToolTrace.Count < target)
+        {
+            var sourceIndex = reply.ToolTrace.Count - baseline;
+
+            if (sourceIndex < 0 || sourceIndex >= metrics.ToolTrace.Count)
+            {
+                break;
+            }
+
+            reply.ToolTrace.Add(metrics.ToolTrace[sourceIndex]);
+            reply.Steps.Add(new ChatStep(ChatStepKind.Tool, string.Empty, reply.ToolTrace.Count - 1));
+        }
+    }
+
+    /// <summary>把宿主追问插进当前回合（只发给模型，不新开一条回复）。</summary>
+    private async Task AppendHostPromptAsync(ChatMessage reply, string prompt)
+    {
+        reply.Steps.Add(new ChatStep(ChatStepKind.HostPrompt, prompt));
+        StateHasChanged();
+        await NotifySessionChangedAsync();
     }
 
     /// <summary>通知外层把最新会话写回 SQLite（取消 / 出错时也保存已生成的部分）。</summary>
@@ -2066,7 +2400,12 @@
             _runningMountKey = null;
             _cts = null;
             await SetGeneratingAsync(false);
-            StateHasChanged();
+
+            if (!_disposed)
+            {
+                StateHasChanged();
+            }
+
             await NotifySessionChangedAsync();
         }
     }
@@ -2174,7 +2513,18 @@
         Settings.Changed -= OnSettingsChanged;
         Registry.Changed -= OnRegistryChanged;
 
-        // 审批宿主在 AppShell 顶层，切换会话时不该取消别的会话正在等待的请求；
-        // 只有本组件自己的生成被取消时，cancellationToken 会让对应请求按拒绝结束。
+        // 组件被整体移除（关窗 / 页面切换）时别留下一个孤儿生成：
+        // 取消流并把侧栏状态收回。审批宿主在 AppShell 顶层，不受这里影响。
+        if (_cts is not null)
+        {
+            _cts.Cancel();
+            _cts = null;
+        }
+
+        if (_isGenerating)
+        {
+            _isGenerating = false;
+            Session.IsGenerating = false;
+        }
     }
 }

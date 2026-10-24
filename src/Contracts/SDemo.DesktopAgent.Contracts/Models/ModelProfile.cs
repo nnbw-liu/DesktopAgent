@@ -11,7 +11,10 @@ public sealed record ModelProfile(
     bool SupportsTools = true,
     bool SupportsParallelToolCalls = false,
     bool SupportsReasoning = false,
-    string? Preset = null)
+    string? Preset = null,
+    // 思考强度：none / low / medium / high；空表示不显式请求，按服务端默认。
+    // none 是显式关闭（reasoning_effort=none）：省略字段时端点默认值说了算，Qwen3 等默认反而是思考。
+    string? ReasoningEffort = null)
 {
     /// <summary>未知模型的默认档案（§3.2：按 8K / 2K 输出）。</summary>
     public static ModelProfile Unknown { get; } = new();

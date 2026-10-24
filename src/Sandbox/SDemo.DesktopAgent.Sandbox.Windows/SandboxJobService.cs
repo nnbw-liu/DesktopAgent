@@ -399,7 +399,8 @@ public sealed class SandboxJobService : ISandboxJobService
             var outcome = new SandboxJobOutcome(sessionId, jobId, result, changes, layout.Root)
             {
                 WorkspaceRoot = workspace,
-                TrashDirectory = _directory.GetTrashDirectory(jobId)
+                TrashDirectory = _directory.GetTrashDirectory(jobId),
+                Effects = SandboxEffectDetector.Detect(script, changes)
             };
             OutcomeAvailable?.Invoke(this, outcome);
             return outcome;
@@ -804,7 +805,9 @@ public sealed class SandboxJobService : ISandboxJobService
                 StdOut = run.StdOut,
                 StdErr = run.StdErr,
                 Duration = run.Duration,
-                Message = run.Message ?? "沙箱没有写出 result.json。"
+                Message = run.Message
+                    ?? "沙箱宿主没有写出 result.json（进程可能被组策略/杀软终止，或 sandbox\\host 下的宿主版本与当前程序不一致）。"
+                       + $"作业目录：{layout.Root}。可先重试一次；仍失败请在设置里换一种沙箱，或改用直跑白名单命令。"
             };
         }
 

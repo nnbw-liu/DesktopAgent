@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using SDemo.DesktopAgent.Agents;
 using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Editing;
@@ -20,6 +21,8 @@ public static class AgentCoreServiceCollectionExtensions
     {
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IThemeService, ThemeService>();
+        // 打开 / 定位文件：默认兜底实现，平台宿主注册真实 Shell 后再覆盖。
+        services.TryAddSingleton<IFileLauncherService, NullFileLauncherService>();
         services.AddDesktopAgentAgents();
         services.AddSingleton<ISearchService, SearchService>();
         services.AddSingleton<IToolApprovalService, ToolApprovalService>();

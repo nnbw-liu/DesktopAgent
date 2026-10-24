@@ -40,6 +40,19 @@
     </section>
 
     <section class="settings-section">
+        <h2 class="settings-section-title">对话</h2>
+        <p class="settings-section-hint">控制切换聊天室时正在生成的回复如何处理。</p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">切换聊天室时继续生成</span>
+                <span class="settings-row-hint">打开后切走不会中断，回复在后台继续，左侧列表保持「推理中…」；关闭则切走即中断。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@_continueOnSwitch" @onchange="HandleContinueOnSwitchChanged" />
+        </label>
+    </section>
+
+    <section class="settings-section">
         <h2 class="settings-section-title">版本信息</h2>
         <p class="settings-section-hint">排查问题时把这几项一起发过来即可。</p>
 
@@ -70,6 +83,7 @@
 
 @code {
     private string _language = "zh-CN";
+    private bool _continueOnSwitch;
 
     private static readonly (ThemePreference Value, string Key, string Label, string Description)[] ThemeOptions =
     [
@@ -81,6 +95,20 @@
     protected override void OnInitialized()
     {
         _language = Settings.Current.Language;
+        _continueOnSwitch = Settings.Current.ContinueGenerationOnChatSwitch;
+    }
+
+    private void HandleContinueOnSwitchChanged(ChangeEventArgs args)
+    {
+        _continueOnSwitch = args.Value is true;
+
+        if (Settings.Current.ContinueGenerationOnChatSwitch == _continueOnSwitch)
+        {
+            return;
+        }
+
+        Settings.Current.ContinueGenerationOnChatSwitch = _continueOnSwitch;
+        Settings.Save();
     }
 
     private void HandleLanguageChanged(ChangeEventArgs args)

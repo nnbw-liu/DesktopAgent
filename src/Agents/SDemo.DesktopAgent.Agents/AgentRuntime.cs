@@ -15,7 +15,9 @@ public sealed record AgentInvocation(
     IReadOnlyList<AITool> Tools,
     int MaxToolIterations,
     string AgentName = "SDemo Agent",
-    Func<IChatClient, IChatClient>? Decorate = null);
+    Func<IChatClient, IChatClient>? Decorate = null,
+    // 思考强度（low / medium / high）；空表示按服务端默认。
+    string? ReasoningEffort = null);
 
 /// <summary>一次流式调用里，模型侧产生的增量事件。上层据此更新 UI / 统计 / 轨迹。</summary>
 public abstract record AgentStreamEvent

@@ -72,12 +72,58 @@ public sealed class AgentSessionRunnerTests
         var registry = new AgentToolRegistry([new ReadOnlyPack()]);
         var runner = new AgentSessionRunner(chat, builder, _settings, calibration: calibration, tools: registry);
 
-        var plan = runner.Preview(Request(toolPacks: new HashSet<string> { "files" }));
+        var plan = runner.Preview(Request(
+            [new ChatMessage(ChatMessageRole.User, "看一下这个文件")],
+            toolPacks: new HashSet<string> { "files" }));
 
         Assert.NotNull(plan.Report.Routing);
         Assert.True(plan.Report.Segments.ToolSchema > 0);
         Assert.Equal(plan.Report.Segments.Total, plan.Report.Estimated);
         Assert.Contains("read_file", plan.Report.Routing!.ExposedTools);
+        Assert.Equal(TurnIntent.Answer, plan.Report.Routing.Intent);
+        Assert.Contains("本轮类型：问答", plan.Instructions);
+    }
+
+    [Fact]
+    public void 纯对话预览不注入工具并使用对话提示词()
+    {
+        var chat = new ScriptedChat([Script.Text("ok")]);
+        var root = TempRoot();
+        var calibration = new TokenCalibrationStore(Path.Combine(root, "calibration.json"));
+        var builder = new ContextBuilder(_counter, _settings, calibration);
+        var registry = new AgentToolRegistry([new ReadOnlyPack()]);
+        var runner = new AgentSessionRunner(chat, builder, _settings, calibration: calibration, tools: registry);
+
+        var plan = runner.Preview(Request(toolPacks: new HashSet<string> { "files" }));
+
+        Assert.NotNull(plan.Report.Routing);
+        Assert.Equal(TurnIntent.Chat, plan.Report.Routing!.Intent);
+        Assert.Empty(plan.Report.Routing.ExposedTools);
+        Assert.Equal(0, plan.Report.Segments.ToolSchema);
+        Assert.Equal(SystemPrompts.Chat, plan.Instructions);
+        Assert.DoesNotContain("本轮类型", plan.Instructions);
+    }
+
+    [Fact]
+    public void 没有可用工具时也使用对话提示词()
+    {
+        var chat = new ScriptedChat([Script.Text("ok")]);
+        var root = TempRoot();
+        var calibration = new TokenCalibrationStore(Path.Combine(root, "calibration.json"));
+        var builder = new ContextBuilder(_counter, _settings, calibration);
+        var runner = new AgentSessionRunner(
+            chat,
+            builder,
+            _settings,
+            calibration: calibration,
+            tools: new AgentToolRegistry([]));
+
+        var plan = runner.Preview(Request(
+            [new ChatMessage(ChatMessageRole.User, "帮我改一下这个文件")]));
+
+        Assert.False(plan.Report.Routing!.NeedsTools);
+        Assert.Equal(SystemPrompts.Chat, plan.Instructions);
+        Assert.DoesNotContain("本轮类型", plan.Instructions);
     }
 
     [Fact]

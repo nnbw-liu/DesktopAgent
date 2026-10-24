@@ -68,6 +68,22 @@ public sealed class AutoContinueTests
             alreadyContinued: 0).Continue);
     }
 
+    [Fact]
+    public void 本轮没有新编辑时不续跑()
+    {
+        var session = DirtySession();
+
+        var decision = AutoContinuePolicy.Decide(
+            session,
+            "dotnet build Demo.sln",
+            null,
+            new VerificationSettings { AutoVerifyAfterEdit = true, MaxAutoContinue = 1 },
+            alreadyContinued: 0,
+            hasNewEdits: false);
+
+        Assert.False(decision.Continue);
+    }
+
     private static ChatSession DirtySession()
     {
         var session = ChatSession.CreateEmpty();

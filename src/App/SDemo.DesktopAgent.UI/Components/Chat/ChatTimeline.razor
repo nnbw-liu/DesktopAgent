@@ -1,0 +1,140 @@
+@using SDemo.DesktopAgent.Context
+@using SDemo.DesktopAgent.Models
+@using SDemo.DesktopAgent.Services
+
+@* 按真实顺序排列的步骤：思考 → 工具 → 思考 → 工具 → … → 正文 *@
+@if (Steps.Count > 0)
+{
+    <div class="timeline">
+        @for (var stepIndex = 0; stepIndex < Steps.Count; stepIndex++)
+        {
+            var step = Steps[stepIndex];
+            var index = stepIndex;
+
+            @if (step.Kind == ChatStepKind.Reasoning)
+            {
+                var open = _open.Contains(index);
+                var thinking = IsLive && IsLastStep(stepIndex);
+
+                <div class="timeline-step timeline-step--reasoning @(thinking ? "is-thinking" : null)">
+                    <button type="button"
+                            class="reasoning-toggle"
+                            aria-expanded="@(open ? "true" : "false")"
+                            @onclick="() => Toggle(index)">
+                        <span class="reasoning-caret @(open ? "is-open" : null)">▸</span>
+                        <span class="reasoning-summary">@(thinking ? "思考中…" : $"思考 · {step.Text.Length:N0} 字")</span>
+                        @if (!open)
+                        {
+                            <span class="reasoning-preview">@Preview(step.Text)</span>
+                        }
+                    </button>
+
+                    @if (open)
+                    {
+                        <pre class="reasoning-body">@step.Text</pre>
+                    }
+                </div>
+            }
+            else if (step.Kind == ChatStepKind.Tool)
+            {
+                @if (ToolAt(step.ToolIndex) is { } entry)
+                {
+                    <div class="timeline-step timeline-step--tool @ToolClass(entry.Status)">
+                        <span class="timeline-tool-caret">▸</span>
+                        <span class="timeline-tool-name" title="@entry.ToolId">@entry.ToolId</span>
+                        <span class="timeline-tool-status">@ToolStatus(entry)</span>
+                        <span class="timeline-tool-summary" title="@entry.Summary">@ToolSummary(entry)</span>
+                    </div>
+                }
+            }
+            else if (step.Kind == ChatStepKind.HostPrompt)
+            {
+                <div class="timeline-step timeline-step--host" title="@step.Text">
+                    <span class="host-prompt-label">宿主追问</span>
+                    <span class="host-prompt-text">@HostPreview(step.Text)</span>
+                </div>
+            }
+            else if (step.Kind == ChatStepKind.Text)
+            {
+                <div class="msg-body msg-body--markdown timeline-step timeline-step--text">
+                    @((MarkupString)MarkdownRenderer.ToHtml(step.Text))
+                </div>
+            }
+        }
+    </div>
+}
+
+@code {
+    /// <summary>步骤时间线；由 ChatRoom 按实时事件或历史边界还原。</summary>
+    [Parameter] public IReadOnlyList<ChatStep> Steps { get; set; } = [];
+
+    /// <summary>步骤里的 Tool 步骤按索引取这里的条目。</summary>
+    [Parameter] public IReadOnlyList<ToolTraceEntry> Trace { get; set; } = [];
+
+    /// <summary>还在生成：最后一步是思考时显示「思考中…」。</summary>
+    [Parameter] public bool IsLive { get; set; }
+
+    /// <summary>展开的思考步骤下标。默认全部收起，只留一行摘要 + 最新一行预览。</summary>
+    private readonly HashSet<int> _open = [];
+
+    private void Toggle(int index)
+    {
+        if (!_open.Remove(index))
+        {
+            _open.Add(index);
+        }
+    }
+
+    private bool IsLastStep(int index) => index == Steps.Count - 1;
+
+    private ToolTraceEntry? ToolAt(int index) =>
+        index >= 0 && index < Trace.Count ? Trace[index] : null;
+
+    /// <summary>宿主追问压成一行：去掉前缀，只留第一行。</summary>
+    private static string HostPreview(string text)
+    {
+        const string prefix = "[宿主提示]";
+        var content = text.StartsWith(prefix, StringComparison.Ordinal) ? text[prefix.Length..].Trim() : text.Trim();
+        var firstLine = content.Split('\n')[0].Trim();
+
+        return firstLine.Length <= 72 ? firstLine : firstLine[..72] + "…";
+    }
+
+    private static string Preview(string text)
+    {
+        var last = text
+            .Split('\n')
+            .LastOrDefault(line => !string.IsNullOrWhiteSpace(line))?
+            .Trim() ?? string.Empty;
+
+        return last.Length <= 72 ? last : last[..72] + "…";
+    }
+
+    private static string ToolClass(string status) => status switch
+    {
+        ToolTraceEntry.StatusError => "is-error",
+        ToolTraceEntry.StatusDenied or ToolTraceEntry.StatusRejected => "is-rejected",
+        _ => "is-ok"
+    };
+
+    private static string ToolStatus(ToolTraceEntry entry) => entry.Status switch
+    {
+        ToolTraceEntry.StatusOk => entry.ExitCode is 0 or null ? "成功" : $"退出码 {entry.ExitCode}",
+        ToolTraceEntry.StatusError => entry.ExitCode is int code ? $"失败（{code}）" : "失败",
+        ToolTraceEntry.StatusRejected => "已拒绝",
+        ToolTraceEntry.StatusDenied => "未授权",
+        ToolTraceEntry.StatusCanceled => "已取消",
+        _ => entry.Status
+    };
+
+    private static string ToolSummary(ToolTraceEntry entry)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.Summary))
+        {
+            var text = entry.Summary!.ReplaceLineEndings(" ").Trim();
+            return text.Length <= 90 ? text : text[..90] + "…";
+        }
+
+        return entry.OutputChars > 0 ? $"输出 {entry.OutputChars} 字符" : string.Empty;
+    }
+}

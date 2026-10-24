@@ -106,6 +106,47 @@ public sealed class AgentChatServiceToolExposureTests
         Assert.True(telemetry.Report!.ToolSchemaTokens <= context.Budget.ToolSchemaLimit);
     }
 
+    [Fact]
+    public async Task 对话轮不生成工具并切换对话提示词()
+    {
+        _settings.Current.Agent.Mode = AgentModePreference.Full;
+        using var temp = new TempDirectory();
+        var paths = new StubAppPaths(temp.Root);
+        var registry = new AgentToolRegistry([new FileToolPack()]);
+
+        var runtime = new RecordingRuntime();
+        var service = new AgentChatService(
+            registry,
+            new WorkspaceContext(paths),
+            _settings,
+            new ToolApprovalService(),
+            new StubSandboxJobService(),
+            new NullAuditLog(),
+            paths,
+            new FileReadRegistry(),
+            runtime);
+
+        var builder = new ContextBuilder(_counter, _settings);
+        var context = builder.Build(new ContextBuildRequest(
+            Provider(),
+            "m",
+            [new ChatMessage(ChatMessageRole.User, "你好")]));
+        var telemetry = new ContextRunTelemetry();
+        var plan = new AgentRunPlan(
+            Provider(), "m", context, new HashSet<string> { "files" },
+            SessionId: "s1", Metrics: new AgentRunMetrics());
+
+        await foreach (var _ in service.RunAsync(plan, telemetry))
+        {
+        }
+
+        Assert.NotNull(runtime.Invocation);
+        Assert.Empty(runtime.Invocation!.Tools);
+        Assert.Equal(SystemPrompts.Chat, runtime.Invocation.Instructions);
+        Assert.False(telemetry.Report!.Routing!.NeedsTools);
+        Assert.Equal(0, telemetry.Report.ToolSchemaTokens);
+    }
+
     private static ChatMessage Message() => new(ChatMessageRole.User, "看一下这个文件");
 
     private static ModelProvider Provider() => new()

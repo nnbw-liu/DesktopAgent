@@ -84,7 +84,7 @@ Compact 下最近用过的工具优先复用；`Full` 返回全部可用工具�
 | E npm 工作区测试 | 7 | ✅ | 2 次格式失败 + 1 次找不到后 `replace_text` 成功 |
 
 - **多数结果 3/5**（A 2/3、C 2/2、E 2/3 通过）；单轮最差 2/5，A/E 有抖动。
-- thinking 核查：`reasoning_content` 为空、`reasoning_tokens=0`、流式 0 reasoning 字符；`enable_thinking` 开关无效。该模型实际是非 thinking，不需要为思考预算带上下文。
+- thinking 核查（已更正）：默认不发 `reasoning_effort` 时 `reasoning_content` 为空、`reasoning_tokens=0`，`enable_thinking` / `/think` 对该构建无效；但显式发 `reasoning_effort: high` 能开启（实测 300 reasoning tokens 吃满 2048 输出预算）。所以它是**默认关的混合思考模型**，不是「不产生思考」——省略字段在 vLLM / Ollama 这类默认思考的后端会直接落回思考，设置页的「不思考」因此改为显式发 `reasoning_effort: none`。
 - 失败主因不是“不调用工具”，而是 `apply_patch` 格式/锚点失败，以及新测试断言写错。
 
 ## 7. 边界
