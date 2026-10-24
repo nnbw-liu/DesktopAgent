@@ -24,6 +24,21 @@
 <section class="chat @(IsEmpty ? "chat--empty" : null) @(IsActive ? null : "chat--hidden")">
     @if (IsEmpty)
     {
+        @* 空聊天室没有标题栏，设置入口固定在右上角。 *@
+        <div class="chat-empty-actions">
+            <button type="button"
+                    class="chat-menu-button chat-settings-button"
+                    title="聊天室设置"
+                    aria-label="聊天室设置"
+                    @onclick="() => OnOpenSessionSettings.InvokeAsync()">
+                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" stroke-width="1.25" />
+                    <path d="M8 1.9v1.5M8 12.6v1.5M1.9 8h1.5M12.6 8h1.5M3.7 3.7l1.05 1.05M11.25 11.25l1.05 1.05M12.3 3.7l-1.05 1.05M4.75 11.25 3.7 12.3"
+                          stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
+                </svg>
+            </button>
+        </div>
+
         <div class="welcome">
             <h1>你好，我是 SDemo DesktopAgent</h1>
             <p>描述你的任务，我会在本地工作区里帮你完成。</p>
@@ -46,6 +61,18 @@
                         }
                     </span>
                 }
+
+                <button type="button"
+                        class="chat-menu-button chat-settings-button"
+                        title="聊天室设置"
+                        aria-label="聊天室设置"
+                        @onclick="() => OnOpenSessionSettings.InvokeAsync()">
+                    <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+                        <circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" stroke-width="1.25" />
+                        <path d="M8 1.9v1.5M8 12.6v1.5M1.9 8h1.5M12.6 8h1.5M3.7 3.7l1.05 1.05M11.25 11.25l1.05 1.05M12.3 3.7l-1.05 1.05M4.75 11.25 3.7 12.3"
+                              stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
+                    </svg>
+                </button>
 
                 <div class="chat-menu-wrap">
                     <button type="button" class="chat-menu-button" title="会话操作" aria-haspopup="true" aria-expanded="@_sessionMenuOpen"
@@ -508,7 +535,7 @@
         </ChatComposer>
 
         @* P1：上下文占用环移到输入框下方；新聊天室还没有内容，不显示。 *@
-        @if (!IsEmpty && Settings.Current.Context.ShowContextMeter)
+        @if (!IsEmpty && CurrentScope().Context.ShowContextMeter)
         {
             <div class="composer-usage">
                 <ContextMeter Report="_contextPreview" />
@@ -643,6 +670,10 @@
     [Parameter]
     public EventCallback OnOpenModelSettings { get; set; }
 
+    /// <summary>打开当前聊天室的设置抽屉（只影响这个会话）。</summary>
+    [Parameter]
+    public EventCallback OnOpenSessionSettings { get; set; }
+
     /// <summary>当前聊天室可选的工作区。</summary>
     [Parameter]
     public IReadOnlyList<Workspace> Workspaces { get; set; } = [];
@@ -673,6 +704,7 @@
     private string _draft = string.Empty;
     private bool _isGenerating;
     private string? _sessionId;
+    private string? _workspaceId;
     private ChatSession? _currentSession;
     private ElementReference _scrollElement;
 
@@ -828,6 +860,13 @@
             _currentSession = Session;
         }
 
+        // 会话换到另一个工作区时，继承的模型 / 上下文设置会跟着变。
+        if (_workspaceId != Session.WorkspaceId)
+        {
+            _workspaceId = Session.WorkspaceId;
+            RefreshModelOptions();
+            RefreshContextPreview();
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -972,6 +1011,18 @@
                 group.ToList()))
             .ToList();
 
+        // 模型优先级：聊天室 > 工作区 > 通用；没有作用域覆盖时保留当前选择。
+        var scope = CurrentScope();
+        var scoped = options.FirstOrDefault(option =>
+            string.Equals(option.Provider.Id, scope.ProviderId, StringComparison.Ordinal) &&
+            string.Equals(option.ModelId, scope.ModelId, StringComparison.Ordinal));
+
+        if (scoped is not null)
+        {
+            _selectedKey = scoped.Key;
+            return;
+        }
+
         if (_selectedKey is not null && options.Any(option => option.Key == _selectedKey))
         {
             return;
@@ -1003,12 +1054,17 @@
         }
     }
 
-    private void SelectModel(ModelOption option)
+    private async Task SelectModel(ModelOption option)
     {
         _selectedKey = option.Key;
         _modelMenuOpen = false;
+
+        // 底部选择器改的是「当前聊天室」的模型；通用设置只记住最后一次选择，供新聊天室兜底。
+        Session.ScopedSettings.ProviderId = option.Provider.Id;
+        Session.ScopedSettings.ModelId = option.ModelId;
         RememberSelection();
         _contextNotice = null;
+        await NotifySessionChangedAsync();
         RefreshContextPreview();
     }
 
@@ -1061,7 +1117,8 @@
                 EffectiveToolPacks(),
                 _selectedSkill,
                 Session.Id,
-                Session: Session));
+                Session: Session,
+                Scope: CurrentScope()));
             report = plan.Report;
         }
         catch (ContextBudgetException ex)
@@ -1093,6 +1150,17 @@
 
     private ModelOption? CurrentModelOption() =>
         _modelOptions.FirstOrDefault(option => string.Equals(option.Key, _selectedKey, StringComparison.Ordinal));
+
+    /// <summary>当前聊天室归属的工作区；没有归属返回 null。</summary>
+    private Workspace? CurrentWorkspace() =>
+        string.IsNullOrWhiteSpace(Session.WorkspaceId)
+            ? null
+            : Settings.Current.Workspaces.FirstOrDefault(workspace =>
+                string.Equals(workspace.Id, Session.WorkspaceId, StringComparison.Ordinal));
+
+    /// <summary>通用 → 工作区 → 聊天室 合并后的有效设置。</summary>
+    private EffectiveSettings CurrentScope() =>
+        EffectiveSettings.Resolve(Settings.Current, CurrentWorkspace(), Session);
 
     private void DismissContextNotice() => _contextNotice = null;
 
@@ -1155,7 +1223,8 @@
                 Session,
                 option.Provider,
                 option.ModelId,
-                Session.Id));
+                Session.Id,
+                CurrentScope()));
 
             _contextNotice = outcome.Message;
 
@@ -1223,7 +1292,7 @@
     /// <summary>切换一条消息的 pin；上限由 Core 的 PinPolicy 判定（便于单测）。</summary>
     private async Task TogglePinAsync(ChatMessage message)
     {
-        var limit = Settings.Current.Context.MaxPinnedMessages;
+        var limit = CurrentScope().Context.MaxPinnedMessages;
         var result = PinPolicy.Toggle(Session, message, limit);
 
         if (!result.Changed)
@@ -1799,6 +1868,7 @@
         using var cts = new CancellationTokenSource();
         _cts = cts;
 
+        var scope = CurrentScope();
         var userInput = Session.Messages.LastOrDefault(message => message.Role == ChatMessageRole.User)?.Content ?? string.Empty;
         var reply = new ChatMessage(ChatMessageRole.Assistant, string.Empty)
         {
@@ -1862,7 +1932,8 @@
                             _selectedSkill,
                             Session.Id,
                             metrics,
-                            Session: Session),
+                            Session: Session,
+                            Scope: scope),
                         telemetry,
                         cts.Token),
                     telemetry,

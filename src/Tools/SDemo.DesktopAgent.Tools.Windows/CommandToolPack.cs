@@ -75,7 +75,7 @@ public sealed class CommandToolPack : IAgentToolPack
         string? purpose,
         CancellationToken cancellationToken = default)
     {
-        var execution = context.Settings.Current.Execution;
+        var execution = context.Scope?.Execution ?? context.Settings.Current.Execution;
 
         if (!context.Settings.Current.Tools.IsPackEnabled(PackId, Descriptor.DefaultEnabled))
         {

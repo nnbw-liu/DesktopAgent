@@ -15,4 +15,7 @@ public sealed class Workspace
 
     /// <summary>测试命令（可空）。</summary>
     public string? TestCommand { get; set; }
+
+    /// <summary>只属于本工作区的设置覆盖；null 字段继续继承通用设置。</summary>
+    public ScopedSettings ScopedSettings { get; set; } = new();
 }

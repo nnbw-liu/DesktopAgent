@@ -102,7 +102,9 @@ public sealed class MemoryToolPack : IAgentToolPack
             return Begin("当前会话不属于工作区，或工作区知识库未启用；无法读取归档会话。");
         }
 
-        var configured = context.Settings.Current.Context?.MidTurnToolResultChars ?? 2000;
+        var configured = context.Scope?.Context.MidTurnToolResultChars
+            ?? context.Settings.Current.Context?.MidTurnToolResultChars
+            ?? 2000;
         var budget = Math.Clamp(configured - 200, 512, 8000);
 
         try

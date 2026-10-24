@@ -119,6 +119,9 @@ namespace SDemo.DesktopAgent.Migrations
                     b.Property<string>("PluginMemoryJson")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ScopedSettingsJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Summary")
                         .HasColumnType("TEXT");
 

@@ -25,7 +25,8 @@ public sealed record AgentRunPlan(
     IReadOnlySet<string> ToolPacks,
     string SessionId = "",
     AgentRunMetrics? Metrics = null,
-    ChatSession? Session = null);
+    ChatSession? Session = null,
+    EffectiveSettings? Scope = null);
 
 /// <summary>
 /// 通过 Microsoft Agent Framework 调用模型。只负责传输、流式解析与工具轨迹采集；
@@ -115,9 +116,10 @@ public sealed class AgentChatService : IAgentChatService
             plan.Metrics?.RunId,
             _skills,
             plan.Session?.WorkspaceId,
-            _memory);
+            _memory,
+            plan.Scope);
 
-        var agentSettings = _settings.Current.Agent ?? new AgentSettings();
+        var agentSettings = plan.Scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
         var available = _tools.ToolNames(plan.ToolPacks);
         var agentMode = Context.AgentModeResolver.Resolve(
             plan.Context.Profile,
@@ -156,7 +158,8 @@ public sealed class AgentChatService : IAgentChatService
             plan.Context,
             telemetry,
             toolCallLimit,
-            ResolveInstructions(plan, decision));
+            ResolveInstructions(plan, decision),
+            plan.Scope);
 
         var pendingCalls = new Dictionary<string, (string Name, string? Digest)>(StringComparer.Ordinal);
         var text = new StringBuilder();
@@ -310,9 +313,10 @@ public sealed class AgentChatService : IAgentChatService
         ContextPlan plan,
         ContextRunTelemetry telemetry,
         int toolCallLimit,
-        string instructions)
+        string instructions,
+        EffectiveSettings? scope)
     {
-        var settings = _settings.Current.Context ?? new ContextSettings();
+        var settings = scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
         var budgetOptions = new ContextBudgetChatOptions(
             Enabled: settings.Enabled && settings.MidTurnTrim,
             Budget: plan.Budget,

@@ -39,12 +39,12 @@ public sealed class ContextBuilder
     /// <summary>组装一次请求的上下文；超预算且无法再裁时抛 <see cref="ContextBudgetException"/>。</summary>
     public ContextPlan Build(ContextBuildRequest request)
     {
-        var settings = _settings.Current.Context ?? new ContextSettings();
+        var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
         var profile = ResolveProfile(request);
         var mode = AgentModeResolver.Resolve(
             profile,
             request.ModelId,
-            request.ModeOverride ?? _settings.Current.Agent.Mode);
+            request.ModeOverride ?? request.Scope?.Agent.Mode ?? _settings.Current.Agent.Mode);
         var policy = new ContextPolicy(profile, settings);
         var budget = Math.Abs(request.BudgetScale - 1.0) > 1e-9 && request.BudgetScale > 0
             ? policy.Budget.Scale(request.BudgetScale)

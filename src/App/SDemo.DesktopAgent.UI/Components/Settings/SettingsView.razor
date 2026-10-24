@@ -1,8 +1,8 @@
 @* 设置页：右侧整页。顶部分区切换，下面是各自独立滚动的设置内容。 *@
 <section class="settings">
     <header class="settings-header">
-        <h1>设置</h1>
-        <p>外观、语言与模型提供商配置都保存在本机，修改即时生效。</p>
+        <h1>全局设置</h1>
+        <p>这里只放全局默认值；工作区与聊天室可以在各自入口覆盖，优先级为聊天室 &gt; 工作区 &gt; 全局。</p>
     </header>
 
     <nav class="settings-tabs" role="tablist">
@@ -59,7 +59,7 @@
                 <PluginSettings />
                 break;
             default:
-                <ToolsSettings OnOpenSession="OnOpenSession" />
+                <ToolsSettings />
                 break;
         }
     </div>
@@ -69,10 +69,6 @@
     /// <summary>打开设置时默认显示的分区（例如从聊天页的「未配置模型」跳过来）。</summary>
     [Parameter]
     public SettingsSection InitialSection { get; set; } = SettingsSection.General;
-
-    /// <summary>M3：从知识库归档列表跳到某个会话。</summary>
-    [Parameter]
-    public EventCallback<string> OnOpenSession { get; set; }
 
     private SettingsSection _tab = SettingsSection.General;
 

@@ -90,11 +90,45 @@ public sealed class ChatStoreContextTests : IDisposable
         Assert.Contains("LastVerificationJson", sessionColumns);
         Assert.Contains("TodosJson", sessionColumns);
         Assert.Contains("IsArchived", sessionColumns);
+        Assert.Contains("ScopedSettingsJson", sessionColumns);
 
         var messageColumns = ReadColumns(connection, "messages");
         Assert.Contains("ToolTraceJson", messageColumns);
         Assert.Contains("MemoryCitationsJson", messageColumns);
         Assert.Contains("IsPinned", messageColumns);
+    }
+
+    [Fact]
+    public async Task 聊天室作用域设置落库后能读回()
+    {
+        var store = new ChatStore(_root);
+        var session = new ChatSession
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = "带作用域设置的会话",
+            UpdatedAt = DateTime.Now,
+            ScopedSettings = new ScopedSettings
+            {
+                ProviderId = "local",
+                ModelId = "qwen3.5-4b",
+                BudgetRatio = 0.6,
+                AutoCompact = false,
+                AgentMode = AgentModePreference.Compact,
+                ConfirmFileWrite = false
+            }
+        };
+
+        session.Messages.Add(new ChatMessage(ChatMessageRole.User, "测试作用域设置"));
+
+        await store.SaveSessionAsync(session);
+
+        var loaded = Assert.Single(await store.LoadAllAsync([]));
+        Assert.Equal("local", loaded.ScopedSettings.ProviderId);
+        Assert.Equal("qwen3.5-4b", loaded.ScopedSettings.ModelId);
+        Assert.Equal(0.6, loaded.ScopedSettings.BudgetRatio);
+        Assert.False(loaded.ScopedSettings.AutoCompact);
+        Assert.Equal(AgentModePreference.Compact, loaded.ScopedSettings.AgentMode);
+        Assert.False(loaded.ScopedSettings.ConfirmFileWrite);
     }
 
     [Fact]

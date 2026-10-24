@@ -199,7 +199,7 @@ public sealed class EditToolPack : IAgentToolPack
                 ? updatedNormalized.Replace("\n", "\r\n")
                 : updatedNormalized;
 
-            if (context.Settings.Current.ConfirmFileWrite)
+            if (context.Scope?.ConfirmFileWrite ?? context.Settings.Current.ConfirmFileWrite)
             {
                 var decision = await context.Approvals.RequestAsync(
                     new ToolApprovalRequest(
@@ -219,7 +219,8 @@ public sealed class EditToolPack : IAgentToolPack
                 }
             }
 
-            if (checkpoints is not null && context.Settings.Current.Checkpoints.Enabled)
+            if (checkpoints is not null
+                && (context.Scope?.Checkpoints.Enabled ?? context.Settings.Current.Checkpoints.Enabled))
             {
                 try
                 {
@@ -308,7 +309,7 @@ public sealed class EditToolPack : IAgentToolPack
                 return precheck;
             }
 
-            if (context.Settings.Current.ConfirmFileWrite)
+            if (context.Scope?.ConfirmFileWrite ?? context.Settings.Current.ConfirmFileWrite)
             {
                 var decision = await context.Approvals.RequestAsync(
                     new ToolApprovalRequest(
@@ -328,7 +329,8 @@ public sealed class EditToolPack : IAgentToolPack
                 }
             }
 
-            if (checkpoints is not null && context.Settings.Current.Checkpoints.Enabled)
+            if (checkpoints is not null
+                && (context.Scope?.Checkpoints.Enabled ?? context.Settings.Current.Checkpoints.Enabled))
             {
                 try
                 {
@@ -401,7 +403,7 @@ public sealed class EditToolPack : IAgentToolPack
                 // P7 外部仓库实测：模型补丁失败后会按提示词「重写整个文件」，
                 // 但只写回自己记得的片段，导致源文件被截断。对明显缩水的覆盖直接拒绝，
                 // 把模型推回 replace_text / apply_patch；新建文件不受影响。
-                if (context.Settings.Current.Agent.WriteFileShrinkGuard
+                if (context.Scope?.Agent.WriteFileShrinkGuard ?? context.Settings.Current.Agent.WriteFileShrinkGuard
                     && original.Length >= 500
                     && content.Length < original.Length * 0.7)
                 {
@@ -411,7 +413,7 @@ public sealed class EditToolPack : IAgentToolPack
                 }
             }
 
-            if (context.Settings.Current.ConfirmFileWrite)
+            if (context.Scope?.ConfirmFileWrite ?? context.Settings.Current.ConfirmFileWrite)
             {
                 var diff = BuildWriteDiff(relative, exists, original, content);
                 var decision = await context.Approvals.RequestAsync(
@@ -432,7 +434,8 @@ public sealed class EditToolPack : IAgentToolPack
                 }
             }
 
-            if (checkpoints is not null && context.Settings.Current.Checkpoints.Enabled)
+            if (checkpoints is not null
+                && (context.Scope?.Checkpoints.Enabled ?? context.Settings.Current.Checkpoints.Enabled))
             {
                 try
                 {

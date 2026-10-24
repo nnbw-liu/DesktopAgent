@@ -1,0 +1,660 @@
+@using SDemo.DesktopAgent.Context
+@using SDemo.DesktopAgent.Execution
+@using SDemo.DesktopAgent.Models
+@inject ISettingsService Settings
+@inject ChatStore ChatStore
+@inject IWorkspaceMemory Memory
+@inject SessionArchiveService ArchiveService
+@inject IWorkspaceWarmupService Warmup
+
+@* 工作区 / 聊天室设置：从右侧滑出；未设置的项留空，感叹号里显示说明与上级值。 *@
+<div class="scope-drawer-backdrop" @onclick="CloseAsync"></div>
+<aside class="scope-drawer" role="dialog" aria-modal="true" aria-label="@DrawerTitle">
+    <header class="scope-drawer-header">
+        <div class="scope-drawer-heading">
+            <h2>@DrawerTitle</h2>
+            <p>@DrawerSubtitle</p>
+        </div>
+        <button type="button" class="scope-drawer-close" title="关闭" @onclick="CloseAsync">✕</button>
+    </header>
+
+    <div class="scope-drawer-body">
+        <section class="scope-category">
+            <h3 class="scope-category-title">模型</h3>
+
+            <ScopedSettingRow Title="使用的模型"
+                              Description="当前作用域使用哪个模型；留着不设就继续向上继承。"
+                              InheritedText="@ModelInheritedText()"
+                              IsOverridden="@(HasModelPair(Overrides))"
+                              OnReset="() => ResetAsync(scope => { scope.ProviderId = null; scope.ModelId = null; })">
+                <select class="field-input field-input--select scope-model-select"
+                        value="@ModelOverrideKey()"
+                        @onchange="ChangeModelAsync">
+                    <option value="">未设置</option>
+                    @foreach (var provider in Settings.Current.Providers)
+                    {
+                        @if (provider.Models.Count > 0)
+                        {
+                            <optgroup label="@provider.Name">
+                                @foreach (var model in provider.Models)
+                                {
+                                    var key = $"{provider.Id}|{model.Id}";
+                                    <option value="@key">@model.Name</option>
+                                }
+                            </optgroup>
+                        }
+                    }
+                </select>
+            </ScopedSettingRow>
+        </section>
+
+        <section class="scope-category">
+            <h3 class="scope-category-title">上下文</h3>
+
+            <ScopedSettingRow Title="启用上下文预算"
+                              Description="关闭后退回全量历史，仅用于排查。"
+                              InheritedText="@InheritedText(BoolText(GlobalScope.Context.Enabled), BoolText(WorkspaceOverrides?.ContextEnabled))"
+                              IsOverridden="@(Overrides.ContextEnabled is not null)"
+                              OnReset="() => ResetAsync(scope => scope.ContextEnabled = null)">
+                <select class="field-input field-input--select" value="@BoolValue(Overrides.ContextEnabled)" @onchange="args => ChangeBoolAsync(args, value => Overrides.ContextEnabled = value)">
+                    <option value="">未设置</option>
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="预算占窗口比例"
+                              Description="0.1 – 0.95；越大越激进。"
+                              InheritedText="@InheritedText(NumberText(GlobalScope.Context.BudgetRatio), NumberText(WorkspaceOverrides?.BudgetRatio))"
+                              IsOverridden="@(Overrides.BudgetRatio is not null)"
+                              OnReset="() => ResetAsync(scope => scope.BudgetRatio = null)">
+                <input class="field-input" type="number" min="0.1" max="0.95" step="0.05"
+                       value="@NumberValue(Overrides.BudgetRatio)"
+                       placeholder="未设置"
+                       @onchange="args => ChangeDoubleAsync(args, value => Overrides.BudgetRatio = value)" />
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="最近保留轮次"
+                              Description="普通模型完整保留的最近轮数；其余历史交给摘要。"
+                              InheritedText="@InheritedText(NumberText(GlobalScope.Context.KeepRecentTurns), NumberText(WorkspaceOverrides?.KeepRecentTurns))"
+                              IsOverridden="@(Overrides.KeepRecentTurns is not null)"
+                              OnReset="() => ResetAsync(scope => scope.KeepRecentTurns = null)">
+                <input class="field-input" type="number" min="1" max="30"
+                       value="@NumberValue(Overrides.KeepRecentTurns)"
+                       placeholder="未设置"
+                       @onchange="args => ChangeIntAsync(args, value => Overrides.KeepRecentTurns = value)" />
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="自动压缩"
+                              Description="超预算时增量生成摘要；关闭后只做硬裁剪。"
+                              InheritedText="@InheritedText(BoolText(GlobalScope.Context.AutoCompact), BoolText(WorkspaceOverrides?.AutoCompact))"
+                              IsOverridden="@(Overrides.AutoCompact is not null)"
+                              OnReset="() => ResetAsync(scope => scope.AutoCompact = null)">
+                <select class="field-input field-input--select" value="@BoolValue(Overrides.AutoCompact)" @onchange="args => ChangeBoolAsync(args, value => Overrides.AutoCompact = value)">
+                    <option value="">未设置</option>
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="启用状态包"
+                              Description="把工作区结构、最近改动与验证状态放进系统块。"
+                              InheritedText="@InheritedText(BoolText(GlobalScope.Context.StatePackEnabled), BoolText(WorkspaceOverrides?.StatePackEnabled))"
+                              IsOverridden="@(Overrides.StatePackEnabled is not null)"
+                              OnReset="() => ResetAsync(scope => scope.StatePackEnabled = null)">
+                <select class="field-input field-input--select" value="@BoolValue(Overrides.StatePackEnabled)" @onchange="args => ChangeBoolAsync(args, value => Overrides.StatePackEnabled = value)">
+                    <option value="">未设置</option>
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="显示占用环"
+                              Description="输入框下方的上下文 token 占用。"
+                              InheritedText="@InheritedText(BoolText(GlobalScope.Context.ShowContextMeter), BoolText(WorkspaceOverrides?.ShowContextMeter))"
+                              IsOverridden="@(Overrides.ShowContextMeter is not null)"
+                              OnReset="() => ResetAsync(scope => scope.ShowContextMeter = null)">
+                <select class="field-input field-input--select" value="@BoolValue(Overrides.ShowContextMeter)" @onchange="args => ChangeBoolAsync(args, value => Overrides.ShowContextMeter = value)">
+                    <option value="">未设置</option>
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="pin 数量上限"
+                              Description="pin 的消息永不淘汰 / 压缩。"
+                              InheritedText="@InheritedText(NumberText(GlobalScope.Context.MaxPinnedMessages), NumberText(WorkspaceOverrides?.MaxPinnedMessages))"
+                              IsOverridden="@(Overrides.MaxPinnedMessages is not null)"
+                              OnReset="() => ResetAsync(scope => scope.MaxPinnedMessages = null)">
+                <input class="field-input" type="number" min="1" max="100"
+                       value="@NumberValue(Overrides.MaxPinnedMessages)"
+                       placeholder="未设置"
+                       @onchange="args => ChangeIntAsync(args, value => Overrides.MaxPinnedMessages = value)" />
+            </ScopedSettingRow>
+        </section>
+
+        <section class="scope-category">
+            <h3 class="scope-category-title">工具与执行</h3>
+
+            <ScopedSettingRow Title="运行模式"
+                              Description="自动按窗口 / 模型名判断；也可强制完整或精简。"
+                              InheritedText="@InheritedText(ModeText(GlobalScope.Agent.Mode), ModeOverrideText(WorkspaceOverrides?.AgentMode))"
+                              IsOverridden="@(Overrides.AgentMode is not null)"
+                              OnReset="() => ResetAsync(scope => scope.AgentMode = null)">
+                <select class="field-input field-input--select" value="@ModeValue(Overrides.AgentMode)" @onchange="ChangeModeAsync">
+                    <option value="">未设置</option>
+                    <option value="Auto">自动</option>
+                    <option value="Full">完整</option>
+                    <option value="Compact">精简</option>
+                </select>
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="全量暴露工具"
+                              Description="排障用：所有启用工具都交给模型，仍受窗口预算限制。"
+                              InheritedText="@InheritedText(BoolText(GlobalScope.Agent.ExposeAllTools), BoolText(WorkspaceOverrides?.ExposeAllTools))"
+                              IsOverridden="@(Overrides.ExposeAllTools is not null)"
+                              OnReset="() => ResetAsync(scope => scope.ExposeAllTools = null)">
+                <select class="field-input field-input--select" value="@BoolValue(Overrides.ExposeAllTools)" @onchange="args => ChangeBoolAsync(args, value => Overrides.ExposeAllTools = value)">
+                    <option value="">未设置</option>
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="search_capabilities 兜底"
+                              Description="模型可自查当前会话可用的工具，只影响 Full 模式。"
+                              InheritedText="@InheritedText(BoolText(GlobalScope.Agent.SearchCapabilitiesEnabled), BoolText(WorkspaceOverrides?.SearchCapabilitiesEnabled))"
+                              IsOverridden="@(Overrides.SearchCapabilitiesEnabled is not null)"
+                              OnReset="() => ResetAsync(scope => scope.SearchCapabilitiesEnabled = null)">
+                <select class="field-input field-input--select" value="@BoolValue(Overrides.SearchCapabilitiesEnabled)" @onchange="args => ChangeBoolAsync(args, value => Overrides.SearchCapabilitiesEnabled = value)">
+                    <option value="">未设置</option>
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="技能索引注入"
+                              Description="只注入名字、一句话与何时用；正文仍由 load_skill 按需读取。"
+                              InheritedText="@InheritedText(BoolText(GlobalScope.Agent.SkillIndexEnabled), BoolText(WorkspaceOverrides?.SkillIndexEnabled))"
+                              IsOverridden="@(Overrides.SkillIndexEnabled is not null)"
+                              OnReset="() => ResetAsync(scope => scope.SkillIndexEnabled = null)">
+                <select class="field-input field-input--select" value="@BoolValue(Overrides.SkillIndexEnabled)" @onchange="args => ChangeBoolAsync(args, value => Overrides.SkillIndexEnabled = value)">
+                    <option value="">未设置</option>
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="工作区知识库"
+                              Description="归档会话进入本工作区检索索引；关闭时上下文成本为 0。"
+                              InheritedText="@InheritedText(BoolText(GlobalScope.Agent.WorkspaceMemoryEnabled), BoolText(WorkspaceOverrides?.WorkspaceMemoryEnabled))"
+                              IsOverridden="@(Overrides.WorkspaceMemoryEnabled is not null)"
+                              OnReset="() => ResetAsync(scope => scope.WorkspaceMemoryEnabled = null)">
+                <select class="field-input field-input--select" value="@BoolValue(Overrides.WorkspaceMemoryEnabled)" @onchange="args => ChangeBoolAsync(args, value => Overrides.WorkspaceMemoryEnabled = value)">
+                    <option value="">未设置</option>
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="写入前确认"
+                              Description="模型覆盖工作区文件前请求确认。"
+                              InheritedText="@InheritedText(BoolText(GlobalScope.ConfirmFileWrite), BoolText(WorkspaceOverrides?.ConfirmFileWrite))"
+                              IsOverridden="@(Overrides.ConfirmFileWrite is not null)"
+                              OnReset="() => ResetAsync(scope => scope.ConfirmFileWrite = null)">
+                <select class="field-input field-input--select" value="@BoolValue(Overrides.ConfirmFileWrite)" @onchange="args => ChangeBoolAsync(args, value => Overrides.ConfirmFileWrite = value)">
+                    <option value="">未设置</option>
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="拒绝缩水覆盖"
+                              Description="新内容不足原文 70% 时拒绝整文件 write_file。"
+                              InheritedText="@InheritedText(BoolText(GlobalScope.Agent.WriteFileShrinkGuard), BoolText(WorkspaceOverrides?.WriteFileShrinkGuard))"
+                              IsOverridden="@(Overrides.WriteFileShrinkGuard is not null)"
+                              OnReset="() => ResetAsync(scope => scope.WriteFileShrinkGuard = null)">
+                <select class="field-input field-input--select" value="@BoolValue(Overrides.WriteFileShrinkGuard)" @onchange="args => ChangeBoolAsync(args, value => Overrides.WriteFileShrinkGuard = value)">
+                    <option value="">未设置</option>
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="编辑前检查点"
+                              Description="每个 turn 一个 checkpoint，可撤销最近一次改动。"
+                              InheritedText="@InheritedText(BoolText(GlobalScope.Checkpoints.Enabled), BoolText(WorkspaceOverrides?.CheckpointsEnabled))"
+                              IsOverridden="@(Overrides.CheckpointsEnabled is not null)"
+                              OnReset="() => ResetAsync(scope => scope.CheckpointsEnabled = null)">
+                <select class="field-input field-input--select" value="@BoolValue(Overrides.CheckpointsEnabled)" @onchange="args => ChangeBoolAsync(args, value => Overrides.CheckpointsEnabled = value)">
+                    <option value="">未设置</option>
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </ScopedSettingRow>
+
+            <ScopedSettingRow Title="直跑命令"
+                              Description="允许白名单命令在宿主直跑；仍会先请求审批。"
+                              InheritedText="@InheritedText(BoolText(GlobalScope.Execution.DirectRunEnabled), BoolText(WorkspaceOverrides?.DirectRunEnabled))"
+                              IsOverridden="@(Overrides.DirectRunEnabled is not null)"
+                              OnReset="() => ResetAsync(scope => scope.DirectRunEnabled = null)">
+                <select class="field-input field-input--select" value="@BoolValue(Overrides.DirectRunEnabled)" @onchange="args => ChangeBoolAsync(args, value => Overrides.DirectRunEnabled = value)">
+                    <option value="">未设置</option>
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </ScopedSettingRow>
+        </section>
+
+        @if (Kind == ScopeSettingsKind.Workspace && Workspace is not null)
+        {
+            <section class="scope-category">
+                <h3 class="scope-category-title">工作区专用</h3>
+
+                <p class="settings-section-hint">这些值只属于工作区「@Workspace.Name」，不参与通用设置。</p>
+
+                <label class="field">
+                    <span class="field-label">构建命令</span>
+                    <input class="field-input" @bind="_buildCommand" @bind:event="oninput" placeholder="dotnet build Demo.sln -v minimal" />
+                </label>
+
+                <label class="field">
+                    <span class="field-label">测试命令</span>
+                    <input class="field-input" @bind="_testCommand" @bind:event="oninput" placeholder="dotnet test Demo.sln --no-build" />
+                </label>
+
+                <div class="editor-footer">
+                    <button type="button" class="ghost-button" @onclick="DetectCommandsAsync">自动探测</button>
+                    <button type="button" class="primary-button" @onclick="SaveCommandsAsync">保存命令</button>
+                    <button type="button" class="ghost-button" disabled="@_isWarming" @onclick="WarmupAsync">
+                        @(_isWarming ? "restore 中…" : "预热包缓存")
+                    </button>
+                </div>
+
+                @if (_workspaceMessage is not null)
+                {
+                    <p class="settings-message">@_workspaceMessage</p>
+                }
+
+                <div class="scope-memory-head">
+                    <span class="field-label">归档会话</span>
+                    <button type="button" class="ghost-button" @onclick="RebuildIndexAsync">重建索引</button>
+                </div>
+
+                @if (_archived.Count == 0)
+                {
+                    <p class="settings-message">还没有归档会话。在侧栏会话菜单里点「归档到知识库」。</p>
+                }
+                else
+                {
+                    <div class="memory-archive-list">
+                        @foreach (var card in _archived)
+                        {
+                            <div class="memory-archive-row">
+                                <div class="memory-archive-row-text">
+                                    <span class="memory-archive-row-title">@card.Title</span>
+                                    <span class="memory-archive-row-meta">
+                                        @card.UpdatedAt.ToString("yyyy-MM-dd HH:mm") · @card.MessageCount 条消息
+                                    </span>
+                                </div>
+                                <div class="memory-archive-row-actions">
+                                    <button type="button" class="ghost-button" @onclick="() => OpenArchivedAsync(card)">打开</button>
+                                    <button type="button" class="ghost-button" @onclick="() => UnarchiveAsync(card)">取消归档</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (_memoryMessage is not null)
+                {
+                    <p class="settings-message">@_memoryMessage</p>
+                }
+            </section>
+        }
+
+    </div>
+</aside>
+
+@code {
+    [Parameter, EditorRequired]
+    public ScopeSettingsKind Kind { get; set; }
+
+    /// <summary>工作区设置时的目标工作区。</summary>
+    [Parameter]
+    public Workspace? Workspace { get; set; }
+
+    /// <summary>聊天室设置时的当前会话。</summary>
+    [Parameter]
+    public ChatSession? Session { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>聊天室设置变化后由外层持久化。</summary>
+    [Parameter]
+    public EventCallback<ChatSession> OnSessionChanged { get; set; }
+
+    /// <summary>工作区归档会话列表里「打开」。</summary>
+    [Parameter]
+    public EventCallback<string> OnOpenSession { get; set; }
+
+    private string _buildCommand = string.Empty;
+    private string _testCommand = string.Empty;
+    private string? _workspaceMessage;
+    private string? _memoryMessage;
+    private bool _isWarming;
+    private string? _archivedWorkspaceId;
+    private IReadOnlyList<MemorySessionCard> _archived = [];
+
+    private string DrawerTitle => Kind == ScopeSettingsKind.Workspace
+        ? $"工作区设置 · {Workspace?.Name}"
+        : "聊天室设置";
+
+    private string DrawerSubtitle => Kind == ScopeSettingsKind.Workspace
+        ? "只作用于这个工作区；未设置的项继承通用设置。"
+        : "只作用于当前聊天室；未设置的项继承工作区，再继承通用设置。";
+
+    private ScopedSettings Overrides =>
+        Kind == ScopeSettingsKind.Workspace
+            ? Workspace?.ScopedSettings ?? new ScopedSettings()
+            : Session?.ScopedSettings ?? new ScopedSettings();
+
+    private Workspace? ScopeWorkspace =>
+        Kind == ScopeSettingsKind.Workspace
+            ? Workspace
+            : string.IsNullOrWhiteSpace(Session?.WorkspaceId)
+                ? null
+                : Settings.Current.Workspaces.FirstOrDefault(workspace =>
+                    string.Equals(workspace.Id, Session.WorkspaceId, StringComparison.Ordinal));
+
+    private ScopedSettings? WorkspaceOverrides => ScopeWorkspace?.ScopedSettings;
+
+    private EffectiveSettings GlobalScope =>
+        EffectiveSettings.Resolve(Settings.Current, null, null);
+
+    protected override void OnParametersSet()
+    {
+        if (Kind == ScopeSettingsKind.Workspace
+            && Workspace is not null
+            && _archivedWorkspaceId != Workspace.Id)
+        {
+            _archivedWorkspaceId = Workspace.Id;
+            _buildCommand = Workspace.BuildCommand ?? string.Empty;
+            _testCommand = Workspace.TestCommand ?? string.Empty;
+            _ = RefreshArchivedAsync();
+        }
+    }
+
+    private Task CloseAsync() => OnClose.InvokeAsync();
+
+    private async Task ResetAsync(Action<ScopedSettings> reset)
+    {
+        reset(Overrides);
+        await SaveScopeAsync();
+    }
+
+    private async Task SaveScopeAsync()
+    {
+        // 通用设置 Save 同时广播 Changed，聊天室据此刷新模型与上下文预览。
+        Settings.Save();
+
+        if (Kind == ScopeSettingsKind.Chat && Session is not null)
+        {
+            await OnSessionChanged.InvokeAsync(Session);
+        }
+
+        StateHasChanged();
+    }
+
+    private bool HasModelPair(ScopedSettings scope) =>
+        !string.IsNullOrWhiteSpace(scope.ProviderId) && !string.IsNullOrWhiteSpace(scope.ModelId);
+
+    private string ModelOverrideKey() =>
+        HasModelPair(Overrides) ? $"{Overrides.ProviderId}|{Overrides.ModelId}" : string.Empty;
+
+    private async Task ChangeModelAsync(ChangeEventArgs args)
+    {
+        var key = args.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            Overrides.ProviderId = null;
+            Overrides.ModelId = null;
+        }
+        else
+        {
+            var parts = key.Split('|', 2);
+            if (parts.Length == 2)
+            {
+                Overrides.ProviderId = parts[0];
+                Overrides.ModelId = parts[1];
+            }
+        }
+
+        await SaveScopeAsync();
+    }
+
+    private async Task ChangeBoolAsync(ChangeEventArgs args, Action<bool?> set)
+    {
+        var raw = args.Value?.ToString();
+        set(raw == "true" ? true : raw == "false" ? false : null);
+        await SaveScopeAsync();
+    }
+
+    private async Task ChangeIntAsync(ChangeEventArgs args, Action<int?> set)
+    {
+        set(int.TryParse(args.Value?.ToString(), out var value) ? value : null);
+        await SaveScopeAsync();
+    }
+
+    private async Task ChangeDoubleAsync(ChangeEventArgs args, Action<double?> set)
+    {
+        set(double.TryParse(args.Value?.ToString(), out var value) ? value : null);
+        await SaveScopeAsync();
+    }
+
+    private async Task ChangeModeAsync(ChangeEventArgs args)
+    {
+        Overrides.AgentMode = Enum.TryParse<AgentModePreference>(args.Value?.ToString(), true, out var mode)
+            ? mode
+            : null;
+        await SaveScopeAsync();
+    }
+
+    private static string BoolValue(bool? value) =>
+        value is bool flag ? (flag ? "true" : "false") : string.Empty;
+
+    private static string NumberValue(int? value) => value?.ToString() ?? string.Empty;
+
+    private static string NumberValue(double? value) => value?.ToString("0.##") ?? string.Empty;
+
+    private string ModeValue(AgentModePreference? mode) =>
+        mode?.ToString() ?? string.Empty;
+
+    private static string ModeText(AgentModePreference mode) => mode switch
+    {
+        AgentModePreference.Full => "完整",
+        AgentModePreference.Compact => "精简",
+        _ => "自动"
+    };
+
+    private static string ModeOverrideText(AgentModePreference? mode) =>
+        mode is null ? "未设置" : ModeText(mode.Value);
+
+    private static string BoolText(bool value) => value ? "开启" : "关闭";
+
+    private static string BoolText(bool? value) => value is null ? "未设置" : BoolText(value.Value);
+
+    private static string NumberText(int value) => value.ToString();
+
+    private static string NumberText(int? value) => value?.ToString() ?? "未设置";
+
+    private static string NumberText(double value) => value.ToString("0.##");
+
+    private static string NumberText(double? value) => value?.ToString("0.##") ?? "未设置";
+
+    private string InheritedText(string global, string? workspace = null)
+    {
+        if (Kind == ScopeSettingsKind.Workspace)
+        {
+            return $"通用设置：{global}";
+        }
+
+        var inherited = string.IsNullOrEmpty(workspace) || workspace == "未设置"
+            ? $"{global}（继承通用）"
+            : workspace;
+
+        return $"通用设置：{global}\n工作区设置：{inherited}";
+    }
+
+    private string ModelInheritedText()
+    {
+        var global = GlobalModelLabel();
+        if (Kind == ScopeSettingsKind.Workspace)
+        {
+            return $"通用设置：{global}";
+        }
+
+        var workspace = WorkspaceModelLabel(ScopeWorkspace);
+        if (workspace == "未设置")
+        {
+            workspace = $"{global}（继承通用）";
+        }
+
+        return $"通用设置：{global}\n工作区设置：{workspace}";
+    }
+
+    private string GlobalModelLabel()
+    {
+        var provider = Settings.Current.Providers.FirstOrDefault(item =>
+            string.Equals(item.Id, Settings.Current.LastProviderId, StringComparison.Ordinal));
+        var model = provider?.Models.FirstOrDefault(item =>
+            string.Equals(item.Id, Settings.Current.LastModelId, StringComparison.Ordinal));
+
+        return provider is null || model is null ? "未设置" : $"{provider.Name} · {model.Name}";
+    }
+
+    private string WorkspaceModelLabel(Workspace? workspace)
+    {
+        if (workspace is null
+            || string.IsNullOrWhiteSpace(workspace.ScopedSettings.ProviderId)
+            || string.IsNullOrWhiteSpace(workspace.ScopedSettings.ModelId))
+        {
+            return "未设置";
+        }
+
+        var provider = Settings.Current.Providers.FirstOrDefault(item =>
+            string.Equals(item.Id, workspace.ScopedSettings.ProviderId, StringComparison.Ordinal));
+        var model = provider?.Models.FirstOrDefault(item =>
+            string.Equals(item.Id, workspace.ScopedSettings.ModelId, StringComparison.Ordinal));
+
+        return provider is null || model is null
+            ? $"{workspace.ScopedSettings.ProviderId} · {workspace.ScopedSettings.ModelId}"
+            : $"{provider.Name} · {model.Name}";
+    }
+
+    private async Task RefreshArchivedAsync()
+    {
+        if (Workspace is null)
+        {
+            _archived = [];
+            return;
+        }
+
+        try
+        {
+            _archived = Memory.ListArchived(Workspace.Id);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _archived = [];
+            _memoryMessage = $"读取归档列表失败：{ex.Message}";
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private void DetectCommandsAsync()
+    {
+        if (Workspace is not { } workspace)
+        {
+            return;
+        }
+
+        var suggestion = WorkspaceCommandDetector.Detect(workspace.Path);
+        _buildCommand = suggestion.BuildCommand ?? string.Empty;
+        _testCommand = suggestion.TestCommand ?? string.Empty;
+        _workspaceMessage = string.IsNullOrEmpty(_buildCommand)
+            ? "没有探测到 .sln / .csproj / package.json；请手动填写。"
+            : "已填入探测结果，确认后点「保存命令」。";
+    }
+
+    private void SaveCommandsAsync()
+    {
+        if (Workspace is not { } workspace)
+        {
+            return;
+        }
+
+        workspace.BuildCommand = string.IsNullOrWhiteSpace(_buildCommand) ? null : _buildCommand.Trim();
+        workspace.TestCommand = string.IsNullOrWhiteSpace(_testCommand) ? null : _testCommand.Trim();
+        Settings.Save();
+        _workspaceMessage = "工作区构建 / 测试命令已保存。";
+    }
+
+    private async Task WarmupAsync()
+    {
+        if (Workspace is not { } workspace)
+        {
+            return;
+        }
+
+        _isWarming = true;
+        _workspaceMessage = "正在 restore…";
+
+        try
+        {
+            var result = await Warmup.RestoreAsync(workspace.Path);
+            _workspaceMessage = result.Message;
+        }
+        catch (Exception ex)
+        {
+            _workspaceMessage = $"restore 失败：{ex.Message}";
+        }
+        finally
+        {
+            _isWarming = false;
+        }
+    }
+
+    private async Task RebuildIndexAsync()
+    {
+        if (Workspace is not { } workspace)
+        {
+            return;
+        }
+
+        _memoryMessage = ArchiveService.Rebuild(workspace.Id);
+        await RefreshArchivedAsync();
+    }
+
+    private Task OpenArchivedAsync(MemorySessionCard card) =>
+        OnOpenSession.InvokeAsync(card.SessionId);
+
+    private async Task UnarchiveAsync(MemorySessionCard card)
+    {
+        var session = (await ChatStore.LoadAllAsync(Settings.Current.Workspaces))
+            .FirstOrDefault(item => string.Equals(item.Id, card.SessionId, StringComparison.Ordinal));
+
+        if (session is null)
+        {
+            _memoryMessage = "会话已不存在；下次重建索引时会自动清理。";
+            await RefreshArchivedAsync();
+            return;
+        }
+
+        var outcome = await ArchiveService.UnarchiveAsync(session);
+        _memoryMessage = outcome.Message;
+        await RefreshArchivedAsync();
+    }
+}

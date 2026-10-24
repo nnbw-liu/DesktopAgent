@@ -97,7 +97,9 @@ public sealed class SkillToolPack : IAgentToolPack
     /// <summary>单条工具结果的字符预算；没有配置时按 2000 字符兜底。</summary>
     private static int ChunkBudget(ToolContext context)
     {
-        var configured = context.Settings.Current.Context?.MidTurnToolResultChars ?? 2000;
+        var configured = context.Scope?.Context.MidTurnToolResultChars
+            ?? context.Settings.Current.Context?.MidTurnToolResultChars
+            ?? 2000;
 
         // 头尾说明还会占几十个字符，正文再留一点余量。
         return Math.Clamp(configured - 160, MinChunkChars, MaxContentChars);

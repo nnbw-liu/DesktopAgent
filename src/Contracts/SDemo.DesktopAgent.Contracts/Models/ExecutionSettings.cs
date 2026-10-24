@@ -28,6 +28,17 @@ public sealed class ExecutionSettings
     public int BuildTimeoutSeconds { get; set; } = 600;
 
     public int MaxOutputChars { get; set; } = 12_000;
+
+    /// <summary>复制一份用于按作用域合并；白名单单独复制，避免作用域解析改到全局对象。</summary>
+    public ExecutionSettings Clone() => new()
+    {
+        Mode = Mode,
+        DirectRunEnabled = DirectRunEnabled,
+        Allowlist = [.. Allowlist],
+        DefaultTimeoutSeconds = DefaultTimeoutSeconds,
+        BuildTimeoutSeconds = BuildTimeoutSeconds,
+        MaxOutputChars = MaxOutputChars
+    };
 }
 
 /// <summary>热工作区（P4 可选，默认关闭）。</summary>

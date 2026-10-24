@@ -96,6 +96,7 @@
                             @if (_openMenu == workspaceMenu)
                             {
                                 <div class="item-menu">
+                                    <button type="button" class="item-menu-entry" @onclick="() => OpenWorkspaceSettings(workspace)">工作区设置</button>
                                     <button type="button" class="item-menu-entry" @onclick="() => StartRename(workspaceMenu, workspace.Name)">重命名</button>
                                     <button type="button" class="item-menu-entry item-menu-entry--danger" @onclick="() => DeleteWorkspace(workspace)">删除</button>
                                 </div>
@@ -219,6 +220,10 @@
 
     [Parameter]
     public EventCallback<(Workspace Workspace, string Name)> OnRenameWorkspace { get; set; }
+
+    /// <summary>打开某个工作区自己的设置（只影响这个工作区）。</summary>
+    [Parameter]
+    public EventCallback<Workspace> OnOpenWorkspaceSettings { get; set; }
 
     private string? _openMenu;
     private string? _renamingKey;
@@ -348,6 +353,12 @@
     {
         _openMenu = null;
         await OnDeleteWorkspace.InvokeAsync(workspace);
+    }
+
+    private async Task OpenWorkspaceSettings(Workspace workspace)
+    {
+        _openMenu = null;
+        await OnOpenWorkspaceSettings.InvokeAsync(workspace);
     }
 
     private async Task HandleRenameKeyDown(KeyboardEventArgs args)

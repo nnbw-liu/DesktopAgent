@@ -77,4 +77,7 @@ public sealed class ContextSettings
 
     /// <summary>溢出重试时的预算缩放比例（§3.8：按 total × 0.5 重算）。</summary>
     public double OverflowRetryScale { get; set; } = 0.5;
+
+    /// <summary>复制一份用于按作用域合并；属性都是值类型，浅拷贝即可。</summary>
+    public ContextSettings Clone() => (ContextSettings)MemberwiseClone();
 }

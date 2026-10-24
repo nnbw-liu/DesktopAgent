@@ -186,14 +186,14 @@ $env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
 
 1. **Header**：`HeaderContent` 参数放工作区（空聊天室）；上传的附件由 `ChatComposer` 追加在它下面，没有内容时整块不渲染、不占高度。
 2. **输入区**：`<textarea>` 多行输入，`field-sizing: content` 自动增高（上限 200px 后内部滚动）。
-3. **底部功能区**：左侧是「＋ 上传文件」和常用技能（每个 chip 左侧带一个字形图标，最多直接显示 3 个，超出的进「更多」，菜单里同样是「图标 + 名称 + 说明」）；右侧依次是**搜索**、**文件**两个可同时点亮的图标按钮、模型选择器、发送按钮。`IsGenerating` 为 true 时发送按钮切换为停止图标（`.is-stop`）。模型选择会记到设置里（`lastProviderId` / `lastModelId`），下次启动自动选中。
+3. **底部功能区**：左侧是「＋ 上传文件」和常用技能（每个 chip 左侧带一个字形图标，最多直接显示 3 个，超出的进「更多」，菜单里同样是「图标 + 名称 + 说明」）；右侧依次是**搜索**、**文件**两个可同时点亮的图标按钮、模型选择器、发送按钮。`IsGenerating` 为 true 时发送按钮切换为停止图标（`.is-stop`）。模型选择器按提供商分组，组头可收起 / 展开；选中后写入当前聊天室，`lastProviderId` / `lastModelId` 只作为新聊天室的兜底默认值。
 
 上传的附件会复制到 `%APPDATA%\SDemo\DesktopAgent\uploads\{sessionId}\`，显示在输入框 Header 里（新建聊天室时在工作区选择器下面）；发送后附件随消息持久化，消息气泡里也会显示。文本类附件（`.md` / `.txt` / `.json` / 常见代码后缀）会内联进模型上下文（单个最多 16K 字符、总量 48K），二进制附件只把名称 / 大小 / 路径告诉模型。也可以把文件直接**拖进输入框**：JS 把 drop 的文件写进 Blazor 的 file input，再走同一套上传逻辑。
 
 消息底部会显示元信息（`msg-meta`）：
 
-- 用户消息：时间 + 复制按钮。
-- 助手消息：时间、token 总量（同时显示输入 token，hover 显示输入 / 输出明细）、工具调用总次数（hover 显示每个工具的次数）、耗时、复制按钮、**分支按钮**（从这条消息复制上下文，生成一个新的聊天室）。
+- 用户消息：时间、复制按钮、删除按钮（确认后从聊天记录与后续上下文中移除）。
+- 助手消息：时间、token 总量（同时显示输入 token，hover 显示输入 / 输出明细）、工具调用总次数（hover 显示每个工具的次数）、耗时、复制按钮、删除按钮、**分支按钮**（从这条消息复制上下文，生成一个新的聊天室）。
 - token / 工具统计来自 `AgentRunMetrics`：token 从流式返回的 `UsageContent` 累加，工具次数由 `AgentToolbox` 在每次工具调用时计数。服务端没有返回 usage 时只显示耗时。
 
 输入为空时发送按钮禁用。键盘约定由 `js/composer.js` 处理（`document` 捕获阶段监听，元素重渲染后依然有效）：
@@ -218,6 +218,8 @@ $env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
 
 ## 数据存储
 
+设置分三层：通用（设置页）、工作区（侧栏工作区「⋯ → 工作区设置」）、聊天室（聊天室右上角齿轮）。每层只保存自己显式改过的项，未设置的项继续继承上级；优先级为 **聊天室 > 工作区 > 通用**。作用域行标题旁的感叹号会显示属性说明与上级当前值。
+
 设置与会话分开存：
 
 | 数据 | 位置 | 说明 |
@@ -229,7 +231,7 @@ $env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
 > 上表是 Windows 宿主的位置（WPF 与 MAUI-Windows 共用）。Android 宿主把根目录换成
 > `FileSystem.AppDataDirectory`，API Key 改用 AES-GCM（应用私有密钥文件），其余结构一致。
 
-- 两个表：`sessions`（Id / Title / Meta / WorkspaceId / IsPinned / UpdatedAt）和 `messages`（Id / SessionId / Order / Role / Content / Reasoning / AttachmentsJson / CreatedAt / DurationMs / InputTokens / OutputTokens / ToolCallsJson）；删除会话级联删除消息。附件文件本身在 `%APPDATA%\SDemo\DesktopAgent\uploads\{sessionId}\`，数据库只存路径与元信息。
+- 两个表：`sessions`（Id / Title / Meta / WorkspaceId / IsPinned / UpdatedAt / ScopedSettingsJson）和 `messages`（Id / SessionId / Order / Role / Content / Reasoning / AttachmentsJson / CreatedAt / DurationMs / InputTokens / OutputTokens / ToolCallsJson）；删除会话级联删除消息。附件文件本身在 `%APPDATA%\SDemo\DesktopAgent\uploads\{sessionId}\`，数据库只存路径与元信息。
 - 新建聊天室在发出第一条消息前不落库；首条消息写入时在对应库创建会话。
 - 用户消息立即写库；助手消息在流式结束（正常结束 / 停止 / 出错）后写一次，避免每个增量都落盘。
 - 置顶、重命名、删除会话都会立即写库；删除工作区时先把该库中的会话搬到 `history.db`（`WorkspaceId` 置空），再删除工作区 DB 文件。
@@ -244,7 +246,7 @@ $env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
 
 - 工作区分组标题右侧的 **＋**（`SidebarSection.HeaderAction`）添加工作区，点了打开系统文件夹选择框；同路径会复用已有工作区。
 - 点击工作区行：**该工作区还没有任何会话时，直接进入属于它的新建聊天室**（空工作区就是默认入口）；有会话时只是折叠 / 展开它下面的聊天室。
-- 工作区行 hover 出现「＋ 新建聊天室」和「⋯ 更多（重命名 / 删除）」；「＋」无论有没有会话都会新开一个聊天室。
+- 工作区行 hover 出现「＋ 新建聊天室」和「⋯ 更多（工作区设置 / 重命名 / 删除）」；「＋」无论有没有会话都会新开一个聊天室。「工作区设置」从右侧滑出，只作用于这个工作区，包含构建 / 测试命令、归档索引以及可继承的模型 / 上下文 / 工具执行覆盖。
 - 重命名只改显示名，不动目录；删除工作区不会删磁盘文件，它下面的会话回到「历史聊天」。
 - 在工作区里新建的聊天室，发送第一条消息后挂在该工作区下面（缩进一级，置顶的排最前）。
 

@@ -32,12 +32,13 @@
              OnArchiveSession="ArchiveSession"
              OnRenameSession="RenameSession"
              OnDeleteWorkspace="DeleteWorkspace"
-             OnRenameWorkspace="RenameWorkspace" />
+             OnRenameWorkspace="RenameWorkspace"
+             OnOpenWorkspaceSettings="OpenWorkspaceSettings" />
 
     <main class="main-area">
         @if (_view == MainView.Settings)
         {
-            <SettingsView InitialSection="_settingsSection" OnOpenSession="OpenSettingsSession" />
+            <SettingsView InitialSection="_settingsSection" />
         }
         else if (_activeSession is null)
         {
@@ -67,12 +68,30 @@
                       OnWorkspaceChanged="ChangeWorkspace"
                       OnPickWorkspace="PickWorkspace"
                       OnOpenSessionById="OpenSessionById"
+                      OnOpenSessionSettings="OpenSessionSettings"
                       OnArchiveChanged="OnArchiveChanged" />
         }
     </main>
 
     @* 审批宿主放在 AppShell 顶层：切换会话 / 页面时，待确认的请求不会跟着消失。 *@
     <ToolApprovalHost />
+
+    @* 工作区 / 聊天室设置：右侧滑出，只作用于当前作用域。 *@
+    @if (_settingsWorkspace is not null)
+    {
+        <ScopeSettingsDrawer Kind="ScopeSettingsKind.Workspace"
+                             Workspace="_settingsWorkspace"
+                             OnClose="CloseScopeSettings"
+                             OnOpenSession="OpenSettingsSession" />
+    }
+    else if (_sessionSettingsOpen && _activeSession is not null)
+    {
+        <ScopeSettingsDrawer Kind="ScopeSettingsKind.Chat"
+                             Session="_activeSession"
+                             OnClose="CloseScopeSettings"
+                             OnSessionChanged="PersistSession"
+                             OnOpenSession="OpenSettingsSession" />
+    }
 </div>
 
 @code {
@@ -93,6 +112,12 @@
     private MainView _view = MainView.Chat;
 
     private SettingsSection _settingsSection = SettingsSection.General;
+
+    /// <summary>当前打开设置抽屉的工作区；null 表示没有打开。</summary>
+    private Workspace? _settingsWorkspace;
+
+    /// <summary>当前聊天室设置抽屉是否打开。</summary>
+    private bool _sessionSettingsOpen;
 
     private IReadOnlyList<Workspace> Workspaces => Settings.Current.Workspaces;
 
@@ -156,6 +181,26 @@
             StateHasChanged();
         });
 
+    private void CloseScopeSettings()
+    {
+        _settingsWorkspace = null;
+        _sessionSettingsOpen = false;
+    }
+
+    /// <summary>侧栏工作区「更多 → 工作区设置」。</summary>
+    private void OpenWorkspaceSettings(Workspace workspace)
+    {
+        _sessionSettingsOpen = false;
+        _settingsWorkspace = workspace;
+    }
+
+    /// <summary>聊天室右上角的设置入口。</summary>
+    private void OpenSessionSettings()
+    {
+        _settingsWorkspace = null;
+        _sessionSettingsOpen = _activeSession is not null;
+    }
+
     /// <summary>新建聊天室：默认不归属任何工作区，进「历史聊天」。</summary>
     private void StartNewChat() => StartNewChat(null);
 
@@ -166,6 +211,7 @@
     private void StartNewChat(string? mountKey)
     {
         _view = MainView.Chat;
+        CloseScopeSettings();
 
         var session = ChatSession.CreateEmpty();
         if (!string.IsNullOrWhiteSpace(mountKey))
@@ -185,6 +231,7 @@
     private void NewChatInWorkspace(Workspace workspace)
     {
         _view = MainView.Chat;
+        CloseScopeSettings();
         _activeSession = ChatSession.CreateEmpty(workspace.Id);
         UpdateWorkspaceRoot();
     }
@@ -193,6 +240,7 @@
     private void OpenSession(ChatSession session)
     {
         _view = MainView.Chat;
+        CloseScopeSettings();
         _activeSession = session;
         UpdateWorkspaceRoot();
     }
@@ -246,6 +294,7 @@
     {
         _settingsSection = SettingsSection.General;
         _view = MainView.Settings;
+        CloseScopeSettings();
     }
 
     /// <summary>直接打开设置里的「模型设置」分区。</summary>
@@ -253,6 +302,7 @@
     {
         _settingsSection = SettingsSection.Models;
         _view = MainView.Settings;
+        CloseScopeSettings();
     }
 
     private async Task TogglePin(ChatSession session)
@@ -278,6 +328,7 @@
         if (ReferenceEquals(_activeSession, session))
         {
             _view = MainView.Chat;
+            CloseScopeSettings();
             _activeSession = ChatSession.CreateEmpty(session.WorkspaceId);
             UpdateWorkspaceRoot();
         }
@@ -318,6 +369,11 @@
 
         Settings.Current.Workspaces.Remove(workspace);
         Settings.Save();
+
+        if (ReferenceEquals(_settingsWorkspace, workspace))
+        {
+            _settingsWorkspace = null;
+        }
 
         // 内存里的会话跟着回到历史聊天（同时把尚未落库的最新内容补写进历史库）。
         foreach (var session in affected)
@@ -508,6 +564,7 @@
             Meta = "刚刚",
             WorkspaceId = source.WorkspaceId,
             UpdatedAt = DateTime.Now,
+            ScopedSettings = source.ScopedSettings.Clone(),
             Messages = branchMessages,
             Summary = keepSummary ? source.Summary : null,
             SummaryThroughOrder = keepSummary ? source.SummaryThroughOrder : 0,
@@ -520,6 +577,7 @@
         await ChatStore.SaveSessionAsync(branch);
 
         _view = MainView.Chat;
+        CloseScopeSettings();
         _activeSession = branch;
         UpdateWorkspaceRoot();
     }

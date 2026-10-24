@@ -16,14 +16,16 @@ public sealed record AgentRunRequest(
     string? SkillName = null,
     string SessionId = "",
     AgentRunMetrics? Metrics = null,
-    ChatSessionModel? Session = null);
+    ChatSessionModel? Session = null,
+    EffectiveSettings? Scope = null);
 
 /// <summary>手动「压缩现在」的输入。</summary>
 public sealed record AgentCompactRequest(
     ChatSessionModel Session,
     ModelProvider Provider,
     string ModelId,
-    string SessionId = "");
+    string SessionId = "",
+    EffectiveSettings? Scope = null);
 
 /// <summary>
 /// 应用层入口（§3.1）：负责「预算 → 压缩 / 裁剪 → 传输 → 校准 → 溢出重试」，
@@ -113,7 +115,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             return CompactionOutcome.Failure("摘要压缩未启用。");
         }
 
-        var settings = _settings.Current.Context ?? new ContextSettings();
+        var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
         var profile = _builder.ResolveProfile(new ContextBuildRequest(
             request.Provider,
             request.ModelId,
@@ -139,7 +141,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         ContextRunTelemetry telemetry,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var settings = _settings.Current.Context ?? new ContextSettings();
+        var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
         var statePackText = BuildStatePackText(request);
 
         // M4：先把本轮路由定下来（规则 / 小模型 + 回落），后面的预算、压缩重建与重试
@@ -304,7 +306,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         RoutingDecision? routing,
         CancellationToken cancellationToken)
     {
-        var settings = _settings.Current.Context ?? new ContextSettings();
+        var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
         var buildRequest = BuildRequest(request, scale, statePackText, routing);
 
         ContextPlan plan;
@@ -412,7 +414,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             return CompactionOutcome.NotNeeded("未启用压缩。");
         }
 
-        var settings = _settings.Current.Context ?? new ContextSettings();
+        var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
         var buildRequest = BuildRequest(request, scale, statePackText: null);
         var profile = _builder.ResolveProfile(buildRequest);
 
@@ -493,7 +495,8 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             StatePackText: statePackText,
             SummaryFallback: request.Session?.SummaryIsFallback ?? false,
             SkillIndexText: BuildSkillIndexText(request),
-            MemoryText: BuildMemoryText(request));
+            MemoryText: BuildMemoryText(request),
+            Scope: request.Scope);
 
         return build with { Routing = routing ?? RouteCapabilities(request, build) };
     }
@@ -504,7 +507,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
     /// </summary>
     private string? BuildSkillIndexText(AgentRunRequest request)
     {
-        var settings = _settings.Current.Agent ?? new AgentSettings();
+        var settings = request.Scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
         if (!settings.SkillIndexEnabled)
         {
             return null;
@@ -532,7 +535,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
     /// </summary>
     private string? BuildMemoryText(AgentRunRequest request)
     {
-        var settings = _settings.Current.Agent ?? new AgentSettings();
+        var settings = request.Scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
         if (!settings.WorkspaceMemoryEnabled || _memory is null)
         {
             return null;
@@ -584,7 +587,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             return RoutingDecision.Empty;
         }
 
-        var agent = _settings.Current.Agent ?? new AgentSettings();
+        var agent = request.Scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
         var profile = _builder.ResolveProfile(new ContextBuildRequest(
             request.Provider,
             request.ModelId,
@@ -658,7 +661,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         }
 
         var profile = _builder.ResolveProfile(build);
-        var agent = _settings.Current.Agent ?? new AgentSettings();
+        var agent = request.Scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
         var mode = AgentModeResolver.Resolve(profile, request.ModelId, agent.Mode);
         var (userInput, recent) = RoutingInputs(request);
 
@@ -700,7 +703,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         AgentRunRequest request,
         AgentSettings agent)
     {
-        var settings = _settings.Current.Context ?? new ContextSettings();
+        var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
         var providerId = string.IsNullOrWhiteSpace(agent.RoutingProviderId)
             ? settings.SummaryProviderId
             : agent.RoutingProviderId;
@@ -738,7 +741,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             return null;
         }
 
-        var settings = _settings.Current.Context ?? new ContextSettings();
+        var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
         if (!settings.StatePackEnabled)
         {
             return null;
@@ -798,7 +801,8 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         request.ToolPacks,
         request.SessionId,
         request.Metrics,
-        request.Session);
+        request.Session,
+        request.Scope);
 
     /// <summary>成功收尾：写回实际 usage 并做校准（服务端不返回 usage 时自动跳过）。</summary>
     private void CompleteRun(AgentRunRequest request, ContextPlan plan, ContextRunTelemetry telemetry)

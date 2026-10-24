@@ -14,4 +14,11 @@ public sealed class CheckpointSettings
     public bool Enabled { get; set; } = true;
 
     public int Keep { get; set; } = 20;
+
+    /// <summary>复制一份用于按作用域合并。</summary>
+    public CheckpointSettings Clone() => new()
+    {
+        Enabled = Enabled,
+        Keep = Keep
+    };
 }

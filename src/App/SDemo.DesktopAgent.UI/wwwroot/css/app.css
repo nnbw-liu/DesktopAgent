@@ -470,11 +470,20 @@ a {
 /* ---------- 聊天室 ---------- */
 
 .chat {
+    position: relative;
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
     min-width: 0;
     min-height: 0;
+}
+
+/* 空聊天室没有标题栏，右上角仍保留设置入口。 */
+.chat-empty-actions {
+    position: absolute;
+    top: 16px;
+    right: 24px;
+    z-index: 2;
 }
 
 /* 后台继续生成的聊天室仍挂载在 DOM 里，但不再占据视图。 */
@@ -5017,4 +5026,215 @@ a {
     color: var(--text-dim);
     font-size: 12px;
     line-height: 1.6;
+}
+
+/* ---------- 工作区 / 聊天室作用域设置抽屉 ---------- */
+.chat-settings-button .icon {
+    width: 14px;
+    height: 14px;
+}
+
+.scope-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    background: rgba(0, 0, 0, .32);
+}
+
+.scope-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 71;
+    display: flex;
+    flex-direction: column;
+    width: min(440px, 100vw);
+    border-left: 1px solid var(--border-strong);
+    background: var(--bg);
+    box-shadow: -18px 0 48px rgba(0, 0, 0, .28);
+    animation: sd-scope-drawer-in .18s ease-out;
+}
+
+@keyframes sd-scope-drawer-in {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+.scope-drawer-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 18px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.scope-drawer-heading {
+    min-width: 0;
+}
+
+.scope-drawer-heading h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.scope-drawer-heading p {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: 11.5px;
+    line-height: 1.55;
+}
+
+.scope-drawer-close {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.scope-drawer-close:hover {
+    border-color: var(--border);
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.scope-drawer-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 2px 18px 28px;
+    overflow-y: auto;
+}
+
+.scope-category {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.scope-category:last-child {
+    border-bottom: 0;
+}
+
+.scope-category-title {
+    margin: 0 0 4px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.scoped-row {
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--border);
+}
+
+.scoped-row:last-child {
+    border-bottom: 0;
+}
+
+.scoped-row-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.scoped-row-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--text-dim);
+    font-size: 12.5px;
+}
+
+.scoped-row-help {
+    display: inline-grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 15px;
+    height: 15px;
+    border: 1px solid var(--accent-border);
+    border-radius: 50%;
+    color: var(--accent-text);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: help;
+}
+
+.scoped-row-help:hover,
+.scoped-row-help:focus {
+    background: var(--accent-soft);
+    outline: none;
+}
+
+.scoped-row.is-overridden .scoped-row-title {
+    color: var(--text);
+}
+
+.scoped-row.is-overridden .scoped-row-title::after {
+    content: "";
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+.scoped-row-reset {
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent-text);
+    font-family: inherit;
+    font-size: 10.5px;
+    cursor: pointer;
+}
+
+.scoped-row-reset:hover {
+    text-decoration: underline;
+}
+
+.scoped-row-editor {
+    max-width: 280px;
+    margin-top: 7px;
+}
+
+.scoped-row-editor .field-input {
+    width: 100%;
+}
+
+.scope-model-select {
+    width: 100%;
+}
+
+.scope-memory-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.scope-memory-head .ghost-button {
+    padding: 4px 9px;
+    font-size: 11px;
+}
+
+@media (max-width: 520px) {
+    .scope-drawer {
+        width: 100vw;
+    }
 }

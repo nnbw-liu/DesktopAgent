@@ -78,6 +78,9 @@ public sealed class AgentSettings
     /// </summary>
     public int FullMaxToolCalls { get; set; } = 8;
 
+    /// <summary>复制一份用于按作用域合并；属性都是值类型，浅拷贝即可。</summary>
+    public AgentSettings Clone() => (AgentSettings)MemberwiseClone();
+
     /// <summary>按窗口解析本轮暴露上限；<paramref name="contextWindow"/> ≤0 视为未知（按 32K 档）。</summary>
     public int ResolveMaxExposedTools(int contextWindow)
     {

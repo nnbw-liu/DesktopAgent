@@ -129,4 +129,5 @@ public sealed record ContextBuildRequest(
     AgentModePreference? ModeOverride = null,
     RoutingDecision? Routing = null,
     string? SkillIndexText = null,
-    string? MemoryText = null);
+    string? MemoryText = null,
+    SDemo.DesktopAgent.Models.EffectiveSettings? Scope = null);

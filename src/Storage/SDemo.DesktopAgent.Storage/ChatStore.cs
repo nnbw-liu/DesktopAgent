@@ -248,6 +248,9 @@ public sealed class ChatStore
         record.PluginMemoryJson = session.PluginMemory.Count == 0
             ? null
             : JsonSerializer.Serialize(session.PluginMemory, JsonOptions);
+        record.ScopedSettingsJson = session.ScopedSettings.IsEmpty
+            ? null
+            : JsonSerializer.Serialize(session.ScopedSettings, JsonOptions);
 
         // 摘要覆盖范围超出当前消息数（删过消息 / 手工改库）：视为过期，归零后下次重算。
         if (session.SummaryThroughOrder < 0 || session.SummaryThroughOrder > session.Messages.Count)
@@ -564,6 +567,23 @@ public sealed class ChatStore
         }
     }
 
+    private static ScopedSettings DeserializeScopedSettings(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return new ScopedSettings();
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<ScopedSettings>(json, JsonOptions) ?? new ScopedSettings();
+        }
+        catch (JsonException)
+        {
+            return new ScopedSettings();
+        }
+    }
+
     private static ChatSession ToSession(SessionRecord record, string? workspaceId)
     {
         var session = new ChatSession
@@ -579,6 +599,7 @@ public sealed class ChatStore
             ActiveMountId = record.ActiveMountId,
             LastPluginId = record.LastPluginId,
             PluginMemory = DeserializePluginMemory(record.PluginMemoryJson),
+            ScopedSettings = DeserializeScopedSettings(record.ScopedSettingsJson),
             Summary = record.Summary,
             SummaryThroughOrder = record.SummaryThroughOrder,
             SummaryUpdatedAt = record.SummaryUpdatedAt,

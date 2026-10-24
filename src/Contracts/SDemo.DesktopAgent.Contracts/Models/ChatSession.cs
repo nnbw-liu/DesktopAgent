@@ -31,6 +31,9 @@ public sealed class ChatSession
     /// <summary>是否正在生成回复（运行期状态，不落库；左侧列表用于显示“推理中”）。</summary>
     public bool IsGenerating { get; set; }
 
+    /// <summary>只属于本聊天室的设置覆盖；null 字段继续继承工作区 / 通用设置。</summary>
+    public ScopedSettings ScopedSettings { get; set; } = new();
+
     /// <summary>这个会话是从哪个插件入口创建的（<c>&lt;pluginId&gt;/&lt;mountId&gt;</c>）；为空表示普通会话。</summary>
     public string? OriginMountId { get; set; }
 

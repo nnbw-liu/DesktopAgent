@@ -1,0 +1,42 @@
+@* 作用域设置的一行：默认不填；感叹号里带说明与上级值。 *@
+<div class="scoped-row @(IsOverridden ? "is-overridden" : null)">
+    <div class="scoped-row-head">
+        <span class="scoped-row-title">
+            @Title
+            <span class="scoped-row-help" tabindex="0" title="@HelpText" aria-label="@HelpText">!</span>
+        </span>
+
+        @if (IsOverridden)
+        {
+            <button type="button" class="scoped-row-reset" @onclick="() => OnReset.InvokeAsync()">恢复继承</button>
+        }
+    </div>
+
+    <div class="scoped-row-editor">
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>属性说明。</summary>
+    [Parameter]
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>上级设置值，已经格式化成「通用：xxx」的多行文本。</summary>
+    [Parameter]
+    public string InheritedText { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool IsOverridden { get; set; }
+
+    [Parameter]
+    public EventCallback OnReset { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string HelpText => string.Join('\n', Description, InheritedText);
+}

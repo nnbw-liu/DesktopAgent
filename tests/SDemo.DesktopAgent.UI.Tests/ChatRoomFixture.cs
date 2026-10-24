@@ -106,6 +106,7 @@ internal static class ChatRoomFixture
         context.Services.AddSingleton(settings);
         context.Services.AddSingleton(store);
         context.Services.AddSingleton<IVerificationRunner>(new UnavailableVerificationRunner());
+        context.Services.AddSingleton<IWorkspaceWarmupService>(new UnavailableWorkspaceWarmupService());
         context.Services.AddSingleton(runner);
         context.Services.AddSingleton<IToolApprovalService>(new ToolApprovalService());
         context.Services.AddSingleton(new AgentToolRegistry([]));

@@ -48,8 +48,10 @@ public sealed class ChatRoomInteractionTests : TestContext
         _settings.Current.LastProviderId = "local";
         _settings.Current.LastModelId = "qwen3.5-4b";
 
+        var session = new ChatSession { Id = "models", Title = "模型" };
+
         var cut = RenderComponent<ChatRoom>(parameters => parameters
-            .Add(component => component.Session, new ChatSession { Id = "models", Title = "模型" }));
+            .Add(component => component.Session, session));
 
         cut.Find(".model-picker-trigger").Click();
 
@@ -70,6 +72,33 @@ public sealed class ChatRoomInteractionTests : TestContext
 
         Assert.Empty(cut.FindAll(".model-picker-menu"));
         Assert.Contains("云端 · DeepSeek V3", cut.Find(".model-picker-current").TextContent);
+
+        // 底部选择器写入当前聊天室，而不是只改全局「上次使用」。
+        Assert.Equal("cloud", session.ScopedSettings.ProviderId);
+        Assert.Equal("deepseek-v3", session.ScopedSettings.ModelId);
+    }
+
+    [Fact]
+    public void 聊天室未设置模型时继承工作区模型()
+    {
+        _settings.Current.Workspaces.Add(new Workspace
+        {
+            Id = "w1",
+            Name = "工作区",
+            Path = _temp.Root,
+            ScopedSettings = new ScopedSettings
+            {
+                ProviderId = "test",
+                ModelId = "qwen3.5-4b"
+            }
+        });
+
+        var session = new ChatSession { Id = "inherit", Title = "继承", WorkspaceId = "w1" };
+
+        var cut = RenderComponent<ChatRoom>(parameters => parameters
+            .Add(component => component.Session, session));
+
+        Assert.Contains("本地 · qwen3.5-4b", cut.Find(".model-picker-current").TextContent);
     }
 
     [Fact]

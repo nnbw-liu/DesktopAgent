@@ -25,6 +25,8 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         session.Property(record => record.ActiveMountId);
         session.Property(record => record.LastPluginId);
         session.Property(record => record.PluginMemoryJson);
+        // 聊天室级设置覆盖；null 表示全部继承工作区 / 通用设置。
+        session.Property(record => record.ScopedSettingsJson);
         // M3：归档状态；知识库只索引已归档的工作区会话。
         session.Property(record => record.IsArchived);
         // P1 只建列（P2 才开始写入摘要）；老库由 ChatStore.RequiredColumns 补列。
@@ -96,6 +98,9 @@ public sealed class SessionRecord
 
     /// <summary>会话级插件记忆的 JSON，例如 {"translate/composer/target":"ja"}。</summary>
     public string? PluginMemoryJson { get; set; }
+
+    /// <summary>聊天室级设置覆盖（ScopedSettings）的 JSON；null 表示全部继承。</summary>
+    public string? ScopedSettingsJson { get; set; }
 
     /// <summary>滚动摘要正文；P1 只建列，P2 写入。</summary>
     public string? Summary { get; set; }

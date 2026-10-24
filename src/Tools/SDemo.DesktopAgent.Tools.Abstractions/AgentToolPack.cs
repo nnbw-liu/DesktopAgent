@@ -45,7 +45,8 @@ public sealed record ToolContext(
     string? TurnId = null,
     ISkillLibrary? Skills = null,
     string? WorkspaceId = null,
-    IWorkspaceMemory? Memory = null);
+    IWorkspaceMemory? Memory = null,
+    SDemo.DesktopAgent.Models.EffectiveSettings? Scope = null);
 
 /// <summary>
 /// 工具包：搜索 / 文件 / PowerShell 都从这里进工具链。
