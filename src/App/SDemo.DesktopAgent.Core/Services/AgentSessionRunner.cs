@@ -347,15 +347,17 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         try
         {
             var rebuilt = _builder.Build(BuildRequest(request, scale, statePackText, routing));
-            telemetry.Report = rebuilt.Report;
-            return rebuilt;
+            var report = WithSummaryUsage(rebuilt.Report, telemetry);
+            telemetry.Report = report;
+            return rebuilt with { Report = report };
         }
         catch (ContextBudgetException afterCompact)
         {
             // 近期轮次本身太大，摘要帮不上忙：这一轮仍按 L1 结果发送（摘要留给下一轮）。
-            telemetry.Report = plan.Report;
+            var report = WithSummaryUsage(plan.Report, telemetry);
+            telemetry.Report = report;
             telemetry.ContextNotice = afterCompact.Message;
-            return plan;
+            return plan with { Report = report };
         }
     }
 
@@ -380,12 +382,17 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         try
         {
             var rebuilt = _builder.Build(BuildRequest(request, scale, statePackText, routing));
-            telemetry.Report = rebuilt.Report;
-            return rebuilt;
+            var report = WithSummaryUsage(rebuilt.Report, telemetry);
+            telemetry.Report = report;
+            return rebuilt with { Report = report };
         }
         catch (ContextBudgetException again)
         {
-            telemetry.Report = again.Report;
+            if (again.Report is { } report)
+            {
+                telemetry.Report = WithSummaryUsage(report, telemetry);
+            }
+
             throw;
         }
     }
@@ -447,8 +454,22 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             telemetry.ContextNotice = outcome.Message;
         }
 
+        // R1.4：摘要的 token 成本累计进本轮报告（重试 / 多次压缩都会累加）。
+        telemetry.SummaryInputTokens += outcome.SummaryInputTokens;
+        telemetry.SummaryOutputTokens += outcome.SummaryOutputTokens;
+
         return outcome;
     }
+
+    /// <summary>把累计的摘要成本写进报告；没有摘要请求时保持原报告不变。</summary>
+    private static ContextReport WithSummaryUsage(ContextReport report, ContextRunTelemetry telemetry) =>
+        telemetry.SummaryInputTokens == 0 && telemetry.SummaryOutputTokens == 0
+            ? report
+            : report with
+            {
+                SummaryInputTokens = telemetry.SummaryInputTokens,
+                SummaryOutputTokens = telemetry.SummaryOutputTokens
+            };
 
     private ContextBuildRequest BuildRequest(
         AgentRunRequest request,

@@ -28,6 +28,12 @@ public sealed class ContextRunTelemetry
     /// <summary>给用户看的一句提示（溢出 / 需压缩 / 中途裁剪）；null 表示不用提示。</summary>
     public string? ContextNotice { get; set; }
 
+    /// <summary>R1.4：本次生成中摘要请求的累计输入 token（可能触发多次压缩 / 重试）。</summary>
+    public int SummaryInputTokens { get; set; }
+
+    /// <summary>R1.4：本次生成中摘要请求的累计输出 token。</summary>
+    public int SummaryOutputTokens { get; set; }
+
     /// <summary>记录一次中途裁剪。</summary>
     public void RecordMidTurnTrim()
     {

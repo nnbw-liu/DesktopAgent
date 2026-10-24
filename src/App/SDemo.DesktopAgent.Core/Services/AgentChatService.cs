@@ -96,6 +96,9 @@ public sealed class AgentChatService : IAgentChatService
     {
         telemetry ??= new ContextRunTelemetry { Plan = plan.Context, Report = plan.Context.Report };
 
+        // R1.4：本次生成期间真正上屏的审批都记到这个 metrics 上（含工具循环里的多次）。
+        using var approvalScope = ApprovalScope.Begin(plan.Metrics);
+
         // 每次 Run 生成一份工具上下文：会话 / 工作区都按这一次生成固定下来，
         // 单例工具包不会把上一个会话的上下文带进来。
         var context = new ToolContext(

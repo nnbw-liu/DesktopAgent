@@ -193,6 +193,27 @@ public sealed class ContextCompactorTests
         Assert.Equal(1, saves);
     }
 
+    [Fact]
+    public async Task 摘要token成本随压缩结果返回()
+    {
+        var session = BuildSession(20);
+        var text = SummaryOfLength(150).Text;
+        var summarizer = new FakeSummarizer(_ => new SummaryResult(
+            text,
+            UsedModel: true,
+            Tokens: 0,
+            Error: null,
+            InputTokens: 900,
+            OutputTokens: 120));
+
+        var outcome = await CreateCompactor(summarizer).EnsureAsync(Request(session, Settings()));
+
+        Assert.True(outcome.Compacted, outcome.Message);
+        Assert.Equal(1, summarizer.Calls);
+        Assert.Equal(900, outcome.SummaryInputTokens);
+        Assert.Equal(120, outcome.SummaryOutputTokens);
+    }
+
     private static SummaryResult SummaryOfLength(int length)
     {
         var body = string.Join(' ', Enumerable.Repeat("事实", Math.Max(1, length / 2)));

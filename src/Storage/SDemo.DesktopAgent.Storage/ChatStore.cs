@@ -1,4 +1,3 @@
-using System.Data.Common;
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
@@ -314,6 +313,9 @@ public sealed class ChatStore
             messageRecord.MemoryCitationsJson = message.MemoryCitations.Count == 0
                 ? null
                 : JsonSerializer.Serialize(message.MemoryCitations, JsonOptions);
+            messageRecord.ProviderId = message.ProviderId;
+            messageRecord.ModelId = message.ModelId;
+            messageRecord.ApprovalCount = message.ApprovalCount;
             messageRecord.IsPinned = message.IsPinned;
             keep.Add(message.Id);
         }
@@ -355,15 +357,16 @@ public sealed class ChatStore
         return new ChatDbContext(options);
     }
 
-    /// <summary>打开数据库并保证表结构是最新的（含轻量迁移）。</summary>
+    /// <summary>
+    /// 打开数据库并保证表结构是最新的：版本化迁移 + 老库基线化（见 <see cref="ChatDatabaseSchema"/>）。
+    /// </summary>
     private static async Task<ChatDbContext> OpenDatabaseAsync(string path, CancellationToken cancellationToken)
     {
         var db = CreateContext(path);
 
         try
         {
-            await db.Database.EnsureCreatedAsync(cancellationToken);
-            await UpgradeSchemaAsync(db, cancellationToken);
+            await ChatDatabaseSchema.PrepareAsync(db, cancellationToken);
             return db;
         }
         catch
@@ -371,125 +374,6 @@ public sealed class ChatStore
             await db.DisposeAsync();
             throw;
         }
-    }
-
-    /// <summary>
-    /// 轻量迁移：老库缺列时自动补上，避免升级后直接报 “no such column”。
-    /// 两张表各自维护列清单——新增列时只加在这里，不要再写「只扫 messages」的旧逻辑。
-    /// （表结构大改仍建议改用 EF 迁移。）
-    /// </summary>
-    private static readonly (string Table, (string Name, string Definition)[] Columns)[] RequiredColumns =
-    [
-        ("sessions",
-        [
-            ("OriginMountId", "TEXT NULL"),
-            ("ActiveMountId", "TEXT NULL"),
-            ("LastPluginId", "TEXT NULL"),
-            ("PluginMemoryJson", "TEXT NULL"),
-            // P1 建列、P2 写入；提前建好可以避免两期各改一次迁移。
-            ("Summary", "TEXT NULL"),
-            ("SummaryThroughOrder", "INTEGER NOT NULL DEFAULT 0"),
-            ("SummaryUpdatedAt", "TEXT NULL"),
-            ("SummaryTokens", "INTEGER NOT NULL DEFAULT 0"),
-            ("LastVerificationJson", "TEXT NULL"),
-            ("TodosJson", "TEXT NULL"),
-            // M3：归档状态（工作区知识库只索引 IsArchived = 1 的会话）。
-            ("IsArchived", "INTEGER NOT NULL DEFAULT 0")
-        ]),
-        ("messages",
-        [
-            ("AttachmentsJson", "TEXT NULL"),
-            ("CreatedAt", "TEXT NULL"),
-            ("DurationMs", "INTEGER NOT NULL DEFAULT 0"),
-            ("InputTokens", "INTEGER NOT NULL DEFAULT 0"),
-            ("OutputTokens", "INTEGER NOT NULL DEFAULT 0"),
-            ("ToolCallsJson", "TEXT NULL"),
-            ("PluginJson", "TEXT NULL"),
-            ("DerivedJson", "TEXT NULL"),
-            ("ToolTraceJson", "TEXT NULL"),
-            // M3：知识库引用（只用于界面跳转，不进入上下文）。
-            ("MemoryCitationsJson", "TEXT NULL"),
-            ("IsPinned", "INTEGER NOT NULL DEFAULT 0")
-        ])
-    ];
-
-    private static async Task UpgradeSchemaAsync(ChatDbContext db, CancellationToken cancellationToken)
-    {
-        var connection = db.Database.GetDbConnection();
-        await db.Database.OpenConnectionAsync(cancellationToken);
-
-        try
-        {
-            foreach (var (table, columns) in RequiredColumns)
-            {
-                await EnsureColumnsAsync(connection, table, columns, cancellationToken);
-            }
-
-            // M3：知识库 FTS5 表不参与 EF 模型；老库升级到这里时一并补建。
-            if (connection is SqliteConnection sqlite
-                && !ArchiveSchema.TableExists(sqlite, ArchiveSchema.FtsTable))
-            {
-                ArchiveSchema.TryEnsure(sqlite);
-            }
-        }
-        finally
-        {
-            await db.Database.CloseConnectionAsync();
-        }
-    }
-
-    private static async Task EnsureColumnsAsync(
-        DbConnection connection,
-        string table,
-        IReadOnlyList<(string Name, string Definition)> requiredColumns,
-        CancellationToken cancellationToken)
-    {
-        var existing = await ReadColumnsAsync(connection, table, cancellationToken);
-
-        // 表还不存在（空库 / 损坏库）时不在这里硬改，交给后续操作报明确错误。
-        if (existing.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var column in requiredColumns)
-        {
-            if (existing.Contains(column.Name, StringComparer.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            try
-            {
-                await using var alter = connection.CreateCommand();
-                alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column.Name} {column.Definition}";
-                await alter.ExecuteNonQueryAsync(cancellationToken);
-                existing.Add(column.Name);
-            }
-            catch (SqliteException ex) when (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
-            {
-                // 另一个进程刚好也补过这一列，忽略。
-            }
-        }
-    }
-
-    private static async Task<List<string>> ReadColumnsAsync(
-        DbConnection connection,
-        string table,
-        CancellationToken cancellationToken)
-    {
-        var columns = new List<string>();
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = $"SELECT name FROM pragma_table_info('{table}')";
-
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            columns.Add(reader.GetString(0));
-        }
-
-        return columns;
     }
 
     private static List<ChatAttachment> DeserializeAttachments(string? json)
@@ -718,6 +602,9 @@ public sealed class ChatStore
                     Derived = DeserializeDerived(message.DerivedJson),
                     ToolTrace = DeserializeToolTrace(message.ToolTraceJson),
                     MemoryCitations = DeserializeCitations(message.MemoryCitationsJson),
+                    ProviderId = message.ProviderId,
+                    ModelId = message.ModelId,
+                    ApprovalCount = message.ApprovalCount,
                     IsPinned = message.IsPinned
                 })
                 .ToList()

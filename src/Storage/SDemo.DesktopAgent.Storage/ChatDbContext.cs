@@ -59,6 +59,10 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         // M3：知识库引用（只用于界面跳转，不进入上下文）。
         message.Property(record => record.MemoryCitationsJson);
         message.Property(record => record.IsPinned);
+        // R1.4：按 provider / model 汇总成本，以及本轮真实审批次数。
+        message.Property(record => record.ProviderId);
+        message.Property(record => record.ModelId);
+        message.Property(record => record.ApprovalCount);
         message.HasIndex(record => record.SessionId);
     }
 }
@@ -158,4 +162,13 @@ public sealed class MessageRecord
 
     /// <summary>pin 标记；裁剪时永不淘汰。</summary>
     public bool IsPinned { get; set; }
+
+    /// <summary>R1.4：生成这条消息的 provider id（老数据为空）。</summary>
+    public string? ProviderId { get; set; }
+
+    /// <summary>R1.4：生成这条消息的模型 id（老数据为空）。</summary>
+    public string? ModelId { get; set; }
+
+    /// <summary>R1.4：本轮真实审批次数。</summary>
+    public int ApprovalCount { get; set; }
 }

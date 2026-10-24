@@ -122,8 +122,17 @@ internal static class Program
             StringComparison.OrdinalIgnoreCase);
         var results = new List<TaskResult>();
 
+        // R1：任务之间互相污染（A 改坏的测试会拖垮 D/E），按需在任务开始前还原 src/tests。
+        using var snapshot = string.Equals(
+            Environment.GetEnvironmentVariable("P5_ISOLATE"),
+            "1",
+            StringComparison.OrdinalIgnoreCase)
+            ? WorkspaceSnapshot.Create(root)
+            : null;
+
         foreach (var task in tasks)
         {
+            snapshot?.Restore();
             Console.WriteLine($"\n=== {task.Id}: {task.Title} ===");
             var session = ChatSession.CreateEmpty();
             var messages = new List<ChatMessage> { new(ChatMessageRole.User, task.Prompt) };
@@ -163,12 +172,24 @@ internal static class Program
                 var turnOutput = new StringBuilder();
                 var stopwatch = Stopwatch.StartNew();
 
+                // R1：4B 偶尔会退化成长时间不结束的生成；没有超时会让整轮评测挂死。
+                var turnTimeout = int.TryParse(
+                    Environment.GetEnvironmentVariable("P5_TIMEOUT"), out var configuredTimeout)
+                    && configuredTimeout > 0
+                        ? configuredTimeout
+                        : 240;
+                using var turnCts = new CancellationTokenSource(TimeSpan.FromSeconds(turnTimeout));
+
                 try
                 {
-                    await foreach (var delta in chat.RunAsync(tool))
+                    await foreach (var delta in chat.RunAsync(tool, telemetry: null, turnCts.Token))
                     {
                         turnOutput.Append(delta.Text);
                     }
+                }
+                catch (OperationCanceledException) when (turnCts.IsCancellationRequested)
+                {
+                    error = $"单轮超时（{turnTimeout}s），按失败处理。";
                 }
                 catch (Exception ex)
                 {
@@ -287,14 +308,14 @@ internal static class Program
         {
             "A" => new (string Path, string Token, string Label)[]
             {
-                (Path.Combine(root, "src", "SDemo.DesktopAgent.Core", "Models", "AppSettings.cs"),
+                (Path.Combine(root, "src", "Contracts", "SDemo.DesktopAgent.Contracts", "Models", "AppSettings.cs"),
                     "ShowToolCallDetails", "AppSettings.cs 缺 ShowToolCallDetails"),
-                (Path.Combine(root, "src", "SDemo.DesktopAgent.UI", "Components", "Settings", "GeneralSettings.razor"),
+                (Path.Combine(root, "src", "App", "SDemo.DesktopAgent.UI", "Components", "Settings", "GeneralSettings.razor"),
                     "ShowToolCallDetails", "GeneralSettings.razor 缺显示工具调用明细开关")
             },
             "B" => new (string Path, string Token, string Label)[]
             {
-                (Path.Combine(root, "src", "SDemo.DesktopAgent.Core", "Tools", "FileToolPack.cs"),
+                (Path.Combine(root, "src", "Tools", "SDemo.DesktopAgent.Tools.Files", "FileToolPack.cs"),
                     "maxEntries", "FileToolPack.cs 缺 maxEntries"),
                 (Path.Combine(root, "tests", "SDemo.DesktopAgent.Core.Tests", "FileToolPackTests.cs"),
                     "列出目录时按上限截断", "FileToolPackTests.cs 缺截断测试")
@@ -342,8 +363,8 @@ internal static class Program
             "设置页开关并落库",
             """
             任务 A：只改两个文件，用一次 apply_patch：
-            1. read_file src/SDemo.DesktopAgent.Core/Models/AppSettings.cs
-            2. read_file src/SDemo.DesktopAgent.UI/Components/Settings/GeneralSettings.razor
+            1. read_file src/Contracts/SDemo.DesktopAgent.Contracts/Models/AppSettings.cs
+            2. read_file src/App/SDemo.DesktopAgent.UI/Components/Settings/GeneralSettings.razor
             3. 在 AppSettings 增加 public bool ShowToolCallDetails { get; set; } = true;
                在 GeneralSettings 的通用页加一个“显示工具调用明细”开关，onchange 后 Settings.Save()。
             不要搜索、不要读其他文件、不要运行构建（宿主会验证）。最多 6 次工具调用。
@@ -353,7 +374,7 @@ internal static class Program
             "list_files 增加 maxEntries",
             """
             任务 B：只改两个文件：
-            src/SDemo.DesktopAgent.Core/Tools/FileToolPack.cs
+            src/Tools/SDemo.DesktopAgent.Tools.Files/FileToolPack.cs
             tests/SDemo.DesktopAgent.Core.Tests/FileToolPackTests.cs
             给 list_files 增加可选参数 maxEntries（默认 100，范围 1–500），只返回排序后的前 N 项；
             在 FileToolPackTests 增加一个名为“列出目录时按上限截断”的测试。用 apply_patch 修改，不要改其他文件，不要运行构建。
@@ -517,3 +538,4 @@ internal static class Program
         public string SandboxRoot => Path.Combine(DataRoot, "sandbox");
     }
 }
+

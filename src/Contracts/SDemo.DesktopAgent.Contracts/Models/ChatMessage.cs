@@ -33,6 +33,18 @@ public sealed class ChatMessage(ChatMessageRole role, string content)
     /// <summary>本次请求的输出 token（助手消息）。</summary>
     public int OutputTokens { get; set; }
 
+    /// <summary>
+    /// 生成这条消息的 provider / model（R1.4）。用于按 provider / model 汇总 token 成本；
+    /// 老消息没有这两个值时只统计 token，不估算金额。
+    /// </summary>
+    public string? ProviderId { get; set; }
+
+    /// <summary>生成这条消息的模型 id；见 <see cref="ProviderId"/>。</summary>
+    public string? ModelId { get; set; }
+
+    /// <summary>本轮真实的用户审批次数（不含评测的自动审批）。</summary>
+    public int ApprovalCount { get; set; }
+
     /// <summary>本次生成里各工具的调用次数，例如 web_search → 2。</summary>
     public Dictionary<string, int> ToolCalls { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 

@@ -1,0 +1,89 @@
+diff --git a/src/CommandLine/UnParserExtensions.cs b/src/CommandLine/UnParserExtensions.cs
+index e823a7f..10c861b 100644
+--- a/src/CommandLine/UnParserExtensions.cs
++++ b/src/CommandLine/UnParserExtensions.cs
+@@ -1,4 +1,4 @@
+-﻿// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
++// Copyright 2005-2015 Giacomo Stelluti Scala & Contributors. All rights reserved. See License.md in the project root for license information.
+ 
+ using System;
+ using System.Collections;
+@@ -321,19 +321,73 @@ namespace CommandLine
+                 return new string[0];
+ 
+             var inQuote = false;
+-            var chars = command.ToCharArray().Select(v =>
++            var current = new StringBuilder();
++            var args = new List<string>();
++
++            for (var i = 0; i < command.Length; i++)
+             {
++                var v = command[i];
++
++                if (v == '\\' && i + 1 < command.Length && command[i + 1] == '"')
++                {
++                    // An escaped quote is a plain character: it is neither a
++                    // grouping boundary nor a separator.
++                    current.Append('\\').Append('"');
++                    i++;
++                    continue;
++                }
++
+                 if (v == '"')
+                     inQuote = !inQuote;
+-                return !inQuote && v == ' ' ? '\n' : v;
+-            }).ToArray();
+ 
+-            return new string(chars).Split('\n')
+-                .Select(x => keepQuote ? x : x.Trim('"'))
++                if (!inQuote && v == ' ')
++                {
++                    args.Add(current.ToString());
++                    current.Clear();
++                    continue;
++                }
++
++                current.Append(v);
++            }
++            args.Add(current.ToString());
++
++            return args
++                .Select(x => keepQuote ? x : UnescapeQuotes(TrimUnescapedQuotes(x)))
+                 .Where(x => !string.IsNullOrWhiteSpace(x))
+                 .ToArray();
+         }
+ 
++        private static string TrimUnescapedQuotes(string value)
++        {
++            var start = 0;
++            var end = value.Length - 1;
++
++            while (start <= end && value[start] == '"' && !IsEscaped(value, start))
++                start++;
++
++            while (end >= start && value[end] == '"' && !IsEscaped(value, end))
++                end--;
++
++            if (start == 0 && end == value.Length - 1)
++                return value;
++
++            return start > end ? string.Empty : value.Substring(start, end - start + 1);
++        }
++
++        private static bool IsEscaped(string value, int index)
++        {
++            var backslashes = 0;
++            for (var i = index - 1; i >= 0 && value[i] == '\\'; i--)
++                backslashes++;
++
++            return backslashes % 2 == 1;
++        }
++
++        private static string UnescapeQuotes(string value)
++        {
++            return value.IndexOf('\\') < 0 ? value : value.Replace("\\\"", "\"");
++        }
++
+         #endregion
+ 
+     }

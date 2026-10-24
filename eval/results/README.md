@@ -9,6 +9,8 @@
 - `cloud-smoke/`：云端 T01 冒烟，用于确认 provider/Key/工具调用链路。
 - `p1/deepseek-v4.1-flash-32k/`：P1 重跑，云端 DeepSeek V4.1 Flash，32K Full，8/8（单轮）。
 - `p1/compact-8k/`：P1 重跑，Qwen3.5-4B，8K Compact，0/8（外部仓库仍非 8K 目标）。
+- `r1/`：R1.1 规模化验收。`summary.json` / `summary.md` 由 `tools/r1-validate` 生成（30 工具 schema / 20 技能索引 / 20 归档检索）。
+- `r1/8k-round1/`、`r1/8k-round2/`：R1 的 8K 单文件任务 A–E 双跑（Qwen3.5-4B / Compact）；`r1/32k-round1/`：云端 DeepSeek V4.1 Flash 的 32K 外部仓库任务（若配额不足，`verdict.json` 里会标注 `HTTP 429`，不能算模型失败）。
 
 每个任务目录：
 

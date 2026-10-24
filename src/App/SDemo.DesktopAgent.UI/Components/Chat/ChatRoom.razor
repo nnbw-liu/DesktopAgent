@@ -199,6 +199,11 @@
                                     <span class="msg-stat" title="@ToolTip(message)">工具 @message.ToolCalls.Values.Sum() 次</span>
                                 }
 
+                                @if (message.ApprovalCount > 0)
+                                {
+                                    <span class="msg-stat" title="本轮真正弹给你确认的审批次数">审批 @message.ApprovalCount 次</span>
+                                }
+
                                 @if (message.DurationMs > 0)
                                 {
                                     <span class="msg-stat">耗时 @FormatDuration(message.DurationMs)</span>
@@ -1370,6 +1375,12 @@
         }
     }
 
+    /// <summary>
+    /// 测试入口（R1.2）：bUnit 不渲染 WebView2 的输入框 JS 交互，
+    /// 直接走同一条 HandleSend → GenerateAsync 路径，用假 Runner 验证「无修改回灌」。
+    /// </summary>
+    internal Task SubmitForTestAsync(ComposerSubmission submission) => HandleSend(submission);
+
     /// <summary>这个插件的文本会发给模型服务商，且用户还没确认过。</summary>
     private bool NeedsPrivacyPrompt(PluginDescriptor? plugin) =>
         plugin is not null
@@ -1425,7 +1436,9 @@
         var userInput = history.LastOrDefault(message => message.Role == ChatMessageRole.User)?.Content ?? string.Empty;
         var reply = new ChatMessage(ChatMessageRole.Assistant, string.Empty)
         {
-            CreatedAt = DateTime.Now
+            CreatedAt = DateTime.Now,
+            ProviderId = option.Provider.Id,
+            ModelId = option.ModelId
         };
 
         // 普通推理开始：清空 LastPluginId，侧栏图标回到默认。
@@ -1565,6 +1578,8 @@
         var reply = new ChatMessage(ChatMessageRole.Assistant, string.Empty)
         {
             CreatedAt = DateTime.Now,
+            ProviderId = option.Provider.Id,
+            ModelId = option.ModelId,
             // 参数快照随消息落库：重开还能看到当时用的是什么语言。
             Plugin = new PluginMessageInfo(plugin.Id, mount.Id, capability.Id, values, null)
         };
@@ -1765,6 +1780,7 @@
         reply.DurationMs = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
         reply.InputTokens = metrics.InputTokens;
         reply.OutputTokens = metrics.OutputTokens;
+        reply.ApprovalCount = metrics.ApprovalCount;
 
         foreach (var pair in metrics.ToolCalls)
         {

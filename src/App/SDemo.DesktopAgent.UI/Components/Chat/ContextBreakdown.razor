@@ -48,6 +48,12 @@
         <p class="context-note">
             已压缩 @Report.CompactedMessages 条历史（摘要约 @ContextMeter.Format(Report.SummaryTokens) token）@(Report.SummaryFallback ? " · 自动摘要" : string.Empty)
         </p>
+        @if (Report.SummaryCostTokens > 0)
+        {
+            <p class="context-note">
+                摘要成本（累计）：输入 @ContextMeter.Format(Report.SummaryInputTokens) / 输出 @ContextMeter.Format(Report.SummaryOutputTokens) token
+            </p>
+        }
     }
     @if (Report.StatePackUsed)
     {

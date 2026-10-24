@@ -58,6 +58,15 @@ public sealed class ModelEntry
     /// </summary>
     public ModelProfile? Profile { get; set; }
 
+    /// <summary>
+    /// R1.4：输入价格（每百万 token，按服务商计价货币）。为空表示未配置，
+    /// 设置页只展示 token 用量、不估算金额。
+    /// </summary>
+    public decimal? InputPricePerMillion { get; set; }
+
+    /// <summary>R1.4：输出价格（每百万 token）。为空表示未配置。</summary>
+    public decimal? OutputPricePerMillion { get; set; }
+
     [JsonIgnore]
     public string Name => string.IsNullOrWhiteSpace(DisplayName) ? Id : DisplayName;
 }

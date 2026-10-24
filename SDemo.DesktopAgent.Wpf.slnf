@@ -28,7 +28,8 @@
       "src\\App\\SDemo.DesktopAgent.UI\\SDemo.DesktopAgent.UI.csproj",
       "src\\Platform\\SDemo.DesktopAgent.Windows\\SDemo.DesktopAgent.Windows.csproj",
       "src\\Sandbox\\SDemo.DesktopAgent.SandboxHost\\SDemo.DesktopAgent.SandboxHost.csproj",
-      "src\\Hosts\\Wpf\\SDemo.DesktopAgent.csproj"
+      "src\\Hosts\\Wpf\\SDemo.DesktopAgent.csproj",
+      "tests\\SDemo.DesktopAgent.UI.Tests\\SDemo.DesktopAgent.UI.Tests.csproj"
     ]
   }
 }

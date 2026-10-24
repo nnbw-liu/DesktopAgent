@@ -1,0 +1,88 @@
+{
+  "id": "T05",
+  "type": "tests",
+  "title": "\u8865\u9F50 PreferShortName \u53CD\u89E3\u6790\u6D4B\u8BD5",
+  "success": false,
+  "steps": 6,
+  "turns": 1,
+  "seconds": 5.4,
+  "error": "HTTP 429 (TooManyRequests: AccountQuotaExceeded)\r\n\r\nYou have exceeded the weekly usage quota. It will reset at 2026-10-26 00:00:00 \u002B0800 CST. We recommend upgrading your plan for more quota, or waiting for the reset. Request id: 0217927687563674d9266badd4680e9e72735e419b86df3df7023",
+  "acceptanceExit": 0,
+  "acceptanceOutput": "\u003E dotnet build CommandLine.sln -v minimal\r\nActive code page: 65001\r\n  \u6B63\u5728\u786E\u5B9A\u8981\u8FD8\u539F\u7684\u9879\u76EE\u2026\r\n  \u6240\u6709\u9879\u76EE\u5747\u662F\u6700\u65B0\u7684\uFF0C\u65E0\u6CD5\u8FD8\u539F\u3002\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\src\\CommandLine\\bin\\Debug\\net45\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\src\\CommandLine\\bin\\Debug\\net461\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\src\\CommandLine\\bin\\Debug\\netstandard2.0\\CommandLine.dll\r\n  CommandLine -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\src\\CommandLine\\bin\\Debug\\net40\\CommandLine.dll\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\tests\\CommandLine.Tests\\Unit\\Core\\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=net461]\r\n  CommandLine.Tests -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\tests\\CommandLine.Tests\\bin\\Debug\\net461\\CommandLine.Tests.dll\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\tests\\CommandLine.Tests\\Unit\\Core\\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=netcoreapp3.1]\r\n  CommandLine.Tests -\u003E C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\tests\\CommandLine.Tests\\bin\\Debug\\netcoreapp3.1\\CommandLine.Tests.dll\r\n  \u5305 CommandLineParser.0.0.0 \u7F3A\u5C11\u81EA\u8FF0\u6587\u4EF6\u3002\u8F6C\u5230 https://aka.ms/nuget/authoring-best-practices/readme \u4E86\u89E3\u4E3A\u4EC0\u4E48\u5305\u9605\u8BFB\u4E3B\u9898\u5F88\u91CD\u8981\u3002\r\n  \u5DF2\u6210\u529F\u521B\u5EFA\u5305\u201CC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\src\\CommandLine\\bin\\Debug\\CommandLineParser.0.0.0.nupkg\u201D\u3002\r\n  \u5DF2\u6210\u529F\u521B\u5EFA\u5305\u201CC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\src\\CommandLine\\bin\\Debug\\CommandLineParser.0.0.0.snupkg\u201D\u3002\r\n\r\n\u5DF2\u6210\u529F\u751F\u6210\u3002\r\n\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\tests\\CommandLine.Tests\\Unit\\Core\\GetoptTokenizerTests.cs(93,13): warning xUnit2013: Do not use Assert.Equal() to check for collection size. (https://xunit.github.io/xunit.analyzers/rules/xUnit2013) [C:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\tests\\CommandLine.Tests\\CommandLine.Tests.csproj::TargetFramework=net461]\r\nC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\\tests\\CommandLine.Tests\\Unit\\Core\\GetoptTokenizerTests.cs(93,13): warning xUnit2\u2026",
+  "checkFailure": "\u6587\u4EF6 tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u672A\u5305\u542B\u9A8C\u6536\u6A21\u5F0F\uFF1AAgentEval_PreferShortName_UsesShortWhenAvailable",
+  "failureClass": "F5 \u8FC7\u65E9\u7ED3\u675F",
+  "trace": [
+    {
+      "toolId": "workspace_info",
+      "status": "ok",
+      "argsDigest": "",
+      "summary": "[TOOL_RESULT_BEGIN:workspace_info]\n\u5DE5\u4F5C\u533A\u6839\u76EE\u5F55\uFF1AC:\\Users\\12105\\AppData\\Local\\Temp\\agent-eval\\deepseek-v4.1-flash-32k-20261023-231536\n\u6D4B\u8BD5\u9879\u76EE\uFF1Atests/CommandLine.Tests/CommandLine.Tests.csproj\n\u6D4B\u8BD5\u7C7B\u4EFB\u52A1\u4F18\u5148\u6539\u4E0A\u8FF0\u9879\u76EE\u4E0B\u7684\u6D4B\u8BD5\u6587\u4EF6\uFF1B\u4E0D\u8981\u6539\u4EA7\u54C1\u4EE3\u7801\uFF0C\u9664\u975E\u4EFB\u52A1\u660E\u786E\u8981\u6C42\u3002\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "list_files",
+      "status": "ok",
+      "argsDigest": ".",
+      "summary": "[TOOL_RESULT_BEGIN:list_files]\n[\u6587\u4EF6] .editorconfig (368 \u5B57\u8282)\n[\u6587\u4EF6] .git (101 \u5B57\u8282)\n[\u6587\u4EF6] .gitignore (573 \u5B57\u8282)\n[\u6587\u4EF6] appveyor.yml (1413 \u5B57\u8282)\n[\u76EE\u5F55] art\n[\u6587\u4EF6] CHANGELOG.md (13242 \u5B57\u8282)\n[\u6587\u4EF6] CommandLine.sln (2043 \u5B57\u8282)\n[\u6587\u4EF6] CommandLine.snk (596 \u5B57\u8282)\n[\u76EE\u5F55] demo\n[\u6587\u4EF6] Directory.Build.props (954 \u5B57\u8282)\n[\u76EE\u5F55] docs\n[\u6587\u4EF6] License.md (1132 \u5B57\u8282)\n[\u6587\u4EF6] README.md (12730 \u5B57\u8282)\n[\u76EE\u5F55] src\n[\u76EE\u5F55] tests\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "glob_files",
+      "status": "ok",
+      "argsDigest": "**/*Unparser*",
+      "summary": "[TOOL_RESULT_BEGIN:glob_files]\nsrc/CommandLine/UnParserExtensions.cs\ntests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "search_files",
+      "status": "ok",
+      "argsDigest": "PreferShortName",
+      "summary": "[TOOL_RESULT_BEGIN:search_files]\n\u627E\u5230 6 \u6761\u5339\u914D\uFF082 \u4E2A\u6587\u4EF6\uFF0C\u6700\u591A\u663E\u793A 80 \u6761\uFF09\uFF1A\r\nsrc/CommandLine/Text/HelpText.cs:741:                                 config.PreferShortName = s.PreferShortName;\nsrc/CommandLine/UnParserE \u2026 etter.Set(Consumed, ref preferShortName, value); }\nsrc/CommandLine/UnParserExtensions.cs:269:             var longName = (optionSpec.LongName.Length \u003E 0 \u0026\u0026 !settings.PreferShortName)\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "src/CommandLine/UnParserExtensions.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# src/CommandLine/UnParserExtensions.cs \u00B7 \u5171 340 \u884C \u00B7 \u672C\u6B21 1\u2013340\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All rights reserved. See License.md in th \u2026 im(\u0027\u0022\u0027))\n 333|                 .Where(x =\u003E !string.IsNullOrWhiteSpace(x))\n 334|                 .ToArray();\n 335|         }\n 336| \n 337|         #endregion\n 338| \n 339|     }\n 340| }\n[TOOL_RESULT_END]"
+    },
+    {
+      "toolId": "read_file",
+      "status": "ok",
+      "argsDigest": "tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs",
+      "summary": "[TOOL_RESULT_BEGIN:read_file]\n# tests/CommandLine.Tests/Unit/UnParserExtensionsTests.cs \u00B7 \u5171 442 \u884C \u00B7 \u672C\u6B21 1\u201380 \u00B7 \u63A5\u7EED\u7528 offset=81\n   1| // Copyright 2005-2015 Giacomo Stelluti Scala \u0026 Contributors. All righ \u2026 esult)\n  75|         {\n  76|             new Parser()\n  77|                 .FormatCommandLine(options)\n  78|                 .Should().BeEquivalentTo(result);\n  79|         }\n  80| \n[TOOL_RESULT_END]"
+    }
+  ],
+  "routing": [
+    {
+      "turn": 1,
+      "source": "rules",
+      "exposed": [
+        "read_file",
+        "search_files",
+        "apply_patch",
+        "run_command",
+        "todo_write",
+        "replace_text",
+        "write_file",
+        "list_files",
+        "list_tree",
+        "glob_files",
+        "workspace_info",
+        "search_capabilities"
+      ],
+      "called": [
+        "glob_files",
+        "list_files",
+        "read_file",
+        "search_files",
+        "workspace_info"
+      ],
+      "unusedExposed": [
+        "apply_patch",
+        "run_command",
+        "todo_write",
+        "replace_text",
+        "write_file",
+        "list_tree",
+        "search_capabilities"
+      ]
+    }
+  ]
+}

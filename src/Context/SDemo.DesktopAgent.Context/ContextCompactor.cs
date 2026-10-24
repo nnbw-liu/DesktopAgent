@@ -22,7 +22,9 @@ public sealed record CompactionOutcome(
     int ThroughOrder = 0,
     bool UsedFallback = false,
     bool Failed = false,
-    string? Error = null)
+    string? Error = null,
+    int SummaryInputTokens = 0,
+    int SummaryOutputTokens = 0)
 {
     public static CompactionOutcome NotNeeded(string message) => new(false, message);
 
@@ -118,6 +120,8 @@ public sealed class ContextCompactor
         var summary = session.Summary ?? string.Empty;
         var usedFallback = false;
         string? lastError = null;
+        var summaryInputTokens = 0;
+        var summaryOutputTokens = 0;
 
         foreach (var (batch, batchStart) in SplitByTokens(chunk, chunkStart, inputMaxTokens))
         {
@@ -136,6 +140,10 @@ public sealed class ContextCompactor
             var result = _summarizer is null
                 ? SummaryResult.Failed("未配置摘要模型")
                 : await _summarizer.SummarizeAsync(summaryRequest, cancellationToken).ConfigureAwait(false);
+
+            // R1.4：模型摘要的真实成本按批累计（兜底不调用模型，成本为 0）。
+            summaryInputTokens += result.InputTokens;
+            summaryOutputTokens += result.OutputTokens;
 
             if (result.Ok)
             {
@@ -201,7 +209,9 @@ public sealed class ContextCompactor
             SummaryTokens: summaryTokens,
             ThroughOrder: keepFrom,
             UsedFallback: session.SummaryIsFallback,
-            Error: lastError);
+            Error: lastError,
+            SummaryInputTokens: summaryInputTokens,
+            SummaryOutputTokens: summaryOutputTokens);
     }
 
     /// <summary>
