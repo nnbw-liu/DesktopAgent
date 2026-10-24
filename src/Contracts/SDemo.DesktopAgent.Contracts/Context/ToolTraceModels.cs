@@ -16,8 +16,11 @@ public sealed record ToolTraceEntry(
     // 这次工具调用发生时，已经产生了多少思维链 / 正文字符。用于重开会话时还原本「思考→工具→思考」的步骤顺序；
     // -1 表示旧记录没有这个信息。
     int ReasoningChars = -1,
-    int TextChars = -1)
+    int TextChars = -1,
+    // 本次工具调用的关联 id；运行中的条目在结果返回后按它原地替换。
+    string? CallId = null)
 {
+    public const string StatusRunning = "running";
     public const string StatusOk = "ok";
     public const string StatusError = "error";
     public const string StatusRejected = "rejected";

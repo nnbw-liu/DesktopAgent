@@ -539,6 +539,15 @@
         {
             <div class="composer-usage">
                 <ContextMeter Report="_contextPreview" />
+                <span class="chat-token-total"
+                      title="@($"本聊天室累计 {ContextMeter.Format(ChatTotalTokens)} tokens{Environment.NewLine}输入 {ContextMeter.Format(ChatInputTokens)} / 输出 {ContextMeter.Format(ChatOutputTokens)}")">
+                    <svg class="chat-token-icon" viewBox="0 0 16 16" aria-hidden="true">
+                        <ellipse cx="8" cy="4.4" rx="4.4" ry="1.7" fill="none" stroke="currentColor" stroke-width="1.1" />
+                        <path d="M3.6 4.4v3.2c0 .94 1.97 1.7 4.4 1.7s4.4-.76 4.4-1.7V4.4M3.6 7.6v3.2c0 .94 1.97 1.7 4.4 1.7s4.4-.76 4.4-1.7V7.6"
+                              fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+                    </svg>
+                    <span>@ContextMeter.Format(ChatTotalTokens)</span>
+                </span>
             </div>
         }
     </div>
@@ -804,6 +813,15 @@
     private const string HostPromptPrefix = "[宿主提示]";
 
     private bool IsEmpty => Session.Messages.Count == 0;
+
+    /// <summary>本聊天室所有助手消息累计的输入 token。</summary>
+    private int ChatInputTokens => Session.Messages.Sum(message => message.InputTokens);
+
+    /// <summary>本聊天室所有助手消息累计的输出 token。</summary>
+    private int ChatOutputTokens => Session.Messages.Sum(message => message.OutputTokens);
+
+    /// <summary>本聊天室累计 token（输入 + 输出）。</summary>
+    private int ChatTotalTokens => ChatInputTokens + ChatOutputTokens;
 
     protected override void OnInitialized()
     {
@@ -2301,12 +2319,8 @@
             reply.ToolCalls[pair.Key] = reply.ToolCalls.GetValueOrDefault(pair.Key) + pair.Value;
         }
 
-        // 流式过程中已经同步过的条目跳过，只补回合末才出现的。
-        for (var index = reply.ToolTrace.Count - traceBaseline; index < metrics.ToolTrace.Count; index++)
-        {
-            reply.ToolTrace.Add(metrics.ToolTrace[index]);
-            reply.Steps.Add(new ChatStep(ChatStepKind.Tool, string.Empty, reply.ToolTrace.Count - 1));
-        }
+        // 回合末再同步一次：补上中途没推到的条目，并把还在 running 的轨迹收成最终状态。
+        SyncTrace(reply, metrics, traceBaseline);
 
         foreach (var citation in metrics.Citations)
         {
@@ -2355,18 +2369,24 @@
     /// <param name="baseline">这一轮开始时消息上已有的轨迹条数（宿主追问会开新一轮，但不该重复插步骤）。</param>
     private static void SyncTrace(ChatMessage reply, AgentRunMetrics metrics, int baseline)
     {
-        var target = baseline + metrics.ToolTrace.Count;
-
-        while (reply.ToolTrace.Count < target)
+        // 工具开始 / 结束时都会推一次增量：已有条目原地更新（running → 成功 / 失败），
+        // 新条目才追加，这样「运行中」能立刻出现在时间线里。
+        for (var sourceIndex = 0; sourceIndex < metrics.ToolTrace.Count; sourceIndex++)
         {
-            var sourceIndex = reply.ToolTrace.Count - baseline;
+            var targetIndex = baseline + sourceIndex;
+            var entry = metrics.ToolTrace[sourceIndex];
 
-            if (sourceIndex < 0 || sourceIndex >= metrics.ToolTrace.Count)
+            if (targetIndex < reply.ToolTrace.Count)
             {
-                break;
+                if (!Equals(reply.ToolTrace[targetIndex], entry))
+                {
+                    reply.ToolTrace[targetIndex] = entry;
+                }
+
+                continue;
             }
 
-            reply.ToolTrace.Add(metrics.ToolTrace[sourceIndex]);
+            reply.ToolTrace.Add(entry);
             reply.Steps.Add(new ChatStep(ChatStepKind.Tool, string.Empty, reply.ToolTrace.Count - 1));
         }
     }

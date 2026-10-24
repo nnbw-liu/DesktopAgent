@@ -1,0 +1,120 @@
+@inject UsageCostService UsageCost
+
+@* 应用内弹窗：按 provider / model 汇总已落库的 token 与成本。 *@
+<div class="modal-backdrop" @onclick="CloseAsync">
+    <div class="modal modal--usage" role="dialog" aria-modal="true" aria-label="用量与成本" @onclick:stopPropagation="true">
+        <header class="usage-dialog-head">
+            <div>
+                <h2 class="modal-title">用量与成本</h2>
+                <p class="modal-sub">
+                    按提供商 / 模型汇总已落库的助手消息。金额依赖模型条目里的每百万 token 单价，未配置时只显示 token。
+                </p>
+            </div>
+            <button type="button" class="usage-dialog-close" title="关闭" @onclick="CloseAsync">✕</button>
+        </header>
+
+        @if (_usage is null)
+        {
+            <p class="settings-section-hint">统计中…</p>
+        }
+        else
+        {
+            <div class="usage-summary">
+                <div class="usage-kpi">
+                    <span class="usage-kpi-label">总调用</span>
+                    <strong>@_usage.TotalCalls</strong>
+                </div>
+                <div class="usage-kpi">
+                    <span class="usage-kpi-label">输入 token</span>
+                    <strong>@ContextMeter.Format(_usage.TotalInputTokens)</strong>
+                </div>
+                <div class="usage-kpi">
+                    <span class="usage-kpi-label">输出 token</span>
+                    <strong>@ContextMeter.Format(_usage.TotalOutputTokens)</strong>
+                </div>
+                <div class="usage-kpi">
+                    <span class="usage-kpi-label">合计金额</span>
+                    <strong>@(_usage.TotalCost is decimal total ? total.ToString("0.####") : "部分未配价")</strong>
+                </div>
+            </div>
+
+            @if (_usage.Lines.Count == 0)
+            {
+                <p class="settings-section-hint">还没有带模型归属的用量记录。</p>
+            }
+            else
+            {
+                <div class="usage-table">
+                    <div class="usage-row usage-row--head">
+                        <span>提供商 / 模型</span>
+                        <span>调用</span>
+                        <span>输入</span>
+                        <span>输出</span>
+                        <span>金额</span>
+                    </div>
+                    @foreach (var line in _usage.Lines)
+                    {
+                        <div class="usage-row">
+                            <span class="usage-model" title="@($"{line.ProviderId} · {line.ModelId}")">@line.ProviderId · @line.ModelId</span>
+                            <span>@line.Calls</span>
+                            <span>@ContextMeter.Format(line.InputTokens)</span>
+                            <span>@ContextMeter.Format(line.OutputTokens)</span>
+                            <span>@(line.Priced ? line.Cost?.ToString("0.####") : "未配价")</span>
+                        </div>
+                    }
+                    <div class="usage-row usage-row--total">
+                        <span>合计（@_usage.SessionsScanned 个会话）</span>
+                        <span>@_usage.TotalCalls</span>
+                        <span>@ContextMeter.Format(_usage.TotalInputTokens)</span>
+                        <span>@ContextMeter.Format(_usage.TotalOutputTokens)</span>
+                        <span>@(_usage.TotalCost is decimal totalCost ? totalCost.ToString("0.####") : "部分模型未配价")</span>
+                    </div>
+                </div>
+
+                @if (_usage.CallsWithoutProvider > 0)
+                {
+                    <p class="settings-section-hint">
+                        另有 @_usage.CallsWithoutProvider 条旧消息没有 provider / model 归属，只计入会话总数、不参与金额。
+                    </p>
+                }
+            }
+        }
+
+        <div class="modal-actions">
+            <button type="button" class="ghost-button" disabled="@_loading" @onclick="LoadAsync">
+                @(_loading ? "统计中…" : "刷新用量")
+            </button>
+            <button type="button" class="primary-button" @onclick="CloseAsync">关闭</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private UsageCostSummary? _usage;
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+
+        try
+        {
+            _usage = await UsageCost.SummarizeAsync();
+        }
+        catch (Exception)
+        {
+            _usage ??= UsageCostSummary.Empty;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task CloseAsync() => OnClose.InvokeAsync();
+}

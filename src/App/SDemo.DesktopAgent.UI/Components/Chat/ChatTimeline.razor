@@ -114,11 +114,13 @@
     {
         ToolTraceEntry.StatusError => "is-error",
         ToolTraceEntry.StatusDenied or ToolTraceEntry.StatusRejected => "is-rejected",
+        ToolTraceEntry.StatusRunning => "is-running",
         _ => "is-ok"
     };
 
     private static string ToolStatus(ToolTraceEntry entry) => entry.Status switch
     {
+        ToolTraceEntry.StatusRunning => "运行中…",
         ToolTraceEntry.StatusOk => entry.ExitCode is 0 or null ? "成功" : $"退出码 {entry.ExitCode}",
         ToolTraceEntry.StatusError => entry.ExitCode is int code ? $"失败（{code}）" : "失败",
         ToolTraceEntry.StatusRejected => "已拒绝",

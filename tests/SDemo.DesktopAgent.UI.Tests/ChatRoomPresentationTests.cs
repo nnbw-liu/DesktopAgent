@@ -125,6 +125,33 @@ public sealed class ChatRoomPresentationTests : TestContext
     }
 
     [Fact]
+    public void 工具执行中立即显示运行中()
+    {
+        var session = new ChatSession { Id = "tool-running", Title = "运行中" };
+        session.Messages.Add(new ChatMessageModel(ChatMessageRole.User, "跑一下测试"));
+
+        var reply = new ChatMessageModel(ChatMessageRole.Assistant, string.Empty);
+        reply.ToolTrace.Add(new ToolTraceEntry(
+            "run_powershell",
+            ToolTraceEntry.StatusRunning,
+            null,
+            "dotnet test",
+            null,
+            0,
+            DateTime.Now,
+            ReasoningChars: 0,
+            TextChars: 0));
+        session.Messages.Add(reply);
+
+        var cut = RenderComponent<ChatRoom>(parameters => parameters
+            .Add(component => component.Session, session));
+
+        var toolStep = cut.Find(".timeline-step--tool");
+        Assert.Contains("运行中", toolStep.TextContent, StringComparison.Ordinal);
+        Assert.Contains("is-running", toolStep.ClassList);
+    }
+
+    [Fact]
     public void 步骤时间线按思考与工具交替渲染()
     {
         var session = new ChatSession { Id = "timeline", Title = "时间线" };

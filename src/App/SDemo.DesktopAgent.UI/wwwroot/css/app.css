@@ -382,6 +382,27 @@ a {
 }
 
 /* 正在生成回复的会话 */
+/* 会话过多时：展开 / 收起其余对话 */
+.session-show-more {
+    display: block;
+    width: calc(100% - 8px);
+    margin: 2px 4px;
+    padding: 6px 10px 6px 30px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 11px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.session-show-more:hover {
+    background: var(--surface-hover);
+    color: var(--text-dim);
+}
+
 .session-thinking {
     display: inline-flex;
     align-items: center;
@@ -832,7 +853,8 @@ a {
 .composer-usage {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: center;
+    gap: 10px;
     width: 100%;
     max-width: 760px;
     margin: 6px auto 0;
@@ -844,6 +866,26 @@ a {
     height: 24px;
     padding: 0 6px 0 4px;
     font-size: 10.5px;
+}
+
+.chat-token-total {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+    padding-left: 10px;
+    border-left: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    cursor: default;
+}
+
+.chat-token-icon {
+    width: 12px;
+    height: 12px;
+    opacity: .8;
 }
 
 /* ---------- 多功能组合输入框 ---------- */
@@ -4893,6 +4935,12 @@ a {
     color: #d68945;
 }
 
+/* 工具已开始、结果未回：不占用完成计数，状态持续闪烁。 */
+.tool-trace-row.is-running .tool-trace-status {
+    color: var(--accent-text);
+    animation: sd-reasoning-pulse 1.2s ease-in-out infinite;
+}
+
 .tool-trace-summary {
     overflow: hidden;
     color: var(--muted);
@@ -4937,6 +4985,15 @@ a {
 
 .timeline-step--tool.is-rejected {
     border-left-color: #d68945;
+}
+
+.timeline-step--tool.is-running {
+    border-left-color: var(--accent);
+}
+
+.timeline-step--tool.is-running .timeline-tool-status {
+    color: var(--accent-text);
+    animation: sd-reasoning-pulse 1.2s ease-in-out infinite;
 }
 
 .timeline-tool-caret {
@@ -5236,5 +5293,76 @@ a {
 @media (max-width: 520px) {
     .scope-drawer {
         width: 100vw;
+    }
+}
+
+/* ---------- 用量与成本弹窗 ---------- */
+.modal--usage {
+    width: min(760px, 94vw);
+}
+
+.usage-dialog-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.usage-dialog-head .modal-sub {
+    margin-bottom: 14px;
+}
+
+.usage-dialog-close {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.usage-dialog-close:hover {
+    border-color: var(--border);
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.usage-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.usage-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-hover);
+}
+
+.usage-kpi-label {
+    color: var(--muted);
+    font-size: 10.5px;
+}
+
+.usage-kpi strong {
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 620px) {
+    .usage-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }

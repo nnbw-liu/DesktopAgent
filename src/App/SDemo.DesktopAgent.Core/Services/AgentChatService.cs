@@ -169,8 +169,12 @@ public sealed class AgentChatService : IAgentChatService
         var emittedText = 0;
         var emittedReasoning = 0;
 
-        await foreach (var evt in _runtime.StreamAsync(invocation, cancellationToken))
+        try
         {
+            await foreach (var evt in _runtime.StreamAsync(invocation, cancellationToken))
+            {
+                var toolChanged = false;
+
             switch (evt)
             {
                 case AgentStreamEvent.Usage usage:
@@ -188,7 +192,22 @@ public sealed class AgentChatService : IAgentChatService
                     break;
 
                 case AgentStreamEvent.FunctionCall call:
-                    pendingCalls[call.CallId] = (call.Name, DigestArguments(call.Arguments));
+                    var digest = DigestArguments(call.Arguments);
+                    pendingCalls[call.CallId] = (call.Name, digest);
+
+                    // 工具一开始执行就落到轨迹里；结果回来时按 CallId 原地替换成最终状态。
+                    plan.Metrics?.BeginToolTrace(new ToolTraceEntry(
+                        call.Name,
+                        ToolTraceEntry.StatusRunning,
+                        null,
+                        digest,
+                        null,
+                        0,
+                        DateTime.Now,
+                        ReasoningChars: emittedReasoning,
+                        TextChars: emittedText,
+                        CallId: call.CallId));
+                    toolChanged = true;
                     break;
 
                 case AgentStreamEvent.FunctionResult result:
@@ -198,15 +217,22 @@ public sealed class AgentChatService : IAgentChatService
                         pendingCalls,
                         emittedReasoning,
                         emittedText));
+                    toolChanged = true;
                     break;
             }
 
-            if (text.Length > 0 || reasoning.Length > 0)
+            if (text.Length > 0 || reasoning.Length > 0 || toolChanged)
             {
-                yield return new AgentDelta(text.ToString(), reasoning.ToString());
-                text.Clear();
-                reasoning.Clear();
+                    yield return new AgentDelta(text.ToString(), reasoning.ToString());
+                    text.Clear();
+                    reasoning.Clear();
+                }
             }
+        }
+        finally
+        {
+            // 用户停止 / 网络中断时，尚未返回结果的工具不能永远停在「运行中」。
+            plan.Metrics?.CancelRunningTools();
         }
     }
 
@@ -362,7 +388,8 @@ public sealed class AgentChatService : IAgentChatService
             DateTime.Now,
             ParseEdits(text),
             reasoningChars,
-            textChars);
+            textChars,
+            callId);
     }
 
     /// <summary>从工具结果末尾的 <c>[EDIT] 路径 +N -M</c> 行汇总本次改动，供消息下方展示。</summary>

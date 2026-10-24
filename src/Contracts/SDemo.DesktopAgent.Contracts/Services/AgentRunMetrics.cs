@@ -125,8 +125,8 @@ public sealed class AgentRunMetrics
         }
     }
 
-    /// <summary>追加一条轨迹；超过上限的静默丢弃（只保留最近的部分，前面已有汇总）。</summary>
-    public void RecordToolTrace(ToolTraceEntry entry)
+    /// <summary>工具开始执行时先放一条 running 轨迹，UI 不用等结果返回。</summary>
+    public void BeginToolTrace(ToolTraceEntry entry)
     {
         if (_toolTrace.Count >= MaxStoredEntries)
         {
@@ -134,6 +134,49 @@ public sealed class AgentRunMetrics
         }
 
         _toolTrace.Add(entry);
+    }
+
+    /// <summary>
+    /// 追加 / 完成一条轨迹：同 CallId 的 running 条目原地替换，避免开始与结束各占一行；
+    /// 超过上限的静默丢弃（只保留最近的部分，前面已有汇总）。
+    /// </summary>
+    public void RecordToolTrace(ToolTraceEntry entry)
+    {
+        if (!string.IsNullOrEmpty(entry.CallId))
+        {
+            var runningIndex = _toolTrace.FindLastIndex(item =>
+                string.Equals(item.CallId, entry.CallId, StringComparison.Ordinal)
+                && string.Equals(item.Status, ToolTraceEntry.StatusRunning, StringComparison.Ordinal));
+
+            if (runningIndex >= 0)
+            {
+                _toolTrace[runningIndex] = entry;
+                return;
+            }
+        }
+
+        if (_toolTrace.Count >= MaxStoredEntries)
+        {
+            return;
+        }
+
+        _toolTrace.Add(entry);
+    }
+
+    /// <summary>流被取消 / 中断时，把还没拿到结果的 running 轨迹收成已取消。</summary>
+    public void CancelRunningTools()
+    {
+        for (var index = 0; index < _toolTrace.Count; index++)
+        {
+            if (string.Equals(_toolTrace[index].Status, ToolTraceEntry.StatusRunning, StringComparison.Ordinal))
+            {
+                _toolTrace[index] = _toolTrace[index] with
+                {
+                    Status = ToolTraceEntry.StatusCanceled,
+                    Summary = "已取消"
+                };
+            }
+        }
     }
 
     public void AddUsage(int inputTokens, int outputTokens)

@@ -107,6 +107,52 @@ public sealed class AgentChatServiceToolExposureTests
     }
 
     [Fact]
+    public async Task 工具开始时先推送运行中状态再推送结果()
+    {
+        _settings.Current.Agent.Mode = AgentModePreference.Full;
+        using var temp = new TempDirectory();
+        var paths = new StubAppPaths(temp.Root);
+        var registry = new AgentToolRegistry([new FileToolPack()]);
+        var runtime = new ToolCallRuntime();
+        var service = new AgentChatService(
+            registry,
+            new WorkspaceContext(paths),
+            _settings,
+            new ToolApprovalService(),
+            new StubSandboxJobService(),
+            new NullAuditLog(),
+            paths,
+            new FileReadRegistry(),
+            runtime);
+
+        var builder = new ContextBuilder(_counter, _settings);
+        var context = builder.Build(new ContextBuildRequest(Provider(), "m", [Message()]));
+        var metrics = new AgentRunMetrics();
+        var plan = new AgentRunPlan(
+            Provider(), "m", context, new HashSet<string> { "files" },
+            SessionId: "s1", Metrics: metrics);
+
+        var sawRunning = false;
+        var deltaCount = 0;
+
+        await foreach (var _ in service.RunAsync(plan))
+        {
+            deltaCount++;
+
+            if (metrics.ToolTrace.Any(entry => entry.Status == ToolTraceEntry.StatusRunning))
+            {
+                sawRunning = true;
+            }
+        }
+
+        Assert.True(sawRunning);
+        Assert.True(deltaCount >= 2);
+        var trace = Assert.Single(metrics.ToolTrace);
+        Assert.Equal(ToolTraceEntry.StatusOk, trace.Status);
+        Assert.Equal("read_file", trace.ToolId);
+    }
+
+    [Fact]
     public async Task 对话轮不生成工具并切换对话提示词()
     {
         _settings.Current.Agent.Mode = AgentModePreference.Full;
@@ -156,6 +202,23 @@ public sealed class AgentChatServiceToolExposureTests
         BaseUrl = "https://example.com/v1",
         Models = [new ModelEntry { Id = "m", Profile = ModelProfilePresets.FromPreset("8K")! }]
     };
+
+    /// <summary>模拟一次工具调用：先发 FunctionCall，再发 FunctionResult，最后吐正文。</summary>
+    private sealed class ToolCallRuntime : IAgentRuntime
+    {
+        public async IAsyncEnumerable<AgentStreamEvent> StreamAsync(
+            AgentInvocation invocation,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            yield return new AgentStreamEvent.FunctionCall(
+                "call-1",
+                "read_file",
+                new Dictionary<string, object?> { ["path"] = "README.md" });
+            yield return new AgentStreamEvent.FunctionResult("call-1", "[TOOL_STATUS:ok]\n读取完成");
+            yield return new AgentStreamEvent.Text("完成");
+        }
+    }
 
     /// <summary>记录收到的调用（工具列表），然后直接吐一段正文。</summary>
     private sealed class RecordingRuntime : IAgentRuntime

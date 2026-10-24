@@ -106,9 +106,24 @@
 
                     @if (!collapsed)
                     {
-                        @foreach (var session in SessionsFor(workspace))
+                        var workspaceSessions = SessionsFor(workspace).ToList();
+                        var workspaceExpanded = _expandedWorkspaces.Contains(workspace.Id);
+                        var visibleSessions = VisibleSessions(workspaceSessions, workspaceExpanded);
+
+                        @foreach (var session in visibleSessions)
                         {
                             @RenderSession(session)
+                        }
+
+                        @if (workspaceExpanded || visibleSessions.Count < workspaceSessions.Count)
+                        {
+                            <button type="button"
+                                    class="session-show-more"
+                                    @onclick="() => ToggleWorkspaceSessions(workspace.Id)">
+                                @(workspaceExpanded
+                                    ? "收起对话"
+                                    : $"展开其余 {workspaceSessions.Count - visibleSessions.Count} 个对话")
+                            </button>
                         }
                     }
             }
@@ -117,12 +132,28 @@
 
         <SidebarSection Title="历史聊天" Count="@LooseSessions.Count" InitiallyExpanded="true">
             <ChildContent>
-                @foreach (var session in LooseSessions)
+                @{
+                    var looseSessions = LooseSessions;
+                    var visibleLooseSessions = VisibleSessions(looseSessions, _looseExpanded);
+                }
+
+                @foreach (var session in visibleLooseSessions)
                 {
                     @RenderSession(session)
                 }
 
-                @if (LooseSessions.Count == 0)
+                @if (_looseExpanded || visibleLooseSessions.Count < looseSessions.Count)
+                {
+                    <button type="button"
+                            class="session-show-more"
+                            @onclick="ToggleLooseSessions">
+                        @(_looseExpanded
+                            ? "收起对话"
+                            : $"展开其余 {looseSessions.Count - visibleLooseSessions.Count} 个对话")
+                    </button>
+                }
+
+                @if (looseSessions.Count == 0)
                 {
                     <p class="sidebar-empty">新建聊天室并发出第一条消息后，会话会出现在这里。</p>
                 }
@@ -131,6 +162,21 @@
     </div>
 
     <footer class="sidebar-footer">
+        <button type="button"
+                class="sidebar-item"
+                title="用量与成本"
+                @onclick="() => OnOpenUsage.InvokeAsync()">
+            <span class="item-icon">
+                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M2.4 12.8h11.2M4.2 11V7.2M8 11V4.2M11.8 11V8.6"
+                          fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" />
+                </svg>
+            </span>
+            <span class="item-text">
+                <span class="item-title">用量与成本</span>
+            </span>
+        </button>
+
         <button type="button"
                 class="sidebar-item @(IsSettingsActive ? "is-active" : null)"
                 title="设置"
@@ -196,6 +242,10 @@
     [Parameter]
     public EventCallback OnOpenSettings { get; set; }
 
+    /// <summary>打开用量与成本弹窗（全局统计）。</summary>
+    [Parameter]
+    public EventCallback OnOpenUsage { get; set; }
+
     [Parameter]
     public EventCallback<Workspace> OnNewChatInWorkspace { get; set; }
 
@@ -225,10 +275,14 @@
     [Parameter]
     public EventCallback<Workspace> OnOpenWorkspaceSettings { get; set; }
 
+    private const int SessionPageSize = 6;
+
     private string? _openMenu;
     private string? _renamingKey;
     private string _renameText = string.Empty;
     private readonly HashSet<string> _collapsedWorkspaces = [];
+    private readonly HashSet<string> _expandedWorkspaces = [];
+    private bool _looseExpanded;
 
     /// <summary>不属于任何工作区的会话（历史聊天）。</summary>
     private IReadOnlyList<ChatSession> LooseSessions =>
@@ -252,6 +306,40 @@
         Sessions
             .Where(session => string.Equals(session.WorkspaceId, workspace.Id, StringComparison.Ordinal))
             .OrderByDescending(session => session.IsPinned);
+
+    /// <summary>
+    /// 默认只显示前 <see cref="SessionPageSize"/> 个；当前会话被藏起来时额外保留，
+    /// 避免用户正在看的会话从侧栏消失。
+    /// </summary>
+    private IReadOnlyList<ChatSession> VisibleSessions(
+        IReadOnlyList<ChatSession> sessions,
+        bool expanded)
+    {
+        if (expanded || sessions.Count <= SessionPageSize)
+        {
+            return sessions;
+        }
+
+        var visible = sessions.Take(SessionPageSize).ToList();
+        var active = sessions.FirstOrDefault(IsActive);
+
+        if (active is not null && !visible.Contains(active))
+        {
+            visible.Add(active);
+        }
+
+        return visible;
+    }
+
+    private void ToggleWorkspaceSessions(string workspaceId)
+    {
+        if (!_expandedWorkspaces.Remove(workspaceId))
+        {
+            _expandedWorkspaces.Add(workspaceId);
+        }
+    }
+
+    private void ToggleLooseSessions() => _looseExpanded = !_looseExpanded;
 
     private void ToggleCollapse(string workspaceId)
     {

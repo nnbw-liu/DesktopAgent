@@ -25,6 +25,7 @@
              OnStartPluginChat="StartPluginChat"
              OnOpenSession="OpenSession"
              OnOpenSettings="OpenSettings"
+             OnOpenUsage="OpenUsage"
              OnNewChatInWorkspace="NewChatInWorkspace"
              OnAddWorkspace="AddWorkspace"
              OnTogglePin="TogglePin"
@@ -92,6 +93,11 @@
                              OnSessionChanged="PersistSession"
                              OnOpenSession="OpenSettingsSession" />
     }
+
+    @if (_usageOpen)
+    {
+        <UsageCostDialog OnClose="CloseUsage" />
+    }
 </div>
 
 @code {
@@ -118,6 +124,9 @@
 
     /// <summary>当前聊天室设置抽屉是否打开。</summary>
     private bool _sessionSettingsOpen;
+
+    /// <summary>用量与成本弹窗是否打开。</summary>
+    private bool _usageOpen;
 
     private IReadOnlyList<Workspace> Workspaces => Settings.Current.Workspaces;
 
@@ -187,9 +196,19 @@
         _sessionSettingsOpen = false;
     }
 
+    /// <summary>侧栏「用量与成本」：应用内弹窗。</summary>
+    private void OpenUsage()
+    {
+        CloseScopeSettings();
+        _usageOpen = true;
+    }
+
+    private void CloseUsage() => _usageOpen = false;
+
     /// <summary>侧栏工作区「更多 → 工作区设置」。</summary>
     private void OpenWorkspaceSettings(Workspace workspace)
     {
+        _usageOpen = false;
         _sessionSettingsOpen = false;
         _settingsWorkspace = workspace;
     }
@@ -197,6 +216,7 @@
     /// <summary>聊天室右上角的设置入口。</summary>
     private void OpenSessionSettings()
     {
+        _usageOpen = false;
         _settingsWorkspace = null;
         _sessionSettingsOpen = _activeSession is not null;
     }
@@ -294,6 +314,7 @@
     {
         _settingsSection = SettingsSection.General;
         _view = MainView.Settings;
+        _usageOpen = false;
         CloseScopeSettings();
     }
 
@@ -302,6 +323,7 @@
     {
         _settingsSection = SettingsSection.Models;
         _view = MainView.Settings;
+        _usageOpen = false;
         CloseScopeSettings();
     }
 

@@ -102,6 +102,26 @@ public sealed class ChatRoomInteractionTests : TestContext
     }
 
     [Fact]
+    public void 占用环旁边显示聊天室累计输入输出token()
+    {
+        var session = new ChatSession { Id = "tokens", Title = "用量" };
+        session.Messages.Add(new ChatMessageModel(ChatMessageRole.User, "你好"));
+        session.Messages.Add(new ChatMessageModel(ChatMessageRole.Assistant, "回答")
+        {
+            InputTokens = 1000,
+            OutputTokens = 500
+        });
+
+        var cut = RenderComponent<ChatRoom>(parameters => parameters
+            .Add(component => component.Session, session));
+
+        var total = cut.Find(".chat-token-total");
+        Assert.Contains("1.5K", total.TextContent, StringComparison.Ordinal);
+        Assert.Empty(total.QuerySelectorAll(".chat-token-breakdown"));
+        Assert.Contains("输入 1.0K / 输出 500", total.GetAttribute("title")!, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void 删除消息需要确认并同步摘要边界()
     {
         var session = new ChatSession
