@@ -4296,6 +4296,20 @@ a {
     white-space: nowrap;
 }
 
+/* P2a：上下文快照的按段归因，缩进一小格以示「这些是快照的子项」，不是新的顶层分段。 */
+.context-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: -2px 0 0 11px;
+    padding-left: 7px;
+    border-left: 1px solid var(--border);
+}
+
+.context-row--section {
+    font-size: 11px;
+}
+
 .context-divider {
     height: 1px;
     margin: 5px 0;

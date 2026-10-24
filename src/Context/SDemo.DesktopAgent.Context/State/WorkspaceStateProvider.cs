@@ -56,10 +56,14 @@ public sealed class WorkspaceStateProvider
     public int TreeScans { get; private set; }
 
     /// <summary>拼一个状态包；<paramref name="session"/> 为空时只给工作区结构。</summary>
-    public WorkspaceState Build(string? root, ChatSession? session)
+    /// <param name="includeTree">
+    /// 关掉「工作区结构」段时不必扫盘（P2a：验证 / 计划 / 策略仍然要），
+    /// 于是树只留空列表，其余事实照常给。
+    /// </param>
+    public WorkspaceState Build(string? root, ChatSession? session, bool includeTree = true)
     {
         var safeRoot = string.IsNullOrWhiteSpace(root) ? string.Empty : root;
-        var tree = string.IsNullOrEmpty(safeRoot)
+        var tree = !includeTree || string.IsNullOrEmpty(safeRoot)
             ? (IReadOnlyList<string>)Array.Empty<string>()
             : GetTree(safeRoot);
         var edits = session is null

@@ -139,7 +139,8 @@ public sealed class ContextBuilderTests : IDisposable
 
         var plan = CreateBuilder().Build(Request(messages));
 
-        Assert.Single(plan.Messages);
+        // 1 条用户消息 + 1 条宿主上下文快照（P2a：快照永远是最后一条）。
+        Assert.Equal(2, plan.Messages.Count);
         Assert.True(plan.Report.Estimated <= plan.Report.Total);
         Assert.Contains("【附件：", plan.Messages[0].Text);
         // 内联被 48K 总量和窗口预算同时限制，不可能把 50KB 全塞进去。

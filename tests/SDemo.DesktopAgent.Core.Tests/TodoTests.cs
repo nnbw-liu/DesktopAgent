@@ -127,10 +127,23 @@ public sealed class TodoTests
             .Select(index => new TodoItem($"很长的计划项 {index} " + new string('x', 80), TodoStatus.Pending))
             .ToList();
         var state = new WorkspaceStateProvider().Build(string.Empty, session);
+        var counter = new HeuristicTokenCounter();
 
-        var rendered = StatePackFormatter.Format(state, 1200, new HeuristicTokenCounter());
+        var rendered = ContextSectionRegistry.Default.Render(
+            new ContextSectionInput(
+                counter,
+                new ContextSettings(),
+                AgentMode.Full,
+                ModelProfilePresets.FromPreset("32K") ?? ModelProfile.Unknown,
+                state,
+                AgentPolicyFacts.Default,
+                DateTimeOffset.Now,
+                "Asia/Shanghai",
+                LastModelVisibleAt: null),
+            totalCap: 1200);
 
-        Assert.Contains("## 当前计划", rendered.Text);
+        Assert.Contains("当前计划", rendered.Text);
         Assert.Contains("计划已截断", rendered.Text);
+        Assert.True(rendered.TokensOf("plan") <= PlanContextSection.PlanTokenLimit + 24);
     }
 }

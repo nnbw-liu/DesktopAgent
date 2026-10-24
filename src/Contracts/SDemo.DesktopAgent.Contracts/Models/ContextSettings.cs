@@ -39,7 +39,10 @@ public sealed class ContextSettings
     /// <summary>摘要请求超时（秒）；超时走确定性兜底。</summary>
     public int SummaryTimeoutSeconds { get; set; } = 20;
 
-    /// <summary>是否把工作区状态包放进每次请求的固定块。</summary>
+    /// <summary>
+    /// 是否把工作区状态（结构 / 最近改动 / 最近动作）放进每轮末尾的宿主上下文快照。
+    /// 关闭后模型只能靠历史与工具重新读取文件；策略、验证、时间三段不受这个开关影响。
+    /// </summary>
     public bool StatePackEnabled { get; set; } = true;
 
     /// <summary>状态包 token 上限（普通模型）。</summary>
@@ -47,6 +50,12 @@ public sealed class ContextSettings
 
     /// <summary>状态包 token 上限（≤8K 模型，避免挤掉历史）。</summary>
     public int StatePackSmallModelTokenBudget { get; set; } = 500;
+
+    /// <summary>是否注入 <c>time</c> 段（宿主时钟 + 时区 + 距上一条模型可见消息的时长）。</summary>
+    public bool TimeContextEnabled { get; set; } = true;
+
+    /// <summary>是否注入 <c>plan</c> 段（会话当前计划）；没有计划时该段本来就零成本。</summary>
+    public bool PlanContextEnabled { get; set; } = true;
 
     /// <summary>工具循环内部的请求也做 L1 裁剪（§3.7 分支 A）。</summary>
     public bool MidTurnTrim { get; set; } = true;

@@ -19,7 +19,7 @@ public sealed class ContextBreakdownTests : TestContext
         foreach (var label in new[]
                  {
                      "系统提示词", "技能", "工具 schema", "工作区知识库", "历史对话",
-                     "已压缩摘要", "工作区状态", "附件", "工具轨迹", "Pin 消息"
+                     "已压缩摘要", "上下文快照", "附件", "工具轨迹", "Pin 消息"
                  })
         {
             Assert.Contains(label, cut.Markup);
@@ -112,9 +112,61 @@ public sealed class ContextBreakdownTests : TestContext
     }
 
     [Fact]
-    public void 工具schema行带路由数量()
+    public void 快照按段渲染名字与token且标出必需与截断()
     {
         var report = Report() with
+        {
+            StatePackUsed = true,
+            StatePackTokens = 220,
+            Sections =
+            [
+                new ContextSectionUsage("workspace", "工作区", 100, Required: false, Tokens: 60, Truncated: true),
+                new ContextSectionUsage("policy", "当前策略", 110, Required: true, Tokens: 90, Truncated: false),
+                new ContextSectionUsage("time", "当前时间", 150, Required: true, Tokens: 40, Truncated: false)
+            ]
+        };
+
+        var cut = RenderComponent<ContextBreakdown>(parameters => parameters
+            .Add(component => component.Report, report));
+
+        Assert.Contains("· 工作区", cut.Markup);
+        Assert.Contains("· 当前策略", cut.Markup);
+        Assert.Contains("· 当前时间", cut.Markup);
+        Assert.Contains("必需", cut.Markup);
+        Assert.Contains("可选 · 已截断", cut.Markup);
+        Assert.Contains("3 段", cut.Markup);
+        Assert.Contains("宿主上下文快照约 220 token", cut.Markup);
+    }
+
+    [Fact]
+    public void 服务端上报缓存命中时显示命中率()
+    {
+        var report = Report() with
+        {
+            ActualInputTokens = 1000,
+            CacheHitTokens = 800
+        };
+
+        var cut = RenderComponent<ContextBreakdown>(parameters => parameters
+            .Add(component => component.Report, report));
+
+        Assert.Contains("缓存命中 800（80%）", cut.Markup);
+    }
+
+    [Fact]
+    public void 端点不报缓存时不显示命中率()
+    {
+        var report = Report() with { ActualInputTokens = 1000 };
+
+        var cut = RenderComponent<ContextBreakdown>(parameters => parameters
+            .Add(component => component.Report, report));
+
+        Assert.DoesNotContain("缓存命中", cut.Markup);
+    }
+
+    [Fact]
+    public void 工具schema行带路由数量()
+    {        var report = Report() with
         {
             Segments = Report().Segments with { ToolSchema = 1200 },
             Routing = new RoutingDecision(
