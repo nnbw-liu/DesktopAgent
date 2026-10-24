@@ -44,8 +44,16 @@ public abstract record AgentStreamEvent
     /// <summary>思维链增量（部分模型返回）。</summary>
     public sealed record Reasoning(string Value) : AgentStreamEvent;
 
-    /// <summary>本轮请求的服务端用量（可能多次回调）。</summary>
-    public sealed record Usage(int InputTokens, int OutputTokens) : AgentStreamEvent;
+    /// <summary>
+    /// 本轮请求的服务端用量（可能多次回调）。
+    /// </summary>
+    /// <param name="InputTokens">输入 token。</param>
+    /// <param name="OutputTokens">输出 token。</param>
+    /// <param name="CacheHitTokens">
+    /// P2a：命中端点上文缓存的输入 token（<c>UsageDetails.CachedInputTokenCount</c>）。
+    /// 端点不报就是 0；界面据此决定显不显示命中率，不给假数字。
+    /// </param>
+    public sealed record Usage(int InputTokens, int OutputTokens, int CacheHitTokens = 0) : AgentStreamEvent;
 
     /// <summary>
     /// 一次模型请求（DSH 的 step）开始。只有内置循环会发；FICC 的轮次对宿主不可见。

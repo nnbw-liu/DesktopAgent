@@ -96,14 +96,14 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
     }
 
     public ContextPlan Preview(AgentRunRequest request) =>
-        _builder.Build(BuildRequest(request, scale: 1.0, BuildStatePackText(request)));
+        _builder.Build(BuildRequest(request, scale: 1.0, BuildWorkspaceState(request)));
 
     public async Task<ContextPlan> PreviewAsync(
         AgentRunRequest request,
         CancellationToken cancellationToken = default)
     {
         var routing = await ResolveRoutingAsync(request, cancellationToken).ConfigureAwait(false);
-        return _builder.Build(BuildRequest(request, scale: 1.0, BuildStatePackText(request), routing));
+        return _builder.Build(BuildRequest(request, scale: 1.0, BuildWorkspaceState(request), routing));
     }
 
     public async Task<CompactionOutcome> CompactAsync(
@@ -142,7 +142,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
-        var statePackText = BuildStatePackText(request);
+        var state = BuildWorkspaceState(request);
 
         // M4：先把本轮路由定下来（规则 / 小模型 + 回落），后面的预算、压缩重建与重试
         // 都复用同一个决策，保证「一轮只路由一次」。
@@ -150,7 +150,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
 
         // 1. preflight：预算 + 压缩 / L1 裁剪；摘要失败或仍超限时抛出「需压缩」。
         var plan = await BuildOrCompactAsync(
-                request, scale: 1.0, telemetry, statePackText, routing, cancellationToken)
+                request, scale: 1.0, telemetry, state, routing, cancellationToken)
             .ConfigureAwait(false);
         telemetry.Plan = plan;
         telemetry.Report = plan.Report;
@@ -229,7 +229,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         }
 
         var retryPlan = await BuildOrCompactAsync(
-                request, settings.OverflowRetryScale, telemetry, statePackText, routing, cancellationToken)
+                request, settings.OverflowRetryScale, telemetry, state, routing, cancellationToken)
             .ConfigureAwait(false);
         telemetry.Plan = retryPlan;
 
@@ -302,12 +302,12 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         AgentRunRequest request,
         double scale,
         ContextRunTelemetry telemetry,
-        string? statePackText,
+        WorkspaceState? state,
         RoutingDecision? routing,
         CancellationToken cancellationToken)
     {
         var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
-        var buildRequest = BuildRequest(request, scale, statePackText, routing);
+        var buildRequest = BuildRequest(request, scale, state, routing);
 
         ContextPlan plan;
 
@@ -328,7 +328,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
 
             // 连 L1 都放不下：必须压缩；压缩不出来就保持 P1 的报错。
             return await CompactAndRebuildAsync(
-                request, scale, telemetry, statePackText, routing, ex, cancellationToken).ConfigureAwait(false);
+                request, scale, telemetry, state, routing, ex, cancellationToken).ConfigureAwait(false);
         }
 
         // 没有淘汰任何历史 = 没超预算：一次摘要调用都不发生（P2 DoD）。
@@ -348,7 +348,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
 
         try
         {
-            var rebuilt = _builder.Build(BuildRequest(request, scale, statePackText, routing));
+            var rebuilt = _builder.Build(BuildRequest(request, scale, state, routing));
             var report = WithSummaryUsage(rebuilt.Report, telemetry);
             telemetry.Report = report;
             return rebuilt with { Report = report };
@@ -368,7 +368,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         AgentRunRequest request,
         double scale,
         ContextRunTelemetry telemetry,
-        string? statePackText,
+        WorkspaceState? state,
         RoutingDecision? routing,
         ContextBudgetException original,
         CancellationToken cancellationToken)
@@ -383,7 +383,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
 
         try
         {
-            var rebuilt = _builder.Build(BuildRequest(request, scale, statePackText, routing));
+            var rebuilt = _builder.Build(BuildRequest(request, scale, state, routing));
             var report = WithSummaryUsage(rebuilt.Report, telemetry);
             telemetry.Report = report;
             return rebuilt with { Report = report };
@@ -415,7 +415,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         }
 
         var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
-        var buildRequest = BuildRequest(request, scale, statePackText: null);
+        var buildRequest = BuildRequest(request, scale, state: null);
         var profile = _builder.ResolveProfile(buildRequest);
 
         var budget = new ContextPolicy(profile, settings).Budget;
@@ -476,7 +476,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
     private ContextBuildRequest BuildRequest(
         AgentRunRequest request,
         double scale,
-        string? statePackText,
+        WorkspaceState? state,
         RoutingDecision? routing = null)
     {
         var build = new ContextBuildRequest(
@@ -492,7 +492,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             BudgetScale: scale,
             SummaryText: request.Session?.Summary,
             SummaryThroughOrder: request.Session?.SummaryThroughOrder ?? 0,
-            StatePackText: statePackText,
+            State: state,
             SummaryFallback: request.Session?.SummaryIsFallback ?? false,
             SkillIndexText: BuildSkillIndexText(request),
             MemoryText: BuildMemoryText(request),
@@ -741,18 +741,13 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         rule with { Reason = rule.Reason + " · " + note };
 
     /// <summary>
-    /// 工作区状态包：树（30s 缓存）+ 最近改动 + 最近动作。没有工作区 / 关闭时返回 null，
-    /// 不阻塞请求。
+    /// 宿主上下文快照的数据源（P2a）：树（30s 缓存）+ 最近改动 + 最近动作 + 验证 + 计划。
+    /// 没有工作区时返回 null，不阻塞请求；关掉「工作区结构」段时也不扫盘
+    /// （验证 / 计划 / 策略仍然要有，它们不依赖树）。
     /// </summary>
-    private string? BuildStatePackText(AgentRunRequest request)
+    private WorkspaceState? BuildWorkspaceState(AgentRunRequest request)
     {
         if (_statePack is null || _workspace is null || request.Session is null)
-        {
-            return null;
-        }
-
-        var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
-        if (!settings.StatePackEnabled)
         {
             return null;
         }
@@ -763,19 +758,15 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             return null;
         }
 
+        var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
+
         try
         {
-            var profile = _builder.ResolveProfile(BuildRequest(request, 1.0, statePackText: null));
-            var cap = profile.IsSmallModel
-                ? settings.StatePackSmallModelTokenBudget
-                : settings.StatePackTokenBudget;
-
-            var state = _statePack.Build(root, request.Session);
-            return StatePackFormatter.Format(state, cap, _builder.Counter).Text;
+            return _statePack.Build(root, request.Session, includeTree: settings.StatePackEnabled);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
-            // 状态包是增强信息：读不到工作区时不影响本轮请求。
+            // 快照是增强信息：读不到工作区时不影响本轮请求。
             return null;
         }
     }
@@ -827,7 +818,12 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             _calibration?.RecordUsage(request.Provider.Id, request.ModelId, estimated, actual);
 
             // 校准后的报告把实际值带给 UI，便于核对「估算 vs usage」。
-            telemetry.Report = (telemetry.Report ?? plan.Report) with { ActualInputTokens = actual };
+            // P2a：缓存命中数同样只来自服务端 usage，端点不报就保持 0。
+            telemetry.Report = (telemetry.Report ?? plan.Report) with
+            {
+                ActualInputTokens = actual,
+                CacheHitTokens = request.Metrics?.CacheHitTokens ?? 0
+            };
         }
     }
 

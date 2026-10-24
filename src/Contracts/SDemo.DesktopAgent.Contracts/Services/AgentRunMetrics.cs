@@ -26,6 +26,12 @@ public sealed class AgentRunMetrics
 
     public int OutputTokens { get; private set; }
 
+    /// <summary>
+    /// P2a：命中原点上文缓存的输入 token。端点不报 usage 时保持 0，
+    /// 界面据此**不显示**命中率（宁可没有，不给假数字）。
+    /// </summary>
+    public int CacheHitTokens { get; private set; }
+
     public IReadOnlyDictionary<string, int> ToolCalls => _toolCalls;
 
     /// <summary>被宿主拒绝的调用数（循环保护 / 用户拒绝 / 连续失败禁用）。</summary>
@@ -196,9 +202,10 @@ public sealed class AgentRunMetrics
         }
     }
 
-    public void AddUsage(int inputTokens, int outputTokens)
+    public void AddUsage(int inputTokens, int outputTokens, int cacheHitTokens = 0)
     {
         InputTokens += inputTokens;
         OutputTokens += outputTokens;
+        CacheHitTokens += cacheHitTokens;
     }
 }

@@ -42,7 +42,9 @@ public sealed record ContextReport(
     int StatePackTokens = 0,
     RoutingDecision? Routing = null,
     int SummaryInputTokens = 0,
-    int SummaryOutputTokens = 0)
+    int SummaryOutputTokens = 0,
+    IReadOnlyList<ContextSectionUsage>? Sections = null,
+    int CacheHitTokens = 0)
 {
     /// <summary>占输入预算的比例（0~1+）。</summary>
     public double Occupancy => Total <= 0 ? 0 : (double)Estimated / Total;
@@ -55,6 +57,20 @@ public sealed record ContextReport(
     /// 只能靠报告的这两个字段让用户看到「压缩成本」。
     /// </summary>
     public int SummaryCostTokens => SummaryInputTokens + SummaryOutputTokens;
+
+    /// <summary>
+    /// P2a：宿主上下文快照的每段归因（名字 / token / 是否 required / 是否被截断）。
+    /// 快照段是唯一事实源，界面分解面板直接读它，不再自己分类。
+    /// </summary>
+    public IReadOnlyList<ContextSectionUsage> SectionUsages => Sections ?? [];
+
+    /// <summary>
+    /// P2a：服务端上报的缓存命中输入 token（<c>UsageDetails.CachedInputTokenCount</c>）。
+    /// 端点不报就是 0 —— 界面据此决定显不显示命中率，不给假数字。
+    /// </summary>
+    public double CacheHitRate => ActualInputTokens is > 0
+        ? Math.Clamp((double)CacheHitTokens / ActualInputTokens.Value, 0, 1)
+        : 0;
 
     /// <summary>本轮工具 schema 的 token（分段明细里的 Tools 段）。</summary>
     public int ToolSchemaTokens => Segments.ToolSchema;
@@ -97,7 +113,6 @@ public sealed record ContextSegments(
 {
     public int Total => System + Skills + Turns + Attachments + ToolTrace + Pinned + Summary + StatePack + ToolSchema + Knowledge;
 }
-
 /// <summary>
 /// 一次请求的产物：系统提示词 + 已裁剪的请求消息 + 报告。
 /// <see cref="Services.AgentChatService"/> 只消费它，不再决定消息取舍。
@@ -124,7 +139,7 @@ public sealed record ContextBuildRequest(
     double BudgetScale = 1.0,
     string? SummaryText = null,
     int SummaryThroughOrder = 0,
-    string? StatePackText = null,
+    WorkspaceState? State = null,
     bool SummaryFallback = false,
     AgentModePreference? ModeOverride = null,
     RoutingDecision? Routing = null,

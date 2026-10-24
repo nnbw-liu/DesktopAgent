@@ -549,6 +549,8 @@ public static string Full(bool supportsReasoning) => supportsReasoning
 
 #### 3.3.1 上下文段：注册式内容 + 尾部快照（把"状态包"拆开）
 
+> 实施情况：✅ 已落地，见 §13（P2a）。
+
 现状有两个独立问题，值得一起解决：
 
 **(问题一：内容）** `StatePackFormatter` 是唯一的 god-renderer，四个 `##` 段（工作区 / 最近动作 / 当前计划 / 验证）硬编码在 182 行里（`StatePackFormatter.cs:61-144`），截断顺序也是写死的（树 → 改动 → 动作，验证永不截断）。后果：加一个上下文事实（沙箱模式、审批策略、相对时间）就要改这个文件；每段没有独立上限、没有独立开关、`ContextBreakdown` 里也只有 `StatePack` 一个总数（`ContextReport.cs:41-42,94-98`）。
@@ -803,7 +805,7 @@ public interface IInputTriggerSource
 | **P0.5** | 输入框 `@文件`（1.5–2d）+ `/` 命令（1–1.5d）+ `/` 技能（1–1.5d，含 `disable-model-invocation`） | 4–5 天 | 无 | 低（新功能，不碰引擎） | ✅ §9 |
 | **P1a** | 自建 `AgentLoop` 替换 FICC，真工具消息入历史，step 事件 | 3–4 天 | 无 | **中**：FICC 现有行为（重试、非法参数修复、并行）要一一补齐 | ✅ §10 |
 | **P1b** | 工具描述改造 + 曝光面按任务档稳定 + 同轮补齐 + 删 PLAN | 2 天 | P1a | 中：需要评测集重跑 | ✅ §11 |
-| **P2a** | 上下文段注册表（含新增 `policy` / `time` 段）+ 尾部快照消息 + `CacheHitTokens` 测量 | 2–3 天 | 无 | 低 | 待做 |
+| **P2a** | 上下文段注册表（含新增 `policy` / `time` 段）+ 尾部快照消息 + `CacheHitTokens` 测量 | 2–3 天 | 无 | 低 | ✅ §13 |
 | **P2b** | 压缩补三性质 | 1–2 天 | P2a | 中：涉及会话状态迁移 | 待做 |
 | **P2c** | 大输出落盘 | 1 天 | 无 | 低 | 待做 |
 
@@ -1042,7 +1044,6 @@ bUnit 里 `TextChanged` 没人接、组件不重渲染，所以测试一直是�
 - 评测：`tools/routing-eval --mode rules` → 28/28。
 
 ## 12. 参考（证据位置）
-
 DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat/lib/client.js`，`TOOL` = `dsh-client-ui-tool/lib/client.js`）：
 
 > 复现方式：用 `.tmp/asar-extract.js` 从 `DeepSeek Harness\resources\app.asar` 解出 `dsh` 子树（`node .tmp/asar-extract.js <asar> dsh .tmp/dsh-src`），然后直接读各包 README 与 `lib/*.js`。`.tmp/` 是可丢弃的。
@@ -1088,10 +1089,74 @@ DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat
 - `src/App/SDemo.DesktopAgent.UI/Components/Chat/ChatTimeline.razor:14-62`（运行中 17-29、默认收起 78）、`ChatRoom.razor:935-945,162-202,2255-2278,2339-2392`
 - `src/Tools/SDemo.DesktopAgent.Tools.Abstractions/CapabilityRouter.cs`（`Route`、`ResolveProfile` / `ToolsOfProfile`、`PreviousUserInputs`、`HostPromptPrefix`）、`ToolPlaybooks.cs`（模型看到的决策规则表）、`TurnClassifier.cs:54-81`
 - `src/Context/SDemo.DesktopAgent.Context/ContextCompactor.cs:67-215`、`ContextBudgetChatClient.cs:74-75,199-261`、`ContextTrimmer.cs:104-148`
-- `src/Context/SDemo.DesktopAgent.Context/State/StatePackFormatter.cs:21-59,61-144`（god-renderer 与写死的截断顺序）、`State/WorkspaceState.cs:6-13`（数据源）
+- `src/Context/SDemo.DesktopAgent.Context/State/StatePackFormatter.cs:21-59,61-144`（P2a 前的 god-renderer 与写死的截断顺序，已删除）、`State/WorkspaceState.cs`（数据源）、`State/WorkspaceExcludes.cs`（共用排除表）
 - `src/Context/SDemo.DesktopAgent.Context/AgentInstructions.cs:9-19`（死代码；静态沙箱文案）
 - `src/App/SDemo.DesktopAgent.UI/Components/Chat/ChatComposer.razor`（触发菜单、命令路由、`/技能` 点名、高亮层）、`ChatRoom.razor`（`HandleComposerCommandAsync`、`_turnSkill`）
 - `Contracts/Models/ComposerTrigger.cs`、`ComposerTokens.cs`、`ComposerCommands.cs`、`ComposerMatch.cs`（语法、扫描、命令目录、排序）
 - `src/App/SDemo.DesktopAgent.Core/Services/WorkspaceReferenceIndex.cs`（`@` 路径索引）
 - `src/Context/SDemo.DesktopAgent.Context/SkillCatalog.cs`（`disable-model-invocation` 解析）、`SkillIndexBuilder.cs`、`Tools.Skills/SkillToolPack.cs`（索引过滤与 `load_skill` 拒绝）
-- `src/App/SDemo.DesktopAgent.UI/Components/Chat/ContextBreakdown.razor`、`ContextMeter.razor`（现有分解面板与环形；P2a 加段后只需改数据源）；`Contracts/Context/ContextReport.cs`（段定义）
+- `src/App/SDemo.DesktopAgent.UI/Components/Chat/ContextBreakdown.razor`、`ContextMeter.razor`（分解面板与环形；P2a 起按段渲染）；`Contracts/Context/ContextReport.cs`（段定义）
+- `src/Context/SDemo.DesktopAgent.Context/ContextSections/`（P2a）：`IAgentContextSection.cs`（接口 + 中央顺序 + `ContextSectionUsage`）、`ContextSectionRegistry.cs`（排序 / required 先占 / 段内截断）、`StateContextSections.cs`（workspace / changes / actions / verification / plan / time）、`PolicyContextSection.cs`、`AgentPolicyFacts.cs`、`ContextSectionText.cs`（段内截断与相对时间）
+- `src/Context/SDemo.DesktopAgent.Context/HostSnapshot.cs`（快照前缀与 `IsSnapshot` 判据）、`ContextBuilder.cs`（`BuildSnapshot` / 快照最后追加 / 预算从历史里扣）、`ContextReport.cs`（`Sections` / `CacheHitTokens`）
+- `src/Agents/SDemo.DesktopAgent.Agents/AgentRuntime.cs`（`Usage.CacheHitTokens`）、`MafAgentRuntime.cs` / `NativeAgentLoop.cs`（`CachedInputTokenCount` 透出）、`Contracts/Services/AgentRunMetrics.cs`
+
+## 13. P2a 实施记录（上下文段注册表 + 尾部快照 + 缓存命中测量）
+
+状态：✅ 已落地。WPF 解决方案 0 警告 0 错误（Debug / Release）；Core 800、UI 111、Sandbox 219（1 跳过）测试全绿；
+`tools/routing-eval --mode rules` 仍 28/28。
+
+### 落地形态
+
+| 计划项 | 实现 |
+|---|---|
+| §3.3.1-(1) 段注册表 | 新增 `Context/ContextSections/`：`IAgentContextSection`（`Name` / `Title` / `Order` / `Required` / `MaxTokens` / `Render`）+ `ContextSectionOrders` 中央顺序表 + `ContextSectionRegistry`（按 `Order → Name` 排序 → 丢空段 → required 先按 Order 占预算 → 可选段填剩余 → 每段按 `MaxTokens` 截断），重名注册直接抛异常 |
+| 内置段 | `workspace` 100 / `policy` 110 / `changes` 120 / `actions` 125 / `verification` 130 / `plan` 140 / `time` 150；`required` = `policy` + `verification` + `time` |
+| §3.3.1-(2) 尾部快照 | `ContextBuilder.BuildSnapshot` 在裁剪**之后**追加一条 `user` 消息，前缀由 `HostSnapshot.Header` 统一（「宿主生成，不是用户输入；本快照取代之前的快照」）。系统提示词里只剩稳定前缀 + 压缩摘要 |
+| `policy` 段（新增） | `AgentPolicyFacts.FromSettings`：本轮模式、沙箱（类型 / 必需 / 副本只读）、直跑与命令白名单、写回是否需确认 |
+| `time` 段（新增） | 宿主时钟 ISO + 偏移 + IANA 时区、距上一条模型可见消息的时长（`unavailable` / 刚刚 / N 分钟 / N 小时…）；Windows 时区 id 先转 IANA，转不出才退回原 id |
+| 归因 | `ContextReport.Sections`（`ContextSectionUsage[]`：名字 / 标题 / 顺序 / required / token / truncated）；`ContextBreakdown` 在「上下文快照」行下面按段列出，并标出必需 / 已截断 |
+| 单段开关 | 新增 `TimeContextEnabled` / `PlanContextEnabled`；`StatePackEnabled` 收窄为「工作区结构 / 改动 / 动作」三段的开关（策略与验证不受它影响，关掉时也不扫盘） |
+| 缓存命中测量 | `UsageDetails.CachedInputTokenCount` → `AgentStreamEvent.Usage.CacheHitTokens` → `AgentRunMetrics.CacheHitTokens` → `ContextReport.CacheHitTokens` + `CacheHitRate`；界面只在「有实际输入 token 且命中 > 0」时显示命中率 |
+| 摘要留在固定块 | `ContextBuilder.BuildInjection` 只渲染压缩摘要：它只在压缩时变，不会再每轮改系统前缀 |
+
+### 与计划的偏差（取舍）
+
+1. **段标题用 `###`**，`##` 留给快照本身——层级上快照是「一条消息」，段是它的子结构。
+2. **保留 `actions`（最近工具动作）段**：计划表里没有它，但它是现有状态包的一部分，删掉等于静默丢事实；
+   它和 `workspace` / `changes` 一样受 `StatePackEnabled` 管。
+3. **`time` 做成 required**：它只有 ~40 token，却是「这条构建结果是 3 分钟前还是昨天」的唯一依据；
+   用户仍可用开关整段关掉——**开关优先于 required**，两者是不同轴线。
+4. **快照在裁剪之后追加**，所以不需要给裁剪器加「快照例外」：它在结构上就不可能被当成最旧的一轮淘汰。
+   这一点和 DSH 不同（DSH 的快照要持久化进日志，必须显式排除），因为我们的历史是每请求重建的。
+5. **`AgentChatService.ResolveRouting` 必须按前缀排除快照消息**：否则「最后一条 user 消息」会变成快照，
+   把对话轮误判成任务轮（回归由 `AgentChatServiceToolExposureTests.对话轮不生成工具并切换对话提示词` 挡住）。
+   任何以后「从请求消息里取用户输入」的代码都要用 `HostSnapshot.IsSnapshot` 过滤。
+6. **段内截断统一为「保留头部行 + 一行标记」**；只有计划段保留自己的 200 token 增量截断，因为它需要
+   「计划已截断」这句人话。`required` 段不参与总额度竞争，但仍按自己的上限截断。
+7. **删除 `StatePackFormatter`**，`DefaultExcludes` 移到 `WorkspaceExcludes`：树扫描、`@` 引用索引、
+   快照的 `workspace` 段三处共用同一张排除表（以前是两处引用同一份常量）。
+8. **字节稳定靠注入 `TimeProvider`**：`ContextBuilder` 多了可选 `ContextSectionRegistry` / `TimeProvider`
+   两个参数，DI 不注册也能解析（可选参数走默认值），测试里冻住时钟就能断言逐字节相同。
+9. **没有做「改动前后各 20 轮」的缓存实测**：本机没有可用模型端点。测量链路已经端到端测通
+   （假 SSE 上报 `prompt_tokens_details.cached_tokens` → 事件 → 指标 → 报告），但「命中率是否下降」
+   必须在真实端点上跑；而且端点若根本不报这个字段，这条改造只是「结构更干净」（§6 风险 4）。
+
+### 测试
+
+- 段 / 契约：`StatePackTests`（扫描排除与上限、workspace 截断后 required 仍在、相对时间、关段后零成本、
+  关段不扫盘、树缓存、改动去重、计划 200 token、重名抛异常、中央顺序覆盖注册顺序）；
+  `ContextSnapshotTests`（预算压到 200 时 required 仍在且 `Truncated=false`、连续 5 轮逐字节相同、
+  关 `time`/`plan` 成本为 0、切直跑 / 只读后 `policy` 文本变化、时间读数三行、快照永远是最后一条 `user` 消息、
+  快照预算从历史预算里扣）。
+- 构建器：`ContextBuilderSummaryTests`（摘要仍在系统块、快照在末尾且带段归因、直通不加快照、
+  无工作区时仍带策略与时间）、`ContextBuilderTests`（消息数 +1、分段之和 = 总估算）。
+- 回路：`CacheHitTests`（假 `IChatClient` 与假 SSE 两条路径都透出 cached tokens、没有上报时为 0、
+  命中率只在有实际输入时计算）。
+- 界面：`ContextBreakdownTests` 增 3 条（按段渲染 + 必需 / 截断标记、命中率显示、无上报不显示）。
+
+### 边界（留给 P2b / P2c）
+
+- 压缩还没事务化：`compaction/start|summary|end` 三个状态字段属于 P2b。
+- 快照不参与压缩范围计算：压缩从「第一个非 system 节点」起、快照在末尾，天然落在保留区；
+  P2b 需要显式给它打 `IsPinned`。
+- 大输出仍然只是截断（头 1200 / 尾 300 字符），落盘属于 P2c。

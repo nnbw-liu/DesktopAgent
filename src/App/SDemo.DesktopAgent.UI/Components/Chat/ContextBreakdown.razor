@@ -28,6 +28,23 @@
         </div>
     }
 
+    @* P2a：快照按段归因（名字 / token / required），不再是「工作区状态」一个总数。 *@
+    @if (Report.SectionUsages.Count > 0)
+    {
+        <div class="context-sections">
+            @foreach (var section in Report.SectionUsages)
+            {
+                <div class="context-row context-row--section">
+                    <span class="context-row-label">· @section.Title</span>
+                    <span class="context-row-hint">
+                        @(section.Required ? "必需" : "可选")@(section.Truncated ? " · 已截断" : string.Empty)
+                    </span>
+                    <span class="context-row-value">@ContextMeter.Format(section.Tokens)</span>
+                </div>
+            }
+        </div>
+    }
+
     <div class="context-divider"></div>
 
     <div class="context-row is-muted">
@@ -57,7 +74,7 @@
     }
     @if (Report.StatePackUsed)
     {
-        <p class="context-note">工作区状态包约 @ContextMeter.Format(Report.StatePackTokens) token</p>
+        <p class="context-note">宿主上下文快照约 @ContextMeter.Format(Report.StatePackTokens) token（每轮末尾的一条消息）</p>
     }
     @if (Report.Routing is { Count: > 0 } routing)
     {
@@ -101,7 +118,7 @@
         }
         @if (Report.StatePackUsed)
         {
-            <span class="context-flag">状态包</span>
+            <span class="context-flag">快照</span>
         }
         @if (Report.Trimmed)
         {
@@ -126,6 +143,11 @@
         {
             <span>实际输入 @ContextMeter.Format(Report.ActualInputTokens.Value)</span>
             <span>校准 ×@Report.CalibrationFactor.ToString("F2")</span>
+            @* 端点不报 cache 字段时整项不显示（DSH 同样的规矩：宁可没有，不给假数字）。 *@
+            @if (Report.CacheHitTokens > 0)
+            {
+                <span>缓存命中 @ContextMeter.Format(Report.CacheHitTokens)（@((Report.CacheHitRate * 100).ToString("F0"))%）</span>
+            }
         }
         else
         {
@@ -156,7 +178,8 @@
             Report.TotalTurns > Report.KeptTurns ? $"{Report.KeptTurns}/{Report.TotalTurns} 轮" : string.Empty);
         yield return ("已压缩摘要", segments.Summary, "seg-summary",
             Report.CompactedMessages > 0 ? $"{Report.CompactedMessages} 条" : string.Empty);
-        yield return ("工作区状态", segments.StatePack, "seg-state", string.Empty);
+        yield return ("上下文快照", segments.StatePack, "seg-state",
+            Report.SectionUsages.Count > 0 ? $"{Report.SectionUsages.Count} 段" : string.Empty);
         yield return ("附件", segments.Attachments, "seg-attachments", string.Empty);
         yield return ("工具轨迹", segments.ToolTrace, "seg-trace", string.Empty);
         yield return ("Pin 消息", segments.Pinned, "seg-pinned", string.Empty);

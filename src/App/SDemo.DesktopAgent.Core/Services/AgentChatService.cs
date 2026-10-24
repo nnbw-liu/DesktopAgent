@@ -264,7 +264,7 @@ public sealed class AgentChatService : IAgentChatService
             switch (evt)
             {
                 case AgentStreamEvent.Usage usage:
-                    plan.Metrics?.AddUsage(usage.InputTokens, usage.OutputTokens);
+                    plan.Metrics?.AddUsage(usage.InputTokens, usage.OutputTokens, usage.CacheHitTokens);
                     break;
 
                 // 上一步攒下的文本必须按旧 step 先落地，否则最后一句会挂到下一步的序号上。
@@ -367,8 +367,10 @@ public sealed class AgentChatService : IAgentChatService
             return RoutingDecision.Empty;
         }
 
+        // P2a：末尾的宿主上下文快照也是一条 user 消息，但它不是用户说的话——
+        // 拿它当「本轮输入」会把对话轮误判成任务轮，所以按标题前缀排除。
         var userInputs = plan.Context.Messages
-            .Where(message => message.Role == ChatRole.User)
+            .Where(message => message.Role == ChatRole.User && !HostSnapshot.IsSnapshot(message.Text))
             .Select(message => message.Text ?? string.Empty)
             .ToArray();
         var userInput = userInputs.Length > 0 ? userInputs[^1] : string.Empty;
