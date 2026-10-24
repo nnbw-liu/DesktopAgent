@@ -9,17 +9,23 @@ window.sdComposer = {
     _dragOver: null,
     _dragLeave: null,
     _drop: null,
+    // 输入框补全菜单是否打开：打开时方向键 / Enter / Tab / Esc 归菜单，不发送。
+    _menuOpen: false,
 
     attach: function (dotNetRef) {
         this.detach();
 
         this._handler = function (event) {
-            if (event.key !== 'Enter' || event.isComposing) {
+            var target = event.target;
+            if (!target || typeof target.closest !== 'function' || !target.closest('.composer-text')) {
                 return;
             }
 
-            var target = event.target;
-            if (!target || typeof target.closest !== 'function' || !target.closest('.composer-text')) {
+            if (this._menuOpen && this._handleMenuKey(event, dotNetRef)) {
+                return;
+            }
+
+            if (event.key !== 'Enter' || event.isComposing) {
                 return;
             }
 
@@ -43,6 +49,53 @@ window.sdComposer = {
 
         document.addEventListener('keydown', this._handler, true);
         this._attachDrop();
+    },
+
+    // 返回 true 表示这个键已经被菜单吃掉。
+    _handleMenuKey: function (event, dotNetRef) {
+        switch (event.key) {
+            case 'ArrowDown':
+            case 'ArrowUp':
+                event.preventDefault();
+                dotNetRef.invokeMethodAsync('MenuMoveAsync', event.key === 'ArrowDown' ? 1 : -1);
+                return true;
+            case 'Enter':
+            case 'Tab':
+                if (event.isComposing) {
+                    return false;
+                }
+
+                event.preventDefault();
+                dotNetRef.invokeMethodAsync('MenuCommitAsync');
+                return true;
+            case 'Escape':
+                event.preventDefault();
+                dotNetRef.invokeMethodAsync('MenuDismissAsync');
+                return true;
+            default:
+                return false;
+        }
+    },
+
+    setMenuOpen: function (open) {
+        this._menuOpen = !!open;
+    },
+
+    caretOf: function (element) {
+        return element && typeof element.selectionStart === 'number' ? element.selectionStart : 0;
+    },
+
+    // 替换 [start, end) 为 text，并把光标放到末尾；返回替换后的完整文本。
+    replaceRange: function (element, start, end, text) {
+        if (!element) {
+            return '';
+        }
+
+        element.focus();
+        element.setRangeText(text, start, end, 'end');
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+
+        return element.value;
     },
 
     detach: function () {

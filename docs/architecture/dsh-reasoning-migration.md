@@ -869,7 +869,34 @@ token 计量         ctx.tokenMeter              → ContextReport（已有，�
 - `ChatRoomStreamFailureTests` 覆盖「流中途失败」：错误提示必须落成一步，否则按步骤拼出来的答案会漏掉它。
 - 另用 `SDEMO_UI_BASELINE=1` 渲染了一份临时 HTML 逐项核对过（过程组只含过程、答案在组外、工具卡能展开到参数/结果）；截图基线的 PNG 管线在本次 checkout 里缺 `tools/ui-baseline`，所以没有提交新的基线产物。
 
-## 9. 参考（证据位置）
+## 9. P0.5 实施记录（进行中：`@` 文件引用已落地）
+
+状态：`@` 切片完成。构建 0 警告 0 错误；Core 741、UI 92 测试全绿。`/` 命令与 `/` 技能尚未开始。
+
+### 已落地
+
+| 计划项 | 实现 |
+|---|---|
+| 触发语法 | `ComposerTriggers.Detect(text, caret)`：`@` 只认行首/空白之后，`/` 只认行首；`@"带 空格"` 允许空格直到闭合引号；`foo@bar` 与「和/或」不误触发 |
+| 候选排序 | `ComposerMatch`：大小写不敏感的有序子序列，路径段前缀优先，其次匹配间隙、再按候选长度、最后保持宿主顺序 |
+| 路径索引 | `WorkspaceReferenceIndex`：广度优先、深度 8、上限 4000 条、复用状态包的排除表（bin/obj/node_modules…）、30 秒缓存 + `Invalidate()` |
+| 菜单交互 | `sdComposer` 接管菜单开合：`↑↓` 移动、`Enter`/`Tab` 插入、`Esc` 关闭；菜单打开时 Enter 不再发送 |
+| 插入语义 | 只插**纯文本** `@path` / `@"带 空格"`；目录补成 `@"dir/` 并保持菜单（下一次输入自动下钻）；文件插入后补一个空格并关闭 |
+| 接线 | `ChatComposer` 注入 `IComposerReferenceIndex`，`ChatRoom` 传入 `WorkspaceContext.RootPath`；DI 注册落在 `AddDesktopAgentCore` |
+
+### 与计划的偏差
+
+1. **文本在 C# 里算、JS 只改 DOM**：`replaceRange` 不再返回新文本，避免界面/测试/回灌三条路径拿到不同结果。
+2. **目录下钻靠「让 input 事件重新识别」**：插入 `@"dir/` 后不主动查询，交给下一次 `HandleInput` 重算，代码里只有一条识别路径。
+3. **键盘仲裁放在 JS**：沿用现有 `sdComposer` 的 document 捕获监听（Enter 一直是 JS 管的），菜单只是多一种「吃掉按键」的状态，不引入第二套 keydown 监听。
+4. 测试里用 bUnit 的 `JSInterop.Setup<int>("sdComposer.caretOf", invocation => true)`（带 matcher 的重载才匹配带参数的调用），并避开 `RefreshableElementCollection` 的索引器（bUnit 1.40 与仓库里 AngleSharp 1.8.5 不兼容，会抛 `MissingMethodException`）。
+
+### 待办
+
+- `/` 命令：注册表 + 严格语法 + 未知命令拒绝（`/compact`、`/new`、`/model`、`/index`）。
+- `/` 技能：`skills/list` 候选 + 命令优先裁决 + 复用 `SkillName`/`SkillText` 注入 + `disable-model-invocation`。
+
+## 10. 参考（证据位置）
 
 DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat/lib/client.js`，`TOOL` = `dsh-client-ui-tool/lib/client.js`）：
 

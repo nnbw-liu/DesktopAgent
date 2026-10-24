@@ -1,5 +1,6 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using SDemo.DesktopAgent.Core.Services;
 using SDemo.DesktopAgent.Editing;
 using SDemo.DesktopAgent.Execution;
 using SDemo.DesktopAgent.Models;
@@ -113,6 +114,8 @@ internal static class ChatRoomFixture
         context.Services.AddSingleton(new AgentToolRegistry([]));
         context.Services.AddSingleton<ISandboxJobService>(new UnavailableSandboxJobService());
         context.Services.AddSingleton(new SkillCatalog(paths.SkillsRoot));
+        // P0.5：输入框 @ 补全的路径索引（真实实现，指向测试用的临时工作区）。
+        context.Services.AddSingleton<IComposerReferenceIndex>(new WorkspaceReferenceIndex());
         context.Services.AddSingleton(new PluginRegistry(catalog, settings));
         context.Services.AddSingleton(new PluginParameterResolver());
         context.Services.AddSingleton<IPluginRunner>(new NoPluginRunner());

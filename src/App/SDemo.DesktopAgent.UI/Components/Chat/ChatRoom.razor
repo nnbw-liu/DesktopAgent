@@ -444,6 +444,7 @@
 
         <ChatComposer @bind-Text="_draft"
                       SessionId="@Session.Id"
+                      WorkspaceRoot="@WorkspaceContext.RootPath"
                       IsGenerating="_isGenerating"
                       Skills="_skills"
                       SelectedSkill="@_selectedSkill"
