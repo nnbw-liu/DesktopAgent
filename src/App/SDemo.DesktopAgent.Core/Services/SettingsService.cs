@@ -93,6 +93,10 @@ public sealed class SettingsService : ISettingsService
                     // agent 节点（工具预算 / 小模型）同样兜底，避免 JSON 里写成 null。
                     settings.Agent ??= new AgentSettings();
 
+                    // 智能模型路由：旧设置没有该节点时默认关闭；映射列表兜底为 []。
+                    settings.ModelRouting ??= new ModelRoutingSettings();
+                    settings.ModelRouting.Routes ??= [];
+
                     foreach (var provider in settings.Providers)
                     {
                         provider.ApiKey = !string.IsNullOrEmpty(provider.ApiKeyProtected)

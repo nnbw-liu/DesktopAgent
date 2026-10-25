@@ -1,5 +1,6 @@
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
+using SDemo.DesktopAgent.Models;
 using SDemo.DesktopAgent.Plugins;
 using SDemo.DesktopAgent.Sandbox;
 using SDemo.DesktopAgent.Services;
@@ -70,6 +71,10 @@ public sealed class CompositionTests
         // M3：知识库索引与归档服务也必须能从核心容器解析。
         Assert.NotNull(provider.GetRequiredService<IWorkspaceMemory>());
         Assert.NotNull(provider.GetRequiredService<SessionArchiveService>());
+
+        // 智能模型路由：规则 / 混合 / 总控都走同一个入口，DI 缺一个就启动即崩。
+        Assert.NotNull(provider.GetRequiredService<IModelRouter>());
+        Assert.NotNull(provider.GetRequiredService<IModelRoutingAdvisor>());
 
         // 校验 PowerShell 之外的核心包都有工具；PowerShell 由 Windows 宿主单独注册。
         Assert.All(registry.Descriptors, descriptor => Assert.NotEmpty(descriptor.Functions));

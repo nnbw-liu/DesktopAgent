@@ -1,13 +1,200 @@
 @using SDemo.DesktopAgent.Models
 @inject ISettingsService Settings
 
-@* 模型设置：提供商列表（列表最后固定「添加模型提供商」） *@
+@* 模型设置：智能路由 + 提供商列表（列表最后固定「添加模型提供商」） *@
 <div class="settings-pane settings-pane--models">
-    <div class="models-head">
-        <h2 class="settings-section-title">模型提供商</h2>
-        <p class="settings-section-hint">只支持标准 OpenAI API（GET /v1/models、POST /v1/chat/completions）。</p>
-    </div>
+    <div class="models-scroll">
+    <details class="settings-section settings-collapsible">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <span class="settings-fold-text">
+                <span class="settings-section-title">智能模型路由</span>
+                <span class="settings-section-hint">
+                    按任务难度自动换模型：简单问题用便宜模型，改代码用代码模型，架构 / 排查 / 长上下文用强模型。
+                    聊天室输入框旁选「自动选择」启用；手动选一个模型则固定该聊天室。
+                </span>
+            </span>
+        </summary>
 
+        <div class="settings-section-body">
+        <label class="field field--wide">
+            <span class="field-label">工作方式</span>
+            <select class="field-input"
+                    value="@Settings.Current.ModelRouting.Mode"
+                    @onchange="ChangeRoutingMode">
+                <option value="Off">关闭（固定当前模型）</option>
+                <option value="Rules">规则（本地判断，零额外请求）</option>
+                <option value="Hybrid">混合（拿不准时问一次路由模型）</option>
+                <option value="Model">总控（路由模型直接选模型）</option>
+            </select>
+            <span class="field-hint">
+                规则 / 混合模式按下面「任务 → 模型」映射选；总控模式允许路由模型在候选清单里直接挑，
+                候选仍受窗口、工具能力与下面成本偏好的约束。
+            </span>
+        </label>
+
+        @if (Settings.Current.ModelRouting.Mode != ModelRoutingMode.Off)
+        {
+            <div class="settings-subsection">
+                <span class="field-label">任务 → 模型</span>
+                <p class="settings-section-hint">
+                    留空表示回落到「兜底模型」。映射优先于成本偏好；成本偏好只影响总控 / 混合模式下的候选顺序。
+                </p>
+
+                <div class="settings-grid settings-grid--routing">
+                    @foreach (var task in RouteTasks)
+                    {
+                        <label class="field">
+                            <span class="field-label">@TaskLabel(task)</span>
+                            <select class="field-input"
+                                    value="@BindingValue(task)"
+                                    @onchange="args => ChangeRoute(task, args)">
+                                <option value="">未指定</option>
+                                @foreach (var provider in Settings.Current.Providers)
+                                {
+                                    @if (provider.Models.Count > 0)
+                                    {
+                                        <optgroup label="@provider.Name">
+                                            @foreach (var model in provider.Models)
+                                            {
+                                                <option value="@($"{provider.Id}|{model.Id}")">@($"{model.Name}（{provider.Name}）")</option>
+                                            }
+                                        </optgroup>
+                                    }
+                                }
+                            </select>
+                            <span class="field-hint">@TaskHint(task)</span>
+                        </label>
+                    }
+                </div>
+
+                <div class="settings-grid">
+                    <label class="field">
+                        <span class="field-label">兜底模型</span>
+                        <select class="field-input"
+                                value="@DefaultValue()"
+                                @onchange="ChangeDefaultRoute">
+                            <option value="">当前聊天室模型</option>
+                            @foreach (var provider in Settings.Current.Providers)
+                            {
+                                @if (provider.Models.Count > 0)
+                                {
+                                    <optgroup label="@provider.Name">
+                                        @foreach (var model in provider.Models)
+                                        {
+                                            <option value="@($"{provider.Id}|{model.Id}")">@($"{model.Name}（{provider.Name}）")</option>
+                                        }
+                                    </optgroup>
+                                }
+                            }
+                        </select>
+                        <span class="field-hint">某类任务未配置、或配置的模型不可用时使用。</span>
+                    </label>
+
+                    <label class="field">
+                        <span class="field-label">成本偏好</span>
+                        <select class="field-input"
+                                value="@Settings.Current.ModelRouting.CostPreference"
+                                @onchange="ChangeCostPreference">
+                            <option value="Economy">省钱</option>
+                            <option value="Balanced">均衡</option>
+                            <option value="Quality">质量</option>
+                        </select>
+                        <span class="field-hint">只作为路由模型的决策提示与候选排序，不改写你的映射。</span>
+                    </label>
+                </div>
+            </div>
+
+            <details class="settings-details">
+                <summary>路由模型与高级选项</summary>
+
+                <div class="settings-grid">
+                    <label class="field">
+                        <span class="field-label">路由模型</span>
+                        <select class="field-input"
+                                value="@RouterValue()"
+                                @onchange="ChangeRouterModel">
+                            <option value="">复用摘要模型 / 当前模型</option>
+                            @foreach (var provider in Settings.Current.Providers)
+                            {
+                                @if (provider.Models.Count > 0)
+                                {
+                                    <optgroup label="@provider.Name">
+                                        @foreach (var model in provider.Models)
+                                        {
+                                            <option value="@($"{provider.Id}|{model.Id}")">@($"{model.Name}（{provider.Name}）")</option>
+                                        }
+                                    </optgroup>
+                                }
+                            }
+                        </select>
+                        <span class="field-hint">只用于分类 / 选模型，建议用便宜的小模型；失败自动回落规则。</span>
+                    </label>
+
+                    <label class="field">
+                        <span class="field-label">路由超时（秒）</span>
+                        <input class="field-input"
+                               type="number"
+                               min="1"
+                               max="60"
+                               value="@Settings.Current.ModelRouting.RouterTimeoutSeconds"
+                               @onchange="ChangeRouterTimeout" />
+                    </label>
+                </div>
+
+                <label class="settings-row settings-row--toggle">
+                    <span class="settings-row-text">
+                        <span class="settings-row-title">同会话粘住模型</span>
+                        <span class="settings-row-hint">
+                            任务类型不变时沿用上一轮模型，减少切模型导致的提示缓存失效；任务类型变化仍会重新路由。
+                        </span>
+                    </span>
+                    <input type="checkbox"
+                           class="switch"
+                           checked="@Settings.Current.ModelRouting.StickySession"
+                           @onchange="ToggleSticky" />
+                </label>
+
+                <label class="settings-row settings-row--toggle">
+                    <span class="settings-row-text">
+                        <span class="settings-row-title">候选必须装得下当前上下文</span>
+                        <span class="settings-row-hint">
+                            估算输入超过模型窗口时跳过它，优先换大窗口模型；全都装不下时仍选窗口最大的。
+                        </span>
+                    </span>
+                    <input type="checkbox"
+                           class="switch"
+                           checked="@Settings.Current.ModelRouting.RespectContextWindow"
+                           @onchange="ToggleRespectWindow" />
+                </label>
+
+                <div class="settings-message">
+                    当前映射：
+                    @foreach (var task in RouteTasks)
+                    {
+                        <span class="route-summary">@TaskLabel(task)：@BindingLabel(task)</span>
+                    }
+                </div>
+            </details>
+        }
+
+        @if (_routingMessage is not null)
+        {
+            <p class="settings-message">@_routingMessage</p>
+        }
+        </div>
+    </details>
+
+    <details class="settings-section settings-collapsible" open="open">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <span class="settings-fold-text">
+                <span class="settings-section-title">模型提供商</span>
+                <span class="settings-section-hint">只支持标准 OpenAI API（GET /v1/models、POST /v1/chat/completions）。</span>
+            </span>
+        </summary>
+
+        <div class="settings-section-body">
     <div class="provider-scroll">
         @if (Settings.Current.Providers.Count == 0)
         {
@@ -52,6 +239,9 @@
             </article>
         }
     </div>
+        </div>
+    </details>
+    </div>
 
     <div class="provider-add-bar">
         @if (_editing is not null)
@@ -80,9 +270,148 @@
 </div>
 
 @code {
+    private static readonly ModelTaskKind[] RouteTasks =
+    [
+        ModelTaskKind.Simple,
+        ModelTaskKind.Code,
+        ModelTaskKind.Complex
+    ];
+
     private bool _isAdding;
     private ModelProvider? _editing;
     private string? _pendingRemoveId;
+    private string? _routingMessage;
+
+    private static string TaskLabel(ModelTaskKind task) => task switch
+    {
+        ModelTaskKind.Simple => "简单任务",
+        ModelTaskKind.Code => "代码任务",
+        ModelTaskKind.Complex => "复杂任务",
+        _ => task.ToDisplayName()
+    };
+
+    private static string TaskHint(ModelTaskKind task) => task switch
+    {
+        ModelTaskKind.Simple => "问答、解释、小范围只读查询；便宜 / 快的模型。",
+        ModelTaskKind.Code => "改代码、跑构建 / 测试、看日志；稳定的工具调用模型。",
+        ModelTaskKind.Complex => "架构、根因排查、跨文件重构、长上下文；强推理 / 大窗口模型。",
+        _ => string.Empty
+    };
+
+    private string BindingValue(ModelTaskKind task)
+    {
+        var binding = Settings.Current.ModelRouting.Find(task);
+        return binding is null ? string.Empty : $"{binding.ProviderId}|{binding.ModelId}";
+    }
+
+    private string BindingLabel(ModelTaskKind task)
+    {
+        var binding = Settings.Current.ModelRouting.Find(task);
+        if (binding is null)
+        {
+            return "未指定";
+        }
+
+        var provider = Settings.Current.Providers.FirstOrDefault(item =>
+            string.Equals(item.Id, binding.ProviderId, StringComparison.Ordinal));
+        var model = provider?.Models.FirstOrDefault(item =>
+            string.Equals(item.Id, binding.ModelId, StringComparison.Ordinal));
+
+        return model is null || provider is null
+            ? $"{binding.ProviderId} · {binding.ModelId}"
+            : $"{model.Name}（{provider.Name}）";
+    }
+
+    private string DefaultValue() => Settings.Current.ModelRouting.HasDefault
+        ? $"{Settings.Current.ModelRouting.DefaultProviderId}|{Settings.Current.ModelRouting.DefaultModelId}"
+        : string.Empty;
+
+    private string RouterValue() => string.IsNullOrWhiteSpace(Settings.Current.ModelRouting.RouterProviderId)
+        || string.IsNullOrWhiteSpace(Settings.Current.ModelRouting.RouterModelId)
+        ? string.Empty
+        : $"{Settings.Current.ModelRouting.RouterProviderId}|{Settings.Current.ModelRouting.RouterModelId}";
+
+    private void ChangeRoutingMode(ChangeEventArgs args)
+    {
+        if (Enum.TryParse<ModelRoutingMode>(args.Value?.ToString(), true, out var mode))
+        {
+            Settings.Current.ModelRouting.Mode = mode;
+            Settings.Save();
+            _routingMessage = mode == ModelRoutingMode.Off
+                ? "智能路由已关闭，继续使用各聊天室当前选择的模型。"
+                : "已启用智能路由；在聊天室模型选择器里选「自动选择」即可使用。";
+        }
+    }
+
+    private void ChangeRoute(ModelTaskKind task, ChangeEventArgs args)
+    {
+        var (providerId, modelId) = ParseBinding(args.Value?.ToString());
+        Settings.Current.ModelRouting.SetRoute(task, providerId, modelId);
+        Settings.Save();
+        _routingMessage = $"{TaskLabel(task)}：{(string.IsNullOrWhiteSpace(modelId) ? "未指定" : BindingLabel(task))}";
+    }
+
+    private void ChangeDefaultRoute(ChangeEventArgs args)
+    {
+        var (providerId, modelId) = ParseBinding(args.Value?.ToString());
+        Settings.Current.ModelRouting.DefaultProviderId = providerId;
+        Settings.Current.ModelRouting.DefaultModelId = modelId;
+        Settings.Save();
+        _routingMessage = "兜底模型已保存。";
+    }
+
+    private void ChangeCostPreference(ChangeEventArgs args)
+    {
+        if (Enum.TryParse<ModelCostPreference>(args.Value?.ToString(), true, out var preference))
+        {
+            Settings.Current.ModelRouting.CostPreference = preference;
+            Settings.Save();
+            _routingMessage = "成本偏好已保存。";
+        }
+    }
+
+    private void ChangeRouterModel(ChangeEventArgs args)
+    {
+        var (providerId, modelId) = ParseBinding(args.Value?.ToString());
+        Settings.Current.ModelRouting.RouterProviderId = providerId;
+        Settings.Current.ModelRouting.RouterModelId = modelId;
+        Settings.Save();
+        _routingMessage = "路由模型已保存；留空时复用摘要模型。";
+    }
+
+    private void ChangeRouterTimeout(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var seconds))
+        {
+            Settings.Current.ModelRouting.RouterTimeoutSeconds = Math.Clamp(seconds, 1, 60);
+            Settings.Save();
+        }
+    }
+
+    private void ToggleSticky(ChangeEventArgs args)
+    {
+        Settings.Current.ModelRouting.StickySession = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleRespectWindow(ChangeEventArgs args)
+    {
+        Settings.Current.ModelRouting.RespectContextWindow = args.Value is true;
+        Settings.Save();
+    }
+
+    private static (string? ProviderId, string? ModelId) ParseBinding(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return (null, null);
+        }
+
+        var parts = value.Split('|', 2);
+        return parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[1])
+            ? (null, null)
+            : (parts[0], parts[1]);
+    }
 
     private IReadOnlyCollection<string> ExistingIds =>
         Settings.Current.Providers.Select(p => p.Id).ToList();

@@ -12,6 +12,8 @@ public sealed class EffectiveSettings
 
     public required AgentSettings Agent { get; init; }
 
+    public required ModelRoutingSettings ModelRouting { get; init; }
+
     public required ExecutionSettings Execution { get; init; }
 
     public required CheckpointSettings Checkpoints { get; init; }
@@ -24,6 +26,16 @@ public sealed class EffectiveSettings
     /// <summary>解析后的模型 id。</summary>
     public string? ModelId { get; init; }
 
+    /// <summary>作用域是否显式打开 / 关闭自动路由；null 时跟随全局 <see cref="ModelRoutingSettings.Mode"/>。</summary>
+    public bool? AutoModelRouting { get; init; }
+
+    /// <summary>
+    /// 本轮是否启用自动选模型。全局模式是总开关（Off 时任何作用域都不路由）；
+    /// 非 Off 时，作用域显式 false 表示固定模型，null / true 表示跟随自动。
+    /// </summary>
+    public bool UseModelRouting =>
+        ModelRouting.Mode != ModelRoutingMode.Off && (AutoModelRouting ?? true);
+
     public static EffectiveSettings Resolve(
         AppSettings global,
         Workspace? workspace,
@@ -31,15 +43,25 @@ public sealed class EffectiveSettings
     {
         var context = (global.Context ?? new ContextSettings()).Clone();
         var agent = (global.Agent ?? new AgentSettings()).Clone();
+        var modelRouting = (global.ModelRouting ?? new ModelRoutingSettings()).Clone();
         var execution = (global.Execution ?? new ExecutionSettings()).Clone();
         var checkpoints = (global.Checkpoints ?? new CheckpointSettings()).Clone();
         var confirmFileWrite = global.ConfirmFileWrite;
+        bool? autoModelRouting = null;
 
-        Apply(workspace?.ScopedSettings, context, agent, execution, checkpoints, ref confirmFileWrite);
-        Apply(session?.ScopedSettings, context, agent, execution, checkpoints, ref confirmFileWrite);
+        Apply(workspace?.ScopedSettings, context, agent, execution, checkpoints, ref confirmFileWrite, ref autoModelRouting);
+        Apply(session?.ScopedSettings, context, agent, execution, checkpoints, ref confirmFileWrite, ref autoModelRouting);
 
         var providerId = global.LastProviderId;
         var modelId = global.LastModelId;
+
+        // 旧会话如果已经显式选过模型（没有 AutoModelRouting 标记），视为固定模型，
+        // 不因为后来打开全局路由而悄悄换模型；用户可以在模型选择器里重新选「自动」。
+        if (autoModelRouting is null
+            && (HasModelPair(session?.ScopedSettings) || HasModelPair(workspace?.ScopedSettings)))
+        {
+            autoModelRouting = false;
+        }
 
         // provider / model 必须成对；只设了一个就整对忽略，避免拿 A 家的模型去请求 B 家。
         if (HasModelPair(workspace?.ScopedSettings))
@@ -58,11 +80,13 @@ public sealed class EffectiveSettings
         {
             Context = context,
             Agent = agent,
+            ModelRouting = modelRouting,
             Execution = execution,
             Checkpoints = checkpoints,
             ConfirmFileWrite = confirmFileWrite,
             ProviderId = providerId,
-            ModelId = modelId
+            ModelId = modelId,
+            AutoModelRouting = autoModelRouting
         };
     }
 
@@ -76,11 +100,17 @@ public sealed class EffectiveSettings
         AgentSettings agent,
         ExecutionSettings execution,
         CheckpointSettings checkpoints,
-        ref bool confirmFileWrite)
+        ref bool confirmFileWrite,
+        ref bool? autoModelRouting)
     {
         if (scope is null)
         {
             return;
+        }
+
+        if (scope.AutoModelRouting is bool autoRouting)
+        {
+            autoModelRouting = autoRouting;
         }
 
         if (scope.ContextEnabled is bool contextEnabled)
