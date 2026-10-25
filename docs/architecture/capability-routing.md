@@ -354,3 +354,43 @@ M1–M4 解决的是「从很多工具里挑哪些」，但从未回答「这一
 - 「帮我改一下这个文件」仍拿到 `read_file` / `apply_patch` 等必要工具。
 - 「解释一下怎么改」「这个文件改哪里了？」不触发无修改追问。
 - 全量暴露（排障开关）仍然优先于对话判定。
+
+## 13. P1b：曝光面按任务档稳定 + 工具描述带决策规则（2026-10-24）
+
+配套记录见 [dsh-reasoning-migration.md §11](dsh-reasoning-migration.md#11-p1b-实施记录工具描述--曝光面--同轮补齐--删-plan)。
+
+### 问题
+
+1. **工具面随关键词抖动**：路由只看「这一句」，句子没命中意图词就退回核心集——用户上一句在改代码、这一句只说「继续」，
+   `replace_text` / `write_file` 就当轮消失了，模型只能重问或改用别的方式。
+2. **描述只写「是什么」，不写「什么时候用」**：选择先验全在宿主的 `IntentRules` 关键词表里，模型看不到；
+   而 `read_file` / `search_files` / `apply_patch` / `replace_text` / `write_file` / `run_command` / `run_powershell`
+   这些工具的选择恰恰需要判断，不是功能差异。
+3. **`search_capabilities` 是死路**：命中未暴露的工具只回一句「下一轮再说」，本轮内无法自救。
+4. **PLAN 强制**：没有推理通道时的替代品被无差别地压给所有模型，正文里全是「PLAN: 我先看一下」。
+
+### 设计
+
+| 项 | 做法 |
+| --- | --- |
+| 任务档（`ToolTaskProfile`） | 本句有任务信号 → 用它；没有 → 沿用最近一条有任务信号的**用户**输入（新的在前，最多 4 条）；都没有 → `General`（只给核心集，与 M4 一致） |
+| 只增不减 | Full = 核心集 + 任务档工具 + 本句意图工具 + 最近工具；任务档内工具集固定，换话题才换档 |
+| 宿主提示不进历史判定 | `PreviousUserInputs` 跳过 `[宿主提示]` 开头的消息——「本轮没有检测到任何文件修改」不该被当成编辑意图 |
+| 工具描述 | `ToolPlaybooks`：功能说明 + 决策规则拼进模型看到的 `description`（`InstrumentedAIFunction.Description`），9 个包 20 个工具统一一张表，幂等 |
+| 同轮补工具 | `search_capabilities` 执行时回调结构化命中（`CapabilitySearchOutcome`）→ 宿主在本轮内补最多 3 个、只补一次、受 schema 预算约束 → 下一步请求直接带上，界面落一行「本轮补充工具：…」 |
+| 删 PLAN | `SystemPrompts.FullFor(ModelProfile.SupportsReasoning)`：有思考通道用 `FullWithReasoning`（不要求 PLAN），否则 `FullWithPlanLine`；`IntentHint(Task)` 同步分叉 |
+
+### 评测
+
+`tools/routing-eval --mode rules`：**28/28（100%）**，阈值 90%。
+
+- 新增 4 条历史用例：`R25` 追问沿用编辑档、`R26` 追问沿用读取档、`R27` 换话题换档、`R28` 无历史只给核心集。
+- 顺带补了一个关键词缺口：`R11`「看看工作区目录结构」此前一直 MISS（`list_tree` 不在核心集），`ReadWords` 增加「目录结构 / 看目录」后命中。
+  基线（P1b 之前 24 条）是 23/24，现在 28/28。
+
+### 与计划的偏差
+
+1. **决策规则集中在一张表，而不是散在工具包里**：成对关系（read ↔ search、run_command ↔ run_powershell、三种写文件工具）写在一处才不会互相矛盾，也便于评测直接断言；模型看到的仍是同一条 description。
+2. **补工具只补一次、最多 3 个**：无界补充等于「边跑边全量暴露」，会把 8K 的预算吃掉。
+3. **补工具只在自建循环里生效**（`AgentSettings.NativeLoop`）：FICC 的轮次对宿主不可见，`ExpandTools` 在 FICC 路径上不传。
+4. **界面用 `ChatStepKind.HostPrompt` 表达补工具**，未新增 `Retry` 步骤类型；渲染标签由「宿主追问」改为「宿主提示」（同一行既承载追问，也承载补工具说明）。

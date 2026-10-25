@@ -97,8 +97,8 @@
                 </select>
             </ScopedSettingRow>
 
-            <ScopedSettingRow Title="启用状态包"
-                              Description="把工作区结构、最近改动与验证状态放进系统块。"
+            <ScopedSettingRow Title="工作区结构 / 改动 / 动作"
+                              Description="快照里的工作区段；关闭后这一段成本为 0（策略与验证仍在）。"
                               InheritedText="@InheritedText(BoolText(GlobalScope.Context.StatePackEnabled), BoolText(WorkspaceOverrides?.StatePackEnabled))"
                               IsOverridden="@(Overrides.StatePackEnabled is not null)"
                               OnReset="() => ResetAsync(scope => scope.StatePackEnabled = null)">

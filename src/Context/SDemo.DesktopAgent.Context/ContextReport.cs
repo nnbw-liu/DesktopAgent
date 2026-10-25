@@ -42,7 +42,13 @@ public sealed record ContextReport(
     int StatePackTokens = 0,
     RoutingDecision? Routing = null,
     int SummaryInputTokens = 0,
-    int SummaryOutputTokens = 0)
+    int SummaryOutputTokens = 0,
+    IReadOnlyList<ContextSectionUsage>? Sections = null,
+    int CacheHitTokens = 0,
+    int PrunedTokens = 0,
+    // P2c：超长工具输出落盘的条数；SpillFailures 是写盘失败、退回纯截断的条数。
+    int SpilledResults = 0,
+    int SpillFailures = 0)
 {
     /// <summary>占输入预算的比例（0~1+）。</summary>
     public double Occupancy => Total <= 0 ? 0 : (double)Estimated / Total;
@@ -56,8 +62,28 @@ public sealed record ContextReport(
     /// </summary>
     public int SummaryCostTokens => SummaryInputTokens + SummaryOutputTokens;
 
+    /// <summary>
+    /// P2a：宿主上下文快照的每段归因（名字 / token / 是否 required / 是否被截断）。
+    /// 快照段是唯一事实源，界面分解面板直接读它，不再自己分类。
+    /// </summary>
+    public IReadOnlyList<ContextSectionUsage> SectionUsages => Sections ?? [];
+
+    /// <summary>
+    /// P2a：服务端上报的缓存命中输入 token（<c>UsageDetails.CachedInputTokenCount</c>）。
+    /// 端点不报就是 0 —— 界面据此决定显不显示命中率，不给假数字。
+    /// </summary>
+    public double CacheHitRate => ActualInputTokens is > 0
+        ? Math.Clamp((double)CacheHitTokens / ActualInputTokens.Value, 0, 1)
+        : 0;
+
     /// <summary>本轮工具 schema 的 token（分段明细里的 Tools 段）。</summary>
     public int ToolSchemaTokens => Segments.ToolSchema;
+
+    /// <summary>
+    /// P2b：这一轮是否「靠修剪工具轨迹把历史留住了」。
+    /// 修剪省了 token 且没有淘汰任何历史，说明整次摘要（模型调用）被跳过。
+    /// </summary>
+    public bool PrunedInsteadOfCompacted => PrunedTokens > 0 && OmittedMessages == 0;
 
     /// <summary>M3：工作区知识库索引行的 token（没有归档会话时为 0）。</summary>
     public int KnowledgeTokens => Segments.Knowledge;
@@ -97,7 +123,6 @@ public sealed record ContextSegments(
 {
     public int Total => System + Skills + Turns + Attachments + ToolTrace + Pinned + Summary + StatePack + ToolSchema + Knowledge;
 }
-
 /// <summary>
 /// 一次请求的产物：系统提示词 + 已裁剪的请求消息 + 报告。
 /// <see cref="Services.AgentChatService"/> 只消费它，不再决定消息取舍。
@@ -124,7 +149,7 @@ public sealed record ContextBuildRequest(
     double BudgetScale = 1.0,
     string? SummaryText = null,
     int SummaryThroughOrder = 0,
-    string? StatePackText = null,
+    WorkspaceState? State = null,
     bool SummaryFallback = false,
     AgentModePreference? ModeOverride = null,
     RoutingDecision? Routing = null,

@@ -61,7 +61,8 @@ public sealed class MafAgentRuntime : IAgentRuntime
                     case UsageContent { Details: { } usage }:
                         yield return new AgentStreamEvent.Usage(
                             (int)(usage.InputTokenCount ?? 0),
-                            (int)(usage.OutputTokenCount ?? 0));
+                            (int)(usage.OutputTokenCount ?? 0),
+                            (int)(usage.CachedInputTokenCount ?? 0));
                         break;
 
                     case TextReasoningContent { Text: { Length: > 0 } chain }:

@@ -82,18 +82,22 @@ public sealed record TrimStats(
     bool PinnedTruncated,
     bool AttachmentsStubbed,
     bool Trimmed,
-    int CompactedMessages = 0)
+    int CompactedMessages = 0,
+    int PrunedTraceTokens = 0)
 {
     public int MessageTokens => TurnTokens + AttachmentTokens + TraceTokens + PinnedTokens;
 
     /// <summary>含固定块的总估算（trim 时固定块已经单独计过）。</summary>
     public int TotalTokens => SystemTokens + SkillTokens + MessageTokens;
+
+    /// <summary>P2b：这一轮是否靠「修剪工具轨迹」把历史留住了（修剪省下的 token &gt; 0）。</summary>
+    public bool Pruned => PrunedTraceTokens > 0;
 }
 
 /// <summary>
 /// L1 确定性裁剪（§3.5）：
-/// 按轮分组、保留最近 N 轮、从最旧整轮淘汰、当前输入与附件永不淘汰、
-/// 历史附件改桩、工具轨迹限额回放、pin 无条件保留但不允许反噬预算。
+/// 按轮分组、保留最近 N 轮、当前输入与附件永不淘汰、历史附件改桩、
+/// <b>先修剪工具轨迹再淘汰整轮</b>（P2b：先修剪，后摘要）、pin 无条件保留但不允许反噬预算。
 /// 这里不调用模型，也不改写任何领域消息。
 /// </summary>
 public sealed class ContextTrimmer
@@ -138,6 +142,16 @@ public sealed class ContextTrimmer
             pinned[index] = true;
         }
 
+        // P2b：宿主上下文快照不是用户 pin，但同样「永不淘汰」——它在结构上属于末尾的运行时事实，
+        // 被删掉等于模型这一轮不知道当前策略 / 时间。它不占 pin 名额，也不参与 pin 截断。
+        for (var index = 0; index < messages.Count; index++)
+        {
+            if (HostSnapshot.IsSnapshot(messages[index].Content))
+            {
+                pinned[index] = true;
+            }
+        }
+
         // 已被摘要覆盖的消息不再发送：它们由系统块里的摘要代表（P2 §3.2）。
         // 例外：用户 pin 的消息始终保留原文（pin 的语义就是「别让模型忘掉这条」）。
         var keep = new bool[messages.Count];
@@ -159,11 +173,49 @@ public sealed class ContextTrimmer
         var rendered = RenderAll(messages, keep, pinned, attachmentChars, traceTexts, render, options.Counter, skipBefore);
         var rawTokens = rendered.Sum(item => item.Tokens);
 
-        var budgetRaw = EffectiveRawBudget(options);
+        // 修剪前（仍是配置预算）的轨迹成本。修剪只改「轨迹回放多少」，所以
+        // 「修剪前 - 最终」就是修剪省下的 token，与淘汰整轮互不干扰。
+        var traceTokensBeforePrune = rendered.Sum(item => item.TraceTokens);
 
-        // 反复收紧直到进入预算：先淘汰整轮，再缩附件，最后压轨迹。
+        var budgetRaw = EffectiveRawBudget(options);
+        var traceTiers = ContextPruner.TraceTiers(traceBudget);
+        var tierIndex = 0;
+
+        // 收紧顺序（P2b §3.3.2「先修剪，后摘要」）：
+        //   1. 修剪工具轨迹——不调模型、不丢轮次，最便宜；
+        //   2. 淘汰整轮历史——丢掉用户 / 助手原文，最贵；
+        //   3. 缩当前轮附件——用户刚放进来的东西，最后才动。
+        // 轨迹修完能进预算时，裁剪器就不会报「已淘汰历史」，上层也就不会触发摘要模型调用。
         for (var guard = 0; guard < 500 && rawTokens > budgetRaw; guard++)
         {
+            var pruned = false;
+
+            while (tierIndex + 1 < traceTiers.Count)
+            {
+                var nextBudget = traceTiers[++tierIndex];
+                var nextTexts = AllocateTraces(messages, keep, pinned, nextBudget, options.Counter);
+                var nextRendered = RenderAll(
+                    messages, keep, pinned, attachmentChars, nextTexts, render, options.Counter, skipBefore);
+                var nextTokens = nextRendered.Sum(item => item.Tokens);
+
+                // 没有轨迹可修时这一档什么都不省：直接试下一档，不要空转。
+                if (nextTokens >= rawTokens)
+                {
+                    continue;
+                }
+
+                traceTexts = nextTexts;
+                rendered = nextRendered;
+                rawTokens = nextTokens;
+                pruned = true;
+                break;
+            }
+
+            if (pruned)
+            {
+                continue;
+            }
+
             var evicted = false;
 
             while (nextEvictable < evictableTurns.Count)
@@ -200,11 +252,6 @@ public sealed class ContextTrimmer
                 {
                     attachmentChars = attachmentChars >= 2048 ? attachmentChars / 2 : 0;
                 }
-                else if (traceBudget > 0)
-                {
-                    traceBudget = traceBudget >= 100 ? traceBudget / 2 : 0;
-                    traceTexts = AllocateTraces(messages, keep, pinned, traceBudget, options.Counter);
-                }
                 else
                 {
                     break;
@@ -214,6 +261,8 @@ public sealed class ContextTrimmer
             rendered = RenderAll(messages, keep, pinned, attachmentChars, traceTexts, render, options.Counter, skipBefore);
             rawTokens = rendered.Sum(item => item.Tokens);
         }
+
+        var prunedTraceTokens = Math.Max(0, traceTokensBeforePrune - rendered.Sum(item => item.TraceTokens));
 
         // pin 内容超过总预算的 30%：截断到 N 字符，避免 pin 反噬预算（§3.5 规则 8）。
         var pinnedTokens = rendered.Where(item => item.IsPinned).Sum(item => item.Tokens);
@@ -288,8 +337,10 @@ public sealed class ContextTrimmer
             PinnedCount: kept.Count(item => item.IsPinned),
             PinnedTruncated: pinnedTruncated,
             AttachmentsStubbed: rendered.Any(item => item.AttachmentsStubbed && !item.Compacted),
-            Trimmed: omittedMessages > 0 || pinnedTruncated || attachmentChars < options.AttachmentInlineChars,
-            CompactedMessages: compactedMessages);
+            Trimmed: omittedMessages > 0 || pinnedTruncated || attachmentChars < options.AttachmentInlineChars
+                || prunedTraceTokens > 0,
+            CompactedMessages: compactedMessages,
+            PrunedTraceTokens: prunedTraceTokens);
 
         return new TrimResult(keptMessages, stats);
     }

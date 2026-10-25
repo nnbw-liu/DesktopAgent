@@ -141,6 +141,5 @@ public sealed class WorkspaceReferenceIndex : IComposerReferenceIndex
         return results;
     }
 
-    private static bool IsExcluded(string name) =>
-        StatePackFormatter.DefaultExcludes.Contains(name);
+    private static bool IsExcluded(string name) => WorkspaceExcludes.Contains(name);
 }

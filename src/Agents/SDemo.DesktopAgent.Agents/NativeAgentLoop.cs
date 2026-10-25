@@ -34,6 +34,10 @@ internal static class NativeAgentLoop
         var tools = BuildToolMap(invocation.Tools);
         var maxSteps = Math.Max(1, invocation.MaxToolIterations);
 
+        // P1b：本轮内补工具只补一次，补完后面几步都用扩充后的那张表。
+        var activeOptions = options;
+        var expanded = false;
+
         for (var step = 0; step < maxSteps; step++)
         {
             yield return new AgentStreamEvent.StepStarted(step, maxSteps, DateTimeOffset.Now);
@@ -41,7 +45,7 @@ internal static class NativeAgentLoop
             // 最后一次请求不再给工具：和 FICC 一样，逼模型把已有结果收尾成正文，
             // 否则小模型会在打满预算后继续要工具。
             var lastIteration = step == maxSteps - 1;
-            var stepOptions = lastIteration ? WithoutTools(options) : options;
+            var stepOptions = lastIteration ? WithoutTools(activeOptions) : activeOptions;
 
             var updates = new List<ChatResponseUpdate>();
 
@@ -59,7 +63,8 @@ internal static class NativeAgentLoop
                         case UsageContent { Details: { } usage }:
                             yield return new AgentStreamEvent.Usage(
                                 (int)(usage.InputTokenCount ?? 0),
-                                (int)(usage.OutputTokenCount ?? 0));
+                                (int)(usage.OutputTokenCount ?? 0),
+                                (int)(usage.CachedInputTokenCount ?? 0));
                             break;
 
                         case TextReasoningContent { Text: { Length: > 0 } chain }:
@@ -106,6 +111,37 @@ internal static class NativeAgentLoop
                 messages.Add(new ChatMessage(ChatRole.Tool, [new FunctionResultContent(call.CallId, result)]));
 
                 yield return new AgentStreamEvent.FunctionResult(call.CallId, result, step);
+
+                // P1b §3.2.4：模型自查到「本轮没给的工具有用」时，宿主在本轮内补一次并重发请求。
+                // 条件是还有下一步可用（最后一步的工具面会被摘掉，补了也用不上）。
+                if (expanded || lastIteration || invocation.ExpandTools is not { } expand)
+                {
+                    continue;
+                }
+
+                var added = expand(new AgentToolCallRequest(call.Name, call.Arguments, result, step));
+
+                if (added.Count == 0)
+                {
+                    continue;
+                }
+
+                expanded = true;
+
+                foreach (var tool in added)
+                {
+                    if (tool is AIFunction function)
+                    {
+                        tools[function.Name] = function;
+                    }
+                }
+
+                activeOptions = WithAdditionalTools(activeOptions, added);
+
+                yield return new AgentStreamEvent.ToolsExpanded(
+                    step,
+                    added.Select(tool => tool.Name).ToArray(),
+                    "本轮补充工具：" + string.Join("、", added.Select(tool => tool.Name)));
             }
 
             yield return new AgentStreamEvent.StepCompleted(step, DateTimeOffset.Now);
@@ -184,6 +220,17 @@ internal static class NativeAgentLoop
         var clone = options.Clone();
         clone.Tools = null;
         clone.ToolMode = ChatToolMode.None;
+        return clone;
+    }
+
+    /// <summary>复制一份在原工具集后追加了 <paramref name="added"/> 的选项（P1b 本轮补工具）。</summary>
+    private static ChatOptions WithAdditionalTools(ChatOptions options, IReadOnlyList<AITool> added)
+    {
+        var clone = options.Clone();
+        var tools = new List<AITool>(clone.Tools ?? []);
+        tools.AddRange(added);
+        clone.Tools = tools;
+        clone.ToolMode ??= ChatToolMode.Auto;
         return clone;
     }
 }

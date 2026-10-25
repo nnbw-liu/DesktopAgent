@@ -18,7 +18,14 @@ namespace SDemo.DesktopAgent.Services;
 /// 这一段属于第几次模型请求（P1a）。<c>-1</c> 表示运行时没给出 step 边界（FICC），
 /// 界面按「本回合第几轮」兜底。
 /// </param>
-public readonly record struct AgentDelta(string Text, string Reasoning, int Step = -1);
+/// <param name="Notice">
+/// 给用户看的一行宿主提示（P1b：本轮补了哪些工具）。不进模型，只落成过程组里的一步。
+/// </param>
+public readonly record struct AgentDelta(
+    string Text,
+    string Reasoning,
+    int Step = -1,
+    string? Notice = null);
 
 /// <summary>
 /// 一次生成所需的全部输入：已由 <see cref="ContextBuilder"/> 裁剪好的上下文、
@@ -35,6 +42,19 @@ public sealed record AgentRunPlan(
     EffectiveSettings? Scope = null);
 
 /// <summary>
+/// 本轮请求实际会发给模型的「前缀」（P2b §3.3.2 第二条）。
+/// <para>
+/// 摘要请求要复用热前缀，就必须拿到**逐字相同**的 system 提示词与工具声明，
+/// 而不是另拼一份。它由真正执行请求的一方（<see cref="AgentChatService"/>）给出，
+/// 上层（Runner）只负责转交。
+/// </para>
+/// </summary>
+public sealed record AgentRequestPreamble(string? Instructions, IReadOnlyList<AITool> Tools)
+{
+    public static AgentRequestPreamble Empty { get; } = new(null, []);
+}
+
+/// <summary>
 /// 通过 Microsoft Agent Framework 调用模型。只负责传输、流式解析与工具轨迹采集；
 /// 消息取舍在 <see cref="ContextBuilder"/>，本服务不再决定发什么。
 /// </summary>
@@ -45,6 +65,12 @@ public interface IAgentChatService
         AgentRunPlan plan,
         ContextRunTelemetry? telemetry = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// P2b：本轮请求的 system 提示词与工具声明（不执行任何工具），供压缩请求复用热前缀。
+    /// 默认返回空——不做工具声明的实现（测试替身、插件路径）仍然可以编译。
+    /// </summary>
+    AgentRequestPreamble Describe(AgentRunPlan plan) => AgentRequestPreamble.Empty;
 }
 
 /// <inheritdoc />
@@ -69,6 +95,9 @@ public sealed class AgentChatService : IAgentChatService
     private readonly IAgentRuntime _runtime;
     private readonly ISkillLibrary? _skills;
     private readonly IWorkspaceMemory? _memory;
+
+    /// <summary>P1b：本轮内最多补几个工具（只补一次，避免变成「边跑边全量暴露」）。</summary>
+    private const int MaxInTurnExpandedTools = 3;
 
     public AgentChatService(
         AgentToolRegistry tools,
@@ -108,22 +137,7 @@ public sealed class AgentChatService : IAgentChatService
 
         // 每次 Run 生成一份工具上下文：会话 / 工作区都按这一次生成固定下来，
         // 单例工具包不会把上一个会话的上下文带进来。
-        var context = new ToolContext(
-            plan.SessionId,
-            _workspace.RootPath,
-            AgentAttachmentRoots.Build(_paths, plan.SessionId),
-            _settings,
-            _approvals,
-            _sandbox,
-            _audit,
-            _reads,
-            plan.Metrics,
-            plan.Session,
-            plan.Metrics?.RunId,
-            _skills,
-            plan.Session?.WorkspaceId,
-            _memory,
-            plan.Scope);
+        var context = CreateToolContext(plan);
 
         var agentSettings = plan.Scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
         var available = _tools.ToolNames(plan.ToolPacks);
@@ -134,7 +148,70 @@ public sealed class AgentChatService : IAgentChatService
         var decision = plan.Context.Report.Routing ?? ResolveRouting(plan, available, agentSettings, agentMode);
 
         // M1：每轮只路由一次；工具集合 = 核心集 + 选中包（+ 兜底入口），不再全量灌给模型。
-        var (tools, measuredSchemaTokens) = CreateExposedTools(context, plan, decision);
+        // P1b：兜底入口命中「本轮未暴露」的工具时，宿主在本轮内补一次（闭包 Expand 见下）。
+        CapabilitySearchOutcome? capabilitySearch = null;
+        var (tools, measuredSchemaTokens) = CreateExposedTools(
+            context, plan, decision, outcome => capabilitySearch = outcome);
+
+        // 本轮内补工具的账：名称去重 + schema 预算，补进来的工具也算进本轮工具面。
+        var expandedNames = new HashSet<string>(decision.ExposedTools, StringComparer.Ordinal);
+        var schemaLimit = Math.Min(plan.Context.Budget.ToolSchemaLimit, plan.Context.Budget.Total);
+        var usedSchemaTokens = measuredSchemaTokens;
+
+        IReadOnlyList<AITool> Expand(AgentToolCallRequest call)
+        {
+            if (!string.Equals(call.ToolName, CapabilityRouter.EscapeHatchTool, StringComparison.Ordinal)
+                || capabilitySearch is not { } outcome)
+            {
+                return [];
+            }
+
+            var wanted = outcome.Unexposed
+                .Where(name => !expandedNames.Contains(name))
+                .Take(MaxInTurnExpandedTools)
+                .ToArray();
+
+            if (wanted.Length == 0)
+            {
+                return [];
+            }
+
+            var candidates = _tools.CreateExposed(
+                context,
+                plan.ToolPacks,
+                new HashSet<string>(wanted, StringComparer.Ordinal),
+                plan.Metrics);
+
+            var accepted = new List<AITool>();
+            var counter = new HeuristicTokenCounter();
+
+            foreach (var tool in candidates)
+            {
+                var cost = MeasureToolSchema([tool], counter);
+
+                // 至少补一个：否则「补了等于没补」，模型下一轮还得再查一次。
+                if (accepted.Count > 0 && usedSchemaTokens + cost > schemaLimit)
+                {
+                    break;
+                }
+
+                accepted.Add(tool);
+                usedSchemaTokens += cost;
+            }
+
+            if (accepted.Count == 0)
+            {
+                return [];
+            }
+
+            foreach (var tool in accepted)
+            {
+                expandedNames.Add(tool.Name);
+            }
+
+            // 记账统一在收到 ToolsExpanded 时做（见下面的 switch），这里只返回工具本身。
+            return accepted;
+        }
 
         // M4：把本轮路由记进 metrics，流结束后可算「暴露 N 个 / 实际调用 M 个 / 未用 K 个」。
         plan.Metrics?.RecordRouting(decision);
@@ -165,7 +242,8 @@ public sealed class AgentChatService : IAgentChatService
             telemetry,
             toolCallLimit,
             ResolveInstructions(plan, decision),
-            plan.Scope);
+            plan.Scope,
+            Expand);
 
         var pendingCalls = new Dictionary<string, PendingToolCall>(StringComparer.Ordinal);
         var text = new StringBuilder();
@@ -178,6 +256,9 @@ public sealed class AgentChatService : IAgentChatService
         // P1a：内置循环会带来显式的 step；-1 表示这个运行时看不到 step 边界（FICC）。
         var currentStep = -1;
 
+        // P1b：本轮补工具的宿主提示；下一条增量把它带出去，落成过程组里的一行。
+        string? notice = null;
+
         try
         {
             await foreach (var evt in _runtime.StreamAsync(invocation, cancellationToken))
@@ -187,7 +268,7 @@ public sealed class AgentChatService : IAgentChatService
             switch (evt)
             {
                 case AgentStreamEvent.Usage usage:
-                    plan.Metrics?.AddUsage(usage.InputTokens, usage.OutputTokens);
+                    plan.Metrics?.AddUsage(usage.InputTokens, usage.OutputTokens, usage.CacheHitTokens);
                     break;
 
                 // 上一步攒下的文本必须按旧 step 先落地，否则最后一句会挂到下一步的序号上。
@@ -250,13 +331,21 @@ public sealed class AgentChatService : IAgentChatService
                         emittedText));
                     toolChanged = true;
                     break;
+
+                // P1b：宿主按 search_capabilities 的命中结果补了工具，下一步请求就会带上它们。
+                case AgentStreamEvent.ToolsExpanded expanded:
+                    plan.Metrics?.RecordToolExpansion(expanded.Tools);
+                    notice = expanded.Reason;
+                    toolChanged = true;
+                    break;
             }
 
             if (text.Length > 0 || reasoning.Length > 0 || toolChanged)
             {
-                    yield return new AgentDelta(text.ToString(), reasoning.ToString(), currentStep);
+                    yield return new AgentDelta(text.ToString(), reasoning.ToString(), currentStep, notice);
                     text.Clear();
                     reasoning.Clear();
+                    notice = null;
                 }
             }
         }
@@ -282,8 +371,13 @@ public sealed class AgentChatService : IAgentChatService
             return RoutingDecision.Empty;
         }
 
-        var userInput = plan.Context.Messages
-            .LastOrDefault(message => message.Role == ChatRole.User)?.Text ?? string.Empty;
+        // P2a：末尾的宿主上下文快照也是一条 user 消息，但它不是用户说的话——
+        // 拿它当「本轮输入」会把对话轮误判成任务轮，所以按标题前缀排除。
+        var userInputs = plan.Context.Messages
+            .Where(message => message.Role == ChatRole.User && !HostSnapshot.IsSnapshot(message.Text))
+            .Select(message => message.Text ?? string.Empty)
+            .ToArray();
+        var userInput = userInputs.Length > 0 ? userInputs[^1] : string.Empty;
         var recent = plan.Metrics?.ToolTrace.Select(entry => entry.ToolId).TakeLast(6).ToArray() ?? [];
 
         return CapabilityRouter.Route(new CapabilityRoutingInput(
@@ -293,7 +387,8 @@ public sealed class AgentChatService : IAgentChatService
             mode,
             agentSettings.ResolveMaxExposedTools(plan.Context.Profile.ContextWindow, mode),
             agentSettings.SearchCapabilitiesEnabled,
-            agentSettings.ExposeAllTools));
+            agentSettings.ExposeAllTools,
+            PreviousUserInputs: CapabilityRouter.PreviousUserInputs(userInputs)));
     }
 
     /// <summary>
@@ -303,7 +398,8 @@ public sealed class AgentChatService : IAgentChatService
     private (IReadOnlyList<AITool> Tools, int SchemaTokens) CreateExposedTools(
         ToolContext context,
         AgentRunPlan plan,
-        RoutingDecision decision)
+        RoutingDecision decision,
+        Action<CapabilitySearchOutcome>? onCapabilitySearch = null)
     {
         if (decision.Count == 0)
         {
@@ -312,7 +408,13 @@ public sealed class AgentChatService : IAgentChatService
 
         var exposed = new HashSet<string>(decision.ExposedTools, StringComparer.Ordinal);
         var tools = _tools
-            .CreateExposed(context, plan.ToolPacks, exposed, plan.Metrics, decision.EscapeHatch)
+            .CreateExposed(
+                context,
+                plan.ToolPacks,
+                exposed,
+                plan.Metrics,
+                decision.EscapeHatch,
+                onCapabilitySearch)
             .ToList();
 
         var counter = new HeuristicTokenCounter();
@@ -363,6 +465,47 @@ public sealed class AgentChatService : IAgentChatService
             ? plan.Context.Instructions
             : SystemPrompts.Chat;
 
+    /// <summary>
+    /// P2b §3.3.2 第二条：把本轮请求的 system 提示词与工具声明原样交出去。
+    /// 只声明、不执行：工具实例化不会触发审批、也不写审计。
+    /// </summary>
+    public AgentRequestPreamble Describe(AgentRunPlan plan)
+    {
+        var agentSettings = plan.Scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
+        var available = _tools.ToolNames(plan.ToolPacks);
+        var agentMode = Context.AgentModeResolver.Resolve(
+            plan.Context.Profile,
+            plan.ModelId,
+            agentSettings.Mode);
+        var decision = plan.Context.Report.Routing ?? ResolveRouting(plan, available, agentSettings, agentMode);
+
+        // 与 RunAsync 走同一条生成路径（同一个 decision、同一个注册表顺序），声明才会逐字一致。
+        var (tools, _) = CreateExposedTools(CreateToolContext(plan), plan, decision);
+
+        return new AgentRequestPreamble(ResolveInstructions(plan, decision), tools);
+    }
+
+    /// <summary>
+    /// 每次 Run / Describe 生成一份工具上下文：会话、工作区与作用域都按这一次调用固定下来，
+    /// 单例工具包不会把上一个会话的上下文带进来。
+    /// </summary>
+    private ToolContext CreateToolContext(AgentRunPlan plan) => new(
+        plan.SessionId,
+        _workspace.RootPath,
+        AgentAttachmentRoots.Build(_paths, plan.SessionId),
+        _settings,
+        _approvals,
+        _sandbox,
+        _audit,
+        _reads,
+        plan.Metrics,
+        plan.Session,
+        plan.Metrics?.RunId,
+        _skills,
+        plan.Session?.WorkspaceId,
+        _memory,
+        plan.Scope);
+
     private AgentInvocation CreateInvocation(
         ModelProvider provider,
         string modelId,
@@ -371,10 +514,18 @@ public sealed class AgentChatService : IAgentChatService
         ContextRunTelemetry telemetry,
         int toolCallLimit,
         string instructions,
-        EffectiveSettings? scope)
+        EffectiveSettings? scope,
+        Func<AgentToolCallRequest, IReadOnlyList<AITool>>? expandTools = null)
     {
         var settings = scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
         var agent = scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
+
+        // P2c：超长工具输出落盘到 <workspace>/.agent/spill，上下文里只留头尾预览 + 回读指引。
+        // 没有工作区、或用户关掉开关时传 null，退回纯截断（落盘是尽力而为，不能改变工具结果语义）。
+        IToolResultSpillStore? spill = settings.SpillLargeToolOutputs && !string.IsNullOrWhiteSpace(_workspace.RootPath)
+            ? new WorkspaceToolResultSpillStore(_workspace.RootPath)
+            : null;
+
         var budgetOptions = new ContextBudgetChatOptions(
             Enabled: settings.Enabled && settings.MidTurnTrim,
             Budget: plan.Budget,
@@ -382,7 +533,8 @@ public sealed class AgentChatService : IAgentChatService
             CalibrationFactor: plan.Report.CalibrationFactor,
             KeepRecentTurns: settings.KeepRecentTurns,
             ToolResultChars: settings.MidTurnToolResultChars,
-            MaxOutputTokens: Math.Clamp(plan.Profile.MaxOutputTokens, 128, 8192));
+            MaxOutputTokens: Math.Clamp(plan.Profile.MaxOutputTokens, 128, 8192),
+            Spill: spill);
 
         return new AgentInvocation(
             new Uri(provider.BaseUrl, UriKind.Absolute),
@@ -397,7 +549,9 @@ public sealed class AgentChatService : IAgentChatService
             // 模型档案里配了思考强度才发送 reasoning_effort（none = 显式关闭）；没配就保持服务端默认。
             ReasoningEffort: plan.Profile.ReasoningEffort,
             // P1a：工具循环由谁跑，只在设置里显式打开时换成内置循环（默认仍是 FICC）。
-            NativeLoop: agent.NativeLoop);
+            NativeLoop: agent.NativeLoop,
+            // P1b：本轮内补工具只在自建循环里成立（FICC 的轮次对宿主不可见）。
+            ExpandTools: agent.NativeLoop ? expandTools : null);
     }
 
     private static ToolTraceEntry BuildTraceEntry(

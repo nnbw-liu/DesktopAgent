@@ -98,6 +98,47 @@ public sealed class AgentToolRegistryTests
         Assert.Contains("已暴露", text);
     }
 
+    [Fact]
+    public async Task 兜底入口把命中但未暴露的工具报给宿主()
+    {
+        // P1b §3.2.4：宿主不再只是看着模型「下一轮再说」，而是拿到结构化命中结果在本轮补工具。
+        var registry = new AgentToolRegistry([Pack("a", order: 10)]);
+        CapabilitySearchOutcome? outcome = null;
+
+        var tools = registry.CreateExposed(
+            Context(),
+            new HashSet<string> { "a" },
+            new HashSet<string> { "fake_tool" },
+            escapeHatch: true,
+            onCapabilitySearch: captured => outcome = captured);
+
+        var function = Assert.IsAssignableFrom<AIFunction>(
+            Assert.Single(tools, tool => tool.Name == CapabilityRouter.EscapeHatchTool));
+
+        var result = await function.InvokeAsync(
+            new AIFunctionArguments(new Dictionary<string, object?> { ["query"] = "fake" }));
+
+        Assert.NotNull(outcome);
+        Assert.Equal("fake", outcome!.Query);
+        Assert.Contains("fake_tool", outcome.Matched);
+        // fake_tool 本轮已经暴露，只报没暴露的那个。
+        Assert.Equal(["fake_tool2"], outcome.Unexposed);
+
+        var text = result?.ToString() ?? string.Empty;
+        Assert.Contains("本轮未暴露", text, StringComparison.Ordinal);
+        Assert.Contains("本轮内补一次", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 模型看到的描述里带决策规则()
+    {
+        var registry = new AgentToolRegistry([new DescribedPack()]);
+        var tool = Assert.Single(registry.Create(Context(), new HashSet<string> { "files" }));
+
+        Assert.StartsWith("读工作区文件。", tool.Description, StringComparison.Ordinal);
+        Assert.Contains(ToolPlaybooks.RulesFor("read_file")!, tool.Description, StringComparison.Ordinal);
+    }
+
     private static IAgentToolPack Pack(string id, int order) =>
         new FakePack(new AgentToolPackDescriptor(
             id,
@@ -145,6 +186,24 @@ public sealed class AgentToolRegistryTests
             [AIFunctionFactory.Create(FakeTool, name: "fake_tool")];
 
         private static string FakeTool() => "ok";
+    }
+
+    /// <summary>带基础描述的工具包：验证「功能说明 + 决策规则」拼在模型看到的那条描述里。</summary>
+    private sealed class DescribedPack : IAgentToolPack
+    {
+        public AgentToolPackDescriptor Descriptor { get; } = new(
+            "files",
+            "文件",
+            "测试包",
+            "T",
+            AgentToolRisk.Low,
+            10,
+            DefaultEnabled: false,
+            WindowsOnly: false,
+            [new AgentToolFunctionDescriptor("read_file", "读文件")]);
+
+        public IReadOnlyList<AITool> Create(ToolContext context) =>
+            [AIFunctionFactory.Create(() => "ok", name: "read_file", description: "读工作区文件。")];
     }
 }
 

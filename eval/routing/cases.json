@@ -239,4 +239,48 @@
     "forbiddenTools": ["apply_patch"],
     "note": "8K Compact 读取"
   }
+,
+  {
+    "id": "R25",
+    "prompt": "继续",
+    "history": ["帮我修一下这个 bug"],
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["replace_text", "apply_patch"],
+    "forbiddenTools": ["run_powershell"],
+    "note": "追问沿用上一轮的编辑任务档（只增不减）"
+  },
+  {
+    "id": "R26",
+    "prompt": "继续吧",
+    "history": ["这个函数定义在哪个文件"],
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["search_files"],
+    "forbiddenTools": ["pdf_read", "run_powershell"],
+    "note": "追问沿用上一轮的读取任务档"
+  },
+  {
+    "id": "R27",
+    "prompt": "跑一下构建",
+    "history": ["帮我修一下这个 bug"],
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["run_command"],
+    "forbiddenTools": ["pdf_read"],
+    "note": "换话题时任务档跟着变"
+  },
+  {
+    "id": "R28",
+    "prompt": "继续",
+    "packs": ["todo", "search", "skills", "files", "edits", "memory", "pdf", "powershell", "command"],
+    "mode": "Full",
+    "window": 32768,
+    "expectedTools": ["read_file"],
+    "forbiddenTools": ["replace_text"],
+    "note": "没有历史也没有任务信号：只给核心集"
+  }
 ]

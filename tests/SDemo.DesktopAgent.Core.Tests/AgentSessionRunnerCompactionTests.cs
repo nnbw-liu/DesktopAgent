@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.AI;
 using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Models;
 using SDemo.DesktopAgent.Services;
@@ -206,9 +207,83 @@ public sealed class AgentSessionRunnerCompactionTests
         Assert.Equal(0, chat.Calls);
     }
 
+    // ---------- P2b ----------
+
+    [Fact]
+    public async Task 自动压缩把本轮提示词与工具声明作为热前缀传给摘要()
+    {
+        var session = BuildSession();
+        var chat = new FakeChat
+        {
+            Preamble = new AgentRequestPreamble(
+                "会话自己的系统提示词",
+                [AIFunctionFactory.Create((string path) => "ok", name: "read_file", description: "读取文件")])
+        };
+        var summarizer = new FakeSummarizer();
+        var runner = CreateRunner(chat, summarizer);
+        var telemetry = new ContextRunTelemetry();
+
+        await foreach (var _ in runner.StreamAsync(Request(session), telemetry))
+        {
+        }
+
+        Assert.True(summarizer.Calls >= 1, "压缩应当真的调用摘要");
+        Assert.Equal("会话自己的系统提示词", summarizer.LastRequest!.Instructions);
+        Assert.Equal("read_file", Assert.Single(summarizer.LastRequest.Tools!).Name);
+    }
+
+    [Fact]
+    public async Task 修剪工具轨迹放得下时跳过摘要()
+    {
+        // 轨迹预算调得比消息预算还大（长上下文档的配置）：不修剪就一定超预算、一定触发摘要。
+        _settings.Current.Context.ToolTraceTokenBudget = 8000;
+
+        var session = new ChatSession { Id = "s3", Title = "轨迹很多" };
+
+        for (var turn = 0; turn < 6; turn++)
+        {
+            session.Messages.Add(new ChatMessage(ChatMessageRole.User, $"问题 {turn}：" + new string('甲', 20)));
+            var reply = new ChatMessage(ChatMessageRole.Assistant, $"回答 {turn}：" + new string('乙', 20));
+
+            for (var index = 0; index < 200; index++)
+            {
+                reply.ToolTrace.Add(new ToolTraceEntry(
+                    "powershell",
+                    ToolTraceEntry.StatusOk,
+                    ExitCode: 0,
+                    ArgsDigest: $"scripts/run-{turn}-{index}.ps1",
+                    Summary: "执行成功，输出了一小段日志",
+                    OutputChars: 200,
+                    At: DateTime.Now));
+            }
+
+            session.Messages.Add(reply);
+        }
+
+        var chat = new FakeChat();
+        var summarizer = new FakeSummarizer();
+        var runner = CreateRunner(chat, summarizer);
+        var telemetry = new ContextRunTelemetry();
+
+        await foreach (var _ in runner.StreamAsync(Request(session), telemetry))
+        {
+        }
+
+        Assert.Equal(1, chat.Calls);
+        Assert.Equal(0, summarizer.Calls);
+        Assert.Null(session.Summary);
+        Assert.True(telemetry.Report!.PrunedInsteadOfCompacted, "应当靠修剪轨迹进预算");
+        Assert.Contains("修剪", telemetry.ContextNotice);
+    }
+
     private sealed class FakeChat : IAgentChatService
     {
         public int Calls { get; private set; }
+
+        /// <summary>本轮请求的前缀（P2b）：摘要请求会原样复用。</summary>
+        public AgentRequestPreamble Preamble { get; init; } = AgentRequestPreamble.Empty;
+
+        public AgentRequestPreamble Describe(AgentRunPlan plan) => Preamble;
 
         public async IAsyncEnumerable<AgentDelta> RunAsync(
             AgentRunPlan plan,
@@ -244,9 +319,12 @@ public sealed class AgentSessionRunnerCompactionTests
 
         public int Calls { get; private set; }
 
+        public SummaryRequest? LastRequest { get; private set; }
+
         public Task<SummaryResult> SummarizeAsync(SummaryRequest request, CancellationToken cancellationToken)
         {
             Calls++;
+            LastRequest = request;
             return Task.FromResult(_fail
                 ? SummaryResult.Failed("500")
                 : new SummaryResult(ValidSummary(), true, 10, null));

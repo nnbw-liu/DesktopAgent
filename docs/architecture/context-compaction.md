@@ -1,6 +1,6 @@
 # 上下文压缩与工作记忆（P2）
 
-> 适用版本：P2 完成后（分支 `feature/vibe-p2-compaction`）
+> 适用版本：P2 完成后（分支 `feature/vibe-p2-compaction`）；P2b 已补「先修剪 / 热前缀 / 事务」
 > 配套：[p2 计划](../reports/p2-compaction-memory.md)、[P2 报告](../reports/p2-report.md)、[P1 预算文档](context-budget.md)
 > 一句话：**超预算时先把「较早历史」压成摘要，再按预算硬裁剪；原文永远保留，模型看不到但用户随时能看。**
 
@@ -8,18 +8,22 @@
 
 ```text
 AgentSessionRunner.StreamAsync
-  1. ContextBuilder.Build(消息, 摘要, 状态包, 预算)
+  1. ContextBuilder.Build(消息, 摘要, 快照, 预算)
+       └─ ContextTrimmer：先修剪工具轨迹 → 再淘汰整轮 → 最后缩附件（P2b）
   2. 若 L1 需要淘汰历史（OmittedMessages > 0）且 AutoCompact：
+       开始标记落库（事务 / 锁）
        ContextCompactor.EnsureAsync(...)   // 只改会话语义字段，不改原文
+       摘要不缩小 → 拒绝；否则摘要 + 覆盖范围一次性提交
        重新 Build（带新摘要）
      压缩失败：继续用第 1 步的 L1 结果，不阻塞回答
   3. 若 Build 直接抛 NeedsCompaction：
        压缩后重建；仍放不下才把错误抛给 UI
 ```
 
-两个关键点：
+三个关键点：
 
 - **触发条件不是「估算 > total」本身，而是「L1 已经必须淘汰历史」**。P1 的裁剪器总会把请求裁到预算内，因此「超预算」在 P2 表现为 `OmittedMessages > 0`。这样既不会每轮都摘要，又能在真正丢历史时先摘要。
+- **修剪排在淘汰之前（P2b）**：轨迹修完能进预算时 `OmittedMessages` 就是 0，第 2 步整段不会发生——一次模型调用都不花。这就是 DSH「先修剪，后摘要」的形状（见 §2.5）。
 - **滞回是天然的**：压缩后 `SummaryThroughOrder` 覆盖被淘汰的那段，下一轮不再有 `OmittedMessages`；等新历史再涨满 `KeepRecentTurns` 轮，才触发下一次（8K 默认约 6 轮）。
 
 ## 2. 摘要
@@ -74,9 +78,60 @@ AgentSessionRunner.StreamAsync
 ### 2.4 摘要模型
 
 - 设置 → 上下文 → 「摘要模型」；为空表示用当前会话的 provider / model。
-- 摘要请求 `temperature = 0`、`max_tokens = SummaryMaxTokens`、无工具、无历史。
+- 摘要请求 `temperature = 0`、`max_tokens = SummaryMaxTokens`、不执行任何工具。
+- **请求形状是原对话的真前缀（P2b）**：
+
+  ```text
+  [system]  会话本轮的系统提示词（逐字，不换成摘要器专用提示词）
+  [assistant] 已有摘要（若此前压缩过）
+  [user]/[assistant]  …被遮蔽区域逐条回放（role 与正文保持原样）
+  [user]    压缩指令（6 小节模板 + 来源标注规则）
+  ```
+
+  工具声明（`ChatOptions.Tools`）也原样带上：前缀一致，端点才可能命中上一次请求的 KV 缓存。
+  带工具后个别模型会直接发起工具调用（没有文本），这时**去掉工具重试一次**，而不是降级成兜底。
+  拿不到会话提示词的路径（例如 L1 连放都放不下）退回摘要器自己的固定提示词——那条路没有前缀可复用。
 - 摘要请求不写入会话消息，不计入当轮 `EstimatedInputTokens`，避免污染计量校准。
 - 单次输入超过 `SummaryInputMaxTokens` 时按块增量摘要，后一块带上已生成的摘要。
+
+### 2.5 先修剪，后摘要
+
+收紧的**顺序**就是成本顺序（P2b）：
+
+| 顺序 | 手段 | 代价 | 实现 |
+| --- | --- | --- | --- |
+| 1 | 修剪工具轨迹（配置 → 减半 → 0） | 不调模型、不丢轮次 | `ContextPruner.TraceTiers` + `ContextTrimmer` |
+| 2 | 历史附件改桩 / 缩当前轮附件内联 | 不调模型，附件仍可按路径重读 | `ContextTrimmer` |
+| 3 | 淘汰整轮历史 | 丢掉用户 / 助手原文 | `ContextTrimmer` |
+| 4 | 摘要（把淘汰段压成一段） | **一次（或多次）模型调用** | `ContextCompactor` |
+
+因为修剪排在淘汰之前，「需要摘要」这个信号本身就意味着修剪已经不够用了。修剪省下的量记在
+`TrimStats.PrunedTraceTokens` → `ContextReport.PrunedTokens`，分解面板会单独列一行
+「已先修剪工具轨迹约 N token（不必压缩历史）」。
+
+> 注意：默认 `ToolTraceTokenBudget=300` 时，轨迹本来就只占 300 token，修剪很少是超预算的主因；
+> 这条性质在预算调大（长上下文档）时才明显。它的另一个价值是把顺序钉死，避免以后加收缩档位时又回到「先丢历史」。
+
+### 2.6 事务与恢复
+
+一次压缩是一个事务，标记落在 `sessions` 表（P2b）：
+
+| 字段 | 含义 |
+| --- | --- |
+| `CompactionStartedAt` | 开始时间。**先落库**，它同时是锁：同进程里看到「只有开始」= 有压缩在跑，本轮让路 |
+| `CompactionFinishedAt` | 收尾时间。早于开始时间视为未收尾 |
+| `CompactionReason` | `auto` / `manual` / `rejected` / `failed:…` / `auto-fallback`，排障用 |
+
+规则：
+
+- **摘要与覆盖范围只在最后一次落库里同时出现**：开始标记与摘要是两次写，中途崩溃库里只有「开始」。
+- **未配对的开始分两种**：同一进程里是「有压缩在跑」→ 本轮跳过并提示；从库里读回来的是「上一个进程崩了」→
+  打上 `CompactionInterruptedOnLoad`，由下一次压缩接管（口径是「上次没跑完，重做这一段」），
+  界面上会话头和分隔线都会标出「上次压缩未完成」。
+- **不缩小的摘要直接拒绝**：摘要 token ≥（被遮蔽区域 + 旧摘要）时丢弃，原文 / 旧摘要 / 覆盖范围都不动。
+- 摘要器抛异常时也会把事务收尾（`failed:<异常类型>`），否则这个会话会永远停在「有压缩在跑」。
+- `ContextBuilder` 把宿主上下文快照追加在裁剪之后，`ContextTrimmer` 把它并入「永不淘汰」集合，
+  `ContextCompactor` 的轮次切分忽略它、压缩范围在它之前截断——快照在任何路径上都不进摘要。
 
 ## 3. 工作记忆状态包
 
@@ -116,6 +171,8 @@ AgentSessionRunner.StreamAsync
 - **压缩现在**：会话 `⋯` 菜单，强制压缩一次（忽略「新增不足 4 轮 / 不足 200 token」阈值）。
 - **清空摘要**：会话 `⋯` 菜单；清空后下一轮重新压缩。
 - **重启**：摘要、覆盖范围、更新时间从数据库读回；覆盖范围大于消息数时自动归零并清空，避免使用可疑摘要。
+- **上次压缩未完成（P2b）**：库里留下「只有开始」的标记时，会话头显示一个琥珀色徽标、分隔线上多一行证据文案
+  （悬浮可看开始时间与原因）。摘要没有提交、原文都在；下一次压缩会把这一段重做一次。
 
 ## 5. 调参与推荐值
 
@@ -132,6 +189,7 @@ AgentSessionRunner.StreamAsync
 | `MaxPinnedMessages` | 20 | 0–200 | 0 表示禁止 pin |
 | `AutoCompact` | true | — | 关闭后只做 L1 硬裁剪 |
 | `StatePackEnabled` | true | — | 关闭后不发工作区状态 |
+| `ToolTraceTokenBudget` | 300 | 0– | 每轮回放工具轨迹的总预算；P2b 起它在淘汰整轮之前先被逐档收紧 |
 
 推荐：
 
@@ -150,6 +208,9 @@ AgentSessionRunner.StreamAsync
 6. **验证块尚未接真实结果**：P4 之前固定「未运行验证」。
 7. **摘要不覆盖当前轮**：最后一条 user 消息与最近 `KeepRecentTurns` 轮永远原文发送。
 8. **摘要请求携带历史正文**：使用云端摘要模型时，被压缩的历史会发给该模型；与主模型相同的隐私边界，未额外脱敏。
+9. **热前缀是否命中缓存无法自证**：摘要请求按「原对话前缀」构造（P2b），但命中与否只能看端点上报的
+   `CacheHitTokens`；本地推理服务通常不做前缀缓存，那时这条改造只是「请求形状更干净」。
+10. **崩溃恢复不做「跳过这一段」**：覆盖范围不提交，所以重做是幂等的；`Busy` 只拦同进程的并发压缩。
 
 ## 7. 排障
 
@@ -160,6 +221,8 @@ AgentSessionRunner.StreamAsync
 | 压缩后仍然很大 | 最近轮次 / 单条消息 / 状态包是否过大；调小 `KeepRecentTurns` 或 `StatePackTokenBudget` |
 | pin 后仍看不到 | pin 是否在摘要范围内（应当保留）；是否超过 `MaxPinnedMessages` |
 | 重启后摘要消失 | `SummaryThroughOrder` 是否大于消息数（被自动归零）；查看 `sessions` 表四列 |
+| 显示「上次压缩未完成」 | `CompactionStartedAt` 有值而 `CompactionFinishedAt` 为空 / 更早：上一次压缩没跑完；下一次压缩会重做这一段，无需手工清理 |
+| 每轮都提示「已先修剪工具轨迹」 | 轨迹预算偏大（`ToolTraceTokenBudget`）或历史轨迹条目多；属于正常收敛，想少修剪就把预算调小 |
 | 分隔线位置不对 | `SummaryThroughOrder` 是消息序号上界；UI 按会话消息顺序比对 |
 
 ## 8. 相关代码
@@ -173,6 +236,10 @@ AgentSessionRunner.StreamAsync
 | OpenAI 兼容传输 | `Core/Context/Summarizers/OpenAiSummaryChatTransport.cs` |
 | 确定性兜底 | `Core/Context/Summarizers/ExtractiveContextSummarizer.cs` |
 | 压缩编排 | `Core/Context/ContextCompactor.cs` |
+| 先修剪后摘要（P2b） | `Core/Context/ContextPruner.cs`（档位）+ `ContextTrimmer.cs`（收紧顺序） |
+| 摘要传输契约（P2b） | `Core/Context/Summarizers/ISummaryChatTransport.cs`（`SummaryChatRequest`：messages + tools） |
+| 压缩事务字段（P2b） | `Contracts/Models/ChatSession.cs`（`CompactionStartedAt/FinishedAt/Reason`）+ 迁移 `AddSessionCompactionState` |
+| 本轮前缀（P2b） | `Core/Services/AgentChatService.cs`（`Describe`：提示词 + 工具声明） |
 | 状态包 | `Core/Context/State/WorkspaceState.cs`、`WorkspaceStateProvider.cs`、`StatePackFormatter.cs` |
 | 流水线接线 | `Core/Services/AgentSessionRunner.cs` |
 | 报告字段 | `Core/Context/ContextReport.cs` |

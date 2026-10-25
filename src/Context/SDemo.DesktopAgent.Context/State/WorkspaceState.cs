@@ -100,7 +100,6 @@ public sealed class FileSystemWorkspaceTreeScanner : IWorkspaceTreeScanner
         return result;
     }
 
-    /// <summary>排除规则集中在这里，后续可配置（P2 先固定）。</summary>
-    public static bool IsExcluded(string name) =>
-        StatePackFormatter.DefaultExcludes.Contains(name);
+    /// <summary>排除规则集中在 <see cref="WorkspaceExcludes"/>，后续可配置（P2 先固定）。</summary>
+    public static bool IsExcluded(string name) => WorkspaceExcludes.Contains(name);
 }

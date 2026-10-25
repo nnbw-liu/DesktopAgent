@@ -41,6 +41,17 @@ public sealed record RoutingDecision(
     public TurnIntent Intent { get; init; } = TurnIntent.Answer;
 
     /// <summary>
+    /// 本轮所属的任务档（P1b §3.2.3）。档内工具集固定；相邻轮没有任务信号时沿用上一轮的档，
+    /// 所以「继续」这种句子不会把工具面收掉一半。
+    /// </summary>
+    public ToolTaskProfile Profile { get; init; } = ToolTaskProfile.General;
+
+    /// <summary>
+    /// 任务档是否来自历史轮（本句没有任务信号）。界面据此说明「沿用了上一轮的任务档」。
+    /// </summary>
+    public bool ProfileInherited { get; init; }
+
+    /// <summary>
     /// 本轮是否真的需要工具。为 false 时运行时收到空工具集，系统提示词换成「直接回答」，
     /// 宿主也不再因为「没有改文件」而追问。
     /// </summary>
