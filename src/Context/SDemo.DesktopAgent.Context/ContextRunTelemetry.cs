@@ -28,6 +28,12 @@ public sealed class ContextRunTelemetry
     /// <summary>给用户看的一句提示（溢出 / 需压缩 / 中途裁剪）；null 表示不用提示。</summary>
     public string? ContextNotice { get; set; }
 
+    /// <summary>P2c：本次生成里落盘的超长工具结果条数（上下文里只剩头尾预览 + 回读指引）。</summary>
+    public int SpilledToolResults { get; private set; }
+
+    /// <summary>P2c：本次生成里写盘失败、退回纯截断的条数（尽力而为，不算工具失败）。</summary>
+    public int SpillFailures { get; private set; }
+
     /// <summary>R1.4：本次生成中摘要请求的累计输入 token（可能触发多次压缩 / 重试）。</summary>
     public int SummaryInputTokens { get; set; }
 
@@ -42,6 +48,28 @@ public sealed class ContextRunTelemetry
         if (Report is { } report)
         {
             Report = report with { MidTurnTrimmed = true };
+        }
+    }
+
+    /// <summary>记录一次工具输出落盘（<paramref name="saved"/> 为 false 表示写盘失败、退回截断）。</summary>
+    public void RecordSpill(bool saved)
+    {
+        if (saved)
+        {
+            SpilledToolResults++;
+        }
+        else
+        {
+            SpillFailures++;
+        }
+
+        if (Report is { } report)
+        {
+            Report = report with
+            {
+                SpilledResults = SpilledToolResults,
+                SpillFailures = SpillFailures
+            };
         }
     }
 }

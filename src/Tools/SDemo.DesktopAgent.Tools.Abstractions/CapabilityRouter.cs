@@ -3,6 +3,10 @@ using SDemo.DesktopAgent.Context;
 namespace SDemo.DesktopAgent.Services;
 
 /// <summary>一轮路由的输入（§4.2 / §4.3）：用户原句、最近轨迹、可用工具、模式与上限。</summary>
+/// <param name="PreviousUserInputs">
+/// 本轮之前的用户输入（新的在前，最多几条）。用来在「这一句没有任务信号」时沿用上一轮的
+/// 任务档（P1b §3.2.3）——「继续」不该让工具面跳变。为空时行为与只做单轮判定完全一致。
+/// </param>
 public sealed record CapabilityRoutingInput(
     string UserInput,
     IReadOnlyList<string> RecentToolIds,
@@ -11,7 +15,8 @@ public sealed record CapabilityRoutingInput(
     int MaxExposedTools,
     bool EscapeHatch = true,
     bool ExposeAll = false,
-    bool HasSelectedSkill = false);
+    bool HasSelectedSkill = false,
+    IReadOnlyList<string>? PreviousUserInputs = null);
 
 /// <summary>
 /// 能力路由：成本档 0 的规则实现（M1–M3），外加成本档 1 的小模型建议落地（M4）。
@@ -50,7 +55,7 @@ public static class CapabilityRouter
     ];
 
     private static readonly string[] ReadWords =
-        ["查", "解释", "在哪", "为什么", "怎么", "what", "where", "why", "explain", "find"];
+        ["查", "解释", "在哪", "为什么", "怎么", "目录结构", "看目录", "what", "where", "why", "explain", "find"];
 
     private static readonly string[] RunWords =
         ["跑", "构建", "测试", "编译", "build", "test", "run", "compile"];
@@ -138,11 +143,18 @@ public static class CapabilityRouter
         }
 
         var (intent, intentTools) = DetectIntent(input.UserInput);
+
+        // P1b §3.2.3：先定任务档，再补本句意图。档内工具集固定，相邻轮只增不减——
+        // 这一句没有任务信号时沿用上一轮的档，而不是让工具面随关键词抖动。
+        var (profile, inherited) = ResolveProfile(input);
+        var profileTools = ToolsOfProfile(profile);
         var ordered = new List<string>();
 
         if (input.Mode == AgentMode.Compact)
         {
-            // Compact 保持 P6 行为：意图优先，最近用过的工具插到最前面，末位兜底四件套。
+            // Compact 保持 P6 行为：任务档优先，本句意图补包，最近用过的工具插到最前面，
+            // 末位兜底四件套。
+            AddCandidates(ordered, profileTools, available);
             AddCandidates(ordered, intentTools, available);
 
             foreach (var recent in input.RecentToolIds.Reverse())
@@ -157,9 +169,10 @@ public static class CapabilityRouter
         }
         else
         {
-            // Full：核心集先来，再按意图补包，最后接最近用过的工具。
+            // Full：核心集先来，再按任务档与意图补包，最后接最近用过的工具。
             // 不再用「全部可用工具」填满剩余名额：名额是上限，不是指标。
             AddCandidates(ordered, CoreTools, available);
+            AddCandidates(ordered, profileTools, available);
             AddCandidates(ordered, intentTools, available);
 
             foreach (var recent in input.RecentToolIds.Reverse())
@@ -172,7 +185,15 @@ public static class CapabilityRouter
         }
 
         return Finalize(
-            input, available, ordered, intent, RoutingDecision.RulesSource, advice: null, intentKind);
+            input,
+            available,
+            ordered,
+            intent,
+            RoutingDecision.RulesSource,
+            advice: null,
+            intentKind,
+            profile,
+            inherited);
     }
 
     /// <summary>
@@ -242,6 +263,8 @@ public static class CapabilityRouter
         }
 
         var intent = string.IsNullOrWhiteSpace(advice.Intent) ? "unknown" : advice.Intent.Trim();
+        var (profile, inherited) = ResolveProfile(input);
+
         return Finalize(
             input,
             available,
@@ -249,11 +272,121 @@ public static class CapabilityRouter
             intent,
             RoutingDecision.SmallModelSource,
             advice,
-            TurnClassifier.Classify(input.UserInput, input.HasSelectedSkill));
+            TurnClassifier.Classify(input.UserInput, input.HasSelectedSkill),
+            profile,
+            inherited);
     }
+
+    /// <summary>
+    /// 任务档（P1b §3.2.3）：本句有任务信号用它，否则沿用最近一条有任务信号的历史输入。
+    /// 判不出来时是 <see cref="ToolTaskProfile.General"/>（只给核心集，与 M4 之前一致）。
+    /// </summary>
+    public static ToolTaskProfile ResolveProfile(string? userInput, IReadOnlyList<string>? previousUserInputs = null)
+        => ResolveProfile(new CapabilityRoutingInput(
+            userInput ?? string.Empty,
+            [],
+            [],
+            AgentMode.Full,
+            MaxExposedTools: 0,
+            PreviousUserInputs: previousUserInputs)).Profile;
+
+    /// <summary>同上；<paramref name="inherited"/> 表示档是从历史轮沿用来的。</summary>
+    public static (ToolTaskProfile Profile, bool Inherited) ResolveProfile(CapabilityRoutingInput input)
+    {
+        var current = DetectIntent(input.UserInput ?? string.Empty).Intent;
+
+        if (!string.Equals(current, "unknown", StringComparison.Ordinal))
+        {
+            return (ToProfile(current), false);
+        }
+
+        foreach (var previous in input.PreviousUserInputs ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(previous))
+            {
+                continue;
+            }
+
+            var intent = DetectIntent(previous).Intent;
+
+            if (!string.Equals(intent, "unknown", StringComparison.Ordinal))
+            {
+                return (ToProfile(intent), true);
+            }
+        }
+
+        return (ToolTaskProfile.General, false);
+    }
+
+    /// <summary>任务档对应的固定工具集；<see cref="ToolTaskProfile.General"/> 不额外补包。</summary>
+    public static IReadOnlyList<string> ToolsOfProfile(ToolTaskProfile profile) =>
+        profile == ToolTaskProfile.General ? [] : ToolsOf(IntentOf(profile));
+
+    private static ToolTaskProfile ToProfile(string intent) => intent switch
+    {
+        "read" => ToolTaskProfile.Read,
+        "edit" => ToolTaskProfile.Edit,
+        "run" => ToolTaskProfile.Run,
+        "shell" => ToolTaskProfile.Shell,
+        "pdf" => ToolTaskProfile.Document,
+        "web" => ToolTaskProfile.Web,
+        "memory" => ToolTaskProfile.Memory,
+        "plan" => ToolTaskProfile.Plan,
+        _ => ToolTaskProfile.General
+    };
+
+    private static string IntentOf(ToolTaskProfile profile) => profile switch
+    {
+        ToolTaskProfile.Read => "read",
+        ToolTaskProfile.Edit => "edit",
+        ToolTaskProfile.Run => "run",
+        ToolTaskProfile.Shell => "shell",
+        ToolTaskProfile.Document => "pdf",
+        ToolTaskProfile.Web => "web",
+        ToolTaskProfile.Memory => "memory",
+        ToolTaskProfile.Plan => "plan",
+        _ => "unknown"
+    };
 
     /// <summary>规则意图的短标签（diagnostics / 测试用）。</summary>
     public static string ClassifyIntent(string input) => DetectIntent(input).Intent;
+
+    /// <summary>
+    /// 宿主自动追加的提示消息前缀（无修改回灌 / 自动验证）。它出现在历史里但是**不是用户输入**，
+    /// 判任务档时必须跳过——「本轮没有检测到任何文件修改」不该被当成用户要改文件。
+    /// </summary>
+    public const string HostPromptPrefix = "[宿主提示]";
+
+    /// <summary>这条用户消息是不是宿主自己追加的提示。</summary>
+    public static bool IsHostPrompt(string? text) =>
+        text is not null && text.TrimStart().StartsWith(HostPromptPrefix, StringComparison.Ordinal);
+
+    /// <summary>
+    /// 从按时间顺序排列的用户输入里取出「本轮之前」的最近几条（新的在前，最多 <paramref name="limit"/> 条）。
+    /// 调用方把历史直接交给 <see cref="CapabilityRoutingInput.PreviousUserInputs"/> 即可。
+    /// </summary>
+    public static IReadOnlyList<string> PreviousUserInputs(
+        IReadOnlyList<string>? userInputsInOrder,
+        int limit = 4)
+    {
+        if (userInputsInOrder is null || userInputsInOrder.Count <= 1 || limit <= 0)
+        {
+            return [];
+        }
+
+        var previous = new List<string>(Math.Min(limit, userInputsInOrder.Count - 1));
+
+        for (var i = userInputsInOrder.Count - 2; i >= 0 && previous.Count < limit; i--)
+        {
+            // 宿主提示不是用户说的话，不参与任务档判定。
+            if (!string.IsNullOrWhiteSpace(userInputsInOrder[i]) && !IsHostPrompt(userInputsInOrder[i]))
+            {
+                previous.Add(userInputsInOrder[i]);
+            }
+        }
+
+        return previous;
+    }
 
     /// <summary>
     /// 输入是否像“要改代码 / 跑命令”的任务，而不是寒暄或纯问答。
@@ -310,7 +443,9 @@ public static class CapabilityRouter
         string intent,
         string source,
         RoutingAdvice? advice,
-        TurnIntent intentKind)
+        TurnIntent intentKind,
+        ToolTaskProfile profile,
+        bool profileInherited)
     {
         var limit = ResolveLimit(input, available.Count);
 
@@ -331,7 +466,9 @@ public static class CapabilityRouter
             {
                 Source = source,
                 // 全量暴露是为了排障：对话轮也按工具轮处理，避免提示词说「不要用工具」却给了工具。
-                Intent = intentKind == TurnIntent.Chat ? TurnIntent.Task : intentKind
+                Intent = intentKind == TurnIntent.Chat ? TurnIntent.Task : intentKind,
+                Profile = profile,
+                ProfileInherited = profileInherited
             };
         }
 
@@ -387,6 +524,12 @@ public static class CapabilityRouter
             $"{input.Mode} · 意图={intent} · 暴露 {exposed.Length}/{available.Count}"
             + (truncated ? $"（上限 {limit}）" : string.Empty);
 
+        if (profile != ToolTaskProfile.General)
+        {
+            // 任务档是「这一轮按什么任务在给工具」；从历史轮沿用时要写出来，否则诊断看起来像没命中意图。
+            reason += $" · 任务档={profile}" + (profileInherited ? "（沿用上一轮）" : string.Empty);
+        }
+
         if (source == RoutingDecision.SmallModelSource)
         {
             reason += " · 小模型路由";
@@ -407,7 +550,9 @@ public static class CapabilityRouter
             Reason: reason)
         {
             Source = source,
-            Intent = intentKind
+            Intent = intentKind,
+            Profile = profile,
+            ProfileInherited = profileInherited
         };
     }
 

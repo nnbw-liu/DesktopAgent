@@ -34,7 +34,7 @@ public sealed class ScopedSettings
     /// <summary>超预算时是否自动压缩。</summary>
     public bool? AutoCompact { get; set; }
 
-    /// <summary>是否把工作区状态包放进系统块。</summary>
+    /// <summary>是否把工作区结构 / 改动 / 动作放进每轮末尾的宿主上下文快照。</summary>
     public bool? StatePackEnabled { get; set; }
 
     /// <summary>是否在输入框下方显示上下文占用环。</summary>

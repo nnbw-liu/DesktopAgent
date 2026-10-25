@@ -432,6 +432,8 @@ DSH 把"思考正文"做成单值 slot（`conversation.chat.reasoning.body`）�
 
 ### 3.2 P1：把"选工具"从宿主猜换成模型判（核心）
 
+> 实施情况：§3.2.1 见 §10（P1a 已落地），§3.2.2–§3.2.5 见 §11（P1b 已落地）。
+
 #### 3.2.1 先说实话：这一步的前提是拿回循环
 
 DSH 那套"模型自己用 CoT 选工具"能成立，靠的是**模型看得到完整决策依据**：真工具结果在历史里、工具描述带策略、曝光面稳定。我们现在三样都缺，而且缺的根因是同一个：
@@ -547,6 +549,8 @@ public static string Full(bool supportsReasoning) => supportsReasoning
 
 #### 3.3.1 上下文段：注册式内容 + 尾部快照（把"状态包"拆开）
 
+> 实施情况：✅ 已落地，见 §13（P2a）。
+
 现状有两个独立问题，值得一起解决：
 
 **(问题一：内容）** `StatePackFormatter` 是唯一的 god-renderer，四个 `##` 段（工作区 / 最近动作 / 当前计划 / 验证）硬编码在 182 行里（`StatePackFormatter.cs:61-144`），截断顺序也是写死的（树 → 改动 → 动作，验证永不截断）。后果：加一个上下文事实（沙箱模式、审批策略、相对时间）就要改这个文件；每段没有独立上限、没有独立开关、`ContextBreakdown` 里也只有 `StatePack` 一个总数（`ContextReport.cs:41-42,94-98`）。
@@ -616,6 +620,8 @@ public interface IAgentContextSection
 
 #### 3.3.2 压缩：补三个性质，不重写
 
+> 实施情况：✅ 已落地，见 §14（P2b）。
+
 我们已经有 `ContextCompactor`（保留最近 N 轮、pin 保护、防抖、失败退化为抽取式、落库回滚）。缺的是 DSH 的三个性质：
 
 | 性质 | DSH 做法 | 我们的补丁 |
@@ -627,6 +633,8 @@ public interface IAgentContextSection
 第三条尤其重要：我们现在"压缩失败回滚内存"（`ContextCompactor.cs:169-200`），但**进程崩溃时没有痕迹**，用户只会看到会话突然变短或重复压缩。有 start/summary 标记就能诊断。
 
 #### 3.3.3 大工具输出落盘
+
+> 实施情况：✅ 已落地，见 §15（P2c）。
 
 现状是截断（头 1200 / 尾 300 + 省略说明，`ContextBudgetChatClient.cs:74-75`）。问题是**模型再想看也没了**，只能让工具重跑一遍——对 `run_command` 是重跑构建，代价很高。
 
@@ -795,15 +803,15 @@ public interface IInputTriggerSource
 
 ## 5. 落地顺序与工时
 
-| 阶段 | 内容 | 工时 | 依赖 | 风险 |
-|---|---|---|---|---|
-| **P0** | 步骤模型（含 `GroupPart`）+ 过程组 + 工具行/卡片 + 四档配置对象 + `StepsJson` | 3–4 天 | 无 | 低（纯 UI + 存储列） |
-| **P0.5** | 输入框 `@文件`（1.5–2d）+ `/` 命令（1–1.5d）+ `/` 技能（1–1.5d，含 `disable-model-invocation`） | 4–5 天 | 无 | 低（新功能，不碰引擎） |
-| **P1a** | 自建 `AgentLoop` 替换 FICC，真工具消息入历史，step 事件 | 3–4 天 | 无 | **中**：FICC 现有行为（重试、非法参数修复、并行）要一一补齐 |
-| **P1b** | 工具描述改造 + 曝光面按任务档稳定 + 同轮补齐 + 删 PLAN | 2 天 | P1a | 中：需要评测集重跑 |
-| **P2a** | 上下文段注册表（含新增 `policy` / `time` 段）+ 尾部快照消息 + `CacheHitTokens` 测量 | 2–3 天 | 无 | 低 |
-| **P2b** | 压缩补三性质 | 1–2 天 | P2a | 中：涉及会话状态迁移 |
-| **P2c** | 大输出落盘 | 1 天 | 无 | 低 |
+| 阶段 | 内容 | 工时 | 依赖 | 风险 | 状态 |
+|---|---|---|---|---|---|
+| **P0** | 步骤模型（含 `GroupPart`）+ 过程组 + 工具行/卡片 + 四档配置对象 + `StepsJson` | 3–4 天 | 无 | 低（纯 UI + 存储列） | ✅ §8 |
+| **P0.5** | 输入框 `@文件`（1.5–2d）+ `/` 命令（1–1.5d）+ `/` 技能（1–1.5d，含 `disable-model-invocation`） | 4–5 天 | 无 | 低（新功能，不碰引擎） | ✅ §9 |
+| **P1a** | 自建 `AgentLoop` 替换 FICC，真工具消息入历史，step 事件 | 3–4 天 | 无 | **中**：FICC 现有行为（重试、非法参数修复、并行）要一一补齐 | ✅ §10 |
+| **P1b** | 工具描述改造 + 曝光面按任务档稳定 + 同轮补齐 + 删 PLAN | 2 天 | P1a | 中：需要评测集重跑 | ✅ §11 |
+| **P2a** | 上下文段注册表（含新增 `policy` / `time` 段）+ 尾部快照消息 + `CacheHitTokens` 测量 | 2–3 天 | 无 | 低 | ✅ §13 |
+| **P2b** | 压缩补三性质 | 1–2 天 | P2a | 中：涉及会话状态迁移 | ✅ §14 |
+| **P2c** | 大输出落盘 | 1 天 | 无 | 低 | ✅ §15 |
 
 建议排期：**P0 → P0.5 → P2a → P1a → P1b → P2b → P2c**。先把"看得见的推理"做好，再补输入框，然后动上下文，最后才动循环（要评测兜底）。
 
@@ -820,12 +828,16 @@ public interface IInputTriggerSource
 ```
 思考              reasoning-delta(index)     → AgentStreamEvent.Reasoning（已有，缺 index/step）
 工具调用           tool/call event            → ToolTraceEntry + ChatStep(Tool)（已有，缺 StepIndex/CallId）
-步骤边界           step/start … step/end      → ChatStep.StepIndex（P1）
-工具消息入历史      assistant/message + tool/result → ChatRole.Tool 消息（P1，现在压成文本）
+步骤边界           step/start … step/end      → ChatStep.StepIndex（P1a 已落地）
+工具消息入历史      assistant/message + tool/result → ChatRole.Tool 消息（P1a 已落地）
 工具行             tool.call.toolview 键控    → IToolViewRegistry + ToolPresentation（P0）
 工具卡             client-derived props       → 同上，从 ArgsJson/结果现场算（P0）
 过程组             group part reasoning/response → ChatGroupPart + ProcessGroup.razor（P0）
 四档显隐           display policy 对象        → ProcessDisplayPolicy（P0）
+工具描述           描述即决策规则（何时用/换谁）→ ToolPlaybooks 拼进 description（P1b）
+曝光面             稳定（不随每轮关键词抖动） → ToolTaskProfile 任务档 + 只增不减（P1b）
+同轮补工具         （不需要：不裁工具）        → search_capabilities 闭环：本轮补 ≤3 个并重发（P1b）
+PLAN 强制          （没有：/plan 是独立模式）  → FullFor(SupportsReasoning) 按能力分叉（P1b）
 上下文段           systemPrompt.context({name,order,required}) → IAgentContextSection 注册表（P2a）
 运行时快照         user 消息 + source 归因    → 历史末尾的单条 snapshot 消息（P2a）
 时间上下文         time-context 三行读数       → `time` 段（IANA 时区 + 相对时长 + 缺失指令）（P2a）
@@ -833,12 +845,211 @@ public interface IInputTriggerSource
 / 命令             commands 注册表（UI 平面）   → IComposerCommand + 严格语法 + 未知拒绝（P0.5）
 / 技能             skill 手势 + 目录            → SkillName/SkillText 通道 + `disable-model-invocation`（P0.5）
 压缩事务           compaction/start|summary|end → ChatSession 压缩状态字段（P2b）
-大输出            spill（12500 token）+ pruner（8192 字符） → .agent/spill/*.log + read_file 分页（P2c）
+先修剪后摘要        pruner 先跑，够用就跳过摘要   → 修剪档位排在「淘汰整轮」之前（P2b）
+摘要复用热前缀      逐字回放 system+tools+区域    → SummaryChatRequest（instructions + tools + 真消息）（P2b）
+大输出            spill（12500 token）+ pruner（8192 字符） → .agent/spill/*.log + read_file 分页（P2c；阈值用 MidTurnToolResultChars）
 token 计量         ctx.tokenMeter              → ContextReport（已有，够用；补每段归因）
 ```
 
-## 8. 参考（证据位置）
+## 8. P0 实施记录（2026-10-24）
 
+状态：✅ 已落地。WPF 解决方案 0 警告 0 错误；Core 717、UI 87、Sandbox 219 测试全绿。
+
+### 落地形态
+
+| 计划项 | 实现 |
+|---|---|
+| 步骤模型 | `ChatStep` 增加 `StepIndex` / `CallId` / `StartedAt` / `EndedAt`，并新增**计算属性** `Part`（`Text → Answer`，其余 `Process`）——不用给生产者加字段，也不用迁移存量 JSON |
+| 步骤持久化 | `ChatMessage.Steps` → `messages.StepsJson`（新迁移 `20261024133546_AddMessageSteps`）；`StepsFor` 优先读结构化步骤，旧消息仍回退 `ChatTimelineBuilder.FromTrace`（顺带补上 `CallId`） |
+| 过程组 | `ChatTimeline.razor` 拆成「过程组 + 组外答案」：过程组只装思考/工具/宿主追问，**正文（答案）永远在组外**；组头显示 `过程 · 12.4 s` 与 `N 步 · M 次工具 · 失败 K`，收起时贴一行最新思考 |
+| 四档显隐 | `ProcessDisplayMode` + `ProcessDisplayPolicy`（四个开关 + 收起时机）落在 Contracts，`ChatPresentationSettings` 进 `AppSettings.Chat`；设置页「通用 → 对话」两个下拉 |
+| 工具行/卡片 | `ToolPresentation`（客户端派生）+ `ChatStepRow.razor`：单行 `名称 · 状态 · 摘要 · 耗时`，点开看目标 / 参数 / 编辑行 / 结果预览；未知工具回落 generic |
+| 工具轨迹补数据 | 记录轨迹时算好 `Title`（命令+前两参数 / 路径 / 模式）、`ArgsJson`（截断 512）、`DurationMs`、`ResultPreview`（前 200 字）；running 条目也带标题，工具一开跑就能看出在做什么 |
+| 计时 | Turn 级：组头用 `ChatMessage.DurationMs`，工具行用 `ToolTraceEntry.DurationMs`。**没有做**逐行思考计时（DSH 也没有，见 §3.1-(5)） |
+
+### 与计划的偏差（取舍）
+
+1. **答案 = 所有 Text 步骤的拼接**（DSH 的做法），不是「最后一段连续正文」。代价是中途说的话（"我先看一下"）会被提升到答案区；换来的是**不需要任何边界启发式**，折叠永远不会藏住回答。原有的交错顺序在「完全展开」档完整保留。
+2. **只要还有 running 的工具，这一轮就不收起**。DSH 用 `turn.status === open` 表达同一件事；我们的工具可能比流更晚结束，所以在 `CanFoldProcess` 里显式判断。
+3. **`LiveProcessDetail` 暂未参与渲染**：运行中的轮次一律展开（用户要看着它跑）。字段保留，等有"简洁档也要运行细节"的需求再接。
+4. **思考正文的可替换渲染（§3.1-(7)）没做**：`ChatStepRow` 已独立成组件，将来抽 `RenderFragment` 只改一处。
+5. **每轮用量页脚（§3.1-(8)）没做**：依赖 `UsageDetails.CachedInputTokenCount`，属 P2a 的测量项。
+
+### 测试
+
+- 新增 `ProcessDisplayTests`（档位映射、Part、合并规则）、`AgentChatServicePresentationTests`（标题/参数/预览）、`ToolPresentationTests`（形态映射、状态与耗时文案、HasDetail）。
+- `ChatRoomPresentationTests` 增 4 条：标准档合成一组且保留答案、点组头展开、详细档默认展开、切档保留手动展开；工具卡展开断言参数与结果。
+- `ChatStoreContextTests` 增步骤落库往返；`ChatTimelineTests` 增 `CallId`/`Part` 断言。
+- `ChatRoomStreamFailureTests` 覆盖「流中途失败」：错误提示必须落成一步，否则按步骤拼出来的答案会漏掉它。
+- 另用 `SDEMO_UI_BASELINE=1` 渲染了一份临时 HTML 逐项核对过（过程组只含过程、答案在组外、工具卡能展开到参数/结果）；截图基线的 PNG 管线在本次 checkout 里缺 `tools/ui-baseline`，所以没有提交新的基线产物。
+
+## 9. P0.5 实施记录（已完成：`@` 文件、`/` 命令、`/` 技能）
+
+状态：三条管线全部落地。构建 0 警告 0 错误；Core 758、UI 102 测试全绿。
+
+### 已落地
+
+| 计划项 | 实现 |
+|---|---|
+| 触发语法 | `ComposerTriggers.Detect(text, caret)`：`@` 只认行首/空白之后，`/` 只认行首；`@"带 空格"` 允许空格直到闭合引号；`foo@bar` 与「和/或」不误触发 |
+| 候选排序 | `ComposerMatch`：大小写不敏感的有序子序列，路径段前缀优先，其次匹配间隙、再按候选长度、最后保持宿主顺序 |
+| 路径索引 | `WorkspaceReferenceIndex`：广度优先、深度 8、上限 4000 条、复用状态包的排除表（bin/obj/node_modules…）、30 秒缓存 + `Invalidate()` |
+| 菜单交互 | `sdComposer` 接管菜单开合：`↑↓` 移动、`Enter`/`Tab` 确认、`Esc` 关闭；菜单打开时 Enter 不再发送 |
+| `@` 插入 | 只插**纯文本** `@path` / `@"带 空格"`；目录补成 `@"dir/` 并保持菜单（下一次输入自动下钻）；文件插入后补一个空格并关闭 |
+| **选中样式** | `ComposerTokens.Scan` 扫已落下的 token（`@` 引用、行首 `/` 命令），`ToHighlightHtml` 输出转义后的高亮层；透明镜像层画 token 底色（紫=引用、琥珀=命令），输入框文字保持可见，滚动由 `sdComposer.syncScroll` 同步 |
+| `/` 命令 | `ComposerCommands`：严格语法（首字节 `/` + 小写名 + 空白/行尾）、未知命令拒绝；`/compact`（转 `CompactNowAsync`）、`/model`（打开模型设置）、`/index`（重建知识库）、`/help`；命令**不进模型**，执行后清空输入 |
+| `/` 技能 | 同一 `/` 菜单：命令在前、技能在后，**同名时命令赢**；点选插入 `/name `，提交时 `ComposerSubmission.InvokedSkill` 带上技能名；手打 `/name` 同样识别（任何空白分隔处），正文由现有 `SkillName`/`SkillText` 通道全文注入 |
+| 防重复加载 | 技能全文注入时提示词里加一句「不要再调用 load_skill 加载同名技能」 |
+| 权限位 | 技能 frontmatter 新增 `disable-model-invocation`：不进索引、`load_skill` 拒绝、只能 `/name` 加载 |
+
+### 与计划的偏差
+
+1. **文本在 C# 里算、JS 只改 DOM**：`replaceRange` 不再返回新文本，避免界面/测试/回灌三条路径拿到不同结果。
+2. **目录下钻靠「让 input 事件重新识别」**：插入 `@"dir/` 后不主动查询，交给下一次 `HandleInput` 重算，代码里只有一条识别路径。
+3. **键盘仲裁放在 JS**：沿用现有 `sdComposer` 的 document 捕获监听（Enter 一直是 JS 管的），菜单只是多一种「吃掉按键」的状态，不引入第二套 keydown 监听。
+4. **高亮层用「透明镜像 + 底色」而不是把文字也画在高亮层**：输入框自己画字，中文输入法的组合态才不会消失；token 只贡献背景与下划线，避免字形重影。
+5. **`/技能` 的识别范围比 `/命令` 宽**：命令只认行首（避免「和/或」误触发），技能按 DSH 的手势规则认任意空白分隔处。
+6. **`/new` 没做**：新建会话要新的宿主回调（AppShell 目前没把「新建」暴露给 ChatRoom），留到补回调时一起做。
+7. 测试里用 bUnit 的 `JSInterop.Setup<int>("sdComposer.caretOf", invocation => true)`（带 matcher 的重载才匹配带参数的调用），并避开 `RefreshableElementCollection` 的索引器（bUnit 1.40 与仓库里 AngleSharp 1.8.5 不兼容，会抛 `MissingMethodException`）。
+
+### 测试
+
+- 契约：`ComposerTriggerTests`（语法/格式化）、`ComposerTokenTests`（扫描/高亮/技能识别/命令行解析）。
+- Core：`ComposerReferenceTests`（枚举/排除/缓存/排序）、`SkillCatalogTests`（`disable-model-invocation` 解析）、`SkillIndexBuilderTests`（禁用技能不进索引）、`SkillToolPackTests`（`load_skill` 拒绝）。
+- UI：`ChatComposerMentionTests`（`@` 弹菜单/方向键/下钻/关闭）、`ChatComposerCommandTests`（命令在前、执行不发送、技能插入、手打识别、未知命令转交宿主、高亮 token）、`ChatRoomCommandTests`（未知命令只提示、`/compact` 打到服务、`/help` 列表、无工作区时 `/index` 提示）。
+
+### 修补（2026-10-24）：鼠标点选候选后键盘失效
+
+现象：`@` / `/` 候选区用鼠标点选之后，Enter 不再发送、Tab 不再有反应、Esc 也关不掉菜单。
+
+根因有两条，第一条是主因：
+
+1. **`@for` 的循环变量被所有候选行共享**。`@onclick="() => CommitAsync(index)"` 捕获的是同一个 `index`，
+   循环结束时它已经等于 `_items.Count`——**鼠标点任何一行都会越界**，`CommitAsync` 直接 return，
+   菜单既不插入也不关闭，行还在原地并拿到了焦点。
+2. keydown 监听的第二道判断是 `event.target.closest('.composer-text')`。鼠标点过按钮后焦点在按钮上，
+   于是 ↑↓ / Enter / Tab / Esc 全被挡掉，菜单再也关不掉（而且 JS 的 `_menuOpen` 还是 true）。
+
+修法（三层一起，任何一层单独都够挡住复现）：
+
+- 每轮拷一份 `var itemIndex = index;` 再进 lambda（`ChatComposer.razor`）。
+- 候选行加 `tabindex="-1"` 与 `@onmousedown:preventDefault`：鼠标按下不转移焦点，Tab 也不会落到行上。
+- `sdComposer` 的 keydown 改为**菜单打开时按键归菜单**（只接管「输入框内 / 焦点已丢失」两种情形，
+  不抢别的输入控件），不再要求焦点一定在 textarea 里。
+- 菜单关闭后用 `sdComposer.focusInput` 把焦点还给输入框（已经在输入框时不动光标）。
+- C# 侧留一份 `_menuOpen` 镜像，`CloseMenuAsync` / 切换会话时与 JS 对齐，避免「看不见的菜单吃掉按键」。
+- `CommitAsync` 越界时顺手关菜单自愈，而不是静默 return。
+
+测试：`ChatComposerMentionTests` 新增「鼠标点选后插入路径、关菜单、还焦点」「候选行不进 Tab 顺序」
+「没有候选时确认只复位不发送」「鼠标移上去高亮那一行」四条。
+
+### 修补（2026-10-24）：确认候选后文本被插了两遍
+
+现象：`@` 菜单里按 **Tab / Enter** 确认（鼠标点选同样）之后，输入框里出现两份文件名——
+高亮 token 之后多出一截 `物业交割单.docx `。
+
+根因是文本有两条写入路径：C# 先改 `Text` 并触发 `TextChanged`，Blazor 的重渲染**已经把
+`<textarea>` 的值换成了新文本**；紧接着 JS 的 `sdComposer.replaceRange` 又在 `[start, end)`
+上做了一次 `setRangeText`，于是插入内容被叠到已更新的文本上（它想替换的 `@` 已经不在原位）。
+bUnit 里 `TextChanged` 没人接、组件不重渲染，所以测试一直是绿的，真机上才复现。
+
+修法（三条一起，任何一条单独都够）：
+
+- **JS 不再按区间插入**：只保留 `sdComposer.applyText(element, value, caret)`——文本由 C#
+  算好后原样落到 DOM，顺带摆光标。文本永远只有一份来源，插几次都不会叠。
+- **光标在渲染之后才摆**：`OnAfterRenderAsync` 里消费 `_pendingCaret`。另外位置要在
+  `StateHasChanged()` **之前**存进局部变量——这次渲染可能同步执行，`OnAfterRender` 会立刻把
+  `_pendingCaret` 清掉（目录下钻一开始就是栽在这里：拿回的光标是 -1，识别不出下一层）。
+- **目录下钻不再依赖 JS 补发的 `input` 事件**：插入后直接 `RefreshMenuAsync(caret)` 算下一层，
+  否则去掉 input 事件之后菜单要等用户再敲一个字才刷新。
+
+测试：`ChatComposerMentionTests` 新增「确认候选只插入一次文本_光标落在插入之后」（断言最终文本、
+`TextChanged` 的回灌值、以及不存在第二条按区间插入的互操作），并把「选目录后菜单保持打开继续下钻」
+改成断言下一层候选**立刻**出现。
+
+## 10. P1a 实施记录（内置工具循环）
+
+状态：✅ 已落地，**默认关闭**（`AgentSettings.NativeLoop`）。WPF 解决方案 0 警告 0 错误（Debug / Release 均通过）；Core 768、UI 106 测试全绿。
+
+### 落地形态
+
+| 计划项 | 实现 |
+|---|---|
+| 自建循环 | 新增 `Agents/NativeAgentLoop.cs`；`MafAgentRuntime` 按 `AgentInvocation.NativeLoop` 二选一，两条路径共用同一条客户端链（`OpenAI → Decorate`）与同一份 `ChatOptions` |
+| 真工具消息入历史 | 每步结束后把整条 assistant 消息（正文 + `tool_calls`）与逐条 `ChatRole.Tool` 消息写进本次调用的消息表；下一步原样回放，不再压成 `[工具轨迹]` 文本 |
+| step 事件 | `AgentStreamEvent.StepStarted(step, maxSteps)` / `StepCompleted(step)`；`FunctionCall` / `FunctionResult` 带上 `Step` |
+| 每步用量 | 每次请求的 `UsageContent` 各自透出（FICC 里也是每次都报，这里语义一致） |
+| 收尾 | 最后一次请求摘掉工具（`ChatOptions.Clone()` 后 `Tools=null` + `ToolMode=None`），模型必须把已有结果写成正文——照抄 FICC 的 `MaximumIterationsPerRequest` 行为 |
+| 工具失败 | 未知工具 / 异常都回「结果文本」而不是抛异常；未知工具带 `[TOOL_STATUS:error]`，模型下一轮能看见原因 |
+| 接上界面 | `AgentDelta.Step`（-1 = 运行时看不到 step）→ `ChatRoom` 用 `stepBase` 偏移成整条回合的序号，`ChatStep.StepIndex` 第一次真正表示「第几次模型请求」 |
+| 开关 | `AgentSettings.NativeLoop` + 设置页「工具预算与路由 → 内置工具循环（P1a，实验）」；默认关 |
+
+### 与计划的偏差（取舍）
+
+1. **`FunctionCall` 事件比 FICC 晚一点点**：流式 delta 里的工具参数是分片到达的，逐块解析只能拿到半截 JSON，
+   所以工具调用在流结束后从 `updates.ToChatResponse()` 整条取（FICC 的流式实现也是这么做的）。执行紧随其后，用户无感。
+2. **串行执行，不做并发**：FICC 的 `AllowConcurrentInvocation` 默认就是 false，并发写文件本来也是风险。
+3. **默认关闭**：按 §6.1，先做一个开关、新旧都能跑，用 `tools/AgentEval` 对比后再翻默认。本机没有可用模型端点，
+   所以这一步留给评测。
+4. **`ContextBudgetChatClient` 仍在循环内侧**：每次 `GetStreamingResponseAsync` 前都会裁剪一次，语义与 FICC 时期一致，
+   循环中途不触发压缩（那是 P2b 的事务语义）。
+5. **reasoning 的回放交给 provider**：assistant 消息里的 reasoning 照 FICC 一样进历史，OpenAI 兼容适配器只序列化
+   `content` / `tool_calls`，所以实测不会把思维链重复发回端点。
+
+### 测试
+
+- `NativeAgentLoopTests`（假 SSE 端点）：工具调用/结果作为真实消息回灌（断言第二次请求体里有 `tool_calls`、`role:tool`、
+  `tool_call_id` 与工具输出）、一次响应里的两个工具按顺序配对、最后一轮不再声明工具、未知工具只回错误结果、
+  参数不是合法 JSON 时不炸整轮、没有工具调用时只有一步、没有声明工具时幻觉调用只回一次错误、上下文裁剪装饰器每次请求都运行。
+- `AgentChatServiceToolExposureTests`：step 边界跟着增量透传（0 → 1）、设置打开时 `NativeLoop` 进到 `AgentInvocation`。
+- 原来的假端点抽成 `FakeOpenAiServer`，FICC 与内置循环两条路径共用。
+
+### 下一步（P1b 的前置）
+
+- 跑 `tools/AgentEval` + `eval/routing/cases.json` 对比两条路径，再决定是否把 `NativeLoop` 改成默认。
+- 循环里已经握着工具表：「本轮补工具」只需要在 `InvokeAsync` 命中「未暴露」时追加工具并重发一次请求，不需要等下一轮。
+
+## 11. P1b 实施记录（工具描述 / 曝光面 / 同轮补齐 / 删 PLAN）
+
+状态：✅ 已落地。WPF 解决方案 0 警告 0 错误（Debug / Release）；Core 784、UI 108、Sandbox 219（1 跳过）测试全绿；
+`tools/routing-eval --mode rules` **28/28（100%）**。
+
+### 落地形态
+
+| 计划项 | 实现 |
+|---|---|
+| §3.2.2 工具描述带决策规则 | 新增 `Tools.Abstractions/ToolPlaybooks.cs`：一张「工具名 → 决策规则」表（20 个工具），`InstrumentedAIFunction.Description` = 功能说明 + 规则；幂等，嵌套包装不会重复追加 |
+| §3.2.3 曝光面按任务档稳定 | 新增 `Contracts/Context/ToolTaskProfile.cs`（General / Read / Edit / Run / Shell / Document / Web / Memory / Plan）；`CapabilityRouter.ResolveProfile`（本句有任务信号用它，否则沿用最近一条用户输入）→ **Full = 核心集 + 任务档工具 + 本句意图工具 + 最近工具**；`RoutingDecision.Profile/ProfileInherited` 进报告与 Reason |
+| 只增不减 | 任务档内工具集固定；`PreviousUserInputs` 从会话历史取最近 4 条（跳过 `[宿主提示]`），Runner 与 ChatService 两条路由路径都传 |
+| §3.2.4 同轮补工具 | `search_capabilities` 执行时回调 `CapabilitySearchOutcome`（命中 + 未暴露）→ `AgentChatService` 在本轮内补最多 3 个、**只补一次**、受 schema 预算约束 → `AgentInvocation.ExpandTools` → `NativeAgentLoop` 扩充 `ChatOptions.Tools` 重发，并透出 `AgentStreamEvent.ToolsExpanded` |
+| 补工具可见 | `AgentDelta.Notice` → `ChatRoom` 落成 `ChatStepKind.HostPrompt` 一步（过程组内，标签「宿主提示」）；`AgentRunMetrics.ToolExpansions` 记账 |
+| §3.2.5 删 PLAN | `SystemPrompts.FullWithReasoning` / `FullWithPlanLine` + `FullFor(ModelProfile.SupportsReasoning)`；`ContextBuilder.SelectBasePrompt` 与 `IntentHint(Task)` 按能力分叉 |
+| 评测 | `eval/routing/cases.json` 24 → 28 条（新增 4 条带 `history` 的随访 / 换话题用例）；`tools/routing-eval` 支持 `history` 字段 |
+
+### 与计划的偏差（取舍）
+
+1. **决策规则集中在一张表，而不是改 9 个工具包的 `description`**：成对关系（`read_file` ↔ `search_files`、
+   `run_command` ↔ `run_powershell`、三种写文件工具）写在一处才不会互相矛盾；模型看到的仍是同一条 description，
+   `MeasureToolSchema` 量到的也是拼好后的文本（预算不会漏算）。代价是规则与工具实现分处两个文件。
+2. **「只增不减」靠任务档粘性实现，不靠记住上一轮曝光集合**：不需要给 Runner 加会话级状态；
+   派生自消息历史 → 同一份历史必得同一份决策，可复现、可测试。换话题时任务档合法地换掉旧工具。
+3. **补工具只补一次、最多 3 个**：无界补充等于「边跑边全量暴露」；`AgentSettings.NativeLoop` 关闭时（FICC）
+   不传 `ExpandTools`，因为那时宿主看不到 step 边界。
+4. **界面复用 `HostPrompt` 步骤，不新增 `Retry` 类型**：P0 的步骤枚举已经有「宿主追问」，把标签改成「宿主提示」即可同时承载两类提示。
+5. **`R11` 是顺带修的关键词缺口**：P1b 之前这批用例实际是 23/24（`R11`「看看工作区目录结构」一直 MISS）；
+   `ReadWords` 补「目录结构 / 看目录」后 28/28。
+
+### 测试
+
+- 契约 / 路由：`ToolExposureProfileTests`（追问沿用编辑档、无历史只给核心集、换话题换档、本句优先于历史、
+  `PreviousUserInputs` 取值与宿主提示过滤、描述拼接与幂等、关键工具规则互相指路）。
+- 注册表：`AgentToolRegistryTests` 增「兜底入口把命中但未暴露的工具报给宿主」「模型看到的描述里带决策规则」。
+- 循环：`NativeAgentLoopTests` 增「本轮内补工具后下一步请求就带上新工具」（3 次请求体断言）「本轮补工具只补一次」。
+- 提示词：`FullPromptTests` / `CompactPromptTests` 覆盖两种 Full 变体与 `SupportsReasoning` 分叉。
+- 界面：`ChatRoomToolExpansionTests`（补工具提示落成宿主提示步骤、答案不受影响）。
+- 评测：`tools/routing-eval --mode rules` → 28/28。
+
+## 12. 参考（证据位置）
 DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat/lib/client.js`，`TOOL` = `dsh-client-ui-tool/lib/client.js`）：
 
 > 复现方式：用 `.tmp/asar-extract.js` 从 `DeepSeek Harness\resources\app.asar` 解出 `dsh` 子树（`node .tmp/asar-extract.js <asar> dsh .tmp/dsh-src`），然后直接读各包 README 与 `lib/*.js`。`.tmp/` 是可丢弃的。
@@ -869,17 +1080,212 @@ DSH（0.2.1-rc.3，`app.asar` 内 `@deepseek-ai/`；`CHAT` = `dsh-client-ui-chat
 
 本仓库：
 
+- `src/Agents/SDemo.DesktopAgent.Agents/AgentRuntime.cs`（`AgentInvocation.NativeLoop`、step 事件、`FunctionCall/Result.Step`）
+- `src/Agents/SDemo.DesktopAgent.Agents/NativeAgentLoop.cs`（P1a 自建循环：真工具消息、最后一轮摘工具、未知工具/异常兜底）
+- `src/Agents/SDemo.DesktopAgent.Agents/MafAgentRuntime.cs`（两条循环的分叉点、客户端链与 `ChatOptions` 共用）
+- `src/App/SDemo.DesktopAgent.Core/Services/AgentChatService.cs`（step 跟踪、`AgentDelta.Step`、`NativeLoop` 透传）
+- `src/Contracts/SDemo.DesktopAgent.Contracts/Models/AgentSettings.cs`（`NativeLoop` 开关，默认关）
+- `src/App/SDemo.DesktopAgent.UI/Components/Settings/ToolsSettings.razor`（「内置工具循环」开关）
 - `src/Agents/SDemo.DesktopAgent.Agents/MafAgentRuntime.cs:32-46,59-90`（FICC 与事件映射）
 - `src/App/SDemo.DesktopAgent.Core/Services/AgentChatService.cs:174-230`（合并 delta、轨迹记录）
-- `src/Context/SDemo.DesktopAgent.Context/SystemPrompts.cs:10-24`（PLAN 指令）
+- `src/Context/SDemo.DesktopAgent.Context/SystemPrompts.cs:11-47`（`TaskRules` 共用规则、`FullWithPlanLine` / `FullWithReasoning`、`FullFor(SupportsReasoning)`）
 - `src/Context/SDemo.DesktopAgent.Context/ContextBuilder.cs:60-79,416-479`（提示词拼装与注入块）
 - `src/Context/SDemo.DesktopAgent.Context/AgentMessageMapper.cs:70-72,195-208`（`[工具轨迹]` 文本块）
 - `src/Contracts/SDemo.DesktopAgent.Contracts/Models/ChatTimeline.cs:16-48`、`Context/ToolTraceModels.cs:16-21`（字符边界还原）
 - `src/App/SDemo.DesktopAgent.UI/Components/Chat/ChatTimeline.razor:14-62`（运行中 17-29、默认收起 78）、`ChatRoom.razor:935-945,162-202,2255-2278,2339-2392`
-- `src/Tools/SDemo.DesktopAgent.Tools.Abstractions/CapabilityRouter.cs:107-176`、`TurnClassifier.cs:54-81`
-- `src/Context/SDemo.DesktopAgent.Context/ContextCompactor.cs:67-215`、`ContextBudgetChatClient.cs:74-75,199-261`、`ContextTrimmer.cs:104-148`
-- `src/Context/SDemo.DesktopAgent.Context/State/StatePackFormatter.cs:21-59,61-144`（god-renderer 与写死的截断顺序）、`State/WorkspaceState.cs:6-13`（数据源）
+- `src/Tools/SDemo.DesktopAgent.Tools.Abstractions/CapabilityRouter.cs`（`Route`、`ResolveProfile` / `ToolsOfProfile`、`PreviousUserInputs`、`HostPromptPrefix`）、`ToolPlaybooks.cs`（模型看到的决策规则表）、`TurnClassifier.cs:54-81`
+- `src/Context/SDemo.DesktopAgent.Context/ContextCompactor.cs:67-215`、`ContextBudgetChatClient.cs`（中途裁剪；P2c 起含落盘与回读预览）、`ContextTrimmer.cs:104-148`
+- `src/Context/SDemo.DesktopAgent.Context/State/StatePackFormatter.cs:21-59,61-144`（P2a 前的 god-renderer 与写死的截断顺序，已删除）、`State/WorkspaceState.cs`（数据源）、`State/WorkspaceExcludes.cs`（共用排除表）
 - `src/Context/SDemo.DesktopAgent.Context/AgentInstructions.cs:9-19`（死代码；静态沙箱文案）
-- `src/App/SDemo.DesktopAgent.UI/Components/Chat/ChatComposer.razor:39-43,360,556`（textarea + 只有文本/附件的提交）、`Contracts/Models/ComposerSubmission.cs`（当前只有两个字段）
-- `src/Context/SDemo.DesktopAgent.Context/SkillCatalog.cs`、`SkillIndexBuilder.cs:15-91`、`Tools.Skills/SkillToolPack.cs`（技能索引 / `load_skill` / frontmatter 解析）
-- `src/App/SDemo.DesktopAgent.UI/Components/Chat/ContextBreakdown.razor`、`ContextMeter.razor`（现有分解面板与环形；P2a 加段后只需改数据源）；`Contracts/Context/ContextReport.cs`（段定义）
+- `src/App/SDemo.DesktopAgent.UI/Components/Chat/ChatComposer.razor`（触发菜单、命令路由、`/技能` 点名、高亮层）、`ChatRoom.razor`（`HandleComposerCommandAsync`、`_turnSkill`）
+- `Contracts/Models/ComposerTrigger.cs`、`ComposerTokens.cs`、`ComposerCommands.cs`、`ComposerMatch.cs`（语法、扫描、命令目录、排序）
+- `src/App/SDemo.DesktopAgent.Core/Services/WorkspaceReferenceIndex.cs`（`@` 路径索引）
+- `src/Context/SDemo.DesktopAgent.Context/SkillCatalog.cs`（`disable-model-invocation` 解析）、`SkillIndexBuilder.cs`、`Tools.Skills/SkillToolPack.cs`（索引过滤与 `load_skill` 拒绝）
+- `src/App/SDemo.DesktopAgent.UI/Components/Chat/ContextBreakdown.razor`、`ContextMeter.razor`（分解面板与环形；P2a 起按段渲染）；`Contracts/Context/ContextReport.cs`（段定义）
+- `src/Context/SDemo.DesktopAgent.Context/ContextSections/`（P2a）：`IAgentContextSection.cs`（接口 + 中央顺序 + `ContextSectionUsage`）、`ContextSectionRegistry.cs`（排序 / required 先占 / 段内截断）、`StateContextSections.cs`（workspace / changes / actions / verification / plan / time）、`PolicyContextSection.cs`、`AgentPolicyFacts.cs`、`ContextSectionText.cs`（段内截断与相对时间）
+- `src/Context/SDemo.DesktopAgent.Context/HostSnapshot.cs`（快照前缀与 `IsSnapshot` 判据）、`ContextBuilder.cs`（`BuildSnapshot` / 快照最后追加 / 预算从历史里扣）、`ContextReport.cs`（`Sections` / `CacheHitTokens`）
+- P2b：`src/Context/SDemo.DesktopAgent.Context/ContextPruner.cs`（修剪档位）、`ContextTrimmer.cs`（收紧顺序：修剪 → 淘汰 → 缩附件）、`ContextCompactor.cs`（事务标记 / 拒绝不缩小 / 快照不压缩）、`Summarizers/ISummaryChatTransport.cs`（`SummaryChatRequest`：messages + tools）、`Summarizers/SummaryPrompt.cs`（真前缀回放 + 压缩指令）、`Summarizers/SummaryFormat.cs`（`RemapSources`）、`Summarizers/LlmContextSummarizer.cs`（去工具重试）
+- P2b：`src/Contracts/SDemo.DesktopAgent.Contracts/Models/ChatSession.cs`（`CompactionStartedAt/FinishedAt/Reason`、`HasUnfinishedCompaction`）、`src/Storage/SDemo.DesktopAgent.Storage/Migrations/20261025050412_AddSessionCompactionState.cs`、`src/App/SDemo.DesktopAgent.Core/Services/AgentChatService.cs`（`Describe` = 本轮提示词 + 工具声明）、`UI/Components/Chat/CompactionDivider.razor`（中断证据行）
+- P2c：`src/Context/SDemo.DesktopAgent.Context/Spill/ToolResultSpillStore.cs`（`IToolResultSpillStore` + 工作区实现：文件名清洗、`.agent/.gitignore`、文件数上限）、`ContextBudgetChatClient.cs`（落盘 + 头尾预览 + `read_file` 回读指引、`read_file` 跳过落盘）、`ContextRunTelemetry.cs`（`SpilledToolResults` / `SpillFailures`）、`Contracts/Models/ContextSettings.cs`（`SpillLargeToolOutputs`）、`Tools.Files/FileToolPack.cs`（`maxLineChars`）、`State/WorkspaceExcludes.cs` + `WorkspaceSearch.ExcludedDirectories`（`.agent` 不入树 / 搜索）、`UI/Components/Chat/ContextBreakdown.razor`（落盘说明行）
+- `src/Agents/SDemo.DesktopAgent.Agents/AgentRuntime.cs`（`Usage.CacheHitTokens`）、`MafAgentRuntime.cs` / `NativeAgentLoop.cs`（`CachedInputTokenCount` 透出）、`Contracts/Services/AgentRunMetrics.cs`
+
+## 13. P2a 实施记录（上下文段注册表 + 尾部快照 + 缓存命中测量）
+
+状态：✅ 已落地。WPF 解决方案 0 警告 0 错误（Debug / Release）；Core 800、UI 111、Sandbox 219（1 跳过）测试全绿；
+`tools/routing-eval --mode rules` 仍 28/28。
+
+### 落地形态
+
+| 计划项 | 实现 |
+|---|---|
+| §3.3.1-(1) 段注册表 | 新增 `Context/ContextSections/`：`IAgentContextSection`（`Name` / `Title` / `Order` / `Required` / `MaxTokens` / `Render`）+ `ContextSectionOrders` 中央顺序表 + `ContextSectionRegistry`（按 `Order → Name` 排序 → 丢空段 → required 先按 Order 占预算 → 可选段填剩余 → 每段按 `MaxTokens` 截断），重名注册直接抛异常 |
+| 内置段 | `workspace` 100 / `policy` 110 / `changes` 120 / `actions` 125 / `verification` 130 / `plan` 140 / `time` 150；`required` = `policy` + `verification` + `time` |
+| §3.3.1-(2) 尾部快照 | `ContextBuilder.BuildSnapshot` 在裁剪**之后**追加一条 `user` 消息，前缀由 `HostSnapshot.Header` 统一（「宿主生成，不是用户输入；本快照取代之前的快照」）。系统提示词里只剩稳定前缀 + 压缩摘要 |
+| `policy` 段（新增） | `AgentPolicyFacts.FromSettings`：本轮模式、沙箱（类型 / 必需 / 副本只读）、直跑与命令白名单、写回是否需确认 |
+| `time` 段（新增） | 宿主时钟 ISO + 偏移 + IANA 时区、距上一条模型可见消息的时长（`unavailable` / 刚刚 / N 分钟 / N 小时…）；Windows 时区 id 先转 IANA，转不出才退回原 id |
+| 归因 | `ContextReport.Sections`（`ContextSectionUsage[]`：名字 / 标题 / 顺序 / required / token / truncated）；`ContextBreakdown` 在「上下文快照」行下面按段列出，并标出必需 / 已截断 |
+| 单段开关 | 新增 `TimeContextEnabled` / `PlanContextEnabled`；`StatePackEnabled` 收窄为「工作区结构 / 改动 / 动作」三段的开关（策略与验证不受它影响，关掉时也不扫盘） |
+| 缓存命中测量 | `UsageDetails.CachedInputTokenCount` → `AgentStreamEvent.Usage.CacheHitTokens` → `AgentRunMetrics.CacheHitTokens` → `ContextReport.CacheHitTokens` + `CacheHitRate`；界面只在「有实际输入 token 且命中 > 0」时显示命中率 |
+| 摘要留在固定块 | `ContextBuilder.BuildInjection` 只渲染压缩摘要：它只在压缩时变，不会再每轮改系统前缀 |
+
+### 与计划的偏差（取舍）
+
+1. **段标题用 `###`**，`##` 留给快照本身——层级上快照是「一条消息」，段是它的子结构。
+2. **保留 `actions`（最近工具动作）段**：计划表里没有它，但它是现有状态包的一部分，删掉等于静默丢事实；
+   它和 `workspace` / `changes` 一样受 `StatePackEnabled` 管。
+3. **`time` 做成 required**：它只有 ~40 token，却是「这条构建结果是 3 分钟前还是昨天」的唯一依据；
+   用户仍可用开关整段关掉——**开关优先于 required**，两者是不同轴线。
+4. **快照在裁剪之后追加**，所以不需要给裁剪器加「快照例外」：它在结构上就不可能被当成最旧的一轮淘汰。
+   这一点和 DSH 不同（DSH 的快照要持久化进日志，必须显式排除），因为我们的历史是每请求重建的。
+5. **`AgentChatService.ResolveRouting` 必须按前缀排除快照消息**：否则「最后一条 user 消息」会变成快照，
+   把对话轮误判成任务轮（回归由 `AgentChatServiceToolExposureTests.对话轮不生成工具并切换对话提示词` 挡住）。
+   任何以后「从请求消息里取用户输入」的代码都要用 `HostSnapshot.IsSnapshot` 过滤。
+6. **段内截断统一为「保留头部行 + 一行标记」**；只有计划段保留自己的 200 token 增量截断，因为它需要
+   「计划已截断」这句人话。`required` 段不参与总额度竞争，但仍按自己的上限截断。
+7. **删除 `StatePackFormatter`**，`DefaultExcludes` 移到 `WorkspaceExcludes`：树扫描、`@` 引用索引、
+   快照的 `workspace` 段三处共用同一张排除表（以前是两处引用同一份常量）。
+8. **字节稳定靠注入 `TimeProvider`**：`ContextBuilder` 多了可选 `ContextSectionRegistry` / `TimeProvider`
+   两个参数，DI 不注册也能解析（可选参数走默认值），测试里冻住时钟就能断言逐字节相同。
+9. **没有做「改动前后各 20 轮」的缓存实测**：本机没有可用模型端点。测量链路已经端到端测通
+   （假 SSE 上报 `prompt_tokens_details.cached_tokens` → 事件 → 指标 → 报告），但「命中率是否下降」
+   必须在真实端点上跑；而且端点若根本不报这个字段，这条改造只是「结构更干净」（§6 风险 4）。
+
+### 测试
+
+- 段 / 契约：`StatePackTests`（扫描排除与上限、workspace 截断后 required 仍在、相对时间、关段后零成本、
+  关段不扫盘、树缓存、改动去重、计划 200 token、重名抛异常、中央顺序覆盖注册顺序）；
+  `ContextSnapshotTests`（预算压到 200 时 required 仍在且 `Truncated=false`、连续 5 轮逐字节相同、
+  关 `time`/`plan` 成本为 0、切直跑 / 只读后 `policy` 文本变化、时间读数三行、快照永远是最后一条 `user` 消息、
+  快照预算从历史预算里扣）。
+- 构建器：`ContextBuilderSummaryTests`（摘要仍在系统块、快照在末尾且带段归因、直通不加快照、
+  无工作区时仍带策略与时间）、`ContextBuilderTests`（消息数 +1、分段之和 = 总估算）。
+- 回路：`CacheHitTests`（假 `IChatClient` 与假 SSE 两条路径都透出 cached tokens、没有上报时为 0、
+  命中率只在有实际输入时计算）。
+- 界面：`ContextBreakdownTests` 增 3 条（按段渲染 + 必需 / 截断标记、命中率显示、无上报不显示）。
+
+### 边界（留给 P2b / P2c）
+
+- 压缩还没事务化：`compaction/start|summary|end` 三个状态字段属于 P2b。→ ✅ P2b 已补（§14）。
+- 快照不参与压缩范围计算：压缩从「第一个非 system 节点」起、快照在末尾，天然落在保留区；
+  P2b 需要显式给它打 `IsPinned`。→ ✅ P2b 已补（§14）。
+- 大输出仍然只是截断（头 1200 / 尾 300 字符），落盘属于 P2c。→ ✅ P2c 已补（§15）。
+
+## 14. P2b 实施记录（压缩补三性质：先修剪 / 热前缀 / 事务）
+
+状态：✅ 已落地。WPF 解决方案 0 警告 0 错误（Debug / Release）；Core 821、UI 116、Sandbox 219（1 跳过）
+测试全绿；`tools/routing-eval --mode rules` 仍 28/28。
+
+### 落地形态
+
+| 计划项 | 实现 |
+|---|---|
+| §3.3.2-(1) **先修剪，后摘要** | 新增 `Context/ContextPruner.cs`（档位：配置值 → 减半 → 0，低于 100 直接归零）；`ContextTrimmer` 的收紧顺序改为「**修剪工具轨迹 → 淘汰整轮 → 缩当前轮附件**」；省下的量记进 `TrimStats.PrunedTraceTokens` → `ContextReport.PrunedTokens` / `PrunedInsteadOfCompacted`；Runner 在「修剪后就没有历史需要淘汰」时直接跳过摘要（0 次模型调用）并给一行提示；分解面板单独列「已先修剪工具轨迹约 N token」 |
+| §3.3.2-(2) **摘要请求复用热前缀** | `ISummaryChatTransport` 从契约层**下移**到 Context（它要接 `AITool`，而契约层不许引用 AI SDK）；`SummaryChatRequest`（messages + tools + maxTokens）；`SummaryPrompt.BuildMessages` 拼 `[system=会话原样] + [已有摘要] + [被遮蔽区域逐条回放] + [user=压缩指令]`；`ContextCompactionRequest.Instructions/Tools` 由 `IAgentChatService.Describe(plan)` 提供（`AgentChatService` 走与 `RunAsync` **同一条** `CreateExposedTools` 路径，声明顺序一致）；`Agents` 工程新增对 `Context` 的引用（方向仍是上层 → 上下文引擎，无环） |
+| §3.3.2-(3a) **拒绝不缩小的摘要** | 摘要 token ≥（被遮蔽区域 + 旧摘要）时拒绝：`CompactionOutcome.Rejected`，原文 / 旧摘要 / 覆盖范围都不动，标记记 `rejected` |
+| §3.3.2-(3b) **事务化** | `ChatSession.CompactionStartedAt / FinishedAt / Reason` + `HasUnfinishedCompaction` + 运行期 `CompactionInterruptedOnLoad`；`sessions` 表三列（迁移 `20261025050412_AddSessionCompactionState`）；压缩**先把开始标记落库（这就是锁）**，摘要与覆盖范围最后一次性提交；未配对的开始 = 同进程有压缩在跑（本轮让路 `Busy`）或崩溃留下的证据（读回后由下一次压缩接管） |
+| §13 边界 **快照显式 pin** | `ContextTrimmer` 把快照消息并入「永不淘汰」集合（不占 pin 名额、不参与 pin 截断）；`ContextCompactor` 的轮次切分忽略快照，压缩范围在第一条快照前截断 |
+| 界面 | 会话头「上次压缩未完成」徽标（带悬浮说明：开始时间 + 原因 + 摘要未提交）、分隔线上多一行证据文案 |
+
+### 与计划的偏差（取舍）
+
+1. **「先修剪」的实际触发频率取决于轨迹预算。** 默认 `ToolTraceTokenBudget=300` 时，轨迹本来就只占 300 token，
+   修剪很少是超预算的主因；这条性质在预算调大（长上下文档）时才明显。顺序钉死的价值在于：
+   以后再加收缩档位时不会再回到「先丢历史、再修细节」。
+2. **回放不是 100% 逐字节。** 区域消息按 `AgentMessageMapper.Render(msg, 0, null)` 渲染（附件桩、无轨迹），
+   而真实请求的第一条保留消息可能带一行 `[上下文提示] 已省略…`。不一致时只是缓存不命中，不影响摘要质量；
+   做到逐字节需要把上次实际发出的 payload 存下来，那是 P2c 之后的事。
+3. **来源序号改为「按位置数」再回填。** 逐字回放不能往每条消息前面插 `[mN]`，所以指令改成「第一条是 m1」，
+   由 `SummaryFormat.RemapSources` 换回会话绝对序号；超出本批范围的值原样保留（通常是上一版摘要里的绝对序号，或模型照抄的来源）。
+4. **带工具声明后个别模型会直接发起工具调用**（没有文本）：`LlmContextSummarizer` **去掉工具重试一次**，
+   而不是把这次压缩降级成确定性兜底。格式不符的既有重试保持不变。
+5. **「不缩小」按「被替换内容 = 区域 + 旧摘要」比较**，不是只比区域——摘要整体取代旧摘要，只比区域会把
+   「摘要变小但比旧摘要大」的情况误判成有效。
+6. **崩溃恢复不做「跳过这一段」。** 覆盖范围没提交，所以重做是幂等的（同一段最多重做一次）；
+   `Busy` 只拦同进程的并发压缩。界面上的「上次压缩未完成」是证据与诊断，不是拒绝服务。
+7. **手动压缩也走同一条事务与热前缀**：「压缩现在」先尽力建一次上下文拿前缀（`DescribeBestEffort`），
+   建不出来（超预算）就退回摘要器固定提示词，压缩照做。
+8. **没有独立 `compaction/summary` 事件**：只有 start / end 两个标记 + 原因，够诊断、够恢复，
+   但没有 DSH 那样的事件流；要事件流就得先把会话存储换成事件溯源（§4 已明确不搬）。
+9. **失败 / 取消也一定把内存里的标记收尾**（落库用 `CancellationToken.None` 尽力而为）：
+   否则一次失败的压缩会让这个会话在本进程里永远「有压缩在跑」，之后每一轮都让路。
+   库里的「只有开始」留到下次打开时显示未完成——两份状态说的是同一件事：**这次压缩没有提交**。
+
+### 测试
+
+- 修剪：`ContextPrunerTests`（档位序列 / 单调 / 首档是原配置）；`ContextTrimmerTests` 增 3 条
+  （先修剪再淘汰整轮、正文本身超预算时才淘汰、快照永不被淘汰）。
+- 热前缀：`ContextSummarizerTests` 增 4 条（真前缀结构 + 工具声明、无会话提示词时退回固定提示词、
+  工具调用无文本时去工具重试、来源序号按位置回填）；`AgentSessionRunnerCompactionTests` 增 2 条
+  （Runner 把 `Describe` 的前缀转交给摘要请求、修剪后就放得下时一次摘要都不调）。
+- 事务：`ContextCompactorTests` 增 7 条（开始 / 提交各落库一次且中间态只有开始标记、拒绝不缩小、
+  未收尾时让路、崩溃读回后接管、提交前崩溃时库里没有半截摘要、提交保存失败后不会被当成有压缩在跑、
+  摘要器抛异常时事务也会收尾、快照不进入压缩范围）；`ChatStoreSummaryTests` 增 2 条（标记落库往返、崩溃读回标成中断）。
+- 界面：`CompactionDividerTests` 增 2 条（中断证据行 / 正常压缩不显示）；`ChatRoomPresentationTests`
+  增「未完成徽标 + 没有分隔线 + 原文照常」；`ContextBreakdownTests` 增 2 条（修剪行、没修剪不显示）。
+- 回归：Core 821（+21）、UI 116（+5）、Sandbox 219（1 跳过，未变）、routing-eval 28/28。
+
+### 边界（留给 P2c）
+
+- 大输出仍然只是截断（头 1200 / 尾 300 字符）：落盘与 `read_file` 回读属于 P2c。→ ✅ P2c 已补（§15）。
+- 摘要请求的前缀**是否真的命中缓存**只能看端点上报的 `CacheHitTokens`；本机没有可用端点，
+  测量链路已通（P2a），结论留给真实端点。
+- `ContextBudgetChatClient` 的中途裁剪没有接入修剪档位：它在工具循环内部只做「单条工具结果强裁 + 整块淘汰」，
+  与 P2c 的 spill 一起重做更合适。→ ✅ P2c 已在同一处把「强裁」换成「落盘 + 预览」（§15）；
+  修剪档位仍只在 `ContextTrimmer` 里，循环内部不调摘要（P2b 的事务语义不变）。
+
+## 15. P2c 实施记录（大工具输出落盘）
+
+状态：✅ 已落地。WPF 解决方案 0 警告 0 错误（Debug / Release）；Core 832（+11）、UI 118（+2）、Sandbox 219（1 跳过）
+测试全绿；`tools/routing-eval --mode rules` 仍 28/28。
+
+### 落地形态
+
+| 计划项 | 实现 |
+|---|---|
+| §3.3.3 落盘 seam | 新增 `Context/Spill/ToolResultSpillStore.cs`：`IToolResultSpillStore.Save(callId, text)` + `WorkspaceToolResultSpillStore`（写 `<workspace>/.agent/spill/<callId>.log`，UTF-8 无 BOM，同内容不重写） |
+| 上下文替换 | `ContextBudgetChatClient` 把「强裁」换成「先落盘再预览」：头 1200（在**行边界**收口）+ 尾 300 + 全文路径 + `read_file("…", offset: N)` 指引；整份输出没有换行时改为提示 `maxLineChars` |
+| `read` 不自落盘 | 从历史里的 `tool_calls` 建 CallId → 工具名，`read_file` 的输出显式跳过落盘（DSH 同样跳过 `read`） |
+| 尽力而为 | 写盘失败返回 `null` → 退回纯截断并注明「全文未能落盘」；`ContextRunTelemetry.SpillFailures` 记账，工具结果本身仍是成功 |
+| 不污染工作区 | 落盘目录自带 `.agent/.gitignore`（内容 `*`）；`.agent` 进 `WorkspaceExcludes` 与 `WorkspaceSearch.ExcludedDirectories`（树 / `@` / 搜索都不见），只能显式 `read_file` 读；文件数上限 200，超出按最后写入时间清理最旧的 |
+| 回读能力 | `read_file` 新增 `maxLineChars`（默认 500，最多 20000）：日志里的超长单行可一次多看一些；跨行续读仍走原有 `offset` / 「接续用 offset=」链 |
+| 设置 | `ContextSettings.SpillLargeToolOutputs`（默认开）+ 设置页「高级」开关 |
+| 归因 | `ContextReport.SpilledResults` / `SpillFailures` → 分解面板一行「已把 N 条超长工具输出落盘到 .agent/spill（可用 read_file 回读，无需重跑）」 |
+| 决策规则 | `ToolPlaybooks` 的 `read_file` / `run_command` / `run_powershell` 各补一句「输出被截断时按 .agent/spill 路径回读，不要重跑命令」 |
+
+### 与计划的偏差（取舍）
+
+1. **落盘点在「中途裁剪装饰器」，不是「工具结果被接纳的那一刻」**。FICC 与 `NativeAgentLoop` 都在
+   `ContextBudgetChatClient` 内侧，这个装饰器是两边都经过的唯一 seam；按 §14 的边界，把「强裁」就地换成
+   「落盘 + 预览」最合适。代价：文件在下一次请求前才写（用户无感），工具名要靠历史里的 `tool_calls` 反查。
+2. **阈值沿用 `MidTurnToolResultChars`（默认 2000 字符），没有另加 `maxInlineTokens`**。DSH 用 12500 token
+   是因为它不裁工具结果；我们的上下文里本来最多只留 2000 字符，再设一个更大的落盘阈值等于「先丢 200K 再落盘」。
+   同一个数字既是触发条件也是内联上限，只有一条规则。
+3. **落到工作区而不是 AppData**：`read_file` 只允许读工作区（+ 附件只读根），落到外面就没有回读通道，
+   还得给工具面加新工具。工作区方案的副作用（`git status` 污染）用目录内 `.gitignore` 解决。
+4. **`.agent` 不进搜索 / 树 / `@` 索引**：它们是会话日志，不是工作区内容；让 `search_files` 扫几百个
+   200K 日志只会拖慢并淹没真正的命中。显式路径的 `read_file` 不受影响。
+5. **清理不是精确的**：按最后写入时间保留 200 个。很久以前那次的全文可能被清掉，但预览仍在历史里——
+   这是有意的有界化，不是完整性承诺。
+6. **`read_file` 加了 `maxLineChars`**（计划里没有）：没有它，压缩成单行的 JSON / 日志即使落盘也只能读到
+   前 500 字符，回读等于没做。参数默认 500，行为与旧版逐字节一致。
+7. **没有把「全文路径」写进 `ToolTraceEntry`**：轨迹在结果回来那一刻落库，而落盘发生在下一次请求前；
+   要写进去就得让装饰器反向更新 metrics，收益（工具卡多一行路径）不抵这条反向依赖。落盘 / 失败条数走报告。
+
+### 测试
+
+- Core：`ToolResultSpillTests`（8 条）：超长结果落盘且上下文只剩预览 / 按预览里的 `read_file(path, offset)`
+  一路翻到第 3000 行的中间标记 / `read_file` 的结果不落盘 / 写盘失败退回纯截断并记 `SpillFailures` /
+  同一 `callId` 二次请求不重写文件且预览逐字节相同 / 文件名清洗与缺省哈希 / 落盘目录自带 `.gitignore` /
+  没有工作区时不落盘。
+- 接线：`AgentChatServiceToolExposureTests` 新增 2 条（走真实的装饰器链验证「超长结果落到工作区 `.agent/spill`」、
+  关掉 `SpillLargeToolOutputs` 后不落盘）。
+- 读取：`ReadFileRangeTests` 新增「超长单行可调大单行上限读完」。
+- 界面：`ContextBreakdownTests` 新增 2 条（落盘条数与失败条数、没落盘不显示）。
+- 回归：Core 832（+11）、UI 118（+2）、Sandbox 219（1 跳过）、routing-eval 28/28。
+
+### 边界（后续）
+
+- 落盘的是**原始工具结果**（含 `[TOOL_RESULT_BEGIN:…]` 包装），不是清洗后的正文：回读时模型看到的内容
+  与它上一轮看到的一致，不另存一份格式。
+- 回读成本仍按普通 `read_file` 计（每次 30K 字符 / 2000 行）；按字节切片要改 `read_file` 的语义，暂不做。
+- 沙箱里的 `run_command` 看到的是**工作区副本**：`.agent/spill` 在副本里也在，但它是宿主写的，不参与写回比对。

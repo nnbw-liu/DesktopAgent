@@ -19,7 +19,9 @@ public sealed class WorkspaceSearch
 
     private static readonly HashSet<string> ExcludedDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".git", ".vs", "bin", "obj", "node_modules", ".tmp", "TestResults"
+        // .agent 是宿主自己的目录（P2c 的大输出落盘在 .agent/spill）：树 / 搜索 / glob 里不出现，
+        // 但模型仍可用 read_file 按给出的路径显式回读。
+        ".git", ".vs", "bin", "obj", "node_modules", ".tmp", "TestResults", ".agent"
     };
 
     /// <summary>

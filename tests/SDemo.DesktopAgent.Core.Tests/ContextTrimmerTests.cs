@@ -177,6 +177,95 @@ public sealed class ContextTrimmerTests : IDisposable
         Assert.Contains("截断", kept.Rendered.Text);
     }
 
+    // ---------- P2b「先修剪，后摘要」 ----------
+
+    [Fact]
+    public void 先修剪工具轨迹再淘汰整轮历史()
+    {
+        var messages = new List<ChatMessage>();
+
+        for (var turn = 0; turn < 4; turn++)
+        {
+            messages.Add(User($"第 {turn} 轮：" + new string('问', 40)));
+            var reply = Assistant($"第 {turn} 轮回答：" + new string('答', 40));
+
+            for (var index = 0; index < 12; index++)
+            {
+                reply.ToolTrace.Add(new ToolTraceEntry(
+                    "powershell",
+                    ToolTraceEntry.StatusOk,
+                    ExitCode: 0,
+                    ArgsDigest: $"scripts/run-{turn}-{index}.ps1",
+                    Summary: "执行成功，输出了一小段日志",
+                    OutputChars: 200,
+                    At: DateTime.Now));
+            }
+
+            messages.Add(reply);
+        }
+
+        // 预算刚好够「正文」不够「正文 + 轨迹」：旧实现会先淘汰整轮，新实现先把轨迹修到放得下。
+        var contentOnly = messages.Sum(message => _counter.CountMessage(
+            message.Role == ChatMessageRole.User ? "user" : "assistant",
+            message.Content));
+
+        var result = _trimmer.Trim(
+            messages,
+            Options(messageBudget: contentOnly + 40 + 8, keepRecentTurns: 10, toolTraceBudget: 300),
+            AgentMessageMapper.Render);
+
+        Assert.Equal(0, result.Stats.OmittedMessages);
+        Assert.Equal(result.Stats.TotalTurns, result.Stats.KeptTurns);
+        Assert.True(result.Stats.PrunedTraceTokens > 0, "应当靠修剪轨迹进预算");
+        Assert.True(result.Stats.Pruned);
+    }
+
+    [Fact]
+    public void 修剪放不下时才淘汰整轮()
+    {
+        var messages = new List<ChatMessage>();
+
+        for (var turn = 0; turn < 4; turn++)
+        {
+            messages.Add(User($"第 {turn} 轮：" + new string('问', 400)));
+            messages.Add(Assistant($"第 {turn} 轮回答：" + new string('答', 400)));
+        }
+
+        // 正文本身就远超预算：轨迹一刀也修不出空间，只能整轮淘汰（旧的兜底路径仍然有效）。
+        var result = _trimmer.Trim(
+            messages,
+            Options(messageBudget: 400, keepRecentTurns: 1),
+            AgentMessageMapper.Render);
+
+        Assert.True(result.Stats.OmittedMessages > 0);
+        Assert.Equal(1, result.Stats.KeptTurns);
+        Assert.Equal(0, result.Stats.PrunedTraceTokens);
+    }
+
+    [Fact]
+    public void 宿主上下文快照永不被淘汰()
+    {
+        var messages = new List<ChatMessage>();
+
+        for (var turn = 0; turn < 6; turn++)
+        {
+            messages.Add(User($"第 {turn} 轮：" + new string('问', 200)));
+            messages.Add(Assistant($"第 {turn} 轮回答：" + new string('答', 200)));
+        }
+
+        messages.Add(User(HostSnapshot.Compose("### 时间\n2026-10-25T12:00:00+08:00")));
+
+        var result = _trimmer.Trim(
+            messages,
+            Options(messageBudget: 120, keepRecentTurns: 1),
+            AgentMessageMapper.Render);
+
+        var snapshot = Assert.Single(
+            result.Messages,
+            message => HostSnapshot.IsSnapshot(message.Source.Content));
+        Assert.Contains("宿主上下文快照", snapshot.Rendered.Text);
+    }
+
     public void Dispose()
     {
         try

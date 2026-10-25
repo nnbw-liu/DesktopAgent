@@ -64,4 +64,7 @@ public sealed class AppSettings
 
     /// <summary>智能模型路由（默认关闭；旧设置文件没有该节点时按默认值）。</summary>
     public ModelRoutingSettings ModelRouting { get; set; } = new();
+
+    /// <summary>对话呈现：过程展示档位与收起时机（P0）。</summary>
+    public ChatPresentationSettings Chat { get; set; } = new();
 }

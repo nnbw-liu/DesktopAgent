@@ -36,6 +36,10 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         session.Property(record => record.SummaryTokens);
         session.Property(record => record.LastVerificationJson);
         session.Property(record => record.TodosJson);
+        // P2b：压缩事务标记（start / end / 原因）；只有开始没有收尾 = 上次压缩没跑完。
+        session.Property(record => record.CompactionStartedAt);
+        session.Property(record => record.CompactionFinishedAt);
+        session.Property(record => record.CompactionReason);
         session.HasIndex(record => record.UpdatedAt);
         session.HasMany(record => record.Messages)
             .WithOne()
@@ -58,6 +62,8 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         message.Property(record => record.PluginJson);
         message.Property(record => record.DerivedJson);
         message.Property(record => record.ToolTraceJson);
+        // P0：步骤时间线（只服务界面，不进入上下文）。
+        message.Property(record => record.StepsJson);
         // M3：知识库引用（只用于界面跳转，不进入上下文）。
         message.Property(record => record.MemoryCitationsJson);
         message.Property(record => record.IsPinned);
@@ -113,6 +119,15 @@ public sealed class SessionRecord
     /// <summary>摘要正文的 token 估算。</summary>
     public int SummaryTokens { get; set; }
 
+    /// <summary>P2b：上一次压缩的开始时间（事务标记 / 锁）；null 表示从没压缩过。</summary>
+    public DateTime? CompactionStartedAt { get; set; }
+
+    /// <summary>P2b：上一次压缩的收尾时间；早于开始时间视为未收尾。</summary>
+    public DateTime? CompactionFinishedAt { get; set; }
+
+    /// <summary>P2b：上一次压缩的结论（auto / manual / rejected / failed:…），排障用。</summary>
+    public string? CompactionReason { get; set; }
+
     /// <summary>最近一次验证结果（VerificationRecord）的 JSON。</summary>
     public string? LastVerificationJson { get; set; }
 
@@ -161,6 +176,9 @@ public sealed class MessageRecord
 
     /// <summary>工具轨迹（ToolTraceEntry[]）的 JSON。</summary>
     public string? ToolTraceJson { get; set; }
+
+    /// <summary>步骤时间线（ChatStep[]）的 JSON；P0 起写入，只服务界面。</summary>
+    public string? StepsJson { get; set; }
 
     /// <summary>知识库引用（MemoryCitation[]）的 JSON；M3。</summary>
     public string? MemoryCitationsJson { get; set; }

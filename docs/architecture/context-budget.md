@@ -102,7 +102,11 @@ record ToolTraceEntry(
 
 MAF 1.25 的 `FunctionInvokingChatClient`（FICC）插在装饰器**外层**，因此每次 LLM 请求（含工具结果回灌）都会经过这里（结论由 `MidTurnPipelineSpikeTests` 固定）：
 
-1. 单条 `FunctionResultContent` 超过 `MidTurnToolResultChars`（默认 2000）时，保留头 1200 + 尾 300 字符，中间写「已省略 N 字符」。
+1. 单条 `FunctionResultContent` 超过 `MidTurnToolResultChars`（默认 2000）时：
+   - **P2c 起先落盘**（`SpillLargeToolOutputs` 默认开）：全文写入工作区 `.agent/spill/<callId>.log`，上下文里换成「头 1200 + 尾 300 + `.agent/spill` 路径 + `read_file(…, offset: N)` 回读指引」。写盘失败（只读工作区 / 权限不足）退回纯截断，并在省略标记里注明「全文未能落盘」——落盘永远是尽力而为，不会把成功的工具调用变成错误。
+   - `read_file` 的输出**不落盘**（它本来就能按 `offset` 再读一次，落盘等于自我复制）；关闭开关时也退回纯截断。
+   - 落盘目录自带 `.agent/.gitignore`（内容 `*`），不污染用户的 `git status`；`.agent` 同时进 `WorkspaceExcludes` 与 `WorkspaceSearch.ExcludedDirectories`，树 / `@` 引用 / 搜索里都不会出现，只有显式 `read_file(".agent/spill/…")` 能读。
+   - 文件数上限 200，超出按最后写入时间清理最旧的；同一 `callId` 重复请求命中同一文件，内容不变就不重写。
 2. 仍超预算时从最旧「整块」淘汰（一块 = 一条 user 消息及其后的 assistant / tool 消息），永远保留 system 前缀与最后一块；孤立 tool 消息一并丢弃。
 3. 每次请求都累计 `ContextRunTelemetry.EstimatedInputTokens` 与 `RequestCount`，供 usage 校准；发生裁剪时 `MidTurnTrimmedRequests++` 并给用户提示。
 
@@ -129,6 +133,7 @@ MAF 1.25 的 `FunctionInvokingChatClient`（FICC）插在装饰器**外层**，�
 | `ToolTraceTokenBudget` | `300` | 每条消息的轨迹回放预算 |
 | `AttachmentInlineTokens` | `4096` | 当前轮附件内联预算（token） |
 | `MidTurnToolResultChars` | `2000` | 单条工具结果上限 |
+| `SpillLargeToolOutputs` | `true` | 超限结果落盘到 `.agent/spill`（P2c），关闭后退回纯截断 |
 | `MaxPinnedMessages` | `20` | pin 数量上限 |
 | `PinnedShareLimit` | `0.30` | pin 占消息预算上限 |
 | `PinnedTruncateChars` | `500` | pin 超量时保留字符 |
@@ -149,4 +154,4 @@ MAF 1.25 的 `FunctionInvokingChatClient`（FICC）插在装饰器**外层**，�
 - 压缩的触发条件是「L1 已开始淘汰历史」（`OmittedMessages > 0`），不是 plan 的 `Estimated > Total`；细节与调参见 [context-compaction.md](context-compaction.md)。
 - 50KB 附件在 8K 窗口下不会全部内联：当前轮最多内联约 4096 token 的正文，其余只留文件名 / 路径，模型需要全文时用工具重新读取。这是有意的取舍，不是缺陷。
 - 估算器是启发式的，靠校准逼近真实 usage；基线误差数据见 [p1-baseline.md](../reports/p1-baseline.md)。
-- 中途裁剪只覆盖 `GetResponseAsync` / `GetStreamingResponseAsync` 的请求；它不感知工具语义，只保证 tool_call / result 成对。
+- 中途裁剪只覆盖 `GetResponseAsync` / `GetStreamingResponseAsync` 的请求；它只从历史里的 `tool_calls` 读工具名（唯一用途是跳过 `read_file` 的落盘），不解释业务语义，只保证 tool_call / result 成对。

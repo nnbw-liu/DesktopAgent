@@ -19,6 +19,10 @@ public sealed class FileToolPack : IAgentToolPack
     public const int MaxResultChars = 30_000;
     public const long MaxReadFileBytes = 8L * 1024 * 1024;
 
+    /// <summary>单行默认显示上限；日志 / 压缩后的 JSON 这类超长单行可以按参数调大。</summary>
+    public const int DefaultLineChars = 500;
+    public const int MaxLineChars = 20_000;
+
     private readonly WorkspaceSearch _search = new();
 
     public AgentToolPackDescriptor Descriptor { get; } = new(
@@ -189,7 +193,8 @@ public sealed class FileToolPack : IAgentToolPack
         public string ReadFile(
             [Description("相对工作区的文件路径。")] string path,
             [Description("起始行号，从 1 开始；默认 1。")] int offset = 1,
-            [Description("本次最多读取多少行，默认 400，最多 2000。")] int limit = DefaultReadLimit)
+            [Description("本次最多读取多少行，默认 400，最多 2000。")] int limit = DefaultReadLimit,
+            [Description("单行最多显示多少字符，默认 500；超长单行可调大（最多 20000）。")] int maxLineChars = DefaultLineChars)
         {
             var file = ResolveReadPath(path);
             if (!File.Exists(file))
@@ -247,13 +252,14 @@ public sealed class FileToolPack : IAgentToolPack
 
             var chars = 0;
             var last = end;
+            var lineLimit = Math.Clamp(maxLineChars, 100, MaxLineChars);
 
             for (var index = start; index <= end; index++)
             {
                 var line = all[index - 1];
-                if (line.Length > 500)
+                if (line.Length > lineLimit)
                 {
-                    line = string.Concat(line.AsSpan(0, 500), "…");
+                    line = string.Concat(line.AsSpan(0, lineLimit), "…");
                 }
 
                 var rendered = $"{index.ToString().PadLeft(4)}| {line}";
