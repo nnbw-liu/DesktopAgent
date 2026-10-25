@@ -75,6 +75,12 @@ public sealed class ContextSettings
     /// <summary>工具循环内单条工具结果的字符上限（§3.7 兜底，A/B 分支都生效）。</summary>
     public int MidTurnToolResultChars { get; set; } = 2000;
 
+    /// <summary>
+    /// 超过 <see cref="MidTurnToolResultChars"/> 的工具结果把全文落盘到 <c>&lt;workspace&gt;/.agent/spill</c>，
+    /// 上下文里只留头尾预览与 <c>read_file</c> 回读指引（P2c）。关闭后退回纯截断。
+    /// </summary>
+    public bool SpillLargeToolOutputs { get; set; } = true;
+
     /// <summary>pin 消息数量上限。</summary>
     public int MaxPinnedMessages { get; set; } = 20;
 

@@ -519,6 +519,13 @@ public sealed class AgentChatService : IAgentChatService
     {
         var settings = scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
         var agent = scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
+
+        // P2c：超长工具输出落盘到 <workspace>/.agent/spill，上下文里只留头尾预览 + 回读指引。
+        // 没有工作区、或用户关掉开关时传 null，退回纯截断（落盘是尽力而为，不能改变工具结果语义）。
+        IToolResultSpillStore? spill = settings.SpillLargeToolOutputs && !string.IsNullOrWhiteSpace(_workspace.RootPath)
+            ? new WorkspaceToolResultSpillStore(_workspace.RootPath)
+            : null;
+
         var budgetOptions = new ContextBudgetChatOptions(
             Enabled: settings.Enabled && settings.MidTurnTrim,
             Budget: plan.Budget,
@@ -526,7 +533,8 @@ public sealed class AgentChatService : IAgentChatService
             CalibrationFactor: plan.Report.CalibrationFactor,
             KeepRecentTurns: settings.KeepRecentTurns,
             ToolResultChars: settings.MidTurnToolResultChars,
-            MaxOutputTokens: Math.Clamp(plan.Profile.MaxOutputTokens, 128, 8192));
+            MaxOutputTokens: Math.Clamp(plan.Profile.MaxOutputTokens, 128, 8192),
+            Spill: spill);
 
         return new AgentInvocation(
             new Uri(provider.BaseUrl, UriKind.Absolute),

@@ -45,7 +45,10 @@ public sealed record ContextReport(
     int SummaryOutputTokens = 0,
     IReadOnlyList<ContextSectionUsage>? Sections = null,
     int CacheHitTokens = 0,
-    int PrunedTokens = 0)
+    int PrunedTokens = 0,
+    // P2c：超长工具输出落盘的条数；SpillFailures 是写盘失败、退回纯截断的条数。
+    int SpilledResults = 0,
+    int SpillFailures = 0)
 {
     /// <summary>占输入预算的比例（0~1+）。</summary>
     public double Occupancy => Total <= 0 ? 0 : (double)Estimated / Total;

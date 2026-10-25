@@ -246,6 +246,14 @@
                    @bind="Context.MidTurnToolResultChars" @bind:after="SaveSettings" />
         </div>
 
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">超长工具输出落盘</span>
+                <span class="settings-row-hint">超出上面上限的结果把全文存到工作区 .agent/spill，上下文只留头尾预览与 read_file 回读指引；关闭后只截断。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@Context.SpillLargeToolOutputs" @onchange="ToggleSpill" />
+        </label>
+
         <div class="settings-row">
             <span class="settings-row-text">
                 <span class="settings-row-title">重置 token 校准</span>
@@ -323,6 +331,12 @@
     private void ToggleOverflowRetry(ChangeEventArgs args)
     {
         Context.OverflowRetry = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleSpill(ChangeEventArgs args)
+    {
+        Context.SpillLargeToolOutputs = args.Value is true;
         Settings.Save();
     }
 
