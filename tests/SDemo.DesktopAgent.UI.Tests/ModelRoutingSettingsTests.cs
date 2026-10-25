@@ -25,6 +25,15 @@ public sealed class ModelRoutingSettingsTests : TestContext
 
         Assert.Contains("智能模型路由", cut.Markup);
         Assert.Contains("规则（本地判断，零额外请求）", cut.Markup);
+        // 路由设置与提供商列表共用滚动容器，底部「添加提供商」保持固定。
+        Assert.NotNull(cut.Find(".models-scroll"));
+        Assert.NotNull(cut.Find(".provider-add-bar"));
+
+        // 两块都可以收起：路由默认收起，提供商默认展开。
+        var folds = cut.FindAll("details.settings-collapsible");
+        Assert.Equal(2, folds.Count);
+        Assert.False(folds.ElementAt(0).HasAttribute("open"));
+        Assert.True(folds.ElementAt(1).HasAttribute("open"));
 
         // 第一个下拉是工作方式；切到混合后映射区出现。
         cut.FindAll("select").ElementAt(0).Change("Hybrid");

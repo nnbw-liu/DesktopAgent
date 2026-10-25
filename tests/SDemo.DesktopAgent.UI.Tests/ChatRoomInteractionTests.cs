@@ -103,7 +103,60 @@ public sealed class ChatRoomInteractionTests : TestContext
         Assert.True(session.ScopedSettings.AutoModelRouting);
         Assert.Null(session.ScopedSettings.ProviderId);
         Assert.Null(session.ScopedSettings.ModelId);
-        Assert.Contains("自动", cut.Find(".model-picker-current").TextContent);
+        Assert.Equal("自动", cut.Find(".model-picker-current").TextContent.Trim());
+
+        // 再打开菜单：只勾选「自动选择」，旧模型不能残留勾选。
+        cut.Find(".model-picker-trigger").Click();
+        var selected = cut.FindAll(".model-picker-option.is-selected");
+        Assert.Single(selected);
+        Assert.Contains("自动选择", selected.ElementAt(0).TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 用量提示按模型区分()
+    {
+        _settings.Current.Providers.Clear();
+        _settings.Current.Providers.Add(new ModelProvider
+        {
+            Id = "test",
+            DisplayName = "测试",
+            BaseUrl = "https://example.com/v1",
+            ApiKey = "k",
+            Models =
+            [
+                new ModelEntry { Id = "fast", DisplayName = "便宜模型" },
+                new ModelEntry { Id = "strong", DisplayName = "强模型" }
+            ]
+        });
+        _settings.Current.LastProviderId = "test";
+        _settings.Current.LastModelId = "fast";
+
+        var session = new ChatSession { Id = "usage", Title = "用量" };
+        session.Messages.Add(new ChatMessageModel(ChatMessageRole.User, "你好"));
+        session.Messages.Add(new ChatMessageModel(ChatMessageRole.Assistant, "回答一")
+        {
+            ProviderId = "test",
+            ModelId = "fast",
+            InputTokens = 1000,
+            OutputTokens = 500
+        });
+        session.Messages.Add(new ChatMessageModel(ChatMessageRole.Assistant, "回答二")
+        {
+            ProviderId = "test",
+            ModelId = "strong",
+            InputTokens = 2000,
+            OutputTokens = 1000
+        });
+
+        var cut = RenderComponent<ChatRoom>(parameters => parameters
+            .Add(component => component.Session, session));
+
+        var title = cut.Find(".chat-token-total").GetAttribute("title");
+        Assert.NotNull(title);
+        Assert.Contains("便宜模型（test）", title, StringComparison.Ordinal);
+        Assert.Contains("强模型（test）", title, StringComparison.Ordinal);
+        Assert.Contains("输入 1.0K / 输出 500", title, StringComparison.Ordinal);
+        Assert.Contains("输入 2.0K / 输出 1.0K", title, StringComparison.Ordinal);
     }
 
     [Fact]

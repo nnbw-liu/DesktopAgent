@@ -496,7 +496,7 @@
                     <div class="model-picker @(_modelMenuOpen ? "is-open" : null)">
                         <button type="button"
                                 class="model-picker-trigger"
-                                title="选择模型"
+                                title="@ModelPickerTitle()"
                                 aria-haspopup="menu"
                                 aria-expanded="@(_modelMenuOpen ? "true" : "false")"
                                 disabled="@_isGenerating"
@@ -546,7 +546,9 @@
                                         {
                                             @foreach (var option in group.Options)
                                             {
-                                                var selected = string.Equals(option.Key, _selectedKey, StringComparison.Ordinal);
+                                                // 自动模式下不勾选任何固定模型；否则「先选模型再选自动」会留下旧勾。
+                                                var selected = !_autoRouting
+                                                    && string.Equals(option.Key, _selectedKey, StringComparison.Ordinal);
 
                                                 <button type="button"
                                                         class="model-picker-option @(selected ? "is-selected" : null)"
@@ -575,13 +577,6 @@
                     </button>
                 }
 
-                @if (_autoRouting && _lastRoute is { } route)
-                {
-                    <span class="model-route-chip"
-                          title="@($"{route.Provider.Name} · {route.ModelId} · {route.Reason}（置信度 {route.Confidence:0.00}）")">
-                        @route.Task.ToDisplayName() · @route.ModelId
-                    </span>
-                }
             </FooterContent>
         </ChatComposer>
 
@@ -590,8 +585,7 @@
         {
             <div class="composer-usage">
                 <ContextMeter Report="_contextPreview" />
-                <span class="chat-token-total"
-                      title="@($"本聊天室累计 {ContextMeter.Format(ChatTotalTokens)} tokens{Environment.NewLine}输入 {ContextMeter.Format(ChatInputTokens)} / 输出 {ContextMeter.Format(ChatOutputTokens)}")">
+                <span class="chat-token-total" title="@UsageTooltip()">
                     <svg class="chat-token-icon" viewBox="0 0 16 16" aria-hidden="true">
                         <ellipse cx="8" cy="4.4" rx="4.4" ry="1.7" fill="none" stroke="currentColor" stroke-width="1.1" />
                         <path d="M3.6 4.4v3.2c0 .94 1.97 1.7 4.4 1.7s4.4-.76 4.4-1.7V4.4M3.6 7.6v3.2c0 .94 1.97 1.7 4.4 1.7s4.4-.76 4.4-1.7V7.6"
@@ -882,6 +876,84 @@
 
     /// <summary>本聊天室累计 token（输入 + 输出）。</summary>
     private int ChatTotalTokens => ChatInputTokens + ChatOutputTokens;
+
+    /// <summary>
+    /// 累计用量的悬浮说明：先给总数，再按「provider + 模型」拆分，
+    /// 这样同一个聊天室里换过模型后，能直接看出每个模型花了多少。
+    /// </summary>
+    private string UsageTooltip()
+    {
+        var lines = new List<string>
+        {
+            $"本聊天室累计 {ContextMeter.Format(ChatTotalTokens)} tokens",
+            $"输入 {ContextMeter.Format(ChatInputTokens)} / 输出 {ContextMeter.Format(ChatOutputTokens)}"
+        };
+
+        var groups = Session.Messages
+            .Where(message => message.Role == ChatMessageRole.Assistant)
+            .Where(message => message.InputTokens > 0 || message.OutputTokens > 0)
+            .GroupBy(message => new
+            {
+                ProviderId = message.ProviderId ?? string.Empty,
+                ModelId = message.ModelId ?? string.Empty
+            })
+            .Select(group => new
+            {
+                group.Key.ProviderId,
+                group.Key.ModelId,
+                Calls = group.Count(),
+                Input = group.Sum(message => message.InputTokens),
+                Output = group.Sum(message => message.OutputTokens)
+            })
+            .OrderByDescending(item => item.Input + item.Output)
+            .ThenBy(item => item.ModelId, StringComparer.Ordinal)
+            .ToList();
+
+        if (groups.Count == 0)
+        {
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        lines.Add(string.Empty);
+        lines.Add("按模型：");
+
+        const int maxModels = 8;
+        foreach (var item in groups.Take(maxModels))
+        {
+            var total = item.Input + item.Output;
+            lines.Add(
+                $"· {ModelDisplayName(item.ProviderId, item.ModelId)}："
+                + $"输入 {ContextMeter.Format(item.Input)} / 输出 {ContextMeter.Format(item.Output)}"
+                + $" / 合计 {ContextMeter.Format(total)}（{item.Calls} 条）");
+        }
+
+        if (groups.Count > maxModels)
+        {
+            lines.Add($"…另有 {groups.Count - maxModels} 个模型");
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>模型显示名：优先取目录里的 DisplayName，目录已删则回落到 id。</summary>
+    private string ModelDisplayName(string providerId, string modelId)
+    {
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            return "未知模型";
+        }
+
+        var provider = string.IsNullOrWhiteSpace(providerId)
+            ? null
+            : Settings.Current.Providers.FirstOrDefault(item =>
+                string.Equals(item.Id, providerId, StringComparison.Ordinal));
+
+        var model = provider?.Models.FirstOrDefault(item =>
+            string.Equals(item.Id, modelId, StringComparison.Ordinal));
+
+        var name = model?.Name ?? modelId;
+        return string.IsNullOrWhiteSpace(providerId) ? name : $"{name}（{providerId}）";
+    }
 
     protected override void OnInitialized()
     {
@@ -1174,13 +1246,29 @@
     {
         if (_autoRouting)
         {
-            return _lastRoute is { } route
-                ? $"自动 · {route.Task.ToDisplayName()} · {route.ModelId}"
-                : "自动 · 按任务选择";
+            return "自动";
         }
 
         var option = CurrentModelOption();
         return option is null ? "选择模型" : $"{option.ProviderName} · {option.ModelName}";
+    }
+
+    /// <summary>把本轮路由详情放进模型按钮的悬浮说明，避免占用输入框的可见空间。</summary>
+    private string ModelPickerTitle()
+    {
+        if (!_autoRouting)
+        {
+            return "选择模型";
+        }
+
+        if (_lastRoute is not { } route)
+        {
+            return "自动选择：按任务类型选择模型";
+        }
+
+        return $"自动选择 · 本轮 {route.Task.ToDisplayName()}{Environment.NewLine}"
+            + $"{route.Provider.Name} · {route.ModelId}{Environment.NewLine}"
+            + $"{route.Reason}（置信度 {route.Confidence:0.00}）";
     }
 
     /// <summary>选择技能：再次点击同一个则取消。</summary>

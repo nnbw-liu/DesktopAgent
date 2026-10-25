@@ -366,7 +366,7 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 - **任务 → 模型映射**：简单、代码、复杂三类分别指定 provider + model，另有兜底模型；路由模型默认复用摘要模型或当前模型，可在设置里单独指定。
 - **护栏**：候选必须装得下本轮上下文、代码 / 复杂任务优先要求工具能力；路由失败 / 超时 / JSON 非法逐级回落规则 → 兜底 → 当前模型，不允许阻塞对话。
 - **会话粘性**：同会话、同任务类型、同配置时沿用上一轮模型，减少切模型导致的提示缓存失效；任务类型或配置变化会重新路由。
-- **可解释**：消息底部显示实际模型，输入框旁显示「本轮 · 类型 · 模型」；路由理由与置信度在悬浮说明里。
+- **可解释**：消息底部显示实际模型；模型选择器选中自动后只显示「自动」，本轮类型 / 模型 / 理由 / 置信度在悬浮说明里；底部累计用量的 tips 也按模型拆分输入 / 输出。
 
 设置与设计细节见 [docs/architecture/model-routing.md](docs/architecture/model-routing.md)。
 
@@ -512,7 +512,7 @@ S6 行为要点：
 
 使用方式：侧栏「新建聊天室」下方有「翻译」入口，点一下就是预选翻译的空会话；输入框底部的「翻译」chip 选中后发送走插件 Run；任意助手消息底部（时间右侧）的插件图标点一下，无参数直接跑、有参数弹出语言面板，产物是挂在原消息下的卡片，重启仍在、也不会进入下一轮上下文。`segments` 能力的卡片与消息都带「对照 / 译文」开关，切换只是重新渲染、不重新请求；呈现方式按会话记忆，新会话默认值在「设置 → 插件」。想关掉或调整上限也在「设置 → 插件」。
 
-**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（当前 719 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 219 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令、构建 / 测试解析、todo / 验证门 / checkpoint / 循环保护、对话 / 任务判定、小模型模式 / 路由 / 工具修复、插件、沙箱与路径安全等。
+**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（当前 850 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 219 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令、构建 / 测试解析、todo / 验证门 / checkpoint / 循环保护、对话 / 任务判定、小模型模式 / 路由 / 工具修复、插件、沙箱与路径安全等。
 
 ## 主题实现
 

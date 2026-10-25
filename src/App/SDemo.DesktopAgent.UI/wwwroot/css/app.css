@@ -1206,19 +1206,6 @@ a {
     font-size: 10px;
 }
 
-.model-route-chip {
-    max-width: 190px;
-    overflow: hidden;
-    padding: 2px 7px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    color: var(--muted);
-    font-size: 10.5px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    cursor: help;
-}
-
 .msg-model {
     max-width: 180px;
     overflow: hidden;
@@ -2651,6 +2638,58 @@ a {
     line-height: 1.65;
 }
 
+/* 可折叠设置块：summary 只放标题与说明，展开后才是表单。 */
+.settings-collapsible {
+    padding-bottom: 2px;
+}
+
+.settings-fold-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 4px 0;
+    color: var(--text);
+    cursor: pointer;
+    list-style: none;
+}
+
+.settings-fold-head::-webkit-details-marker {
+    display: none;
+}
+
+.settings-fold-caret {
+    flex: 0 0 auto;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 10px;
+    transition: transform .12s ease;
+}
+
+.settings-collapsible[open] .settings-fold-caret {
+    transform: rotate(90deg);
+}
+
+.settings-fold-text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.settings-fold-text .settings-section-title,
+.settings-fold-text .settings-section-hint {
+    display: block;
+    margin: 0;
+}
+
+.settings-section-body {
+    max-width: 760px;
+    margin: 12px auto 0;
+}
+
 /* 外观：三个主题卡片 */
 .theme-options {
     display: grid;
@@ -2928,8 +2967,16 @@ a {
 .settings-pane--models {
     display: flex;
     flex-direction: column;
-    padding: 22px 32px 0;
+    padding: 0 32px;
     overflow: hidden;
+}
+
+/* 路由设置 + 提供商列表共用一条滚动条；底部「添加提供商」保持固定。 */
+.models-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 22px 0 12px;
+    overflow-y: auto;
 }
 
 .models-head {
@@ -2940,13 +2987,10 @@ a {
 }
 
 .provider-scroll {
-    flex: 1 1 auto;
-    min-height: 0;
     width: 100%;
     max-width: 760px;
     margin: 0 auto;
     padding: 4px 2px 16px;
-    overflow-y: auto;
 }
 
 .provider-empty {

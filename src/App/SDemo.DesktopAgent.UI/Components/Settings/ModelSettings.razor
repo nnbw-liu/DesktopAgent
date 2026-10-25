@@ -3,13 +3,20 @@
 
 @* 模型设置：智能路由 + 提供商列表（列表最后固定「添加模型提供商」） *@
 <div class="settings-pane settings-pane--models">
-    <section class="settings-section">
-        <h2 class="settings-section-title">智能模型路由</h2>
-        <p class="settings-section-hint">
-            按任务难度自动换模型：简单问题用便宜模型，改代码用代码模型，架构 / 排查 / 长上下文用强模型。
-            聊天室输入框旁选「自动选择」启用；手动选一个模型则固定该聊天室。
-        </p>
+    <div class="models-scroll">
+    <details class="settings-section settings-collapsible">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <span class="settings-fold-text">
+                <span class="settings-section-title">智能模型路由</span>
+                <span class="settings-section-hint">
+                    按任务难度自动换模型：简单问题用便宜模型，改代码用代码模型，架构 / 排查 / 长上下文用强模型。
+                    聊天室输入框旁选「自动选择」启用；手动选一个模型则固定该聊天室。
+                </span>
+            </span>
+        </summary>
 
+        <div class="settings-section-body">
         <label class="field field--wide">
             <span class="field-label">工作方式</span>
             <select class="field-input"
@@ -175,13 +182,19 @@
         {
             <p class="settings-message">@_routingMessage</p>
         }
-    </section>
+        </div>
+    </details>
 
-    <div class="models-head">
-        <h2 class="settings-section-title">模型提供商</h2>
-        <p class="settings-section-hint">只支持标准 OpenAI API（GET /v1/models、POST /v1/chat/completions）。</p>
-    </div>
+    <details class="settings-section settings-collapsible" open="open">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <span class="settings-fold-text">
+                <span class="settings-section-title">模型提供商</span>
+                <span class="settings-section-hint">只支持标准 OpenAI API（GET /v1/models、POST /v1/chat/completions）。</span>
+            </span>
+        </summary>
 
+        <div class="settings-section-body">
     <div class="provider-scroll">
         @if (Settings.Current.Providers.Count == 0)
         {
@@ -225,6 +238,9 @@
                 </div>
             </article>
         }
+    </div>
+        </div>
+    </details>
     </div>
 
     <div class="provider-add-bar">
