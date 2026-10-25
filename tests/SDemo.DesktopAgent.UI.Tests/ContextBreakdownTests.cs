@@ -186,6 +186,25 @@ public sealed class ContextBreakdownTests : TestContext
         Assert.Contains("2 个", cut.Markup);
     }
 
+    [Fact]
+    public void 修剪轨迹省下的量单独列出()
+    {
+        var cut = RenderComponent<ContextBreakdown>(parameters => parameters
+            .Add(component => component.Report, Report() with { PrunedTokens = 420 }));
+
+        Assert.Contains("已先修剪工具轨迹约 420 token", cut.Markup);
+        Assert.Contains("不必压缩历史", cut.Markup);
+    }
+
+    [Fact]
+    public void 没有修剪时不显示修剪行()
+    {
+        var cut = RenderComponent<ContextBreakdown>(parameters => parameters
+            .Add(component => component.Report, Report()));
+
+        Assert.DoesNotContain("已先修剪工具轨迹", cut.Markup);
+    }
+
     private static ContextReport Report() => new(
         ProviderId: "test",
         ModelId: "test",

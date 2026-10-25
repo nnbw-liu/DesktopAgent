@@ -156,7 +156,8 @@ public sealed class ContextBuilder
             StatePackUsed: snapshot.Tokens > 0,
             StatePackTokens: snapshot.Tokens,
             Routing: request.Routing,
-            Sections: snapshot.Sections);
+            Sections: snapshot.Sections,
+            PrunedTokens: (int)Math.Round(stats.PrunedTraceTokens * calibrationFactor));
 
         if (estimated > budget.Total)
         {

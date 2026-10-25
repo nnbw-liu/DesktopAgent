@@ -94,6 +94,13 @@
     {
         <p class="context-note">已省略 @Report.OmittedMessages 条较早消息（约 @ContextMeter.Format(Report.OmittedTokens) token）</p>
     }
+    @* P2b「先修剪，后摘要」：轨迹修剪省下的量单独列出——它是「不用压缩就放得下」的证据。 *@
+    @if (Report.PrunedTokens > 0)
+    {
+        <p class="context-note">
+            已先修剪工具轨迹约 @ContextMeter.Format(Report.PrunedTokens) token@(Report.PrunedInsteadOfCompacted ? "（不必压缩历史）" : string.Empty)
+        </p>
+    }
     @if (Report.AttachmentsStubbed)
     {
         <p class="context-note">部分附件只保留文件名 / 路径（正文可按需读取）</p>

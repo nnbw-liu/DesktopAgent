@@ -101,6 +101,15 @@ namespace SDemo.DesktopAgent.Migrations
                     b.Property<string>("ActiveMountId")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("CompactionFinishedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CompactionReason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompactionStartedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsArchived")
                         .HasColumnType("INTEGER");
 

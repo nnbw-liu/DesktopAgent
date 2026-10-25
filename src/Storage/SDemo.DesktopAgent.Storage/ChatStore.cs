@@ -266,6 +266,10 @@ public sealed class ChatStore
         record.SummaryThroughOrder = session.HasSummary ? session.SummaryThroughOrder : 0;
         record.SummaryTokens = session.HasSummary ? session.SummaryTokens : 0;
         record.SummaryUpdatedAt = session.HasSummary ? session.SummaryUpdatedAt : null;
+        // P2b：压缩事务标记。只有开始没有收尾也要原样落库——那正是崩溃后要看到的证据。
+        record.CompactionStartedAt = session.CompactionStartedAt;
+        record.CompactionFinishedAt = session.CompactionFinishedAt;
+        record.CompactionReason = session.CompactionReason;
         record.LastVerificationJson = session.LastVerification is null
             ? null
             : JsonSerializer.Serialize(session.LastVerification, JsonOptions);
@@ -626,6 +630,11 @@ public sealed class ChatStore
             SummaryUpdatedAt = record.SummaryUpdatedAt,
             SummaryTokens = record.SummaryTokens,
             SummaryIsFallback = SummaryFormat.IsFallback(record.Summary),
+            // P2b：压缩事务标记。只有开始没有收尾 = 上一次进程崩在压缩中途：
+            // 留成可见的标记（不是半截摘要），并允许下一次压缩接管这一段。
+            CompactionStartedAt = record.CompactionStartedAt,
+            CompactionFinishedAt = record.CompactionFinishedAt,
+            CompactionReason = record.CompactionReason,
             LastVerification = DeserializeVerification(record.LastVerificationJson),
             Todos = DeserializeTodos(record.TodosJson),
             Messages = record.Messages
@@ -662,6 +671,10 @@ public sealed class ChatStore
             session.SummaryUpdatedAt = null;
             session.SummaryIsFallback = false;
         }
+
+        // P2b：读回时发现「只有开始没有收尾」= 上一个进程崩在压缩里。
+        // 打上运行期标记：下一次压缩由它接管，且界面能显示「上次压缩未完成」。
+        session.CompactionInterruptedOnLoad = session.HasUnfinishedCompaction;
 
         return session;
     }

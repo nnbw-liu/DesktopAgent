@@ -116,13 +116,21 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         }
 
         var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
-        var profile = _builder.ResolveProfile(new ContextBuildRequest(
+        var build = new ContextBuildRequest(
             request.Provider,
             request.ModelId,
-            request.Session.Messages.ToList()));
+            request.Session.Messages.ToList(),
+            SummaryText: request.Session.Summary,
+            SummaryThroughOrder: request.Session.SummaryThroughOrder,
+            Scope: request.Scope);
+        var profile = _builder.ResolveProfile(build);
         var budget = ContextBudget.Create(profile, settings);
         var (summaryProvider, summaryModel) = ResolveSummaryTarget(
             request.Provider, request.ModelId, settings);
+
+        // P2b：手动压缩同样尽量复用热前缀（同一份提示词 + 同一组工具声明）。
+        // 拿不到 plan（超预算 / 没有工作区）时退回摘要器的固定提示词，压缩本身照做。
+        var preamble = DescribeBestEffort(request, build);
 
         return await _compactor.EnsureAsync(
             new ContextCompactionRequest(
@@ -132,8 +140,35 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
                 profile,
                 settings,
                 budget,
-                Force: true),
+                Force: true,
+                Instructions: preamble.Instructions,
+                Tools: preamble.Tools),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>尽力拿到「本轮请求的前缀」：失败只影响缓存复用，不影响压缩本身。</summary>
+    private AgentRequestPreamble DescribeBestEffort(AgentCompactRequest request, ContextBuildRequest build)
+    {
+        var runRequest = new AgentRunRequest(
+            request.Session.Messages.ToList(),
+            request.Provider,
+            request.ModelId,
+            new HashSet<string>(StringComparer.Ordinal),
+            SessionId: request.SessionId,
+            Session: request.Session,
+            Scope: request.Scope);
+
+        try
+        {
+            // 路由也要算上：`Describe` 用它决定要声明哪些工具，以及选哪版系统提示词。
+            var routing = RouteCapabilities(runRequest, build);
+            var plan = _builder.Build(routing is null ? build : build with { Routing = routing });
+            return _chat.Describe(ToPlan(runRequest, plan));
+        }
+        catch (ContextBudgetException)
+        {
+            return AgentRequestPreamble.Empty;
+        }
     }
 
     public async IAsyncEnumerable<AgentDelta> StreamAsync(
@@ -334,11 +369,19 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         // 没有淘汰任何历史 = 没超预算：一次摘要调用都不发生（P2 DoD）。
         if (plan.Report.OmittedMessages == 0 || !CanCompact(request, settings))
         {
+            // P2b「先修剪，后摘要」：轨迹修剪把历史留住了，就不必再花一次摘要调用。
+            // 这条提示是给用户看「刚才发生了什么」的，不进模型。
+            if (plan.Report.PrunedInsteadOfCompacted)
+            {
+                telemetry.ContextNotice =
+                    $"已先修剪工具轨迹（约 {FormatTokens(plan.Report.PrunedTokens)} token），不必压缩历史。";
+            }
+
             return plan;
         }
 
         var outcome = await CompactAsync(
-            request, scale, telemetry, cancellationToken).ConfigureAwait(false);
+            request, scale, telemetry, plan, cancellationToken).ConfigureAwait(false);
 
         if (!outcome.Compacted)
         {
@@ -374,7 +417,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         CancellationToken cancellationToken)
     {
         var outcome = await CompactAsync(
-            request, scale, telemetry, cancellationToken).ConfigureAwait(false);
+            request, scale, telemetry, plan: null, cancellationToken).ConfigureAwait(false);
 
         if (!outcome.Compacted)
         {
@@ -403,10 +446,15 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         settings.AutoCompact && request.Session is not null && _compactor is not null;
 
     /// <summary>解析摘要模型并跑一次增量压缩；异常不外抛（自动压缩路径必须不阻塞）。</summary>
+    /// <param name="plan">
+    /// 已经建好的本轮上下文（P2b）：摘要请求要复用它的系统提示词与工具声明作为热前缀。
+    /// 为 null 时（L1 连放都放不下的路径）退回摘要器的固定提示词。
+    /// </param>
     private async Task<CompactionOutcome> CompactAsync(
         AgentRunRequest request,
         double scale,
         ContextRunTelemetry telemetry,
+        ContextPlan? plan,
         CancellationToken cancellationToken)
     {
         if (request.Session is null || _compactor is null)
@@ -427,6 +475,9 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         var (summaryProvider, summaryModel) = ResolveSummaryTarget(
             request.Provider, request.ModelId, settings);
 
+        // 热前缀（P2b §3.3.2 第二条）：同一份 instructions + 同一组工具声明。
+        var preamble = plan is null ? AgentRequestPreamble.Empty : _chat.Describe(ToPlan(request, plan));
+
         CompactionOutcome outcome;
 
         try
@@ -438,7 +489,9 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
                     summaryModel,
                     profile,
                     settings,
-                    budget),
+                    budget,
+                    Instructions: preamble.Instructions,
+                    Tools: preamble.Tools),
                 cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -450,8 +503,8 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             return CompactionOutcome.Failure($"压缩失败，继续使用硬裁剪：{ex.Message}", ex.Message);
         }
 
-        // 只有真正压缩 / 压缩失败才给用户提示；「没有可压缩的新增历史」属于正常状态。
-        if (outcome.Compacted || outcome.Failed)
+        // 只有真正压缩 / 压缩失败 / 被拒绝 / 让路才给用户提示；「没有可压缩的新增历史」属于正常状态。
+        if (outcome.Compacted || outcome.Failed || outcome.Rejected || outcome.Busy)
         {
             telemetry.ContextNotice = outcome.Message;
         }

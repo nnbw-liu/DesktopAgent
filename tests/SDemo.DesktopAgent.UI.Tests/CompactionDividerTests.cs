@@ -54,4 +54,27 @@ public sealed class CompactionDividerTests : TestContext
         Assert.Equal(2, cut.FindAll(".compaction-line").Count);
         Assert.Contains("模型不再看到原文，点击查看", cut.Markup);
     }
+
+    [Fact]
+    public void 压缩未完成时标出证据行()
+    {
+        var cut = RenderComponent<CompactionDivider>(parameters => parameters
+            .Add(component => component.Count, 12)
+            .Add(component => component.Tokens, 800)
+            .Add(component => component.Interrupted, true));
+
+        var note = cut.Find(".compaction-interrupted");
+        Assert.Contains("上次压缩未完成", note.TextContent, StringComparison.Ordinal);
+        Assert.Contains("重做这一段", note.TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 正常压缩不显示未完成提示()
+    {
+        var cut = RenderComponent<CompactionDivider>(parameters => parameters
+            .Add(component => component.Count, 12)
+            .Add(component => component.Tokens, 800));
+
+        Assert.Empty(cut.FindAll(".compaction-interrupted"));
+    }
 }

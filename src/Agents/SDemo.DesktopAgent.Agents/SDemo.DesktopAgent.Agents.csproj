@@ -19,6 +19,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Contracts\SDemo.DesktopAgent.Contracts\SDemo.DesktopAgent.Contracts.csproj" />
+    <!-- P2b：摘要请求要复用「会话提示词 + 工具声明」这条热前缀，而这两个类型
+         （SummaryChatRequest / ISummaryChatTransport）随 AI 抽象一起落在上下文引擎里
+         （契约层按架构约定不许引用 AI SDK）。方向仍是上层 → 上下文引擎，无环。 -->
+    <ProjectReference Include="..\..\Context\SDemo.DesktopAgent.Context\SDemo.DesktopAgent.Context.csproj" />
   </ItemGroup>
 
   <ItemGroup>
