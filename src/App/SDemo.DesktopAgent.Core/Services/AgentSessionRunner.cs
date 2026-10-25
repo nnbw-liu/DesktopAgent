@@ -96,14 +96,14 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
     }
 
     public ContextPlan Preview(AgentRunRequest request) =>
-        _builder.Build(BuildRequest(request, scale: 1.0, BuildStatePackText(request)));
+        _builder.Build(BuildRequest(request, scale: 1.0, BuildWorkspaceState(request)));
 
     public async Task<ContextPlan> PreviewAsync(
         AgentRunRequest request,
         CancellationToken cancellationToken = default)
     {
         var routing = await ResolveRoutingAsync(request, cancellationToken).ConfigureAwait(false);
-        return _builder.Build(BuildRequest(request, scale: 1.0, BuildStatePackText(request), routing));
+        return _builder.Build(BuildRequest(request, scale: 1.0, BuildWorkspaceState(request), routing));
     }
 
     public async Task<CompactionOutcome> CompactAsync(
@@ -116,13 +116,21 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         }
 
         var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
-        var profile = _builder.ResolveProfile(new ContextBuildRequest(
+        var build = new ContextBuildRequest(
             request.Provider,
             request.ModelId,
-            request.Session.Messages.ToList()));
+            request.Session.Messages.ToList(),
+            SummaryText: request.Session.Summary,
+            SummaryThroughOrder: request.Session.SummaryThroughOrder,
+            Scope: request.Scope);
+        var profile = _builder.ResolveProfile(build);
         var budget = ContextBudget.Create(profile, settings);
         var (summaryProvider, summaryModel) = ResolveSummaryTarget(
             request.Provider, request.ModelId, settings);
+
+        // P2b：手动压缩同样尽量复用热前缀（同一份提示词 + 同一组工具声明）。
+        // 拿不到 plan（超预算 / 没有工作区）时退回摘要器的固定提示词，压缩本身照做。
+        var preamble = DescribeBestEffort(request, build);
 
         return await _compactor.EnsureAsync(
             new ContextCompactionRequest(
@@ -132,8 +140,35 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
                 profile,
                 settings,
                 budget,
-                Force: true),
+                Force: true,
+                Instructions: preamble.Instructions,
+                Tools: preamble.Tools),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>尽力拿到「本轮请求的前缀」：失败只影响缓存复用，不影响压缩本身。</summary>
+    private AgentRequestPreamble DescribeBestEffort(AgentCompactRequest request, ContextBuildRequest build)
+    {
+        var runRequest = new AgentRunRequest(
+            request.Session.Messages.ToList(),
+            request.Provider,
+            request.ModelId,
+            new HashSet<string>(StringComparer.Ordinal),
+            SessionId: request.SessionId,
+            Session: request.Session,
+            Scope: request.Scope);
+
+        try
+        {
+            // 路由也要算上：`Describe` 用它决定要声明哪些工具，以及选哪版系统提示词。
+            var routing = RouteCapabilities(runRequest, build);
+            var plan = _builder.Build(routing is null ? build : build with { Routing = routing });
+            return _chat.Describe(ToPlan(runRequest, plan));
+        }
+        catch (ContextBudgetException)
+        {
+            return AgentRequestPreamble.Empty;
+        }
     }
 
     public async IAsyncEnumerable<AgentDelta> StreamAsync(
@@ -142,7 +177,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
-        var statePackText = BuildStatePackText(request);
+        var state = BuildWorkspaceState(request);
 
         // M4：先把本轮路由定下来（规则 / 小模型 + 回落），后面的预算、压缩重建与重试
         // 都复用同一个决策，保证「一轮只路由一次」。
@@ -150,7 +185,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
 
         // 1. preflight：预算 + 压缩 / L1 裁剪；摘要失败或仍超限时抛出「需压缩」。
         var plan = await BuildOrCompactAsync(
-                request, scale: 1.0, telemetry, statePackText, routing, cancellationToken)
+                request, scale: 1.0, telemetry, state, routing, cancellationToken)
             .ConfigureAwait(false);
         telemetry.Plan = plan;
         telemetry.Report = plan.Report;
@@ -229,7 +264,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         }
 
         var retryPlan = await BuildOrCompactAsync(
-                request, settings.OverflowRetryScale, telemetry, statePackText, routing, cancellationToken)
+                request, settings.OverflowRetryScale, telemetry, state, routing, cancellationToken)
             .ConfigureAwait(false);
         telemetry.Plan = retryPlan;
 
@@ -302,12 +337,12 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         AgentRunRequest request,
         double scale,
         ContextRunTelemetry telemetry,
-        string? statePackText,
+        WorkspaceState? state,
         RoutingDecision? routing,
         CancellationToken cancellationToken)
     {
         var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
-        var buildRequest = BuildRequest(request, scale, statePackText, routing);
+        var buildRequest = BuildRequest(request, scale, state, routing);
 
         ContextPlan plan;
 
@@ -328,17 +363,25 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
 
             // 连 L1 都放不下：必须压缩；压缩不出来就保持 P1 的报错。
             return await CompactAndRebuildAsync(
-                request, scale, telemetry, statePackText, routing, ex, cancellationToken).ConfigureAwait(false);
+                request, scale, telemetry, state, routing, ex, cancellationToken).ConfigureAwait(false);
         }
 
         // 没有淘汰任何历史 = 没超预算：一次摘要调用都不发生（P2 DoD）。
         if (plan.Report.OmittedMessages == 0 || !CanCompact(request, settings))
         {
+            // P2b「先修剪，后摘要」：轨迹修剪把历史留住了，就不必再花一次摘要调用。
+            // 这条提示是给用户看「刚才发生了什么」的，不进模型。
+            if (plan.Report.PrunedInsteadOfCompacted)
+            {
+                telemetry.ContextNotice =
+                    $"已先修剪工具轨迹（约 {FormatTokens(plan.Report.PrunedTokens)} token），不必压缩历史。";
+            }
+
             return plan;
         }
 
         var outcome = await CompactAsync(
-            request, scale, telemetry, cancellationToken).ConfigureAwait(false);
+            request, scale, telemetry, plan, cancellationToken).ConfigureAwait(false);
 
         if (!outcome.Compacted)
         {
@@ -348,7 +391,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
 
         try
         {
-            var rebuilt = _builder.Build(BuildRequest(request, scale, statePackText, routing));
+            var rebuilt = _builder.Build(BuildRequest(request, scale, state, routing));
             var report = WithSummaryUsage(rebuilt.Report, telemetry);
             telemetry.Report = report;
             return rebuilt with { Report = report };
@@ -368,13 +411,13 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         AgentRunRequest request,
         double scale,
         ContextRunTelemetry telemetry,
-        string? statePackText,
+        WorkspaceState? state,
         RoutingDecision? routing,
         ContextBudgetException original,
         CancellationToken cancellationToken)
     {
         var outcome = await CompactAsync(
-            request, scale, telemetry, cancellationToken).ConfigureAwait(false);
+            request, scale, telemetry, plan: null, cancellationToken).ConfigureAwait(false);
 
         if (!outcome.Compacted)
         {
@@ -383,7 +426,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
 
         try
         {
-            var rebuilt = _builder.Build(BuildRequest(request, scale, statePackText, routing));
+            var rebuilt = _builder.Build(BuildRequest(request, scale, state, routing));
             var report = WithSummaryUsage(rebuilt.Report, telemetry);
             telemetry.Report = report;
             return rebuilt with { Report = report };
@@ -403,10 +446,15 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         settings.AutoCompact && request.Session is not null && _compactor is not null;
 
     /// <summary>解析摘要模型并跑一次增量压缩；异常不外抛（自动压缩路径必须不阻塞）。</summary>
+    /// <param name="plan">
+    /// 已经建好的本轮上下文（P2b）：摘要请求要复用它的系统提示词与工具声明作为热前缀。
+    /// 为 null 时（L1 连放都放不下的路径）退回摘要器的固定提示词。
+    /// </param>
     private async Task<CompactionOutcome> CompactAsync(
         AgentRunRequest request,
         double scale,
         ContextRunTelemetry telemetry,
+        ContextPlan? plan,
         CancellationToken cancellationToken)
     {
         if (request.Session is null || _compactor is null)
@@ -415,7 +463,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         }
 
         var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
-        var buildRequest = BuildRequest(request, scale, statePackText: null);
+        var buildRequest = BuildRequest(request, scale, state: null);
         var profile = _builder.ResolveProfile(buildRequest);
 
         var budget = new ContextPolicy(profile, settings).Budget;
@@ -426,6 +474,9 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
 
         var (summaryProvider, summaryModel) = ResolveSummaryTarget(
             request.Provider, request.ModelId, settings);
+
+        // 热前缀（P2b §3.3.2 第二条）：同一份 instructions + 同一组工具声明。
+        var preamble = plan is null ? AgentRequestPreamble.Empty : _chat.Describe(ToPlan(request, plan));
 
         CompactionOutcome outcome;
 
@@ -438,7 +489,9 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
                     summaryModel,
                     profile,
                     settings,
-                    budget),
+                    budget,
+                    Instructions: preamble.Instructions,
+                    Tools: preamble.Tools),
                 cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -450,8 +503,8 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             return CompactionOutcome.Failure($"压缩失败，继续使用硬裁剪：{ex.Message}", ex.Message);
         }
 
-        // 只有真正压缩 / 压缩失败才给用户提示；「没有可压缩的新增历史」属于正常状态。
-        if (outcome.Compacted || outcome.Failed)
+        // 只有真正压缩 / 压缩失败 / 被拒绝 / 让路才给用户提示；「没有可压缩的新增历史」属于正常状态。
+        if (outcome.Compacted || outcome.Failed || outcome.Rejected || outcome.Busy)
         {
             telemetry.ContextNotice = outcome.Message;
         }
@@ -476,7 +529,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
     private ContextBuildRequest BuildRequest(
         AgentRunRequest request,
         double scale,
-        string? statePackText,
+        WorkspaceState? state,
         RoutingDecision? routing = null)
     {
         var build = new ContextBuildRequest(
@@ -492,7 +545,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             BudgetScale: scale,
             SummaryText: request.Session?.Summary,
             SummaryThroughOrder: request.Session?.SummaryThroughOrder ?? 0,
-            StatePackText: statePackText,
+            State: state,
             SummaryFallback: request.Session?.SummaryIsFallback ?? false,
             SkillIndexText: BuildSkillIndexText(request),
             MemoryText: BuildMemoryText(request),
@@ -593,7 +646,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             request.ModelId,
             request.Messages));
         var mode = AgentModeResolver.Resolve(profile, request.ModelId, agent.Mode);
-        var (userInput, recent) = RoutingInputs(request);
+        var (userInput, recent, previousInputs) = RoutingInputs(request);
 
         var input = new CapabilityRoutingInput(
             userInput,
@@ -603,7 +656,8 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             agent.ResolveMaxExposedTools(profile.ContextWindow, mode),
             agent.SearchCapabilitiesEnabled,
             agent.ExposeAllTools,
-            HasSelectedSkill: !string.IsNullOrWhiteSpace(request.SkillName));
+            HasSelectedSkill: !string.IsNullOrWhiteSpace(request.SkillName),
+            PreviousUserInputs: previousInputs);
 
         var rule = CapabilityRouter.Route(input);
 
@@ -663,7 +717,7 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         var profile = _builder.ResolveProfile(build);
         var agent = request.Scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
         var mode = AgentModeResolver.Resolve(profile, request.ModelId, agent.Mode);
-        var (userInput, recent) = RoutingInputs(request);
+        var (userInput, recent, previousInputs) = RoutingInputs(request);
 
         return CapabilityRouter.Route(new CapabilityRoutingInput(
             userInput,
@@ -673,18 +727,27 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             agent.ResolveMaxExposedTools(profile.ContextWindow, mode),
             agent.SearchCapabilitiesEnabled,
             agent.ExposeAllTools,
-            HasSelectedSkill: !string.IsNullOrWhiteSpace(request.SkillName)));
+            HasSelectedSkill: !string.IsNullOrWhiteSpace(request.SkillName),
+            PreviousUserInputs: previousInputs));
     }
 
-    private static (string UserInput, string[] RecentToolIds) RoutingInputs(AgentRunRequest request)
+    private static (string UserInput, string[] RecentToolIds, string[] PreviousInputs) RoutingInputs(
+        AgentRunRequest request)
     {
-        var userInput = request.Messages
-            .LastOrDefault(message => message.Role == ChatMessageRole.User)?.Content ?? string.Empty;
+        // 用户输入按时间顺序取全：最后一条是本轮，之前的交给任务档（P1b §3.2.3）判「是不是同一个任务」。
+        var userInputs = request.Messages
+            .Where(message => message.Role == ChatMessageRole.User)
+            .Select(message => message.Content ?? string.Empty)
+            .ToArray();
+
+        var userInput = userInputs.Length > 0 ? userInputs[^1] : string.Empty;
+        var previousInputs = CapabilityRouter.PreviousUserInputs(userInputs);
         var recent = request.Metrics?.ToolTrace
             .Select(entry => entry.ToolId)
             .TakeLast(6)
             .ToArray() ?? [];
-        return (userInput, recent);
+
+        return (userInput, recent, [.. previousInputs]);
     }
 
     /// <summary>小模型看到的工具清单：只含「平台支持 ∩ 用户启用」的包，不实例化工具。</summary>
@@ -731,18 +794,13 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
         rule with { Reason = rule.Reason + " · " + note };
 
     /// <summary>
-    /// 工作区状态包：树（30s 缓存）+ 最近改动 + 最近动作。没有工作区 / 关闭时返回 null，
-    /// 不阻塞请求。
+    /// 宿主上下文快照的数据源（P2a）：树（30s 缓存）+ 最近改动 + 最近动作 + 验证 + 计划。
+    /// 没有工作区时返回 null，不阻塞请求；关掉「工作区结构」段时也不扫盘
+    /// （验证 / 计划 / 策略仍然要有，它们不依赖树）。
     /// </summary>
-    private string? BuildStatePackText(AgentRunRequest request)
+    private WorkspaceState? BuildWorkspaceState(AgentRunRequest request)
     {
         if (_statePack is null || _workspace is null || request.Session is null)
-        {
-            return null;
-        }
-
-        var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
-        if (!settings.StatePackEnabled)
         {
             return null;
         }
@@ -753,19 +811,15 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             return null;
         }
 
+        var settings = request.Scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
+
         try
         {
-            var profile = _builder.ResolveProfile(BuildRequest(request, 1.0, statePackText: null));
-            var cap = profile.IsSmallModel
-                ? settings.StatePackSmallModelTokenBudget
-                : settings.StatePackTokenBudget;
-
-            var state = _statePack.Build(root, request.Session);
-            return StatePackFormatter.Format(state, cap, _builder.Counter).Text;
+            return _statePack.Build(root, request.Session, includeTree: settings.StatePackEnabled);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
-            // 状态包是增强信息：读不到工作区时不影响本轮请求。
+            // 快照是增强信息：读不到工作区时不影响本轮请求。
             return null;
         }
     }
@@ -817,7 +871,12 @@ public sealed class AgentSessionRunner : IAgentSessionRunner
             _calibration?.RecordUsage(request.Provider.Id, request.ModelId, estimated, actual);
 
             // 校准后的报告把实际值带给 UI，便于核对「估算 vs usage」。
-            telemetry.Report = (telemetry.Report ?? plan.Report) with { ActualInputTokens = actual };
+            // P2a：缓存命中数同样只来自服务端 usage，端点不报就保持 0。
+            telemetry.Report = (telemetry.Report ?? plan.Report) with
+            {
+                ActualInputTokens = actual,
+                CacheHitTokens = request.Metrics?.CacheHitTokens ?? 0
+            };
         }
     }
 

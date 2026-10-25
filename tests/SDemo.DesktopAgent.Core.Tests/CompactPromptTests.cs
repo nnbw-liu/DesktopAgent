@@ -62,6 +62,34 @@ public sealed class CompactPromptTests
             "big",
             [new ChatMessage(ChatMessageRole.User, "你好")]));
 
-        Assert.Equal(SystemPrompts.Full, plan.Instructions);
+        Assert.Equal(SystemPrompts.FullFor(supportsReasoning: false), plan.Instructions);
+    }
+
+    [Fact]
+    public void 有思考通道的大窗口模型不再要求PLAN()
+    {
+        // P1b §3.2.5：提示词按模型能力分叉，靠 ModelProfile.SupportsReasoning 决定。
+        var settings = new StubSettingsService();
+        var provider = new ModelProvider
+        {
+            Id = "cloud",
+            Models =
+            [
+                new ModelEntry
+                {
+                    Id = "reasoner",
+                    Profile = new ModelProfile(32_768, 4096, SupportsReasoning: true)
+                }
+            ]
+        };
+        var builder = new ContextBuilder(new HeuristicTokenCounter(), settings);
+
+        var plan = builder.Build(new ContextBuildRequest(
+            provider,
+            "reasoner",
+            [new ChatMessage(ChatMessageRole.User, "你好")]));
+
+        Assert.Equal(SystemPrompts.FullWithReasoning, plan.Instructions);
+        Assert.DoesNotContain("PLAN", plan.Instructions);
     }
 }

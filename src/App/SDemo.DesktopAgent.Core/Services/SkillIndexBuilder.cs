@@ -12,11 +12,14 @@ public static class SkillIndexBuilder
     public const int DefaultMaxEntries = 5;
 
     /// <summary>按用户输入挑出最相关的技能；命中不足时按文件名为序补满。</summary>
+    /// <remarks><c>disable-model-invocation</c> 的技能不进索引：模型看不到，只有 `/name` 能加载。</remarks>
     public static IReadOnlyList<SkillIndexEntry> Select(
         IReadOnlyList<SkillIndexEntry> entries,
         string? userInput,
         int maxEntries = DefaultMaxEntries)
     {
+        entries = entries.Where(entry => !entry.DisableModelInvocation).ToArray();
+
         if (entries.Count == 0)
         {
             return [];

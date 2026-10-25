@@ -70,6 +70,21 @@ public sealed class SkillIndexBuilderTests
         Assert.True(counter.CountMessage("system", text) <= 400, $"索引实际 {counter.CountMessage("system", text)} token");
     }
 
+    [Fact]
+    public void 禁止模型调用的技能不进索引()
+    {
+        var entries = new[]
+        {
+            Entry("总结", "压缩长文", "长文需要结论时", []),
+            new SkillIndexEntry("重写", "整文件重写", "用户明确要求重写时", [], DisableModelInvocation: true)
+        };
+
+        var selected = SkillIndexBuilder.Select(entries, "帮我重写这个文件", maxEntries: 5);
+
+        Assert.DoesNotContain(selected, entry => entry.Name == "重写");
+        Assert.Contains(selected, entry => entry.Name == "总结");
+    }
+
     private static SkillIndexEntry Entry(
         string name,
         string description,

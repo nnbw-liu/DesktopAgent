@@ -8,7 +8,10 @@ public sealed record SkillIndexEntry(
     string Name,
     string Description,
     string WhenToUse,
-    IReadOnlyList<string> Tags)
+    IReadOnlyList<string> Tags,
+    // frontmatter 的 disable-model-invocation：这类技能不进索引、load_skill 也拒绝，
+    // 只有用户用 `/name` 显式点名才能加载。
+    bool DisableModelInvocation = false)
 {
     public SkillIndexEntry(string name, string description)
         : this(name, description, string.Empty, [])

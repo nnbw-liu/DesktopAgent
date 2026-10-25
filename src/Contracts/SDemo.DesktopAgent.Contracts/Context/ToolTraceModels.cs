@@ -18,7 +18,16 @@ public sealed record ToolTraceEntry(
     int ReasoningChars = -1,
     int TextChars = -1,
     // 本次工具调用的关联 id；运行中的条目在结果返回后按它原地替换。
-    string? CallId = null)
+    string? CallId = null,
+    // 下面四项只服务界面（工具卡 / 步骤时间线），不进入模型上下文。
+    // 参数原文（截断），供客户端按工具类型现场算卡片；旧记录为空。
+    string? ArgsJson = null,
+    // 一行标题，例如 `dotnet build SDemo.sln`、`src/Program.cs`；旧记录为空。
+    string? Title = null,
+    // 执行耗时（毫秒）；-1 表示旧记录没有这个信息。
+    int DurationMs = -1,
+    // 结果预览（首 200 字），展开工具卡时先看它，不必等完整输出。
+    string? ResultPreview = null)
 {
     public const string StatusRunning = "running";
     public const string StatusOk = "ok";

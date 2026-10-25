@@ -5,7 +5,10 @@ using ChatMessage = SDemo.DesktopAgent.Models.ChatMessage;
 
 namespace SDemo.DesktopAgent.Core.Tests;
 
-/// <summary>P2 构建器接线：摘要 / 状态包进入固定块、被摘要覆盖的消息不再发送、pin 例外。</summary>
+/// <summary>
+/// P2/P2a 构建器接线：摘要留在固定块、工作区状态改走末尾的宿主上下文快照、
+/// 被摘要覆盖的消息不再发送、pin 例外。
+/// </summary>
 public sealed class ContextBuilderSummaryTests
 {
     private readonly HeuristicTokenCounter _counter = new();
@@ -41,11 +44,19 @@ public sealed class ContextBuilderSummaryTests
                 $"消息 {index}"))
             .ToList();
 
+    private static WorkspaceState State(string verification = "未运行验证") => new(
+        Root: @"C:\Demo",
+        Tree: ["src/", "README.md"],
+        RecentEdits: [],
+        RecentActions: [],
+        LastVerification: verification,
+        PinnedCount: 0);
+
     private ContextPlan Build(
         List<ChatMessage> messages,
         string? summary = null,
         int throughOrder = 0,
-        string? statePack = null,
+        WorkspaceState? state = null,
         bool passthrough = false) => new ContextBuilder(_counter, _settings).Build(new ContextBuildRequest(
         Provider(),
         "m",
@@ -53,26 +64,49 @@ public sealed class ContextBuilderSummaryTests
         Passthrough: passthrough,
         SummaryText: summary,
         SummaryThroughOrder: throughOrder,
-        StatePackText: statePack));
+        State: state));
 
     [Fact]
-    public void 摘要与状态包进入固定块并分段计量()
+    public void 摘要留在固定块而工作区状态进末尾快照()
     {
-        var plan = Build(
-            Messages(),
-            Summary(),
-            throughOrder: 4,
-            statePack: "## 工作区\n根目录：C:\\Demo\n## 验证\n未运行验证");
+        var plan = Build(Messages(), Summary(), throughOrder: 4, state: State());
 
         Assert.True(plan.Report.SummaryUsed);
         Assert.True(plan.Report.StatePackUsed);
         Assert.Equal(4, plan.Report.CompactedMessages);
         Assert.True(plan.Report.Segments.Summary > 0);
         Assert.True(plan.Report.Segments.StatePack > 0);
+
+        // 摘要仍在系统提示词里；工作区状态搬到了最后一条 user 消息（P2a §3.3.1-(2)）。
         Assert.Contains("已压缩的历史", plan.Instructions);
         Assert.Contains("不要修改数据库", plan.Instructions);
-        Assert.Contains("工作区状态", plan.Instructions);
+        Assert.DoesNotContain("根目录", plan.Instructions);
+
+        var snapshot = plan.Messages[^1];
+        Assert.Equal(Microsoft.Extensions.AI.ChatRole.User, snapshot.Role);
+        Assert.Contains("宿主上下文快照", snapshot.Text);
+        Assert.Contains("根目录", snapshot.Text);
         Assert.Equal(plan.Report.Segments.Total, plan.Report.Estimated);
+    }
+
+    [Fact]
+    public void 快照按段归因并且带策略与验证()
+    {
+        var plan = Build(Messages(), state: State("dotnet build → ok(0)"));
+
+        var sections = plan.Report.SectionUsages;
+        Assert.Contains(sections, section => section.Name == "policy" && section.Required);
+        Assert.Contains(sections, section => section.Name == "verification" && section.Required);
+        Assert.Contains(sections, section => section.Name == "time" && section.Required);
+        Assert.All(sections, section => Assert.True(section.Tokens > 0));
+
+        Assert.Contains("当前策略", plan.Messages[^1].Text);
+        Assert.Contains("dotnet build → ok(0)", plan.Messages[^1].Text);
+
+        // 分段之和 = 各段正文；快照整体还多一行消息头，两者差在个位数量级。
+        var sectionTotal = sections.Sum(section => section.Tokens);
+        Assert.True(plan.Report.StatePackTokens > sectionTotal);
+        Assert.InRange(plan.Report.StatePackTokens - sectionTotal, 1, 40);
     }
 
     [Fact]
@@ -80,7 +114,8 @@ public sealed class ContextBuilderSummaryTests
     {
         var plan = Build(Messages(), Summary(), throughOrder: 4);
 
-        Assert.Equal(4, plan.Messages.Count);
+        // 4 条历史 + 1 条快照。
+        Assert.Equal(5, plan.Messages.Count);
         Assert.DoesNotContain(plan.Messages, message => message.Text.Contains("消息 0", StringComparison.Ordinal));
         Assert.Contains(plan.Messages, message => message.Text.Contains("消息 4", StringComparison.Ordinal));
     }
@@ -93,7 +128,7 @@ public sealed class ContextBuilderSummaryTests
 
         var plan = Build(messages, Summary(), throughOrder: 4);
 
-        Assert.Equal(5, plan.Messages.Count);
+        Assert.Equal(6, plan.Messages.Count);
         Assert.Contains(plan.Messages, message => message.Text.Contains("消息 1", StringComparison.Ordinal));
     }
 
@@ -110,25 +145,35 @@ public sealed class ContextBuilderSummaryTests
     }
 
     [Fact]
-    public void 直通模式忽略摘要与状态包()
+    public void 直通模式忽略摘要与快照()
     {
-        var plan = Build(Messages(), Summary(), throughOrder: 4, statePack: "## 工作区", passthrough: true);
+        var plan = Build(Messages(), Summary(), throughOrder: 4, state: State(), passthrough: true);
 
         Assert.False(plan.Report.SummaryUsed);
         Assert.False(plan.Report.StatePackUsed);
         Assert.DoesNotContain("已压缩的历史", plan.Instructions);
         Assert.Equal(8, plan.Messages.Count);
+        Assert.DoesNotContain(plan.Messages, message => message.Text.Contains("宿主上下文快照", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void 没有摘要时分段为零()
+    public void 没有摘要时摘要分段为零()
     {
         var plan = Build(Messages());
 
         Assert.False(plan.Report.SummaryUsed);
-        Assert.False(plan.Report.StatePackUsed);
         Assert.Equal(0, plan.Report.Segments.Summary);
-        Assert.Equal(0, plan.Report.Segments.StatePack);
         Assert.Equal(0, plan.Report.CompactedMessages);
+    }
+
+    [Fact]
+    public void 没有工作区时快照仍带策略与时间()
+    {
+        var plan = Build(Messages());
+
+        Assert.True(plan.Report.StatePackUsed);
+        Assert.DoesNotContain(plan.Report.SectionUsages, section => section.Name == "workspace");
+        Assert.Contains(plan.Report.SectionUsages, section => section.Name == "policy");
+        Assert.Contains(plan.Report.SectionUsages, section => section.Name == "time");
     }
 }

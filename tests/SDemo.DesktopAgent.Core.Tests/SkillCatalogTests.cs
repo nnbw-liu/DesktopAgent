@@ -37,8 +37,48 @@ public sealed class SkillCatalogTests : IDisposable
     }
 
     [Fact]
-    public void 没写_icon_时_兜底回名字首字()
+    public void 读到_disable_model_invocation_标记()
     {
+        Write("重写.md", """
+            ---
+            description: 整文件重写，风险较高。
+            disable-model-invocation: true
+            ---
+            正文
+            """);
+
+        Write("总结.md", """
+            ---
+            description: 压成三句话。
+            ---
+            正文
+            """);
+
+        var catalog = new SkillCatalog(_root);
+        var skills = catalog.List();
+
+        Assert.True(skills.Single(skill => skill.Name == "重写").DisableModelInvocation);
+        Assert.False(skills.Single(skill => skill.Name == "总结").DisableModelInvocation);
+
+        // 索引里带着同一个标记，供 SkillIndexBuilder 过滤。
+        Assert.True(catalog.Index().Single(entry => entry.Name == "重写").DisableModelInvocation);
+    }
+
+    [Fact]
+    public void 显式写_false_不启用标记()
+    {
+        Write("普通.md", """
+            ---
+            description: 普通技能。
+            disable-model-invocation: false
+            ---
+            """);
+
+        Assert.False(Assert.Single(new SkillCatalog(_root).List()).DisableModelInvocation);
+    }
+
+    [Fact]
+    public void 没写_icon_时_兜底回名字首字()    {
         Write("代码解释.md", """
             ---
             description: 逐段说明代码。

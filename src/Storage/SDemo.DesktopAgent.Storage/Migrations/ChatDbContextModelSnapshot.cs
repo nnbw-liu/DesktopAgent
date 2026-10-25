@@ -77,6 +77,9 @@ namespace SDemo.DesktopAgent.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("StepsJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ToolCallsJson")
                         .HasColumnType("TEXT");
 
@@ -96,6 +99,15 @@ namespace SDemo.DesktopAgent.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ActiveMountId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompactionFinishedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CompactionReason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompactionStartedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsArchived")
