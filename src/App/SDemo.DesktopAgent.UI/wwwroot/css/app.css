@@ -4296,6 +4296,20 @@ a {
     white-space: nowrap;
 }
 
+/* P2a：上下文快照的按段归因，缩进一小格以示「这些是快照的子项」，不是新的顶层分段。 */
+.context-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: -2px 0 0 11px;
+    padding-left: 7px;
+    border-left: 1px solid var(--border);
+}
+
+.context-row--section {
+    font-size: 11px;
+}
+
 .context-divider {
     height: 1px;
     margin: 5px 0;
@@ -4440,6 +4454,14 @@ a {
     opacity: .85;
 }
 
+/* P2b：上次压缩未完成（只有开始标记、没有收尾）。是证据，不是错误：摘要没提交，原文都在。 */
+.chat-summary-badge--warn {
+    border: 1px solid rgba(183, 121, 31, .45);
+    background: rgba(183, 121, 31, .12);
+    color: #c08a2a;
+    cursor: help;
+}
+
 .chat-menu-wrap {
     position: relative;
 }
@@ -4524,6 +4546,13 @@ a {
 .compaction-hint {
     font-size: 9.5px;
     opacity: .8;
+}
+
+/* P2b：压缩中断的证据行（只有开始标记、没有收尾）。 */
+.compaction-interrupted {
+    margin-top: 2px;
+    color: #c08a2a;
+    font-size: 9.5px;
 }
 
 .msg-action--pin.is-on {

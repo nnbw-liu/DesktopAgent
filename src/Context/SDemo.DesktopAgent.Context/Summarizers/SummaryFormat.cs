@@ -168,6 +168,35 @@ public static class SummaryFormat
     public static bool IsFallback(string? text) =>
         text is not null && text.TrimStart().StartsWith(FallbackMarker, StringComparison.Ordinal);
 
+    /// <summary>
+    /// 把「第几条消息」写的 <c>[mN]</c> 换成会话里的绝对序号（P2b §3.3.2 第二条）。
+    /// <para>
+    /// 热前缀回放要求被遮蔽区域**逐字**发给模型，所以不能往每条消息前面插 <c>[mN]</c> 标记
+    /// （插了就与上次请求不再逐字节相同，缓存前缀在第一条消息处断掉）。折中办法是让模型按位置数
+    /// （"第一条是 m1"），再由我们把位置换回绝对序号。
+    /// </para>
+    /// <para>
+    /// 超出本批范围的值原样保留：那通常是上一版摘要里的绝对序号，或模型照抄的来源。
+    /// </para>
+    /// </summary>
+    public static string RemapSources(string? text, int chunkStartOrder, int chunkCount)
+    {
+        if (string.IsNullOrEmpty(text) || chunkCount <= 0)
+        {
+            return text ?? string.Empty;
+        }
+
+        return SourcePattern.Replace(text, match =>
+        {
+            if (!int.TryParse(match.Groups["order"].Value, out var ordinal) || ordinal < 1 || ordinal > chunkCount)
+            {
+                return match.Value;
+            }
+
+            return $"[m{chunkStartOrder + ordinal - 1}]";
+        });
+    }
+
     /// <summary>从一条消息里提取来源序号（测试 / 调试用）。</summary>
     public static IReadOnlyList<int> Sources(string text) =>
         SourcePattern.Matches(text)

@@ -18,19 +18,28 @@ public sealed class ContextBuilder
     private readonly TokenCalibrationStore? _calibration;
     private readonly ModelProfileResolver _resolver;
     private readonly ContextTrimmer _trimmer = new();
+    private readonly ContextSectionRegistry _sections;
+    private readonly TimeProvider _time;
 
     public ContextBuilder(
         ITokenCounter counter,
         ISettingsService settings,
-        TokenCalibrationStore? calibration = null)
+        TokenCalibrationStore? calibration = null,
+        ContextSectionRegistry? sections = null,
+        TimeProvider? time = null)
     {
         _counter = counter;
         _settings = settings;
         _calibration = calibration;
         _resolver = new ModelProfileResolver(calibration);
+        _sections = sections ?? ContextSectionRegistry.Default;
+        _time = time ?? TimeProvider.System;
     }
 
     public ITokenCounter Counter => _counter;
+
+    /// <summary>快照段表（P2a）：界面 / 报告 / 测试都读同一份。</summary>
+    public ContextSectionRegistry Sections => _sections;
 
     /// <summary>解析模型档案（供 UI / 报告在 Build 之前展示窗口）。</summary>
     public ModelProfile ResolveProfile(ContextBuildRequest request) =>
@@ -67,16 +76,20 @@ public sealed class ContextBuilder
             return BuildPassthrough(request, profile, budget, calibrationFactor, instructions);
         }
 
-        // P2：滚动摘要 + 工作区状态包进入固定块；两者各自计量，先于历史消息分配预算。
+        // P2：滚动摘要仍进固定块；工作区状态改由末尾的「宿主上下文快照」承担（P2a §3.3.1）。
         var injection = BuildInjection(request, budget, settings, systemTokens, skillTokens, knowledgeTokens);
         var finalInstructions = injection.Text.Length == 0
             ? instructions
             : instructions + injection.Text;
 
+        var snapshot = BuildSnapshot(
+            request, budget, settings, mode, profile, systemTokens, skillTokens, knowledgeTokens,
+            injection.SummaryTokens);
+
         var messageBudget = Math.Max(
             128,
             budget.Total - systemTokens - skillTokens - knowledgeTokens
-            - injection.SummaryTokens - injection.StateTokens - toolSchemaTokens);
+            - injection.SummaryTokens - snapshot.Tokens - toolSchemaTokens);
         var trimOptions = TrimOptions.FromPolicy(
             policy,
             messageBudget,
@@ -95,6 +108,12 @@ public sealed class ContextBuilder
                     : entry.OmissionNote + "\n" + entry.Rendered.Text))
             .ToList();
 
+        // 快照永远是最后一条：它在裁剪之后追加，所以永远不会被当成「最旧的一轮」淘汰。
+        if (snapshot.Text.Length > 0)
+        {
+            aiMessages.Add(new AIChatMessage(ChatRole.User, snapshot.Text));
+        }
+
         var stats = trim.Stats;
         var segments = CalibrateSegments(
             stats,
@@ -102,12 +121,12 @@ public sealed class ContextBuilder
             skillTokens,
             calibrationFactor,
             injection.SummaryTokens,
-            injection.StateTokens,
+            snapshot.Tokens,
             toolSchemaTokens,
             knowledgeTokens);
         var estimated = segments.Total;
         var rawEstimated = systemTokens + skillTokens + knowledgeTokens + stats.MessageTokens
-            + injection.SummaryTokens + injection.StateTokens + toolSchemaTokens;
+            + injection.SummaryTokens + snapshot.Tokens + toolSchemaTokens;
 
         var report = new ContextReport(
             request.Provider.Id,
@@ -134,9 +153,11 @@ public sealed class ContextBuilder
             SummaryTokens: injection.SummaryTokens,
             CompactedMessages: stats.CompactedMessages,
             SummaryFallback: injection.SummaryTokens > 0 && request.SummaryFallback,
-            StatePackUsed: injection.StateTokens > 0,
-            StatePackTokens: injection.StateTokens,
-            Routing: request.Routing);
+            StatePackUsed: snapshot.Tokens > 0,
+            StatePackTokens: snapshot.Tokens,
+            Routing: request.Routing,
+            Sections: snapshot.Sections,
+            PrunedTokens: (int)Math.Round(stats.PrunedTraceTokens * calibrationFactor));
 
         if (estimated > budget.Total)
         {
@@ -418,8 +439,8 @@ public sealed class ContextBuilder
     }
 
     /// <summary>
-    /// 摘要与状态包的固定块（P2 §3.2 / §3.3）。先保证摘要（压缩的主产物），
-    /// 状态包用剩余额度；两者各自带标题，来源与计量都在 <see cref="ContextSegments"/> 里。
+    /// 压缩摘要的固定块（P2 §3.2）。摘要仍然留在系统提示词里：它是「被压缩掉的历史」的替身，
+    /// 只有压缩发生时才会变，所以不会再像状态包那样每轮改一次系统前缀。
     /// </summary>
     private InjectionBlock BuildInjection(
         ContextBuildRequest request,
@@ -429,10 +450,7 @@ public sealed class ContextBuilder
         int skillTokens,
         int knowledgeTokens = 0)
     {
-        var hasSummary = !string.IsNullOrWhiteSpace(request.SummaryText);
-        var hasState = !string.IsNullOrWhiteSpace(request.StatePackText);
-
-        if (!hasSummary && !hasState)
+        if (string.IsNullOrWhiteSpace(request.SummaryText))
         {
             return InjectionBlock.Empty;
         }
@@ -444,49 +462,93 @@ public sealed class ContextBuilder
             return InjectionBlock.Empty;
         }
 
-        var text = string.Empty;
-        var summaryTokens = 0;
-        var statePackTokens = 0;
+        var summaryCap = Math.Min(
+            Math.Clamp(settings.SummaryMaxTokens, 128, 4096),
+            Math.Max(0, remaining * 2 / 3));
 
-        if (hasSummary)
+        if (summaryCap < 64)
         {
-            var summaryCap = Math.Min(
-                Math.Clamp(settings.SummaryMaxTokens, 128, 4096),
-                Math.Max(0, remaining * 2 / 3));
-
-            if (summaryCap >= 64)
-            {
-                var body = SummaryFormat.Cap(request.SummaryText, summaryCap, _counter);
-                var block = SummaryHeader + body;
-                summaryTokens = _counter.CountMessage("system", block);
-                text += block;
-            }
+            return InjectionBlock.Empty;
         }
 
-        if (hasState)
-        {
-            var small = budget.Window <= 8192;
-            var configured = small
-                ? settings.StatePackSmallModelTokenBudget
-                : settings.StatePackTokenBudget;
+        var body = SummaryFormat.Cap(request.SummaryText, summaryCap, _counter);
+        var block = SummaryHeader + body;
 
-            var stateCap = Math.Min(
-                Math.Clamp(configured, 64, 2048),
-                Math.Max(0, remaining - summaryTokens));
-
-            if (stateCap >= 64)
-            {
-                var body = TruncateBlock(request.StatePackText!, stateCap, "状态包已截断");
-                var block = StateHeader + body;
-                statePackTokens = _counter.CountMessage("system", block);
-                text += block;
-            }
-        }
-
-        return new InjectionBlock(text, summaryTokens, statePackTokens);
+        return new InjectionBlock(block, _counter.CountMessage("system", block));
     }
 
-    /// <summary>按 token 上限截断任意文本块（状态包专用：超限时保留前面的结构部分）。</summary>
+    /// <summary>
+    /// 宿主上下文快照（P2a §3.3.1-(2)）：历史末尾的**一条 user 消息**，取代以前拼在
+    /// 系统提示词尾部的状态包。三条收益：系统前缀在会话内不再每轮抖动（可缓存）；
+    /// 快照贴着当前输入（模型对它的注意力最高）；报告能按段归因。
+    /// <para>
+    /// 代价照实说：多数 OpenAI 兼容端点不接受中途的 `system` 消息，所以只能用 user + 明确前缀；
+    /// 而且「本快照取代之前的快照」这句话必须写进正文，否则多轮之后模型会以为它们都还有效。
+    /// </para>
+    /// </summary>
+    private SnapshotBlock BuildSnapshot(
+        ContextBuildRequest request,
+        ContextBudget budget,
+        ContextSettings settings,
+        AgentMode mode,
+        ModelProfile profile,
+        int systemTokens,
+        int skillTokens,
+        int knowledgeTokens,
+        int summaryTokens)
+    {
+        // 状态段的总预算还是原来的「状态包上限」，只是它现在管的是一个快照，而不是系统块里的一段。
+        var configured = budget.Window <= 8192
+            ? settings.StatePackSmallModelTokenBudget
+            : settings.StatePackTokenBudget;
+
+        var remaining = Math.Max(
+            0,
+            budget.Total - systemTokens - skillTokens - knowledgeTokens - summaryTokens - 128);
+
+        // 段的总额度 = min(设置里的状态包上限, 本轮真正剩下的空间)。
+        // required 段不受这个数字约束（见 ContextSectionRegistry），所以它只决定可选段能拿多少。
+        var sectionCap = Math.Min(Math.Clamp(configured, 64, 2048), remaining);
+
+        var now = _time.GetLocalNow();
+        var policy = AgentPolicyFacts.FromSettings(_settings.Current, request.Scope);
+        var input = new ContextSectionInput(
+            _counter,
+            settings,
+            mode,
+            profile,
+            request.State,
+            policy,
+            now,
+            ContextSectionText.ResolveTimeZoneId(TimeZoneInfo.Local),
+            LastModelVisibleAt(request));
+
+        var rendered = _sections.Render(input, Math.Max(0, sectionCap));
+
+        if (!rendered.Any)
+        {
+            return SnapshotBlock.Empty;
+        }
+
+        var text = HostSnapshot.Compose(rendered.Text);
+        var tokens = _counter.CountMessage("user", text);
+
+        return new SnapshotBlock(text, tokens, rendered.Sections);
+    }
+
+    /// <summary>上一条模型可见消息的时间：用它算「距上一条消息多久」，没有历史时是 unavailable。</summary>
+    private static DateTimeOffset? LastModelVisibleAt(ContextBuildRequest request)
+    {
+        if (request.Messages.Count == 0)
+        {
+            return null;
+        }
+
+        var last = request.Messages[^1].CreatedAt;
+        return new DateTimeOffset(DateTime.SpecifyKind(last, DateTimeKind.Local));
+    }
+
+    /// <summary>按 token 上限截断任意文本块（超限时保留前面的结构部分）。</summary>
     private string TruncateBlock(string text, int maxTokens, string note)
     {
         var normalized = text.Trim();
@@ -521,11 +583,17 @@ public sealed class ContextBuilder
     private const string SummaryHeader =
         "\n\n## 已压缩的历史（模型不再看到原文；需要细节时请用工具重新读取）\n";
 
-    private const string StateHeader = "\n\n## 工作区状态（宿主生成，不是用户输入）\n";
-
-    private sealed record InjectionBlock(string Text, int SummaryTokens, int StateTokens)
+    private sealed record InjectionBlock(string Text, int SummaryTokens)
     {
-        public static InjectionBlock Empty { get; } = new(string.Empty, 0, 0);
+        public static InjectionBlock Empty { get; } = new(string.Empty, 0);
+    }
+
+    private sealed record SnapshotBlock(
+        string Text,
+        int Tokens,
+        IReadOnlyList<ContextSectionUsage> Sections)
+    {
+        public static SnapshotBlock Empty { get; } = new(string.Empty, 0, []);
     }
 
     private static ModelEntry? FindEntry(ModelProvider provider, string modelId) =>

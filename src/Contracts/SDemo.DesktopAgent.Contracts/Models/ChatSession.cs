@@ -69,6 +69,35 @@ public sealed class ChatSession
     /// <summary>摘要是否由确定性兜底生成（UI 上标注「自动摘要」）。</summary>
     public bool SummaryIsFallback { get; set; }
 
+    /// <summary>
+    /// 本次压缩的开始时间（P2b 事务标记，对应 DSH 的 <c>compaction/start</c>）。
+    /// <para>
+    /// 它同时是**锁**：开始标记先落库，摘要与 <see cref="SummaryThroughOrder"/> 最后一次性落库。
+    /// 只有开始没有收尾，就说明上一次压缩没跑完（崩溃 / 断电），是一条可恢复的证据，而不是半截状态。
+    /// </para>
+    /// </summary>
+    public DateTime? CompactionStartedAt { get; set; }
+
+    /// <summary>本次压缩的收尾时间（对应 <c>compaction/end</c>）；早于开始时间视为未收尾。</summary>
+    public DateTime? CompactionFinishedAt { get; set; }
+
+    /// <summary>最后一次压缩的结论（<c>auto</c> / <c>manual</c> / <c>rejected</c> / <c>failed: …</c>）；只用于排障与提示。</summary>
+    public string? CompactionReason { get; set; }
+
+    /// <summary>
+    /// 有没有一次压缩开始后没有收尾。为 true 时：同一进程内的新压缩必须让路（可能另一个窗口正在压），
+    /// 从数据库读回时则由下一次压缩接管（那时没有活着的压缩者）。
+    /// </summary>
+    public bool HasUnfinishedCompaction =>
+        CompactionStartedAt is { } started
+        && (CompactionFinishedAt is null || CompactionFinishedAt < started);
+
+    /// <summary>
+    /// 运行期标记（不落库）：这个「未收尾」是从数据库读回来的，即上一次进程崩了。
+    /// 与 <see cref="HasUnfinishedCompaction"/> 差一个「有没有活着的压缩者」，压缩器据此决定让路还是接管。
+    /// </summary>
+    public bool CompactionInterruptedOnLoad { get; set; }
+
     /// <summary>最近一次构建 / 测试验证结果（P4；重启后从 LastVerificationJson 恢复）。</summary>
     public SDemo.DesktopAgent.Execution.VerificationRecord? LastVerification { get; set; }
 

@@ -36,6 +36,10 @@ public sealed class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbC
         session.Property(record => record.SummaryTokens);
         session.Property(record => record.LastVerificationJson);
         session.Property(record => record.TodosJson);
+        // P2b：压缩事务标记（start / end / 原因）；只有开始没有收尾 = 上次压缩没跑完。
+        session.Property(record => record.CompactionStartedAt);
+        session.Property(record => record.CompactionFinishedAt);
+        session.Property(record => record.CompactionReason);
         session.HasIndex(record => record.UpdatedAt);
         session.HasMany(record => record.Messages)
             .WithOne()
@@ -114,6 +118,15 @@ public sealed class SessionRecord
 
     /// <summary>摘要正文的 token 估算。</summary>
     public int SummaryTokens { get; set; }
+
+    /// <summary>P2b：上一次压缩的开始时间（事务标记 / 锁）；null 表示从没压缩过。</summary>
+    public DateTime? CompactionStartedAt { get; set; }
+
+    /// <summary>P2b：上一次压缩的收尾时间；早于开始时间视为未收尾。</summary>
+    public DateTime? CompactionFinishedAt { get; set; }
+
+    /// <summary>P2b：上一次压缩的结论（auto / manual / rejected / failed:…），排障用。</summary>
+    public string? CompactionReason { get; set; }
 
     /// <summary>最近一次验证结果（VerificationRecord）的 JSON。</summary>
     public string? LastVerificationJson { get; set; }

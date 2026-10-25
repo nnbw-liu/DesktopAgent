@@ -27,7 +27,8 @@ public static class ToolPlaybooks
             "定位不到目标文件时先用它建立工作区地图，再按路径 read_file；不要用它代替读文件内容。",
         ["read_file"] =
             "改代码前必须先读目标文件；不知道路径先用 search_files / glob_files 定位，不要猜路径。"
-            + "大文件用 offset/limit 分段读，不要一次读完整份。",
+            + "大文件用 offset/limit 分段读，不要一次读完整份；结果被截断并给出 .agent/spill 路径时，"
+            + "按提示的 offset 回读，不要重跑产生它的工具。",
         ["search_files"] =
             "找『某段代码 / 字符串在哪个文件、第几行』用它；只知道文件名形态时用 glob_files；"
             + "要读整篇内容再 read_file。",
@@ -50,10 +51,12 @@ public static class ToolPlaybooks
         ["run_command"] =
             "运行白名单内的可执行文件（不带路径），返回 stdout/stderr 与退出码；用于构建、测试、跑脚本。"
             + "只看文件内容不要用它——用 read_file / search_files；需要管道、重定向、环境变量或 "
-            + "PowerShell 语义时改用 run_powershell。失败时先读输出里的第一处错误，不要原样重试同一条命令。",
+            + "PowerShell 语义时改用 run_powershell。失败时先读输出里的第一处错误，不要原样重试同一条命令。"
+            + "输出过长会被截断并落盘到 .agent/spill，需要中间部分用 read_file 回读，不要重跑命令。",
         ["run_powershell"] =
             "在沙箱里跑 PowerShell 脚本，可用管道 / 重定向 / 环境变量。要构建或跑测试优先 run_command；"
-            + "只是看目录或文件不要用它。每次只做一件明确的事，不要写长脚本。",
+            + "只是看目录或文件不要用它。每次只做一件明确的事，不要写长脚本。"
+            + "输出过长被截断时按提示的 .agent/spill 路径回读，不要重跑脚本。",
         ["pdf_info"] =
             "读 PDF 之前先看页数与基本信息，避免盲读；只在处理 PDF 时用。",
         ["pdf_read"] =

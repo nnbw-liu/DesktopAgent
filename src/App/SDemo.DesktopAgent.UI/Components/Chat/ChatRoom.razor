@@ -51,6 +51,15 @@
 
             @* P2：会话菜单（压缩现在 / 清空摘要）+ 摘要状态。 *@
             <div class="chat-header-actions">
+                @if (Session.HasUnfinishedCompaction)
+                {
+                    @* P2b：开始标记没有收尾 = 上一次压缩没跑完（崩溃 / 断电）。摘要没有提交，原文都在。 *@
+                    <span class="chat-summary-badge chat-summary-badge--warn"
+                          title="@CompactionInterruptedTitle">
+                        上次压缩未完成
+                    </span>
+                }
+
                 @if (Session.HasSummary)
                 {
                     <span class="chat-summary-badge" title="较早的历史已压缩为摘要；原文仍保留，可点击分隔线查看">
@@ -126,6 +135,7 @@
                         <CompactionDivider Count="@Session.SummaryThroughOrder"
                                            Tokens="@Session.SummaryTokens"
                                            IsFallback="@Session.SummaryIsFallback"
+                                           Interrupted="@Session.HasUnfinishedCompaction"
                                            OnOpen="OpenCompactedHistory" />
                     }
 
@@ -1190,6 +1200,19 @@
         EffectiveSettings.Resolve(Settings.Current, CurrentWorkspace(), Session);
 
     private void DismissContextNotice() => _contextNotice = null;
+
+    /// <summary>「上次压缩未完成」的悬浮说明（P2b 事务标记）：什么时候开始的、为什么还在。</summary>
+    private string CompactionInterruptedTitle
+    {
+        get
+        {
+            var started = Session.CompactionStartedAt is { } time ? time.ToString("MM-dd HH:mm:ss") : "未知时间";
+            var reason = string.IsNullOrWhiteSpace(Session.CompactionReason) ? "压缩" : Session.CompactionReason;
+
+            return $"{reason} · 开始于 {started}，但没有收尾（应用意外退出 / 断电）。"
+                + "摘要没有提交、原文都在；下一次压缩会重做这一段。";
+        }
+    }
 
     private void ToggleSessionMenu() => _sessionMenuOpen = !_sessionMenuOpen;
 

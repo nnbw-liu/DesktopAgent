@@ -1,7 +1,7 @@
 @inject ISettingsService Settings
 @inject TokenCalibrationStore Calibration
 
-@* P2 §3.4 设置 → 上下文：预算、保留轮次、自动压缩、摘要模型、状态包、校准。 *@
+@* P2 §3.4 设置 → 上下文：预算、保留轮次、自动压缩、摘要模型、宿主上下文快照、校准。 *@
 <div class="settings-pane">
     <section class="settings-section">
         <h2 class="settings-section-title">预算与裁剪</h2>
@@ -133,23 +133,25 @@
     </section>
 
     <section class="settings-section">
-        <h2 class="settings-section-title">工作记忆状态包</h2>
+        <h2 class="settings-section-title">宿主上下文快照</h2>
         <p class="settings-section-hint">
-            每轮把「工作区结构、最近改动、最近工具动作、验证状态」放进系统块；由宿主生成，不调用模型。
+            每轮在历史末尾追加一条「宿主上下文快照」（不是用户输入）：按段渲染工作区、策略、改动、
+            验证、计划、时间，并把「本快照取代之前的快照」写进正文。放在末尾而不是系统提示词尾部，
+            系统前缀在会话内就不再每轮抖动。
         </p>
 
         <label class="settings-row settings-row--toggle">
             <span class="settings-row-text">
-                <span class="settings-row-title">启用状态包</span>
-                <span class="settings-row-hint">关闭后模型只能靠历史与工具重新读取文件。</span>
+                <span class="settings-row-title">工作区结构 / 改动 / 动作</span>
+                <span class="settings-row-hint">关闭后这一段不扫盘、成本为 0；策略与验证仍会发送。</span>
             </span>
             <input type="checkbox" class="switch" checked="@Context.StatePackEnabled" @onchange="ToggleStatePack" />
         </label>
 
         <div class="settings-row">
             <span class="settings-row-text">
-                <span class="settings-row-title">状态包上限</span>
-                <span class="settings-row-hint">普通模型 / ≤8K 小模型（默认 800 / 500 token）。</span>
+                <span class="settings-row-title">快照上限</span>
+                <span class="settings-row-hint">普通模型 / ≤8K 小模型（默认 800 / 500 token）；必需段不受此限制。</span>
             </span>
             <span class="settings-inline-fields">
                 <input type="number" class="field-input field-input--number" min="64" max="2048"
@@ -159,6 +161,22 @@
                        @bind="Context.StatePackSmallModelTokenBudget" @bind:after="SaveSettings" />
             </span>
         </div>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">时间读数</span>
+                <span class="settings-row-hint">宿主时钟 + IANA 时区 + 距上一条模型可见消息的时长；关闭后成本为 0。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@Context.TimeContextEnabled" @onchange="ToggleTimeContext" />
+        </label>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">当前计划</span>
+                <span class="settings-row-hint">把会话 Todo 列表放进快照；没有计划时本来就零成本。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@Context.PlanContextEnabled" @onchange="TogglePlanContext" />
+        </label>
     </section>
 
     <section class="settings-section">
@@ -228,6 +246,14 @@
                    @bind="Context.MidTurnToolResultChars" @bind:after="SaveSettings" />
         </div>
 
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">超长工具输出落盘</span>
+                <span class="settings-row-hint">超出上面上限的结果把全文存到工作区 .agent/spill，上下文只留头尾预览与 read_file 回读指引；关闭后只截断。</span>
+            </span>
+            <input type="checkbox" class="switch" checked="@Context.SpillLargeToolOutputs" @onchange="ToggleSpill" />
+        </label>
+
         <div class="settings-row">
             <span class="settings-row-text">
                 <span class="settings-row-title">重置 token 校准</span>
@@ -284,6 +310,18 @@
         Settings.Save();
     }
 
+    private void ToggleTimeContext(ChangeEventArgs args)
+    {
+        Context.TimeContextEnabled = args.Value is true;
+        Settings.Save();
+    }
+
+    private void TogglePlanContext(ChangeEventArgs args)
+    {
+        Context.PlanContextEnabled = args.Value is true;
+        Settings.Save();
+    }
+
     private void ToggleMidTurnTrim(ChangeEventArgs args)
     {
         Context.MidTurnTrim = args.Value is true;
@@ -293,6 +331,12 @@
     private void ToggleOverflowRetry(ChangeEventArgs args)
     {
         Context.OverflowRetry = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ToggleSpill(ChangeEventArgs args)
+    {
+        Context.SpillLargeToolOutputs = args.Value is true;
         Settings.Save();
     }
 

@@ -113,6 +113,24 @@ public sealed class ReadFileRangeTests
     }
 
     [Fact]
+    public async Task 超长单行可以调大单行上限读完()
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllText(
+            Path.Combine(temp.Root, "long.txt"),
+            "head\n" + new string('z', 2_000) + "尾部标记\ntail\n");
+        var tool = Tool(temp.Root);
+
+        var clipped = await InvokeAsync(tool.Context, tool.Pack, "read_file",
+            ("path", "long.txt"), ("offset", 2), ("limit", 1));
+        Assert.DoesNotContain("尾部标记", clipped);
+
+        var full = await InvokeAsync(tool.Context, tool.Pack, "read_file",
+            ("path", "long.txt"), ("offset", 2), ("limit", 1), ("maxLineChars", 4_000));
+        Assert.Contains("尾部标记", full);
+    }
+
+    [Fact]
     public async Task CRLF文件行号正确且不把回车带进内容()
     {
         using var temp = new TempDirectory();
