@@ -83,6 +83,52 @@ public sealed class ChatStoreSummaryTests : IDisposable
         Assert.False(loaded.HasSummary);
     }
 
+    [Fact]
+    public async Task 压缩事务标记落库后能读回()
+    {
+        var store = new ChatStore(_root);
+        var session = new ChatSession { Id = "s4", Title = "压缩事务" };
+        session.Messages.Add(new ChatMessage(ChatMessageRole.User, "一"));
+        session.Messages.Add(new ChatMessage(ChatMessageRole.Assistant, "二"));
+
+        var started = new DateTime(2026, 10, 25, 12, 0, 0);
+        session.CompactionStartedAt = started;
+        session.CompactionFinishedAt = started.AddSeconds(3);
+        session.CompactionReason = "auto";
+
+        await store.SaveSessionAsync(session);
+
+        var loaded = Assert.Single(await store.LoadAllAsync([]));
+
+        Assert.Equal(started, loaded.CompactionStartedAt);
+        Assert.Equal(started.AddSeconds(3), loaded.CompactionFinishedAt);
+        Assert.Equal("auto", loaded.CompactionReason);
+        Assert.False(loaded.HasUnfinishedCompaction);
+        Assert.False(loaded.CompactionInterruptedOnLoad);
+    }
+
+    [Fact]
+    public async Task 崩溃留下的未完成压缩读回时标记为中断()
+    {
+        var store = new ChatStore(_root);
+        var session = new ChatSession { Id = "s5", Title = "压缩崩溃" };
+        session.Messages.Add(new ChatMessage(ChatMessageRole.User, "一"));
+        session.Messages.Add(new ChatMessage(ChatMessageRole.Assistant, "二"));
+
+        // 只有开始没有收尾：上一次进程崩在压缩中途。摘要一条都没提交（覆盖范围仍是 0）。
+        session.CompactionStartedAt = new DateTime(2026, 10, 25, 12, 0, 0);
+        session.CompactionFinishedAt = null;
+
+        await store.SaveSessionAsync(session);
+
+        var loaded = Assert.Single(await store.LoadAllAsync([]));
+
+        Assert.True(loaded.HasUnfinishedCompaction);
+        Assert.True(loaded.CompactionInterruptedOnLoad);
+        Assert.Null(loaded.Summary);
+        Assert.Equal(0, loaded.SummaryThroughOrder);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

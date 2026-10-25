@@ -94,6 +94,18 @@
     {
         <p class="context-note">已省略 @Report.OmittedMessages 条较早消息（约 @ContextMeter.Format(Report.OmittedTokens) token）</p>
     }
+    @* P2b「先修剪，后摘要」：轨迹修剪省下的量单独列出——它是「不用压缩就放得下」的证据。 *@
+    @if (Report.PrunedTokens > 0)
+    {
+        <p class="context-note">
+            已先修剪工具轨迹约 @ContextMeter.Format(Report.PrunedTokens) token@(Report.PrunedInsteadOfCompacted ? "（不必压缩历史）" : string.Empty)
+        </p>
+    }
+    @* P2c：超长工具输出落盘——上下文里只剩预览，模型可以按指引回读，不必重跑命令。 *@
+    @if (SpillNote() is { Length: > 0 } spillNote)
+    {
+        <p class="context-note">@spillNote</p>
+    }
     @if (Report.AttachmentsStubbed)
     {
         <p class="context-note">部分附件只保留文件名 / 路径（正文可按需读取）</p>
@@ -210,6 +222,27 @@
     }
 
     private static string FormatLimit(int limit) => limit <= 0 || limit == int.MaxValue ? "不限" : limit.ToString();
+
+    /// <summary>P2c：落盘条数 + 失败的条数；都没有时返回空串（不渲染空行）。</summary>
+    private string SpillNote()
+    {
+        if (Report is null || (Report.SpilledResults <= 0 && Report.SpillFailures <= 0))
+        {
+            return string.Empty;
+        }
+
+        var note = Report.SpilledResults > 0
+            ? $"已把 {Report.SpilledResults} 条超长工具输出落盘到 .agent/spill（可用 read_file 回读，无需重跑）"
+            : string.Empty;
+
+        if (Report.SpillFailures > 0)
+        {
+            var failure = $"{Report.SpillFailures} 条写盘失败，已退回截断";
+            note = note.Length == 0 ? failure : $"{note} · {failure}";
+        }
+
+        return note;
+    }
 
     private static string FormatSource(string? source) =>
         string.Equals(source, SDemo.DesktopAgent.Context.RoutingDecision.SmallModelSource, StringComparison.Ordinal)

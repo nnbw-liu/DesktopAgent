@@ -4454,6 +4454,14 @@ a {
     opacity: .85;
 }
 
+/* P2b：上次压缩未完成（只有开始标记、没有收尾）。是证据，不是错误：摘要没提交，原文都在。 */
+.chat-summary-badge--warn {
+    border: 1px solid rgba(183, 121, 31, .45);
+    background: rgba(183, 121, 31, .12);
+    color: #c08a2a;
+    cursor: help;
+}
+
 .chat-menu-wrap {
     position: relative;
 }
@@ -4538,6 +4546,13 @@ a {
 .compaction-hint {
     font-size: 9.5px;
     opacity: .8;
+}
+
+/* P2b：压缩中断的证据行（只有开始标记、没有收尾）。 */
+.compaction-interrupted {
+    margin-top: 2px;
+    color: #c08a2a;
+    font-size: 9.5px;
 }
 
 .msg-action--pin.is-on {

@@ -7,7 +7,7 @@ namespace SDemo.DesktopAgent.Context;
 public static class WorkspaceExcludes
 {
     public static readonly IReadOnlySet<string> Default = new HashSet<string>(
-        ["bin", "obj", "node_modules", ".git", ".vs", ".tmp", ".idea", "dist", "target"],
+        ["bin", "obj", "node_modules", ".git", ".vs", ".tmp", ".idea", "dist", "target", ".agent"],
         StringComparer.OrdinalIgnoreCase);
 
     public static bool Contains(string name) => Default.Contains(name);

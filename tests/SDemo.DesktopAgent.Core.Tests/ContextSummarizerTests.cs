@@ -1,3 +1,4 @@
+using Microsoft.Extensions.AI;
 using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Models;
 using Xunit;
@@ -230,20 +231,124 @@ public sealed class ContextSummarizerTests
         Assert.True(result.InputTokens > single.InputTokens);
     }
 
+    // ---------- P2b §3.3.2 第二条：摘要请求复用热前缀 ----------
+
+    [Fact]
+    public async Task 摘要请求回放会话提示词与区域消息作为真前缀()
+    {
+        var tool = AIFunctionFactory.Create(
+            (string path) => "ok",
+            name: "read_file",
+            description: "读取一个文件。只读，不修改。");
+
+        var request = Request() with
+        {
+            Instructions = "会话自己的系统提示词（逐字复用）",
+            Tools = [tool]
+        };
+        var transport = new FakeTransport(ValidSummary());
+
+        var result = await new LlmContextSummarizer(transport, _counter)
+            .SummarizeAsync(request, CancellationToken.None);
+
+        Assert.True(result.Ok);
+        var sent = Assert.Single(transport.Requests);
+
+        // 1. system 是会话原样，而不是摘要器自己的固定提示词。
+        Assert.Equal(ChatRole.System, sent.Messages[0].Role);
+        Assert.Equal("会话自己的系统提示词（逐字复用）", sent.Messages[0].Text);
+
+        // 2. 被遮蔽区域逐条回放，role 与正文保持原样（不是压成一段带 [mN] 的文本）。
+        Assert.Equal(3, sent.Messages.Count - 2); // 3 条区域消息
+        Assert.Equal(ChatRole.User, sent.Messages[1].Role);
+        Assert.Contains("不要修改数据库结构", sent.Messages[1].Text);
+        Assert.Equal(ChatRole.Assistant, sent.Messages[2].Role);
+        Assert.Equal(ChatRole.User, sent.Messages[3].Role);
+
+        // 3. 最后一条是压缩指令。
+        Assert.Equal(ChatRole.User, sent.Messages[^1].Role);
+        Assert.StartsWith("现在请把上面的对话压缩成一份结构化检查点", sent.Messages[^1].Text);
+
+        // 4. 工具声明原样带上：热前缀的第二段。
+        Assert.NotNull(sent.Tools);
+        Assert.Equal("read_file", Assert.Single(sent.Tools!).Name);
+    }
+
+    [Fact]
+    public async Task 没有会话提示词时退回摘要器固定提示词()
+    {
+        var transport = new FakeTransport(ValidSummary());
+
+        await new LlmContextSummarizer(transport, _counter)
+            .SummarizeAsync(Request(), CancellationToken.None);
+
+        var sent = Assert.Single(transport.Requests);
+        Assert.Equal(SummaryPrompt.System, sent.Messages[0].Text);
+        Assert.Null(sent.Tools);
+    }
+
+    [Fact]
+    public async Task 模型走工具调用没有文本时去掉工具重试一次()
+    {
+        // 第一次声明了工具，模型直接发起工具调用（没有正文）；去掉工具重试后拿到摘要。
+        var transport = new SequenceTransport(string.Empty, ValidSummary());
+        var request = Request() with
+        {
+            Instructions = "会话提示词",
+            Tools = [AIFunctionFactory.Create((string path) => "ok", name: "read_file", description: "读取")]
+        };
+
+        var result = await new LlmContextSummarizer(transport, _counter)
+            .SummarizeAsync(request, CancellationToken.None);
+
+        Assert.True(result.Ok);
+        Assert.Equal(2, transport.Calls);
+        Assert.NotNull(transport.Requests[0].Tools);
+        Assert.Null(transport.Requests[1].Tools);
+    }
+
+    [Fact]
+    public async Task 来源序号按位置换回会话里的绝对序号()
+    {
+        // 模型只能数「第几条消息」（因为回放的区域里没有 [mN] 标记），这里把它换回绝对序号。
+        var summary = """
+            ## 目标与约束
+            - 不要修改数据库结构 [m1]
+            ## 已确认决策
+            - 改动放 docs/ [m3]
+            ## 关键事实
+            - 沿用旧结论 [m42]
+            ## 已改动
+            - 无
+            ## 未完成
+            - 无
+            ## 用户偏好
+            - 无
+            """;
+
+        var transport = new FakeTransport(summary);
+        var result = await new LlmContextSummarizer(transport, _counter).SummarizeAsync(
+            Request() with { ChunkStartOrder = 10 },
+            CancellationToken.None);
+
+        Assert.True(result.Ok);
+        Assert.Contains("不要修改数据库结构 [m10]", result.Text);
+        Assert.Contains("改动放 docs/ [m12]", result.Text);
+        // 超出本批范围的序号原样保留（那通常是上一版摘要里的绝对序号）。
+        Assert.Contains("沿用旧结论 [m42]", result.Text);
+    }
+
     private sealed class SequenceTransport(params string[] responses) : ISummaryChatTransport
     {
         public int Calls { get; private set; }
 
-        public Task<string> CompleteAsync(
-            ModelProvider provider,
-            string modelId,
-            string systemPrompt,
-            string userPrompt,
-            int maxTokens,
-            CancellationToken cancellationToken)
+        public List<SummaryChatRequest> Requests { get; } = [];
+
+        public Task<string> CompleteAsync(SummaryChatRequest request, CancellationToken cancellationToken)
         {
             var index = Math.Min(Calls, responses.Length - 1);
             Calls++;
+            Requests.Add(request);
             return Task.FromResult(responses[index]);
         }
     }
@@ -261,14 +366,14 @@ public sealed class ContextSummarizerTests
             _exception = exception;
         }
 
+        public List<SummaryChatRequest> Requests { get; } = [];
+
         public async Task<string> CompleteAsync(
-            ModelProvider provider,
-            string modelId,
-            string systemPrompt,
-            string userPrompt,
-            int maxTokens,
+            SummaryChatRequest request,
             CancellationToken cancellationToken)
         {
+            Requests.Add(request);
+
             if (_delay is TimeSpan delay)
             {
                 await Task.Delay(delay, cancellationToken);

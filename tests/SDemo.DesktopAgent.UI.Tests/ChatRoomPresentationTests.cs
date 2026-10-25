@@ -351,6 +351,29 @@ public sealed class ChatRoomPresentationTests : TestContext
         Assert.Contains("120 ms", row.TextContent, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void 压缩中断时显示未完成标记()
+    {
+        var session = new ChatSession { Id = "compaction-interrupted", Title = "压缩中断" };
+        session.Messages.Add(new ChatMessageModel(ChatMessageRole.User, "改一下 README"));
+        session.Messages.Add(new ChatMessageModel(ChatMessageRole.Assistant, "好的。"));
+
+        // P2b：只有开始标记、没有收尾 —— 上一次进程崩在压缩中途（摘要没有提交）。
+        session.CompactionStartedAt = new DateTime(2026, 10, 25, 12, 0, 0);
+        session.CompactionReason = "auto";
+
+        var cut = RenderComponent<ChatRoom>(parameters => parameters
+            .Add(component => component.Session, session));
+
+        var badge = cut.Find(".chat-summary-badge--warn");
+        Assert.Contains("上次压缩未完成", badge.TextContent, StringComparison.Ordinal);
+        Assert.Contains("但没有收尾", badge.GetAttribute("title"), StringComparison.Ordinal);
+
+        // 摘要没提交：不出现分隔线、也不影响原文渲染。
+        Assert.Empty(cut.FindAll(".compaction-divider"));
+        Assert.Equal(2, cut.FindAll(".msg").Count);
+    }
+
     private static ChatMessageModel BuildTimelineReply()
     {
         var reply = new ChatMessageModel(ChatMessageRole.Assistant, "我已经看完了。")

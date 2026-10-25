@@ -42,6 +42,19 @@ public sealed record AgentRunPlan(
     EffectiveSettings? Scope = null);
 
 /// <summary>
+/// 本轮请求实际会发给模型的「前缀」（P2b §3.3.2 第二条）。
+/// <para>
+/// 摘要请求要复用热前缀，就必须拿到**逐字相同**的 system 提示词与工具声明，
+/// 而不是另拼一份。它由真正执行请求的一方（<see cref="AgentChatService"/>）给出，
+/// 上层（Runner）只负责转交。
+/// </para>
+/// </summary>
+public sealed record AgentRequestPreamble(string? Instructions, IReadOnlyList<AITool> Tools)
+{
+    public static AgentRequestPreamble Empty { get; } = new(null, []);
+}
+
+/// <summary>
 /// 通过 Microsoft Agent Framework 调用模型。只负责传输、流式解析与工具轨迹采集；
 /// 消息取舍在 <see cref="ContextBuilder"/>，本服务不再决定发什么。
 /// </summary>
@@ -52,6 +65,12 @@ public interface IAgentChatService
         AgentRunPlan plan,
         ContextRunTelemetry? telemetry = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// P2b：本轮请求的 system 提示词与工具声明（不执行任何工具），供压缩请求复用热前缀。
+    /// 默认返回空——不做工具声明的实现（测试替身、插件路径）仍然可以编译。
+    /// </summary>
+    AgentRequestPreamble Describe(AgentRunPlan plan) => AgentRequestPreamble.Empty;
 }
 
 /// <inheritdoc />
@@ -118,22 +137,7 @@ public sealed class AgentChatService : IAgentChatService
 
         // 每次 Run 生成一份工具上下文：会话 / 工作区都按这一次生成固定下来，
         // 单例工具包不会把上一个会话的上下文带进来。
-        var context = new ToolContext(
-            plan.SessionId,
-            _workspace.RootPath,
-            AgentAttachmentRoots.Build(_paths, plan.SessionId),
-            _settings,
-            _approvals,
-            _sandbox,
-            _audit,
-            _reads,
-            plan.Metrics,
-            plan.Session,
-            plan.Metrics?.RunId,
-            _skills,
-            plan.Session?.WorkspaceId,
-            _memory,
-            plan.Scope);
+        var context = CreateToolContext(plan);
 
         var agentSettings = plan.Scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
         var available = _tools.ToolNames(plan.ToolPacks);
@@ -461,6 +465,47 @@ public sealed class AgentChatService : IAgentChatService
             ? plan.Context.Instructions
             : SystemPrompts.Chat;
 
+    /// <summary>
+    /// P2b §3.3.2 第二条：把本轮请求的 system 提示词与工具声明原样交出去。
+    /// 只声明、不执行：工具实例化不会触发审批、也不写审计。
+    /// </summary>
+    public AgentRequestPreamble Describe(AgentRunPlan plan)
+    {
+        var agentSettings = plan.Scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
+        var available = _tools.ToolNames(plan.ToolPacks);
+        var agentMode = Context.AgentModeResolver.Resolve(
+            plan.Context.Profile,
+            plan.ModelId,
+            agentSettings.Mode);
+        var decision = plan.Context.Report.Routing ?? ResolveRouting(plan, available, agentSettings, agentMode);
+
+        // 与 RunAsync 走同一条生成路径（同一个 decision、同一个注册表顺序），声明才会逐字一致。
+        var (tools, _) = CreateExposedTools(CreateToolContext(plan), plan, decision);
+
+        return new AgentRequestPreamble(ResolveInstructions(plan, decision), tools);
+    }
+
+    /// <summary>
+    /// 每次 Run / Describe 生成一份工具上下文：会话、工作区与作用域都按这一次调用固定下来，
+    /// 单例工具包不会把上一个会话的上下文带进来。
+    /// </summary>
+    private ToolContext CreateToolContext(AgentRunPlan plan) => new(
+        plan.SessionId,
+        _workspace.RootPath,
+        AgentAttachmentRoots.Build(_paths, plan.SessionId),
+        _settings,
+        _approvals,
+        _sandbox,
+        _audit,
+        _reads,
+        plan.Metrics,
+        plan.Session,
+        plan.Metrics?.RunId,
+        _skills,
+        plan.Session?.WorkspaceId,
+        _memory,
+        plan.Scope);
+
     private AgentInvocation CreateInvocation(
         ModelProvider provider,
         string modelId,
@@ -474,6 +519,13 @@ public sealed class AgentChatService : IAgentChatService
     {
         var settings = scope?.Context ?? _settings.Current.Context ?? new ContextSettings();
         var agent = scope?.Agent ?? _settings.Current.Agent ?? new AgentSettings();
+
+        // P2c：超长工具输出落盘到 <workspace>/.agent/spill，上下文里只留头尾预览 + 回读指引。
+        // 没有工作区、或用户关掉开关时传 null，退回纯截断（落盘是尽力而为，不能改变工具结果语义）。
+        IToolResultSpillStore? spill = settings.SpillLargeToolOutputs && !string.IsNullOrWhiteSpace(_workspace.RootPath)
+            ? new WorkspaceToolResultSpillStore(_workspace.RootPath)
+            : null;
+
         var budgetOptions = new ContextBudgetChatOptions(
             Enabled: settings.Enabled && settings.MidTurnTrim,
             Budget: plan.Budget,
@@ -481,7 +533,8 @@ public sealed class AgentChatService : IAgentChatService
             CalibrationFactor: plan.Report.CalibrationFactor,
             KeepRecentTurns: settings.KeepRecentTurns,
             ToolResultChars: settings.MidTurnToolResultChars,
-            MaxOutputTokens: Math.Clamp(plan.Profile.MaxOutputTokens, 128, 8192));
+            MaxOutputTokens: Math.Clamp(plan.Profile.MaxOutputTokens, 128, 8192),
+            Spill: spill);
 
         return new AgentInvocation(
             new Uri(provider.BaseUrl, UriKind.Absolute),
