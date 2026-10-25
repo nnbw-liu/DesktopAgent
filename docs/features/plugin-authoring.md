@@ -12,7 +12,7 @@
 3. [plugin.json 参考](#3-pluginjson-参考)
 4. [技能（skill）文件](#4-技能skill文件)
 5. [参数与默认值](#5-参数与默认值)
-6. [三条入口：侧栏 / 输入框 / 气泡](#6-三条入口侧栏--输入框--气泡)
+6. [四条入口：侧栏 / 输入框 / 气泡 / 划词](#6-四条入口侧栏--输入框--气泡--划词)
 7. [输出格式：纯文本与双语对照](#7-输出格式纯文本与双语对照)
 8. [执行模型与限制](#8-执行模型与限制)
 9. [安全与隐私](#9-安全与隐私)
@@ -73,6 +73,9 @@ version: 1.0
 
 - 输入框底部出现「润色」chip，选中后输入文字发送 → 得到一条带「润色 · SDemo」归属的回答。
 - 任意助手消息底部（时间右侧）出现润色按钮，点一下 → 原消息下方出现派生卡片。
+
+> 想试划词：在 `mounts` 里再加一条 `{ "id": "selection", "surface": "selection", "capability": "polish" }`，
+> 重新扫描后在「设置 → 插件」打开该插件的「选中」，到聊天正文里选中一段文字、松开鼠标即可看到浮动菜单。
 
 > 提示：插件不用重启应用；但**已经打开的会话**需要重新选一次插件（入口列表是扫描时生成的）。
 
@@ -138,7 +141,8 @@ version: 1.0
 | `name` | ✅ | string | — | 展示名 |
 | `skill` | ✅ | string | — | 相对插件目录的 `.md` 路径；**不允许 `..` 或绝对路径** |
 | `allowGlobalSkills` | | bool | `false` | 是否额外注入全局技能（v1 的输入框插件模式不注入，保留字段） |
-| `allowHistory` | | bool | `false` | 输入框模式是否带会话历史（气泡模式永远不带） |
+| `allowHistory` | | bool | `false` | 是否允许带会话历史（还要看 `contextParameter`；默认关） |
+| `contextParameter` | | string | — | 控制「是否关联上下文」的 toggle 参数 key；必须同时 `allowHistory: true` |
 | `output` | | object | `{"format":"text"}` | `text` 或 `segments`（双语对照） |
 | `privacy` | | object | `{}` | `{"sendsText": true}` 时首次使用弹确认 |
 | `parameters` | | array | `[]` | 见 §5 |
@@ -148,13 +152,23 @@ version: 1.0
 | 字段 | 必填 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- | --- |
 | `id` | ✅ | string | — | 插件内唯一 |
-| `surface` | ✅ | enum | — | `sidebar` / `composer` / `message` |
+| `surface` | ✅ | enum | — | `sidebar` / `composer` / `message` / `selection` |
 | `capability` | ✅ | string | — | 必须指向本插件已定义的 capability |
-| `input` | | enum | 按 surface 推断 | `composer` / `message` / `selection`（`selection` 预留，当前忽略） |
+| `input` | | enum | 按 surface 推断 | `composer` / `message` / `selection` |
 | `order` | | int | `100` | 升序；同一个 surface 内比较 |
 | `show` | | bool | `true` | 默认是否显示；用户设置可以覆盖 |
 
-`input` 的推断：`surface=message` → `message`，其它 → `composer`。
+`input` 的推断：
+
+- `surface=sidebar` / `composer` → `composer`
+- `surface=message` → `message`
+- `surface=selection` → `selection`
+
+规则：
+
+- `surface=selection` 只能使用 `input=selection`（一般直接省略）；
+- 其它 surface 不允许声明 `input: "selection"`，否则该入口加载失败；
+- 划词菜单是独立入口，不受「输入框」开关影响；只受插件级启用和「选中」开关控制。
 
 ### 3.4 一个能力挂多个入口
 
@@ -174,9 +188,10 @@ version: 1.0
     ] }
 ],
 "mounts": [
-  { "id": "sidebar",  "surface": "sidebar",  "capability": "translate", "order": 10 },
-  { "id": "composer", "surface": "composer", "capability": "translate", "order": 10 },
-  { "id": "bubble",   "surface": "message",  "capability": "translate", "input": "message", "order": 10 }
+  { "id": "sidebar",   "surface": "sidebar",   "capability": "translate", "order": 10 },
+  { "id": "composer",  "surface": "composer",  "capability": "translate", "order": 10 },
+  { "id": "bubble",    "surface": "message",   "capability": "translate", "input": "message", "order": 10 },
+  { "id": "selection", "surface": "selection", "capability": "translate", "order": 10 }
 ]
 ```
 
@@ -285,20 +300,50 @@ version: 1.0
 
 ---
 
-## 6. 三条入口：侧栏 / 输入框 / 气泡
+### 5.6 关联上下文开关（`contextParameter`）
+
+想让用户自己决定「这一轮要不要带会话历史」，声明一个 toggle 参数，并让能力指向它：
+
+```json
+"capabilities": [
+  {
+    "id": "quick-ask",
+    "name": "简单问答",
+    "skill": "skills/quick-ask.md",
+    "allowHistory": true,
+    "contextParameter": "useContext",
+    "parameters": [
+      { "key": "useContext", "label": "关联上下文", "kind": "toggle", "default": "true" }
+    ]
+  }
+]
+```
+
+- `allowHistory` 是总闸：没有它，`contextParameter` 不生效（校验会报错）。
+- `contextParameter` 必须是本能力里已定义的 `toggle` 参数。
+- 参数值为 `false` 时这一轮不带历史；缺省或非法值按「打开」处理。
+- 历史只在**入口本身允许**时才会带（见 §8）；划词 / 气泡默认也是关的，打开后才带。
+- 参数值仍然按会话记忆：勾选一次，之后同一会话默认沿用。
+
+---
+
+## 6. 四条入口：侧栏 / 输入框 / 气泡 / 划词
 
 | 入口 | 点了之后 | 产物 | 上限 |
 | --- | --- | --- | --- |
 | 侧栏 `sidebar` | **新建一个空会话**，输入框预选该插件 | 之后的发送走插件 Run | `maxInSidebar`，默认 6 个，超出进「更多插件」 |
 | 输入框 `composer` | 选中 chip 后发送 | 一条带插件归属的助手消息（`翻译 · SDemo`） | `maxInComposer`，默认 3 个，超出进「更多」 |
 | 气泡 `message` | 对这条助手消息做加工 | 挂在原消息下的**派生卡片** | 每条消息最多 5 张；按钮内联 2 个，其余进「⋯」 |
+| 划词 `selection` | 在聊天记录里选中文本、鼠标抬起，点浮动菜单里的插件 | 以选中文本为输入的**派生卡片**，挂在选区所在消息下 | `maxInSelection`，默认 4 个，超出进「更多」 |
 
 行为要点：
 
 - **侧栏依赖输入框**：设置里关掉「输入框」后，侧栏入口一起隐藏（侧栏会进入预选插件的会话，进去看不到插件就没有意义）。
-- 三个入口可以独立开关（设置里「输入框 / 侧栏 / 气泡」）。
+- 四个入口可以独立开关（设置里「输入框 / 侧栏 / 气泡 / 选中」）；划词独立于输入框。
 - 输入框模式：选中插件后全局技能区隐藏；chip 上的 `✕` 随时取消。
-- 气泡模式：**不新增对话轮、不改写原消息、派生内容不进入后续上下文**；卡片可复制 / 重试 / 删除。
+- 气泡 / 划词模式：**不新增对话轮、不改写原消息**；卡片可复制 / 重试 / 删除。
+- 派生卡片**默认不进入后续上下文**；卡片上的「加入上下文」按钮可以把内容加进去（只影响之后的请求，不会重新请求模型）。
+- 划词只处理**单条消息正文内**的选区；跨消息、空选区、选中时间 / 按钮都不弹菜单；滚动、切会话、点空白或按关闭按钮会收起。
 - 会话图标跟随「最后一次实际运行的插件」；普通推理开始后立即复位。
 - 生成中禁止切换插件；同一会话同一时间只允许一个 Run。
 
@@ -358,8 +403,9 @@ version: 1.0
 | 项 | 行为 |
 | --- | --- |
 | 轮数 | 单轮，不自动多轮 |
-| 历史 | 输入框：仅当 `allowHistory: true` 时带最近 10 条 / ≤24,000 字符；**气泡永远不带** |
+| 历史 | 只有 `allowHistory: true` 且「关联上下文」为开时才带最近 10 条 / ≤24,000 字符；输入框取当前用户消息之前，气泡取消息之前，划词取选区所在消息及之前 |
 | 工具 | v1 插件**不支持**工具/函数调用，插件只产出文本 |
+| 派生内容 | 默认不进入后续上下文；用户点「加入上下文」后，从下一轮开始追加到所属消息之后（仅 Done 且有文本的卡片） |
 | 全局技能 | 插件模式不注入（`allowGlobalSkills` 保留字段，当前不生效） |
 | 输入长度 | 单次 ≤60,000 字符；超出直接报错（长文本分块尚未实现），不会偷偷截断 |
 | 输出长度 | 卡片 / 消息正文超过 32,000 字符截断并提示 |
@@ -390,13 +436,16 @@ version: 1.0
 
 | 设置 | 默认 | 作用 |
 | --- | --- | --- |
-| 启用插件 | 开 | 总开关；关掉后三处入口全部消失 |
+| 启用插件 | 开 | 总开关；关掉后四处入口全部消失 |
 | 输入框最多显示 | 3 | 超出进「更多」 |
 | 侧栏最多显示 | 6 | 超出进「更多插件」 |
+| 划词菜单最多显示 | 4 | 超出进「更多」 |
 | 记住每个会话上次选中的参数 | 开 | 关掉后只用 manifest 默认值 |
 | 新会话译文默认呈现 | 对照 | `segments` 能力的默认呈现方式 |
 
-每个插件还有：启用、输入框、侧栏、气泡、顺序。
+每个插件还有：启用、输入框、侧栏、气泡、选中、顺序。
+
+`选中` 是划词菜单的独立开关：关掉后该插件不再出现在选区浮动条里，但输入框 / 气泡入口不受影响。
 
 优先级：**用户显式设置 > manifest 的 `show` / `order` > 内置默认**。
 
@@ -438,13 +487,18 @@ version: 1.0
 | `参数 "x" 是 Select，必须提供 options` | 下拉没有选项 |
 | `output.format 只能是 text 或 segments` | 格式值写错 |
 | `参数 "x" 的 defaultFrom "y" 不支持` | 只支持 `system-language` / `system-locale` |
+| `contextParameter "x" 没有对应的参数定义` | 指向了不存在的参数 key |
+| `contextParameter "x" 必须指向 toggle 参数` | 指向的不是 `kind: "toggle"` |
+| `contextParameter 需要同时设置 allowHistory: true` | 只写了开关，没打开历史总闸 |
 
 ### 11.3 只有某个入口不可用
 
 | 报错 | 原因 |
 | --- | --- |
 | `capability "x" 在本插件里不存在` | `mounts[].capability` 写错 |
-| `surface 必须是 sidebar / composer / message` | surface 拼错 |
+| `surface 必须是 sidebar / composer / message / selection` | surface 拼错 |
+| `surface selection 只能使用 input selection` | 选中入口写成了别的 input |
+| `input selection 只能用于 surface selection` | 在气泡 / 输入框入口上声明了 `input: "selection"` |
 | `capability "x" 自身加载失败，这个入口无法使用` | 能力本身有问题，先修能力 |
 
 ### 11.4 只警告、不影响运行
@@ -466,6 +520,8 @@ version: 1.0
 | chip 出现了但点了没反应 | 没配置模型（去「设置 → 模型设置」）；或参数必填但没默认值 |
 | 侧栏入口没了但输入框有 | 检查「输入框」开关是否被关掉（侧栏依赖它） |
 | 气泡按钮不见了 | 检查该插件的「气泡」开关与总开关 |
+| 划词菜单不出现 | 检查「选中」开关；只支持单条消息正文内的选区，空选区 / 跨消息 / 选中时间按钮不会弹 |
+| 卡片上没有「加入上下文」 | 只有 Done 且有文本的卡片才显示；运行中 / 失败 / 取消的卡片不能加入 |
 | 输出格式乱/带 `<s>` 字样 | `segments` 能力要检查 skill 是否要求了「先分析再输出」；多余解释会被忽略但会稀释指令 |
 | 改了 skill 不生效 | 点「重新扫描」；已打开的会话需要重新选一次插件 |
 | 设置改了没反应 | 入口列表与参数在下次渲染时刷新；若仍无变化，重新扫描一次 |
@@ -473,7 +529,7 @@ version: 1.0
 
 调试技巧：
 
-- 先在设置页确认插件的「入口」一行是否三类都有；
+- 先在设置页确认插件的「入口」一行是否四类都有；
 - 用一个**最小 skill**（只写一句「把输入原样返回」）排除提示词问题；
 - 参数先用 `default` 写死，跑通后再换成 `defaultFrom`。
 
@@ -514,7 +570,7 @@ version: 0.1.0
 - 只输出结果，不要解释过程。
 ```
 
-### 13.2 带参数 + 三个入口
+### 13.2 带参数 + 四个入口
 
 ```json
 {
@@ -551,9 +607,10 @@ version: 0.1.0
     }
   ],
   "mounts": [
-    { "id": "sidebar", "surface": "sidebar", "capability": "tone", "order": 20 },
-    { "id": "composer", "surface": "composer", "capability": "tone", "order": 20 },
-    { "id": "bubble", "surface": "message", "capability": "tone", "input": "message", "order": 20 }
+    { "id": "sidebar",   "surface": "sidebar",   "capability": "tone", "order": 20 },
+    { "id": "composer",  "surface": "composer",  "capability": "tone", "order": 20 },
+    { "id": "bubble",    "surface": "message",   "capability": "tone", "input": "message", "order": 20 },
+    { "id": "selection", "surface": "selection", "capability": "tone", "order": 20 }
   ]
 }
 ```
@@ -612,6 +669,58 @@ version: 1.0
 
 skill 里**不要写** `<s>` / `<t>` 或「分段输出」——宿主会自动加契约。你只需要写清翻译规则。
 
+### 13.4 划词 + 关联上下文（内置「简单问答」同款）
+
+```json
+{
+  "id": "quick-ask",
+  "name": "简单问答",
+  "version": "1.0.0",
+  "description": "跳过技能与工具，直接给出简洁回答；可选择是否关联上下文。",
+  "icon": { "text": "问" },
+  "capabilities": [
+    {
+      "id": "quick-ask",
+      "name": "简单问答",
+      "skill": "skills/quick-ask.md",
+      "allowHistory": true,
+      "contextParameter": "useContext",
+      "privacy": { "sendsText": true },
+      "parameters": [
+        { "key": "useContext", "label": "关联上下文", "kind": "toggle", "default": "true" }
+      ]
+    }
+  ],
+  "mounts": [
+    { "id": "sidebar",   "surface": "sidebar",   "capability": "quick-ask", "order": 5 },
+    { "id": "composer",  "surface": "composer",  "capability": "quick-ask", "order": 5 },
+    { "id": "bubble",    "surface": "message",   "capability": "quick-ask", "input": "message", "order": 5 },
+    { "id": "selection", "surface": "selection", "capability": "quick-ask", "order": 5 }
+  ]
+}
+```
+
+```markdown
+---
+name: 简单问答
+description: 跳过技能与工具，直接给出简洁、准确的回答。
+version: 1.0
+---
+
+你是一个直接、可靠的问答助手。用户提供的文本可能是一个问题，也可能是一段需要解释、核对或补充的内容。
+
+规则：
+- 是问题就直接回答；是陈述或片段就解释它、指出关键点或给出结论。
+- 直接给答案，不要复述问题，不要写「好的」「以下是」之类的前言。
+- 简洁优先：默认三句以内；确实需要步骤、列表或代码时再展开。
+- 不使用工具、不读取文件、不调用外部服务。
+- 信息不足时明确说明缺少什么，不要编造。
+- 输出语言与文本一致；保留必要的 Markdown 格式。
+```
+
+> `allowHistory` + `contextParameter` 的组合需要宿主版本支持（当前版本已支持）；
+> 只写 `contextParameter` 而不写 `allowHistory: true` 会让能力加载失败。
+
 ---
 
 ## 14. 当前版本不支持的能力
@@ -621,7 +730,7 @@ skill 里**不要写** `<s>` / `<t>` 或「分段输出」——宿主会自动�
 | 编写 C# / 原生插件 | ❌ v1 只有声明式插件 |
 | 插件调用工具 / 函数 / 网络 / 文件 | ❌ 插件只产出文本；需要副作用的能力应先做成内置工具 |
 | 多选参数 | ⚠️ schema 合法，界面显示「多选暂不支持」 |
-| 选中文本作为输入（`input: "selection"`） | ⚠️ 预留字段，当前忽略 |
+| 选中文本作为输入（`surface: "selection"`） | ✅ 已支持，见 §3.3 / §6 |
 | 自定义模型 / 温度 / maxTokens | ❌ 用会话当前模型 |
 | 长文本自动分块 | ❌ 上限 60,000 字符 |
 | 联网安装 / 插件市场 / 签名 | ❌ 只支持本地目录 |
@@ -638,6 +747,7 @@ skill 里**不要写** `<s>` / `<t>` 或「分段输出」——宿主会自动�
   "enabled": true,
   "maxInComposer": 3,
   "maxInSidebar": 6,
+  "maxInSelection": 4,
   "rememberParameterValues": true,
   "defaultOutputMode": "Bilingual",
   "entries": [
@@ -647,6 +757,7 @@ skill 里**不要写** `<s>` / `<t>` 或「分段输出」——宿主会自动�
       "inSidebar": true,
       "inComposer": true,
       "inMessage": true,
+      "inSelection": true,
       "order": 10
     }
   ],
@@ -663,7 +774,7 @@ skill 里**不要写** `<s>` / `<t>` 或「分段输出」——宿主会自动�
 | 键 | 含义 |
 | --- | --- |
 | `<pluginId>/<mountId>/<key>` | 某个参数上次选的值，例如 `translate/composer/target` |
-| `<pluginId>/ui.mode` | 对照 / 译文的上次选择（`bilingual` / `translation`），同一插件三个入口共用 |
+| `<pluginId>/ui.mode` | 对照 / 译文的上次选择（`bilingual` / `translation`），同一插件四个入口共用 |
 
 `ui.` 前缀属于宿主，插件参数不要以 `ui.` 开头。
 
@@ -676,8 +787,8 @@ skill 里**不要写** `<s>` / `<t>` 或「分段输出」——宿主会自动�
 | `LastPluginId` | 最后一次实际运行的插件（侧栏图标用它） |
 | `PluginMemory` | 上面的记忆键值对 |
 | `messages.PluginJson` | 这条回答由哪个插件、用什么参数生成（含段落） |
-| `messages.DerivedJson` | 挂在消息下的派生卡片（文本快照，不进入上下文） |
+| `messages.DerivedJson` | 挂在消息下的派生卡片；含 `InputText`（划词输入）与 `IncludeInContext`（是否已加入上下文），默认不进上下文 |
 
 ---
 
-*手册版本：与 M0–M6 实现同步。发现问题或想补充示例，改 `docs/features/plugin-authoring.md` 即可。*
+*手册版本：与 M0–M7 实现同步。发现问题或想补充示例，改 `docs/features/plugin-authoring.md` 即可。*

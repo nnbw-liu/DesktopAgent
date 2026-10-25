@@ -22,6 +22,9 @@ public sealed class PluginPreferences
     /// <summary>侧栏最多直接显示几个插件入口。</summary>
     public int MaxInSidebar { get; set; } = 6;
 
+    /// <summary>划词菜单最多直接显示几个插件入口。</summary>
+    public int MaxInSelection { get; set; } = 4;
+
     /// <summary>是否按会话记住上次选的参数值。</summary>
     public bool RememberParameterValues { get; set; } = true;
 
@@ -75,6 +78,9 @@ public sealed class PluginEntryPreferences
 
     /// <summary>气泡（消息底部按钮）开关（null = 用 manifest 的 show）。</summary>
     public bool? InMessage { get; set; }
+
+    /// <summary>划词菜单开关（null = 用 manifest 的 show）；独立于输入框，不受输入框开关影响。</summary>
+    public bool? InSelection { get; set; }
 
     /// <summary>排序覆盖（null = 用 manifest 的 order）。</summary>
     public int? Order { get; set; }

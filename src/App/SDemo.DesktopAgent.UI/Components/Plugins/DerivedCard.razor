@@ -10,6 +10,11 @@
             <span class="derived-state">@stateText</span>
         }
 
+        @if (Artifact.IncludeInContext)
+        {
+            <span class="derived-context-badge" title="这张卡片的内容会进入后续对话的上下文">已加入上下文</span>
+        }
+
         @if (Artifact.State == DerivedState.Done)
         {
             @if (Artifact.DurationMs > 0)
@@ -40,6 +45,18 @@
         }
 
         <span class="derived-actions">
+            @if (CanToggleContext)
+            {
+                <button type="button"
+                        class="derived-action @(Artifact.IncludeInContext ? "is-on" : null)"
+                        title="@(Artifact.IncludeInContext
+                            ? "从下一轮开始不再把这张卡片发给模型"
+                            : "从下一轮开始把这张卡片的内容加入上下文")"
+                        @onclick="() => OnToggleContext.InvokeAsync()">
+                    @(Artifact.IncludeInContext ? "移出上下文" : "加入上下文")
+                </button>
+            }
+
             <button type="button"
                     class="derived-action"
                     disabled="@(Artifact.IsRunning || string.IsNullOrEmpty(Artifact.Text))"
@@ -116,12 +133,20 @@
     [Parameter]
     public EventCallback OnDelete { get; set; }
 
+    /// <summary>切换「这张卡片是否进入后续上下文」。</summary>
+    [Parameter]
+    public EventCallback OnToggleContext { get; set; }
+
     [Inject]
     private IJSRuntime Js { get; set; } = default!;
 
     private bool _copied;
 
     private bool HasSegments => Artifact.Segments is { Count: > 0 };
+
+    /// <summary>只有已完成且有内容的卡片才允许加入上下文，避免把半截结果发出去。</summary>
+    private bool CanToggleContext =>
+        Artifact.State == DerivedState.Done && !string.IsNullOrWhiteSpace(Artifact.Text);
 
     private string StateClass => Artifact.State switch
     {

@@ -75,7 +75,7 @@ public sealed class ChatStorePluginTests : IDisposable
         var reply = new ChatMessage(ChatMessageRole.Assistant, "原文");
         reply.Derived.Add(new DerivedArtifact(
             "a1", "translate", "bubble", "translate", values, null, "译文",
-            DerivedState.Done, null, "mock-model", 1200, 30, 8, DateTime.Now));
+            DerivedState.Done, null, "mock-model", 1200, 30, 8, DateTime.Now, "选中的原文", true));
         reply.Derived.Add(new DerivedArtifact(
             "a2", "translate", "bubble", "translate", values, null, string.Empty,
             DerivedState.Running, null, "mock-model", 0, 0, 0, DateTime.Now));
@@ -92,6 +92,12 @@ public sealed class ChatStorePluginTests : IDisposable
         Assert.Equal(1200, derived[0].DurationMs);
         Assert.Equal(30, derived[0].InputTokens);
         Assert.Equal("ja", derived[0].Values["target"]);
+        Assert.Equal("选中的原文", derived[0].InputText);
+        Assert.True(derived[0].IncludeInContext);
+
+        // 老卡片没有新字段时按默认值读回：输入回落到消息正文、默认不进上下文。
+        Assert.Null(derived[1].InputText);
+        Assert.False(derived[1].IncludeInContext);
 
         // 上次没跑完的卡片加载时收尾成失败，避免界面上永远转圈。
         Assert.Equal(DerivedState.Failed, derived[1].State);

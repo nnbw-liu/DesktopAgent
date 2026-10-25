@@ -13,6 +13,7 @@ Blazor Hybrid 多宿主应用：**一套 Razor 组件 + 一套业务服务**，�
 | `SDemo.DesktopAgent.Plugins.Runtime` | `net10.0` | 插件扫描 / 校验 / 注册表 / 提示词组装 |
 | `SDemo.DesktopAgent.Plugin.Translate` | `net10.0` | 内置翻译插件（清单与技能为嵌入资源） |
 | `SDemo.DesktopAgent.Plugin.Summarize` | `net10.0` | 内置总结插件（清单与技能为嵌入资源） |
+| `SDemo.DesktopAgent.Plugin.QuickAsk` | `net10.0` | 内置简单问答插件（四入口 + 关联上下文开关） |
 | `SDemo.DesktopAgent.Context` | `net10.0` | 上下文预算 / 裁剪 / 压缩 / 状态包 |
 | `SDemo.DesktopAgent.Editing` | `net10.0` | 路径守卫 / 补丁 / 读前写 / checkpoint |
 | `SDemo.DesktopAgent.Execution` | `net10.0` | 内循环策略、验证门、构建 / 测试解析 |
@@ -475,17 +476,18 @@ S6 行为要点：
 
 每个内置插件是一个独立类库：`plugin.json` / `skills/*.md` 通过 `EmbeddedResource LogicalName` 固定为插件内相对路径，类里只需一行继承 `EmbeddedPluginPackage`。新增内置插件 = 新建类库 + 在 `AddDesktopAgentCore()` 里注册 `IPluginPackage`。
 
-当前进度：**M0–M6 全部完成**（加载器、输入框、侧栏、气泡、设置、内置翻译、双语对照）。
+当前进度：**M0–M7 全部完成**（加载器、输入框、侧栏、气泡、设置、内置翻译、双语对照、划词菜单、简单问答、上下文开关）。
 
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
 | M0 骨架 | ✅ | 扫描、解析、校验、排序、去重；坏插件只降级自己，失败条目带文件 + 行号 / JSON 路径 |
 | M1 输入框 | ✅ | 选中插件后发送走插件 Run：chip + 内联参数、会话记忆、助手消息带「翻译 · SDemo」归属 |
 | M2 侧栏 | ✅ | 「新建聊天室」下方的插件入口区，点入口新建预选该插件的空会话（`OriginMountId = ActiveMountId`） |
-| M3 气泡 | ✅ | 助手消息底部的插件按钮 → 派生卡片（复制 / 重试 / 删除）；会话图标跟随 `LastPluginId`，普通推理后复位；派生内容不进上下文 |
-| M4 设置 | ✅ | 「设置 → 插件」：总开关、输入框/侧栏上限、参数记忆、默认呈现、每个插件的启用/输入框/侧栏/气泡/顺序、打开目录、重新扫描；改动即时生效。侧栏依赖输入框（关掉输入框后侧栏入口一并隐藏） |
+| M3 气泡 | ✅ | 助手消息底部的插件按钮 → 派生卡片（复制 / 重试 / 删除）；会话图标跟随 `LastPluginId`，普通推理后复位；派生内容默认不进上下文，可点「加入上下文」 |
+| M4 设置 | ✅ | 「设置 → 插件」：总开关、输入框/侧栏/划词上限、参数记忆、默认呈现、每个插件的启用/输入框/侧栏/气泡/选中/顺序、打开目录、重新扫描；改动即时生效。侧栏依赖输入框（关掉输入框后侧栏入口一并隐藏） |
 | M5 内置翻译 | ✅ | `SDemo.DesktopAgent.Plugin.Translate`（三条入口都可用） |
 | M6 双语对照 | ✅ | 宿主追加格式契约、`<s>/<t>` 解析、宽屏两列 / 窄屏上下、对照 ↔ 纯译文纯渲染切换（零请求）、模型不按格式返回时降级并提示 |
+| M7 划词 + 简单问答 | ✅ | 消息正文选中文本 → 浮动插件菜单；`selection` 入口与「选中」开关；`SDemo.DesktopAgent.Plugin.QuickAsk` 四入口；`allowHistory` + `contextParameter` 按轮控制上下文；卡片「加入上下文」 |
 
 已实现的接缝：
 
@@ -493,26 +495,27 @@ S6 行为要点：
 - `Plugins.Abstractions/IPluginPackage.cs`：`IPluginPackage` / `IPluginContentSource` / `EmbeddedPluginPackage`；目录源与嵌入资源源共用同一套校验。
 - `Plugins.Runtime/PluginManifest.cs`：清单 DTO 与反序列化选项（允许 `//` 注释、尾逗号、大小写不敏感、UTF-8 BOM），未知字段按 JSON 路径记警告。
 - `Plugins.Runtime/PluginValidator.cs`：id 格式与唯一性、skill 路径越界（相对路径 + 全路径前缀比较，必须 `.md`）、占位符必须有参数定义、参数 `kind` / `options`、`minHostVersion`、`plugin.json` 512 KB 与 skill 256 KB 上限、图标只收 SVG `path` 数据。
-- `Plugins.Abstractions/PluginModels.cs`：`PluginDescriptor` / `Capability` / `Mount` / `Parameter` 描述符，入口组合键 `<pluginId>/<mountId>`。
-- `Plugins.Runtime/PluginRegistry.cs`：把扫描结果与用户设置合并成「有效视图」——总开关、插件启用、输入框 / 侧栏 / 气泡开关、顺序、显示上限；设置或重新扫描后立即刷新，UI 只从这里取入口。**侧栏依赖输入框**：关掉输入框入口后侧栏入口也隐藏（侧栏本来就只是进入预选插件的会话）。
-- `Contracts/Models/PluginPreferences.cs`：`settings.json` 的 `plugins` 节点（含每个插件的 `enabled` / `inComposer` / `inSidebar` / `inMessage` / `order` 与隐私确认列表）。旧设置文件没有该节点时用默认值，不写迁移。
+- `Plugins.Abstractions/PluginModels.cs`：`PluginDescriptor` / `Capability` / `Mount` / `Parameter` 描述符，入口组合键 `<pluginId>/<mountId>`；四类 surface：`sidebar` / `composer` / `message` / `selection`。
+- `Plugins.Runtime/PluginRegistry.cs`：把扫描结果与用户设置合并成「有效视图」——总开关、插件启用、输入框 / 侧栏 / 气泡 / 选中开关、顺序、显示上限；设置或重新扫描后立即刷新，UI 只从这里取入口。**侧栏依赖输入框**：关掉输入框入口后侧栏入口也隐藏；**划词独立**，不受输入框影响。
+- `Contracts/Models/PluginPreferences.cs`：`settings.json` 的 `plugins` 节点（含每个插件的 `enabled` / `inComposer` / `inSidebar` / `inMessage` / `inSelection` / `order`、`maxInSelection` 与隐私确认列表）。旧设置文件没有该节点时用默认值，不写迁移。
 - `Plugins.Runtime/PluginParameterResolver.cs`：会话记忆 → `default` → `defaultFrom`（`system-language` / `system-locale`）→ `fallback` → 第一个 option；无效记忆值不会把会话卡死。
 - `Plugins.Runtime/PluginPromptComposer.cs`：skill 去 frontmatter、替换 `{{key}}` / `{{key.label}}`；用户输入单独成条并包进 `<待处理文本>`，`<` 全角转义；`output = segments` 的能力由宿主追加 `<s>/<t>` 格式契约。
 - `Plugins.Runtime/SegmentedOutputParser.cs`：解析 `<s>原文</s><t>译文</t>`（流式中丢弃未闭合尾标签、数量不等以少为准、多出来的译文并入最后一段）；一条完整配对都没有时降级为纯译文。附带流式累积器 `SegmentedOutputAccumulator`。
-- `Core/Plugins/PluginRunner.cs`：单轮、无历史（除非能力打开 `allowHistory`）、无工具；超 60,000 字符直接报错而不是发出去。
+- `Core/Plugins/PluginRunner.cs`：单轮、无工具；历史必须同时满足能力 `allowHistory` 与「关联上下文」开关；超 60,000 字符直接报错而不是发出去。
 - `Core/Services/AgentChatService.cs`：抽出 `RunAsync(AgentRunPlan)`，普通对话与插件 Run 共用同一条请求组装。
 - `Core/Services/ChatStore.cs`：`sessions` 四个插件列 + `messages.PluginJson` / `DerivedJson`；`UpgradeSchemaAsync` **两张表各扫一遍**，老库升级不报 `no such column`；加载时把上次没跑完的 `Running` 卡片收尾成 `Failed`。
 - `UI/Components/Chat/ChatComposer.razor` + `PluginParameterControl.razor`：全局 / 插件模式切换、chip 带 `✕`、最多内联 2 个参数（`select` / `text` / `number` / `toggle`；多选未实现）。
 - `UI/Components/Sidebar/PluginRail.razor`：侧栏入口区（图标 + 名称，最多 6 个 + 「更多插件」），点击走 `AppShell.StartNewChat(mount)`，与「新建聊天室」同一条路径。
 - `UI/Components/Sidebar/Sidebar.razor`：会话图标跟随 `LastPluginId`（插件被删除时回默认图标）。
-- `UI/Components/Plugins/`：`PluginIcon`（只渲染 SVG `path`）、`PluginActionButton`（无参数点击即跑 / 有参数展开面板，OK / Cancel / Esc / 点外部）、`PluginActionBar`（最多内联 2 个，其余进「⋯」）、`DerivedCard`（流式文本、复制 / 重试 / 删除）、`SegmentedOutput`（双语对照宽屏两列 / 窄屏上下，纯译文模式只渲染译文）。
-- `Core/Services/AgentMessageMapper.cs`：请求上下文只由消息正文与附件组成——**派生卡片永远不进去**，并有一条单测钉住这个约定。
-- `UI/Components/Settings/PluginSettings.razor`：总开关 / 上限 / 参数记忆 / 默认呈现 / 每个插件的启用、入口、顺序，加「打开插件目录」「重新扫描」和失败条目；改动即时生效。
+- `UI/Components/Plugins/`：`PluginIcon`（只渲染 SVG `path`）、`PluginActionButton`（无参数点击即跑 / 有参数展开面板，OK / Cancel / Esc / 点外部）、`PluginActionBar`（最多内联 2 个，其余进「⋯」）、`DerivedCard`（流式文本、复制 / 重试 / 删除、加入 / 移出上下文）、`SelectionActionBar` + `SelectionSnapshot`（划词浮条与选区快照）、`SegmentedOutput`（双语对照宽屏两列 / 窄屏上下，纯译文模式只渲染译文）。
+- `UI/wwwroot/js/chat.js`：`readSelection` 读取同一条消息正文内的选区（视口坐标 + `data-message-id`），跨消息 / 空选区返回 null。
+- `Context/AgentMessageMapper.cs`：请求上下文由正文、附件、工具轨迹组成；派生卡片默认不参与，只有用户点「加入上下文」且状态为 Done 的卡片才追加。
+- `UI/Components/Settings/PluginSettings.razor`：总开关 / 上限 / 参数记忆 / 默认呈现 / 每个插件的启用、入口、顺序，加「选中」开关、划词上限、「打开插件目录」「重新扫描」和失败条目；改动即时生效。
 - 隐私：`privacy.sendsText` 的插件首次执行前弹一次确认（取消则不跑），确认结果记在 `plugins.privacyAcknowledged`。
 
-使用方式：侧栏「新建聊天室」下方有「翻译」入口，点一下就是预选翻译的空会话；输入框底部的「翻译」chip 选中后发送走插件 Run；任意助手消息底部（时间右侧）的插件图标点一下，无参数直接跑、有参数弹出语言面板，产物是挂在原消息下的卡片，重启仍在、也不会进入下一轮上下文。`segments` 能力的卡片与消息都带「对照 / 译文」开关，切换只是重新渲染、不重新请求；呈现方式按会话记忆，新会话默认值在「设置 → 插件」。想关掉或调整上限也在「设置 → 插件」。
+使用方式：侧栏「新建聊天室」下方有「翻译」「总结」「简单问答」入口，点一下就是预选该插件的空会话；输入框底部的插件 chip 选中后发送走插件 Run；任意助手消息底部（时间右侧）的插件图标点一下，无参数直接跑、有参数弹出面板，产物是挂在原消息下的卡片。在聊天正文里选中文本、松开鼠标会出现划词菜单，菜单里的插件由「设置 → 插件 → 选中」控制；划词产物同样挂在选区所在消息下。派生卡片默认不进入下一轮上下文，卡片上的「加入上下文」可以显式提升；「简单问答」的「关联上下文」开关决定这一轮是否带历史。`segments` 能力的卡片与消息都带「对照 / 译文」开关，切换只是重新渲染、不重新请求；呈现方式按会话记忆，新会话默认值在「设置 → 插件」。想关掉或调整上限也在「设置 → 插件」。
 
-**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（当前 850 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 219 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令、构建 / 测试解析、todo / 验证门 / checkpoint / 循环保护、对话 / 任务判定、小模型模式 / 路由 / 工具修复、插件、沙箱与路径安全等。
+**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（当前 863 个用例）+ `dotnet test tests/SDemo.DesktopAgent.UI.Tests`（131 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 219 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令、构建 / 测试解析、todo / 验证门 / checkpoint / 循环保护、对话 / 任务判定、小模型模式 / 路由 / 工具修复、插件 / 划词 / 上下文、UI 组件、沙箱与路径安全等。
 
 ## 主题实现
 

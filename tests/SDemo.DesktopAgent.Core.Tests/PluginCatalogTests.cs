@@ -56,7 +56,8 @@ public sealed class PluginCatalogTests
               "mounts": [
                 { "id": "sidebar", "surface": "sidebar", "capability": "main" },
                 { "id": "composer", "surface": "composer", "capability": "main" },
-                { "id": "bubble", "surface": "message", "capability": "main" }
+                { "id": "bubble", "surface": "message", "capability": "main" },
+                { "id": "selection", "surface": "selection", "capability": "main" }
               ]
             }
             """;
@@ -68,8 +69,147 @@ public sealed class PluginCatalogTests
         Assert.Equal(PluginInput.Composer, plugin.Mounts.Single(item => item.Id == "sidebar").Input);
         Assert.Equal(PluginInput.Composer, plugin.Mounts.Single(item => item.Id == "composer").Input);
         Assert.Equal(PluginInput.Message, plugin.Mounts.Single(item => item.Id == "bubble").Input);
+        Assert.Equal(PluginInput.Selection, plugin.Mounts.Single(item => item.Id == "selection").Input);
         Assert.Single(result.UsableMounts(PluginSurface.Sidebar));
         Assert.Single(result.UsableMounts(PluginSurface.Message));
+        Assert.Single(result.UsableMounts(PluginSurface.Selection));
+    }
+
+    [Fact]
+    public void 选中入口不能配其它输入来源()
+    {
+        using var temp = new TempPlugins();
+        var manifest = """
+            {
+              "id": "demo",
+              "name": "演示",
+              "capabilities": [ { "id": "main", "name": "演示", "skill": "skills/main.md" } ],
+              "mounts": [
+                { "id": "selection", "surface": "selection", "capability": "main", "input": "message" }
+              ]
+            }
+            """;
+        temp.WriteLocal("demo", manifest, ("skills/main.md", Fixtures.Skill));
+
+        var result = temp.Scan();
+
+        var mount = Assert.Single(Assert.Single(result.Plugins).Mounts);
+        Assert.False(mount.IsUsable);
+        Assert.Contains("只能使用 input selection", Assert.Single(mount.Issues).Message);
+        Assert.Empty(result.UsableMounts(PluginSurface.Selection));
+    }
+
+    [Fact]
+    public void 非选中入口不能声明selection输入()
+    {
+        using var temp = new TempPlugins();
+        var manifest = """
+            {
+              "id": "demo",
+              "name": "演示",
+              "capabilities": [ { "id": "main", "name": "演示", "skill": "skills/main.md" } ],
+              "mounts": [
+                { "id": "bubble", "surface": "message", "capability": "main", "input": "selection" }
+              ]
+            }
+            """;
+        temp.WriteLocal("demo", manifest, ("skills/main.md", Fixtures.Skill));
+
+        var mount = Assert.Single(Assert.Single(temp.Scan().Plugins).Mounts);
+        Assert.False(mount.IsUsable);
+        Assert.Contains("只能用于 surface selection", Assert.Single(mount.Issues).Message);
+    }
+
+    [Fact]
+    public void 上下文参数指向合法的toggle()
+    {
+        using var temp = new TempPlugins();
+        var manifest = """
+            {
+              "id": "demo",
+              "name": "演示",
+              "capabilities": [
+                {
+                  "id": "main",
+                  "name": "演示",
+                  "skill": "skills/main.md",
+                  "allowHistory": true,
+                  "contextParameter": "useContext",
+                  "parameters": [
+                    { "key": "useContext", "label": "关联上下文", "kind": "toggle", "default": "true" }
+                  ]
+                }
+              ],
+              "mounts": [ { "id": "composer", "surface": "composer", "capability": "main" } ]
+            }
+            """;
+        temp.WriteLocal("demo", manifest, ("skills/main.md", Fixtures.Skill));
+
+        var capability = Assert.Single(Assert.Single(temp.Scan().Usable).Capabilities);
+
+        Assert.True(capability.IsUsable);
+        Assert.Equal("useContext", capability.ContextParameter);
+        Assert.True(capability.AllowHistory);
+        Assert.Equal("true", Assert.Single(capability.Parameters).Default);
+    }
+
+    [Fact]
+    public void 上下文参数没有对应定义_能力不可用()
+    {
+        using var temp = new TempPlugins();
+        var manifest = """
+            {
+              "id": "demo",
+              "name": "演示",
+              "capabilities": [
+                {
+                  "id": "main",
+                  "name": "演示",
+                  "skill": "skills/main.md",
+                  "allowHistory": true,
+                  "contextParameter": "missing"
+                }
+              ],
+              "mounts": [ { "id": "composer", "surface": "composer", "capability": "main" } ]
+            }
+            """;
+        temp.WriteLocal("demo", manifest, ("skills/main.md", Fixtures.Skill));
+
+        var capability = Assert.Single(Assert.Single(temp.Scan().Plugins).Capabilities);
+
+        Assert.False(capability.IsUsable);
+        Assert.Contains("没有对应的参数定义", Assert.Single(capability.Issues).Message);
+    }
+
+    [Fact]
+    public void 上下文参数必须是toggle_且需要allowHistory()
+    {
+        using var temp = new TempPlugins();
+        var manifest = """
+            {
+              "id": "demo",
+              "name": "演示",
+              "capabilities": [
+                {
+                  "id": "main",
+                  "name": "演示",
+                  "skill": "skills/main.md",
+                  "contextParameter": "useContext",
+                  "parameters": [
+                    { "key": "useContext", "label": "关联上下文", "kind": "text" }
+                  ]
+                }
+              ],
+              "mounts": [ { "id": "composer", "surface": "composer", "capability": "main" } ]
+            }
+            """;
+        temp.WriteLocal("demo", manifest, ("skills/main.md", Fixtures.Skill));
+
+        var capability = Assert.Single(Assert.Single(temp.Scan().Plugins).Capabilities);
+
+        Assert.False(capability.IsUsable);
+        Assert.Contains(capability.Issues, issue => issue.Message.Contains("必须指向 toggle 参数"));
+        Assert.Contains(capability.Issues, issue => issue.Message.Contains("allowHistory: true"));
     }
 
     [Fact]

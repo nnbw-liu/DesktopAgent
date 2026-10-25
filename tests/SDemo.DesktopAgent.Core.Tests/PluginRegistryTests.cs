@@ -8,7 +8,7 @@ namespace SDemo.DesktopAgent.Core.Tests;
 /// <summary>插件运行时视图：目录结果 + 用户设置（总开关 / 启用 / 入口 / 顺序 / 上限）。</summary>
 public sealed class PluginRegistryTests
 {
-    private const string ThreeSurfaces = """
+    private const string AllSurfaces = """
         {
           "id": "demo",
           "name": "演示",
@@ -16,7 +16,8 @@ public sealed class PluginRegistryTests
           "mounts": [
             { "id": "sidebar", "surface": "sidebar", "capability": "main", "order": 10 },
             { "id": "composer", "surface": "composer", "capability": "main", "order": 10 },
-            { "id": "bubble", "surface": "message", "capability": "main", "order": 10 }
+            { "id": "bubble", "surface": "message", "capability": "main", "order": 10 },
+            { "id": "selection", "surface": "selection", "capability": "main", "order": 10 }
           ]
         }
         """;
@@ -25,11 +26,11 @@ public sealed class PluginRegistryTests
     public void 总开关关闭_所有入口都消失()
     {
         using var temp = new TempPlugins();
-        temp.WriteLocal("demo", ThreeSurfaces, ("skills/main.md", Fixtures.Skill));
+        temp.WriteLocal("demo", AllSurfaces, ("skills/main.md", Fixtures.Skill));
         var settings = new StubSettingsService();
         var registry = new PluginRegistry(temp.CreateCatalog(), settings);
 
-        Assert.Equal(3, CountMounts(registry));
+        Assert.Equal(4, CountMounts(registry));
 
         settings.Current.Plugins.Enabled = false;
         settings.Save();
@@ -44,7 +45,7 @@ public sealed class PluginRegistryTests
     public void 停用单个插件_入口与查找都消失但显示名还在()
     {
         using var temp = new TempPlugins();
-        temp.WriteLocal("demo", ThreeSurfaces, ("skills/main.md", Fixtures.Skill));
+        temp.WriteLocal("demo", AllSurfaces, ("skills/main.md", Fixtures.Skill));
         var settings = new StubSettingsService();
         var registry = new PluginRegistry(temp.CreateCatalog(), settings);
 
@@ -63,7 +64,7 @@ public sealed class PluginRegistryTests
     public void 关掉侧栏开关_只影响侧栏()
     {
         using var temp = new TempPlugins();
-        temp.WriteLocal("demo", ThreeSurfaces, ("skills/main.md", Fixtures.Skill));
+        temp.WriteLocal("demo", AllSurfaces, ("skills/main.md", Fixtures.Skill));
         var settings = new StubSettingsService();
         var registry = new PluginRegistry(temp.CreateCatalog(), settings);
 
@@ -73,6 +74,7 @@ public sealed class PluginRegistryTests
         Assert.Empty(registry.Mounts(PluginSurface.Sidebar));
         Assert.Single(registry.Mounts(PluginSurface.Composer));
         Assert.Single(registry.Mounts(PluginSurface.Message));
+        Assert.Single(registry.Mounts(PluginSurface.Selection));
         Assert.Null(registry.FindMount("demo/sidebar"));
         Assert.NotNull(registry.FindMount("demo/composer"));
     }
@@ -81,7 +83,7 @@ public sealed class PluginRegistryTests
     public void 关掉输入框开关_侧栏跟着不可用_气泡仍可用()
     {
         using var temp = new TempPlugins();
-        temp.WriteLocal("demo", ThreeSurfaces, ("skills/main.md", Fixtures.Skill));
+        temp.WriteLocal("demo", AllSurfaces, ("skills/main.md", Fixtures.Skill));
         var settings = new StubSettingsService();
         var registry = new PluginRegistry(temp.CreateCatalog(), settings);
 
@@ -95,13 +97,14 @@ public sealed class PluginRegistryTests
         Assert.Null(registry.FindMount("demo/sidebar"));
 
         Assert.Single(registry.Mounts(PluginSurface.Message));
+        Assert.Single(registry.Mounts(PluginSurface.Selection));
     }
 
     [Fact]
     public void 关掉气泡开关_只影响气泡()
     {
         using var temp = new TempPlugins();
-        temp.WriteLocal("demo", ThreeSurfaces, ("skills/main.md", Fixtures.Skill));
+        temp.WriteLocal("demo", AllSurfaces, ("skills/main.md", Fixtures.Skill));
         var settings = new StubSettingsService();
         var registry = new PluginRegistry(temp.CreateCatalog(), settings);
 
@@ -112,13 +115,31 @@ public sealed class PluginRegistryTests
         Assert.Null(registry.FindMount("demo/bubble"));
         Assert.Single(registry.Mounts(PluginSurface.Sidebar));
         Assert.Single(registry.Mounts(PluginSurface.Composer));
+        Assert.Single(registry.Mounts(PluginSurface.Selection));
+    }
+
+    [Fact]
+    public void 关掉选中开关_只影响划词菜单()
+    {
+        using var temp = new TempPlugins();
+        temp.WriteLocal("demo", AllSurfaces, ("skills/main.md", Fixtures.Skill));
+        var settings = new StubSettingsService();
+        var registry = new PluginRegistry(temp.CreateCatalog(), settings);
+
+        settings.Current.Plugins.GetOrAddEntry("demo").InSelection = false;
+        settings.Save();
+
+        Assert.Empty(registry.Mounts(PluginSurface.Selection));
+        Assert.Null(registry.FindMount("demo/selection"));
+        Assert.Single(registry.Mounts(PluginSurface.Composer));
+        Assert.Single(registry.Mounts(PluginSurface.Message));
     }
 
     [Fact]
     public void 侧栏开关不影响输入框与气泡()
     {
         using var temp = new TempPlugins();
-        temp.WriteLocal("demo", ThreeSurfaces, ("skills/main.md", Fixtures.Skill));
+        temp.WriteLocal("demo", AllSurfaces, ("skills/main.md", Fixtures.Skill));
         var settings = new StubSettingsService();
         var registry = new PluginRegistry(temp.CreateCatalog(), settings);
 
@@ -128,6 +149,7 @@ public sealed class PluginRegistryTests
         Assert.Empty(registry.Mounts(PluginSurface.Sidebar));
         Assert.Single(registry.Mounts(PluginSurface.Composer));
         Assert.Single(registry.Mounts(PluginSurface.Message));
+        Assert.Single(registry.Mounts(PluginSurface.Selection));
     }
 
     [Fact]
@@ -165,7 +187,7 @@ public sealed class PluginRegistryTests
     public void 设置变化会触发Changed()
     {
         using var temp = new TempPlugins();
-        temp.WriteLocal("demo", ThreeSurfaces, ("skills/main.md", Fixtures.Skill));
+        temp.WriteLocal("demo", AllSurfaces, ("skills/main.md", Fixtures.Skill));
         var settings = new StubSettingsService();
         var registry = new PluginRegistry(temp.CreateCatalog(), settings);
 
@@ -188,7 +210,7 @@ public sealed class PluginRegistryTests
 
         Assert.Empty(registry.Plugins);
 
-        temp.WriteLocal("demo", ThreeSurfaces, ("skills/main.md", Fixtures.Skill));
+        temp.WriteLocal("demo", AllSurfaces, ("skills/main.md", Fixtures.Skill));
         catalog.Scan();
 
         Assert.Single(registry.Plugins);
@@ -199,7 +221,7 @@ public sealed class PluginRegistryTests
     public void 未知插件条目不影响加载()
     {
         using var temp = new TempPlugins();
-        temp.WriteLocal("demo", ThreeSurfaces, ("skills/main.md", Fixtures.Skill));
+        temp.WriteLocal("demo", AllSurfaces, ("skills/main.md", Fixtures.Skill));
         var settings = new StubSettingsService();
         var registry = new PluginRegistry(temp.CreateCatalog(), settings);
 
@@ -218,14 +240,20 @@ public sealed class PluginRegistryTests
 
         settings.Current.Plugins.MaxInComposer = 0;
         settings.Current.Plugins.MaxInSidebar = 999;
+        settings.Current.Plugins.MaxInSelection = 0;
 
         Assert.Equal(1, registry.MaxFor(PluginSurface.Composer));
         Assert.Equal(20, registry.MaxFor(PluginSurface.Sidebar));
+        Assert.Equal(1, registry.MaxFor(PluginSurface.Selection));
         Assert.Equal(int.MaxValue, registry.MaxFor(PluginSurface.Message));
+
+        settings.Current.Plugins.MaxInSelection = 8;
+        Assert.Equal(8, registry.MaxFor(PluginSurface.Selection));
     }
 
     private static int CountMounts(PluginRegistry registry) =>
         registry.Mounts(PluginSurface.Sidebar).Count
         + registry.Mounts(PluginSurface.Composer).Count
-        + registry.Mounts(PluginSurface.Message).Count;
+        + registry.Mounts(PluginSurface.Message).Count
+        + registry.Mounts(PluginSurface.Selection).Count;
 }
