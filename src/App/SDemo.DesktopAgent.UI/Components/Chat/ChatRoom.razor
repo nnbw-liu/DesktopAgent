@@ -8,6 +8,7 @@
 @inject IJSRuntime Js
 @inject ISettingsService Settings
 @inject IAgentSessionRunner Runner
+@inject IModelRouter ModelRouter
 @inject IToolApprovalService Approvals
 @inject AgentToolRegistry ToolRegistry
 @inject ISandboxJobService Sandbox
@@ -274,6 +275,13 @@
 
                             @if (!isUser)
                             {
+                                @if (!string.IsNullOrWhiteSpace(message.ModelId))
+                                {
+                                    <span class="msg-stat msg-model" title="@($"{message.ProviderId} · {message.ModelId}")">
+                                        @message.ModelId
+                                    </span>
+                                }
+
                                 @if (message.TotalTokens > 0)
                                 {
                                     <span class="msg-stat" title="输入 @message.InputTokens.ToString("N0") / 输出 @message.OutputTokens.ToString("N0")">
@@ -485,6 +493,25 @@
                         {
                             <div class="model-picker-backdrop" @onclick="CloseModelMenu"></div>
                             <div class="model-picker-menu" role="menu" aria-label="选择模型">
+                                <button type="button"
+                                        class="model-picker-option model-picker-option--auto @(_autoRouting ? "is-selected" : null)"
+                                        role="menuitemradio"
+                                        aria-checked="@(_autoRouting ? "true" : "false")"
+                                        disabled="@(Settings.Current.ModelRouting.Mode == ModelRoutingMode.Off)"
+                                        title="@(Settings.Current.ModelRouting.Mode == ModelRoutingMode.Off
+                                            ? "先在 设置 → 模型设置 → 智能模型路由 里启用"
+                                            : "按任务类型自动选择模型；在设置 → 模型设置里配置映射")"
+                                        @onclick="SelectAutoModel">
+                                    <span class="model-picker-option-name">自动选择</span>
+                                    <span class="model-picker-option-hint">
+                                        @(Settings.Current.ModelRouting.Mode == ModelRoutingMode.Off ? "未启用" : "简单 · 代码 · 复杂")
+                                    </span>
+                                    @if (_autoRouting)
+                                    {
+                                        <span class="model-picker-check" aria-hidden="true">✓</span>
+                                    }
+                                </button>
+
                                 @foreach (var group in _modelGroups)
                                 {
                                     var collapsed = _collapsedProviders.Contains(group.ProviderId);
@@ -530,6 +557,14 @@
                     <button type="button" class="model-picker-empty" @onclick="() => OnOpenModelSettings.InvokeAsync()">
                         未配置模型 · 去设置
                     </button>
+                }
+
+                @if (_autoRouting && _lastRoute is { } route)
+                {
+                    <span class="model-route-chip"
+                          title="@($"{route.Provider.Name} · {route.ModelId} · {route.Reason}（置信度 {route.Confidence:0.00}）")">
+                        @route.Task.ToDisplayName() · @route.ModelId
+                    </span>
                 }
             </FooterContent>
         </ChatComposer>
@@ -722,6 +757,12 @@
     private string? _selectedKey;
     private bool _modelMenuOpen;
 
+    /// <summary>当前聊天室是否按任务自动选模型（模型选择器里的「自动」）。</summary>
+    private bool _autoRouting;
+
+    /// <summary>最近一次路由结果，用于选择器与消息旁的解释。</summary>
+    private ModelRoutingDecision? _lastRoute;
+
     /// <summary>模型选择器里被用户收起的提供商；默认全部展开。</summary>
     private readonly HashSet<string> _collapsedProviders = new(StringComparer.Ordinal);
 
@@ -865,7 +906,9 @@
             }
 
             ApplyActiveMount(Session.ActiveMountId);
+            RefreshModelOptions();
             RefreshToolPacks();
+            _lastRoute = null;
             _contextNotice = null;
             _sessionMenuOpen = false;
             _showCompacted = false;
@@ -1031,6 +1074,8 @@
 
         // 模型优先级：聊天室 > 工作区 > 通用；没有作用域覆盖时保留当前选择。
         var scope = CurrentScope();
+        _autoRouting = scope.UseModelRouting;
+
         var scoped = options.FirstOrDefault(option =>
             string.Equals(option.Provider.Id, scope.ProviderId, StringComparison.Ordinal) &&
             string.Equals(option.ModelId, scope.ModelId, StringComparison.Ordinal));
@@ -1076,18 +1121,45 @@
     {
         _selectedKey = option.Key;
         _modelMenuOpen = false;
+        _autoRouting = false;
 
         // 底部选择器改的是「当前聊天室」的模型；通用设置只记住最后一次选择，供新聊天室兜底。
         Session.ScopedSettings.ProviderId = option.Provider.Id;
         Session.ScopedSettings.ModelId = option.ModelId;
+        Session.ScopedSettings.AutoModelRouting = false;
+        ModelRouter.ClearSession(Session.Id);
         RememberSelection();
         _contextNotice = null;
+        _lastRoute = null;
+        await NotifySessionChangedAsync();
+        RefreshContextPreview();
+    }
+
+    /// <summary>切到「自动」：清掉本聊天室的固定模型，交回给路由按任务选择。</summary>
+    private async Task SelectAutoModel()
+    {
+        _modelMenuOpen = false;
+        _autoRouting = true;
+
+        Session.ScopedSettings.AutoModelRouting = true;
+        Session.ScopedSettings.ProviderId = null;
+        Session.ScopedSettings.ModelId = null;
+        ModelRouter.ClearSession(Session.Id);
+        _contextNotice = null;
+        _lastRoute = null;
         await NotifySessionChangedAsync();
         RefreshContextPreview();
     }
 
     private string CurrentModelLabel()
     {
+        if (_autoRouting)
+        {
+            return _lastRoute is { } route
+                ? $"自动 · {route.Task.ToDisplayName()} · {route.ModelId}"
+                : "自动 · 按任务选择";
+        }
+
         var option = CurrentModelOption();
         return option is null ? "选择模型" : $"{option.ProviderName} · {option.ModelName}";
     }
@@ -1128,6 +1200,13 @@
 
         try
         {
+            var scope = CurrentScope();
+            var routed = await ResolveModelRouteAsync(option, scope, allowAdvisor: false);
+            if (routed is not null)
+            {
+                option = RouteOption(routed);
+            }
+
             var plan = await Runner.PreviewAsync(new AgentRunRequest(
                 Session.Messages.ToList(),
                 option.Provider,
@@ -1136,7 +1215,7 @@
                 _selectedSkill,
                 Session.Id,
                 Session: Session,
-                Scope: CurrentScope()));
+                Scope: scope));
             report = plan.Report;
         }
         catch (ContextBudgetException ex)
@@ -1168,6 +1247,70 @@
 
     private ModelOption? CurrentModelOption() =>
         _modelOptions.FirstOrDefault(option => string.Equals(option.Key, _selectedKey, StringComparison.Ordinal));
+
+    /// <summary>
+    /// 解析本轮实际使用的模型。手动固定时返回 null（调用方继续用原选择）；
+    /// 自动路由失败不抛异常，继续用当前模型，保证消息能发出去。
+    /// </summary>
+    private async Task<ModelRoutingDecision?> ResolveModelRouteAsync(
+        ModelOption fallback,
+        EffectiveSettings scope,
+        IReadOnlyList<ChatMessage>? messages = null,
+        string? userInput = null,
+        bool allowAdvisor = true)
+    {
+        if (!_autoRouting || !scope.UseModelRouting)
+        {
+            return null;
+        }
+
+        userInput ??= Session.Messages
+            .LastOrDefault(message => message.Role == ChatMessageRole.User)?.Content ?? string.Empty;
+
+        var history = messages ?? Session.Messages
+            .Where(message => !(message.Role == ChatMessageRole.Assistant
+                && string.IsNullOrWhiteSpace(message.Content)
+                && message.ToolTrace.Count == 0))
+            .ToList();
+
+        try
+        {
+            var decision = await ModelRouter.RouteAsync(new ModelRoutingRequest(
+                userInput,
+                history,
+                fallback.Provider,
+                fallback.ModelId,
+                Settings.Current.Providers,
+                scope.ModelRouting,
+                IsAuto: true,
+                Session.Id,
+                HasSelectedSkill: !string.IsNullOrWhiteSpace(_selectedSkill),
+                EnabledToolPacks: EffectiveToolPacks(),
+                AllowAdvisor: allowAdvisor));
+
+            _lastRoute = decision;
+            return decision;
+        }
+        catch (Exception)
+        {
+            // 路由是增强能力：失败就继续用当前模型，不把异常甩给生成流程。
+            return null;
+        }
+    }
+
+    /// <summary>把路由结果转成选择器同款结构，供生成 / 预览复用。</summary>
+    private static ModelOption RouteOption(ModelRoutingDecision decision)
+    {
+        var entry = decision.Provider.Models.FirstOrDefault(model =>
+            string.Equals(model.Id, decision.ModelId, StringComparison.Ordinal));
+
+        return new ModelOption(
+            $"{decision.Provider.Id}|{decision.ModelId}",
+            decision.Provider.Name,
+            entry?.Name ?? decision.ModelId,
+            decision.Provider,
+            decision.ModelId);
+    }
 
     /// <summary>当前聊天室归属的工作区；没有归属返回 null。</summary>
     private Workspace? CurrentWorkspace() =>
@@ -1888,6 +2031,14 @@
 
         var scope = CurrentScope();
         var userInput = Session.Messages.LastOrDefault(message => message.Role == ChatMessageRole.User)?.Content ?? string.Empty;
+
+        // 一轮只路由一次：本次发送内的宿主追问 / 重试都复用同一个模型。
+        var routed = await ResolveModelRouteAsync(option, scope, userInput: userInput);
+        if (routed is not null)
+        {
+            option = RouteOption(routed);
+        }
+
         var reply = new ChatMessage(ChatMessageRole.Assistant, string.Empty)
         {
             CreatedAt = DateTime.Now,

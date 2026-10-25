@@ -16,6 +16,12 @@ public sealed class ScopedSettings
     /// <summary>本作用域使用的模型 id；必须和 <see cref="ProviderId"/> 同时存在。</summary>
     public string? ModelId { get; set; }
 
+    /// <summary>
+    /// 本作用域是否自动选模型：true = 按任务路由，false = 固定当前模型；
+    /// null = 继承上级 / 全局路由开关。手选模型会显式写 false。
+    /// </summary>
+    public bool? AutoModelRouting { get; set; }
+
     /// <summary>是否启用上下文预算。</summary>
     public bool? ContextEnabled { get; set; }
 
@@ -72,6 +78,7 @@ public sealed class ScopedSettings
     public bool IsEmpty =>
         ProviderId is null
         && ModelId is null
+        && AutoModelRouting is null
         && ContextEnabled is null
         && BudgetRatio is null
         && KeepRecentTurns is null

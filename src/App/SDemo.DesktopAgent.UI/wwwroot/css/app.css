@@ -1186,6 +1186,74 @@ a {
     white-space: nowrap;
 }
 
+/* 智能路由：选择器顶部的「自动」项与候选旁的短标签 */
+.model-picker-option--auto {
+    margin-bottom: 4px;
+    padding-left: 10px;
+    border-bottom: 1px solid var(--border);
+    border-radius: 7px 7px 0 0;
+}
+
+.model-picker-option:disabled {
+    color: var(--muted);
+    cursor: not-allowed;
+    opacity: .6;
+}
+
+.model-picker-option-hint {
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 10px;
+}
+
+.model-route-chip {
+    max-width: 190px;
+    overflow: hidden;
+    padding: 2px 7px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 10.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: help;
+}
+
+.msg-model {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.settings-details {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+}
+
+.settings-details > summary {
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.settings-details > summary + * {
+    margin-top: 12px;
+}
+
+.route-summary {
+    display: inline-block;
+    margin-right: 10px;
+    color: var(--text-dim);
+}
+
+.settings-grid--routing {
+    margin-top: 8px;
+}
+
 .model-picker-check {
     flex: 0 0 auto;
     font-size: 10.5px;

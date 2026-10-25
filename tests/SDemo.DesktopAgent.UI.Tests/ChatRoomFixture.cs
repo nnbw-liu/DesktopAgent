@@ -1,5 +1,6 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Editing;
 using SDemo.DesktopAgent.Execution;
 using SDemo.DesktopAgent.Models;
@@ -109,6 +110,7 @@ internal static class ChatRoomFixture
         context.Services.AddSingleton<IVerificationRunner>(new UnavailableVerificationRunner());
         context.Services.AddSingleton<IWorkspaceWarmupService>(new UnavailableWorkspaceWarmupService());
         context.Services.AddSingleton(runner);
+        context.Services.AddSingleton<IModelRouter>(new ModelRouter(new HeuristicTokenCounter(), settings: settings));
         context.Services.AddSingleton<IToolApprovalService>(new ToolApprovalService());
         context.Services.AddSingleton(new AgentToolRegistry([]));
         context.Services.AddSingleton<ISandboxJobService>(new UnavailableSandboxJobService());

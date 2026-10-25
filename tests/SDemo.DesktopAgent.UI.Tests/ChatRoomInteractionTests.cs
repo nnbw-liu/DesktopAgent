@@ -56,19 +56,19 @@ public sealed class ChatRoomInteractionTests : TestContext
         cut.Find(".model-picker-trigger").Click();
 
         Assert.Equal(2, cut.FindAll(".model-picker-group").Count);
-        Assert.Equal(3, cut.FindAll(".model-picker-option").Count);
+        Assert.Equal(3, cut.FindAll(".model-picker-option:not(.model-picker-option--auto)").Count);
         Assert.Contains("本地", cut.FindAll(".model-picker-group-name").ElementAt(0).TextContent);
         Assert.Contains("云端", cut.FindAll(".model-picker-group-name").ElementAt(1).TextContent);
 
-        // 收起第一组：只保留第二组的模型。
+        // 收起第一组：只保留第二组的模型（「自动选择」始终在顶部）。
         cut.FindAll(".model-picker-group-head").ElementAt(0).Click();
 
         Assert.Single(cut.FindAll(".model-picker-group.is-collapsed"));
-        Assert.Single(cut.FindAll(".model-picker-option"));
-        Assert.Contains("DeepSeek V3", cut.Find(".model-picker-option").TextContent);
+        Assert.Single(cut.FindAll(".model-picker-option:not(.model-picker-option--auto)"));
+        Assert.Contains("DeepSeek V3", cut.Find(".model-picker-option:not(.model-picker-option--auto)").TextContent);
 
         // 选中后菜单关闭，按钮显示新的提供商 + 模型。
-        cut.Find(".model-picker-option").Click();
+        cut.Find(".model-picker-option:not(.model-picker-option--auto)").Click();
 
         Assert.Empty(cut.FindAll(".model-picker-menu"));
         Assert.Contains("云端 · DeepSeek V3", cut.Find(".model-picker-current").TextContent);
@@ -76,6 +76,34 @@ public sealed class ChatRoomInteractionTests : TestContext
         // 底部选择器写入当前聊天室，而不是只改全局「上次使用」。
         Assert.Equal("cloud", session.ScopedSettings.ProviderId);
         Assert.Equal("deepseek-v3", session.ScopedSettings.ModelId);
+    }
+
+    [Fact]
+    public void 选择自动后清除当前聊天室的固定模型()
+    {
+        _settings.Current.ModelRouting.Mode = ModelRoutingMode.Rules;
+        var session = new ChatSession
+        {
+            Id = "auto",
+            Title = "自动",
+            ScopedSettings = new ScopedSettings
+            {
+                ProviderId = "test",
+                ModelId = "qwen3.5-4b",
+                AutoModelRouting = false
+            }
+        };
+
+        var cut = RenderComponent<ChatRoom>(parameters => parameters
+            .Add(component => component.Session, session));
+
+        cut.Find(".model-picker-trigger").Click();
+        cut.Find(".model-picker-option--auto").Click();
+
+        Assert.True(session.ScopedSettings.AutoModelRouting);
+        Assert.Null(session.ScopedSettings.ProviderId);
+        Assert.Null(session.ScopedSettings.ModelId);
+        Assert.Contains("自动", cut.Find(".model-picker-current").TextContent);
     }
 
     [Fact]
@@ -163,10 +191,10 @@ public sealed class ChatRoomInteractionTests : TestContext
 
         cut.Find(".model-picker-trigger").Click();
         cut.Find(".model-picker-group-head").Click();
-        Assert.Empty(cut.FindAll(".model-picker-option"));
+        Assert.Empty(cut.FindAll(".model-picker-option:not(.model-picker-option--auto)"));
 
         cut.Find(".model-picker-group-head").Click();
-        Assert.Single(cut.FindAll(".model-picker-option"));
+        Assert.Single(cut.FindAll(".model-picker-option:not(.model-picker-option--auto)"));
     }
 
     /// <summary>只渲染：预览直接失败，不会真的请求模型。</summary>

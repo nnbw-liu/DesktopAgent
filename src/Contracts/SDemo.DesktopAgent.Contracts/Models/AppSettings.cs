@@ -61,4 +61,7 @@ public sealed class AppSettings
 
     /// <summary>小模型 / 工具面（P6）。</summary>
     public AgentSettings Agent { get; set; } = new();
+
+    /// <summary>智能模型路由（默认关闭；旧设置文件没有该节点时按默认值）。</summary>
+    public ModelRoutingSettings ModelRouting { get; set; } = new();
 }

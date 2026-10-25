@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using SDemo.DesktopAgent.Agents;
 using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Editing;
+using SDemo.DesktopAgent.Models;
 using SDemo.DesktopAgent.Plugins;
 using SDemo.DesktopAgent.Plugins.Summarize;
 using SDemo.DesktopAgent.Plugins.Translate;
@@ -65,6 +66,9 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddSingleton<ContextBuilder>();
         // M4：规则不确定时的小模型路由；失败自动回落规则。
         services.AddSingleton<IRoutingAdvisor, SmallModelRoutingAdvisor>();
+        // 智能模型路由（工具路由之上的一层）：规则 → 混合 → 模型总控，失败回落手动模型。
+        services.AddSingleton<IModelRoutingAdvisor, LlmModelRoutingAdvisor>();
+        services.AddSingleton<IModelRouter, ModelRouter>();
         services.AddSingleton<IAgentSessionRunner, AgentSessionRunner>();
 
         // P2 压缩与工作记忆：摘要（模型 + 兜底）、压缩编排、状态包。
