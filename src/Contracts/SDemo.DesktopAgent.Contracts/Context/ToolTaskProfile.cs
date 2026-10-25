@@ -31,6 +31,9 @@ public enum ToolTaskProfile
     /// <summary>PDF 文档。</summary>
     Document,
 
+    /// <summary>Word / Excel / PowerPoint 文档。</summary>
+    Office,
+
     /// <summary>联网搜索。</summary>
     Web,
 

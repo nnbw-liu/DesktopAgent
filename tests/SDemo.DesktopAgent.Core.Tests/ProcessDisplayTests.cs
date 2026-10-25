@@ -57,6 +57,7 @@ public sealed class ProcessDisplayTests
     public void 正文是答案其余是过程()
     {
         Assert.Equal(ChatGroupPart.Answer, new ChatStep(ChatStepKind.Text, "答").Part);
+        Assert.Equal(ChatGroupPart.Process, new ChatStep(ChatStepKind.Preamble, "过程说明").Part);
         Assert.Equal(ChatGroupPart.Process, new ChatStep(ChatStepKind.Reasoning, "想").Part);
         Assert.Equal(ChatGroupPart.Process, new ChatStep(ChatStepKind.Tool, string.Empty, 0).Part);
         Assert.Equal(ChatGroupPart.Process, new ChatStep(ChatStepKind.HostPrompt, "[宿主提示] x").Part);
@@ -68,6 +69,10 @@ public sealed class ProcessDisplayTests
         var reasoning = new ChatStep(ChatStepKind.Reasoning, "甲");
         Assert.True(reasoning.CanAppend(ChatStepKind.Reasoning));
         Assert.False(reasoning.CanAppend(ChatStepKind.Text));
+
+        var preamble = new ChatStep(ChatStepKind.Preamble, "说明");
+        Assert.True(preamble.CanAppend(ChatStepKind.Preamble));
+        Assert.False(preamble.CanAppend(ChatStepKind.Text));
 
         var tool = new ChatStep(ChatStepKind.Tool, string.Empty, 0);
         Assert.False(tool.CanAppend(ChatStepKind.Tool));

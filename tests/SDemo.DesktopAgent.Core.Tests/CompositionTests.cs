@@ -73,7 +73,7 @@ public sealed class CompositionTests
 
         var registry = provider.GetRequiredService<AgentToolRegistry>();
         Assert.Equal(
-            ["todo", "search", "skills", "files", "edits", "code_edit", "memory"],
+            ["todo", "search", "skills", "files", "edits", "code_edit", "memory", "office"],
             registry.Descriptors.Select(descriptor => descriptor.Id));
 
         // 文件读写是内置能力：不再依赖输入框 chip；搜索仍由用户逐轮选择。
@@ -81,7 +81,11 @@ public sealed class CompositionTests
         Assert.True(registry.Find("edits")!.BuiltIn);
         Assert.True(registry.Find("skills")!.BuiltIn);
         Assert.True(registry.Find("memory")!.BuiltIn);
+        Assert.True(registry.Find("office")!.BuiltIn);
         Assert.False(registry.Find("search")!.BuiltIn);
+
+        // 上传 Office 附件的提取器也必须在核心容器里，两个宿主共用同一条上传管线。
+        Assert.NotNull(provider.GetRequiredService<IOfficeAttachmentExtractor>());
 
         // M3：知识库索引与归档服务也必须能从核心容器解析。
         Assert.NotNull(provider.GetRequiredService<IWorkspaceMemory>());

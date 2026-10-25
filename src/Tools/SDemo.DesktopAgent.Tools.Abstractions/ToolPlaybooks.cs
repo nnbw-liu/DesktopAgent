@@ -62,6 +62,18 @@ public static class ToolPlaybooks
         ["pdf_read"] =
             "只在用户给了 PDF 或明确要读 PDF 时用；先 pdf_info 看页数，再按 pages 读需要的那几页，"
             + "不要整本一次读完。",
+        ["office_info"] =
+            "用户给了 .docx / .xlsx / .pptx，或要先判断文档结构时用它：一次拿到标题、工作表、幻灯片标题，"
+            + "再决定读哪一段。",
+        ["office_read"] =
+            "把 Office 文档读成 Markdown：Word / Excel / PowerPoint 都支持。"
+            + "先用 office_info 看结构，Excel 用 sheet + range 只读需要的表，PPT 用 slides 只读需要的页；"
+            + "不要把大表格 / 全部幻灯片一次塞进上下文。",
+        ["office_write"] =
+            "用户要产出 Word / Excel / PPT 时用它，path 扩展名决定格式。"
+            + "content 是 Markdown：Word 直接写标题 / 段落 / 列表 / 表格；Excel 用 Markdown 表格且 "
+            + "`## 名称` 是工作表名；PPT 用 `---` 分页、`#` 或 `##` 当页标题。"
+            + "覆盖已有文件必须显式 overwrite=true；写完可以 office_read 抽查。",
         ["web_search"] =
             "只有用户明确要联网、或工作区里确实找不到答案时才用；不要用它替代读工作区文件。",
         ["todo_write"] =

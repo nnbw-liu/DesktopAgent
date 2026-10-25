@@ -135,6 +135,13 @@ internal static class AgentMessageMapper
                 builder.AppendLine().Append($"（PDF 共 {pageCount} 页，文件路径：{attachment.FilePath}）");
             }
 
+            // Office 自动提取有字符上限；把路径给模型，截断后才能用 office_read 按页 / 按表续读。
+            if (IsOffice(attachment))
+            {
+                builder.AppendLine().Append(
+                    $"（Office 文档，可用 office_read 按 slides / sheet / range 续读；文件路径：{attachment.FilePath}）");
+            }
+
             if (attachment.HasTextLayer is false)
             {
                 builder.AppendLine().Append("（未检测到文本层；当前未启用 OCR，无法读取扫描件内容）");
@@ -146,11 +153,15 @@ internal static class AgentMessageMapper
                 builder.AppendLine().Append(
                     IsPdf(attachment)
                         ? $"（PDF 文本提取未完成，可用 pdf_read 工具重试；路径：{attachment.FilePath}）"
-                        : $"（二进制或无法读取的文件，路径：{attachment.FilePath}）");
+                        : IsOffice(attachment)
+                            ? $"（Office 文档未自动提取，可用 office_read 读取；路径：{attachment.FilePath}）"
+                            : $"（二进制或无法读取的文件，路径：{attachment.FilePath}）");
                 continue;
             }
 
-            builder.AppendLine().AppendLine("```text").AppendLine(text).AppendLine("```");
+            // Office 的 sidecar 本身就是 Markdown：按 markdown 围栏贴进去，标题 / 表格不会变成纯文本。
+            builder.AppendLine().AppendLine(IsOffice(attachment) ? "```markdown" : "```text")
+                .AppendLine(text).AppendLine("```");
             budget -= text.Length;
         }
 
@@ -159,6 +170,14 @@ internal static class AgentMessageMapper
 
     private static bool IsPdf(ChatAttachment attachment) =>
         string.Equals(Path.GetExtension(attachment.FilePath), ".pdf", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsOffice(ChatAttachment attachment)
+    {
+        var extension = Path.GetExtension(attachment.FilePath);
+        return extension.Equals(".docx", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static string? TryReadText(ChatAttachment attachment, int maxChars)
     {

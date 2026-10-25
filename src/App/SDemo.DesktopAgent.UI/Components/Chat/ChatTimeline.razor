@@ -103,7 +103,9 @@
     private int FailureCount => Trace.Count(entry => ToolPresentation.IsFailure(entry.Status));
 
     private string Title => Running
-        ? (HasRunningTool ? "运行工具中…" : "思考中…")
+        ? (HasRunningTool
+            ? "运行工具中…"
+            : Steps.LastOrDefault() is { Kind: ChatStepKind.Text } ? "回答中…" : "思考中…")
         : ElapsedMs > 0 ? $"过程 · {FormatDuration(ElapsedMs)}" : "过程";
 
     private string Meta
@@ -147,6 +149,22 @@
             if (reasoning is not null)
             {
                 var lastLine = LastNonEmptyLine(reasoning.Text);
+
+                if (lastLine.Length > 0)
+                {
+                    return Clip(lastLine);
+                }
+            }
+
+            // 没有思考时，过程正文的最后一行同样能说明「刚才在干什么」。
+            var preamble = Steps.LastOrDefault(step =>
+                step.Part == ChatGroupPart.Process
+                && step.Kind == ChatStepKind.Preamble
+                && !string.IsNullOrWhiteSpace(step.Text));
+
+            if (preamble is not null)
+            {
+                var lastLine = LastNonEmptyLine(preamble.Text);
 
                 if (lastLine.Length > 0)
                 {

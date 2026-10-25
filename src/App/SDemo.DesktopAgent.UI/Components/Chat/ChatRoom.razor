@@ -2794,12 +2794,24 @@
             : [];
     }
 
-    /// <summary>把一段增量并进当前步骤；类型不同就开新的一步（思考 → 工具 → 思考 …）。</summary>
+    /// <summary>
+    /// 把一段增量并进当前步骤；类型不同就开新的一步（思考 → 工具 → 思考 …）。
+    /// <para>
+    /// 工具 / 宿主提示出现时，把此前还没被工具隔开的正文改判成「过程正文」：
+    /// 它其实是模型在调用工具前的说明，应该跟着过程组一起收起；
+    /// 只有最后一次工具调用之后的正文才是答案。
+    /// </para>
+    /// </summary>
     private static void AppendStep(ChatMessage reply, ChatStepKind kind, string delta, int stepIndex)
     {
         if (delta.Length == 0)
         {
             return;
+        }
+
+        if (kind is ChatStepKind.Tool or ChatStepKind.HostPrompt)
+        {
+            SealTrailingText(reply);
         }
 
         if (reply.Steps.Count > 0 && reply.Steps[^1].CanAppend(kind))
@@ -2809,6 +2821,39 @@
         }
 
         reply.Steps.Add(new ChatStep(kind, delta, StepIndex: stepIndex, StartedAt: DateTimeOffset.Now));
+    }
+
+    /// <summary>
+    /// 把「上一次工具之后」的正文改判为过程正文。工具一开始，这段文字就已经不是最终答案了；
+    /// 相邻的过程正文顺手合并，避免一次工具调用把一段话拆成好几个节点。
+    /// </summary>
+    private static void SealTrailingText(ChatMessage reply)
+    {
+        for (var index = reply.Steps.Count - 1; index >= 0; index--)
+        {
+            var step = reply.Steps[index];
+
+            if (step.Kind is ChatStepKind.Tool or ChatStepKind.HostPrompt)
+            {
+                break;
+            }
+
+            if (step.Kind == ChatStepKind.Text)
+            {
+                reply.Steps[index] = step with { Kind = ChatStepKind.Preamble };
+            }
+        }
+
+        // Preamble 与 Preamble 相邻时合并回一步，保持节点数只与「说了几段」有关。
+        for (var index = reply.Steps.Count - 1; index > 0; index--)
+        {
+            if (reply.Steps[index].Kind == ChatStepKind.Preamble
+                && reply.Steps[index - 1].Kind == ChatStepKind.Preamble)
+            {
+                reply.Steps[index - 1] = reply.Steps[index - 1].Append(reply.Steps[index].Text);
+                reply.Steps.RemoveAt(index);
+            }
+        }
     }
 
     /// <summary>把本轮的实时工具轨迹同步到消息上，生成过程中就能看到调用了什么。</summary>
@@ -2834,6 +2879,8 @@
             }
 
             reply.ToolTrace.Add(entry);
+            // 工具调用出现：此前说的那段正文属于「过程」，不能继续留在答案区。
+            SealTrailingText(reply);
             reply.Steps.Add(new ChatStep(
                 ChatStepKind.Tool,
                 string.Empty,
@@ -2847,6 +2894,7 @@
     /// <summary>把宿主追问插进当前回合（只发给模型，不新开一条回复）。</summary>
     private async Task AppendHostPromptAsync(ChatMessage reply, string prompt, int stepIndex)
     {
+        SealTrailingText(reply);
         reply.Steps.Add(new ChatStep(ChatStepKind.HostPrompt, prompt, StepIndex: stepIndex));
         StateHasChanged();
         await NotifySessionChangedAsync();

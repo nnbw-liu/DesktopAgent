@@ -117,6 +117,27 @@ public sealed class CapabilityRouterTests
     }
 
     [Fact]
+    public void Office意图暴露读取与写入工具且保留计划工具()
+    {
+        var available = Available
+            .Concat(["office_info", "office_read", "office_write", "todo_write"])
+            .ToArray();
+
+        var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
+            "帮我分析这个 PPT 的需求，并列出开发计划",
+            [],
+            available,
+            AgentMode.Full,
+            MaxExposedTools: 12));
+
+        Assert.Contains("office_info", decision.ExposedTools);
+        Assert.Contains("office_read", decision.ExposedTools);
+        Assert.Contains("office_write", decision.ExposedTools);
+        Assert.Contains("todo_write", decision.ExposedTools);
+        Assert.Contains("意图=office", decision.Reason);
+    }
+
+    [Fact]
     public void Full模式提供兜底入口()
     {
         var decision = CapabilityRouter.Route(new CapabilityRoutingInput(

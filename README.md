@@ -214,7 +214,7 @@ $env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
 2. 首条消息用于生成会话标题（首行前 18 字）与时间；会话在发送前不会出现在列表里，发送后按归属落到「历史聊天」或对应工作区下（置顶的排最前）。
 3. 清空输入框，消息区滚到底部。
 4. 若已配置模型（输入框底部功能区里的模型选择器），调用 Agent Framework 流式生成，助手消息边生成边追加；生成中发送按钮变为停止，点击可中断（保留已生成的部分）。
-5. **思维链**：模型返回 `reasoning_content` 时（如 DeepSeek 系列），MAF 会把它拆成 `TextReasoningContent`；应用把正文与思维链分开接收，消息上方显示「思考过程 · N 字」，默认展开、可折叠。普通模型没有该字段则不显示。开关在设置页的「思考强度」：`不指定` 不发送 `reasoning_effort`（由端点默认决定），`不思考` 显式发送 `none`，`低/中/高` 显式开启；名字带 `thinking` / `reasoner` 的模型是强制思考版本，无法关闭。
+5. **过程与答案**：模型返回 `reasoning_content` 时（如 DeepSeek 系列），MAF 会把它拆成 `TextReasoningContent`；应用按真实到达顺序记成「思考 → 工具 → 思考 → …」的步骤。所有**工具调用之前**的正文（模型在说"我先看一下…"）归入可折叠的「过程组」，只有最后一次工具之后的正文才是答案、永远留在组外。过程组默认收起并显示一行摘要，运行中 / 被中断的轮次不收起；点组头展开能看到思考、工具行与过程正文，手动开合过的不再被自动收起。普通模型没有思维链字段时只显示正文。思考开关在设置页的「思考强度」：`不指定` 不发送 `reasoning_effort`（由端点默认决定），`不思考` 显式发送 `none`，`低/中/高` 显式开启；名字带 `thinking` / `reasoner` 的模型是强制思考版本，无法关闭。
 
 会话持久化到 SQLite（按工作区分库，见「数据存储」），重启后保留；新建的空聊天室在首次发送消息前不落库。
 
@@ -378,14 +378,24 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 
 - **＋ 上传文件**：多选，附件显示在 Header（新聊天室在工作区选择器下面），发送后随消息落库。
 - **常用技能**：直接读取技能库，最多同时显示 3 个，超出的放进「更多」菜单；每个 chip 左侧是技能图标（frontmatter 的 `icon`，没写就取名字首字）。点击后**只显示选中的那一个 chip**（带 `✕` 取消），其余技能隐藏，下一次发送把该技能全文注入系统提示词。
-- **模型工具**：右侧只保留「联网搜索」这类可选外部工具，点亮即启用。文件读写是内置能力，默认开启，不再占输入框 chip；在「设置 → 工具设置」可按 `files`（只读）/ `edits`（写入）分包关闭。
+- **模型工具**：右侧只保留「联网搜索」这类可选外部工具，点亮即启用。文件读写、Office 文档是内置能力，默认开启，不再占输入框 chip；在「设置 → 工具设置」可按 `files`（只读）/ `office`（文档）/ `edits`（写入）分包关闭。
 
 | 工具 | 下发的工具 | 实现 |
 | --- | --- | --- |
 | 联网搜索 | `web_search` | 默认 Bing RSS；可在「设置 → 工具设置」换成自定义搜索 API（地址 + Key） |
 | `files`（只读，内置） | `list_files` / `list_tree` / `read_file` / `search_files` / `glob_files` / `workspace_info` | 按行读带行号与续读；搜索 / glob 纯 .NET；排除 `bin` / `obj` / `.git` 等；路径限制在工作区内 |
+| `office`（内置） | `office_info` / `office_read` / `office_write` | Word / Excel / PowerPoint 以 Markdown 进出：读取时还原标题、段落、列表、表格、幻灯片与备注；写入按扩展名生成 .docx / .xlsx / .pptx；上传附件时自动提取 Markdown sidecar，模型可直接分析 |
 | `edits`（写入，内置） | `apply_patch` / `write_file` | `apply_patch` 应用 unified diff（多文件、全有或全无）；写已有文件前必须先 `read_file`，且审批框显示 diff |
 | `command`（直跑，默认关闭） | `run_command` | 白名单命令（dotnet build / test 等）在宿主直跑；参数不经过 shell、每次审计、可本会话授权；`run_powershell` 仍在沙箱 |
+
+### Office 文档（docx / xlsx / pptx）
+
+- **读**：`office_read` 把文档转成 Markdown。Word 保留标题层级（内置 Heading 样式，手动加粗大字号也会识别）、段落、列表与表格；Excel 每张工作表一个 `## 名称` + Markdown 表格，支持 `sheet` / `range` / `maxRows`；PowerPoint 每页一个 `## 第 N 页 · 标题`，要点为列表，备注单独一行，图片只报数量。
+- **先看结构**：`office_info` 返回 Word 标题结构、Excel 工作表与行数、PPT 页数与页标题。大文档先看结构，再用 `slides` / `sheet` / `range` 分批读。
+- **写**：`office_write` 的 `content` 是 Markdown。Word 直接写标题 / 段落 / 列表 / 表格 / 代码块；Excel 用 Markdown 表格（`## 名称` 是工作表名，也可直接贴 CSV）；PowerPoint 用 `---` 分页、`#` / `##` 当页标题。只能写工作区，默认不覆盖已有文件（`overwrite=true` 才覆盖），每次写入都走审批。
+- **上传即读**：`＋ 上传文件` 选 .docx / .xlsx / .pptx 时，会在旁边写一份 `.office.md` 提取文本（默认前 24000 字符，失败不影响上传）。把 PPT 拖进来直接问"总结需求和计划"，内容已经在上下文里；要读被截断的部分再调 `office_read`。
+- **格式边界**：只支持 OOXML（.docx / .xlsx / .pptx），旧版 .doc / .xls / .ppt 需先另存；不还原字体、颜色、动画、图表数据，Excel 公式读缓存值（无缓存时读公式原文）。
+
 
 ### 技能格式
 
@@ -569,7 +579,7 @@ dotnet run --project tools/ui-baseline/WebViewShot -c Release -- docs/reports/ui
 ## 已知注意事项
 
 - 会话库改为 **EF Core 版本化迁移**（`src/Storage/SDemo.DesktopAgent.Storage/Migrations`）：新库直接 `Migrate()`；老库先补 `EnsureCreated` 时代的缺列，再把 `InitialCreate` 记为已应用（基线化），之后只跑真正新增的迁移。FTS5 知识库表是唯一例外，仍由 `ArchiveSchema` 在迁移后按需建（FTS5 缺失只影响知识库）。新增表结构请用 `dotnet ef migrations add`，不要再手写补列。
-- 上传附件目前只把文本内容内联给模型；图片 / PDF 等二进制文件只会给模型文件名、大小和路径，模型看不到内容。单个附件上限 25 MB、一次最多 10 个。
+- 上传附件会把可读内容内联给模型：文本文件直接内联，PDF 走沙箱提取前几页，`.docx` / `.xlsx` / `.pptx` 自动转成 Markdown sidecar（各默认 24000 字符）；图片 / 其他二进制只给文件名、大小和路径。单个附件上限 25 MB、一次最多 10 个。
 - 关闭窗口默认把应用收进托盘，而不是退出；要恢复“关闭即退出”，把 `MainWindow.OnClosing` 里的隐藏逻辑去掉即可。
 - Markdown 代码块目前只有等宽字体和底色，**没有语法高亮**（Markdig 不内置；需要的话可以再接 highlight.js 或 ColorCode）。
 - `TargetFramework` 带 `10.0.19041.0`：WebView2 组合渲染控件需要 Windows SDK 投影（`Microsoft.Windows.SDK.NET`），改成纯 `net10.0-windows` 会在启动时抛 `FileNotFoundException`。

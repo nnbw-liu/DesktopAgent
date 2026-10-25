@@ -117,6 +117,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SDemo.DesktopAgent.UI.Tests
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SDemo.DesktopAgent.Plugin.QuickAsk", "src\Plugins\SDemo.DesktopAgent.Plugin.QuickAsk\SDemo.DesktopAgent.Plugin.QuickAsk.csproj", "{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SDemo.DesktopAgent.Tools.Office", "src\Tools\SDemo.DesktopAgent.Tools.Office\SDemo.DesktopAgent.Tools.Office.csproj", "{432FDFC8-BF26-4259-990C-DF0585DDB4E3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -595,6 +597,18 @@ Global
 		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Release|x64.Build.0 = Release|Any CPU
 		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Release|x86.ActiveCfg = Release|Any CPU
 		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Release|x86.Build.0 = Release|Any CPU
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3}.Debug|x64.Build.0 = Debug|Any CPU
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3}.Debug|x86.Build.0 = Debug|Any CPU
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3}.Release|x64.ActiveCfg = Release|Any CPU
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3}.Release|x64.Build.0 = Release|Any CPU
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3}.Release|x86.ActiveCfg = Release|Any CPU
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -654,5 +668,6 @@ Global
 		{BC721543-9623-4458-A11D-2B5D623E1E50} = {2428F2E8-4E23-D9E6-2362-288ACBDDD2EC}
 		{57D73514-017D-4BD2-A8B9-D145DA362EB5} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532} = {8C42683D-3B3D-4A60-8C62-08168530DF7A}
+		{432FDFC8-BF26-4259-990C-DF0585DDB4E3} = {C36AC070-2799-4CD4-BB42-67E372B9C1BB}
 	EndGlobalSection
 EndGlobal

@@ -62,6 +62,13 @@ public static class CapabilityRouter
 
     private static readonly string[] PdfWords = ["pdf", "扫描件", "文档页"];
 
+    /// <summary>Office 文档：用户很少说扩展名，更多说「这个 PPT / 表格 / Word」。</summary>
+    private static readonly string[] OfficeWords =
+    [
+        "excel", "xlsx", "word", "docx", "ppt", "pptx", "powerpoint", "幻灯片", "演示文稿",
+        "工作簿", "工作表", "word 文档", "excel 表格", "表格分析"
+    ];
+
     private static readonly string[] ShellWords = ["powershell", "脚本", "沙箱"];
 
     private static readonly string[] WebWords = ["联网", "网上", "网页", "web", "搜索一下"];
@@ -87,6 +94,7 @@ public static class CapabilityRouter
         "帮", "请", "把", "给我", "看看", "检查", "分析", "写", "生成", "整理", "导出", "翻译", "总结",
         "查找", "定位", "修改", "调整", "对比", "优化", "清理", "安装", "配置", "部署", "运行", "测试",
         "文件", "代码", "项目", "目录", "报错", "错误", "日志", "功能", "需求", "怎么做", "如何", "为什么",
+        "ppt", "pptx", "excel", "xlsx", "word", "docx", "幻灯片", "演示文稿", "汇报",
         "能", "可以", "需要", "支持", "文档", "网页", "脚本", "命令",
         "help", "please", "write", "create", "update", "change", "check", "find", "search", "build",
         "test", "run", "fix", "review", "explain", "file", "code", "project", "error", "log"
@@ -99,6 +107,8 @@ public static class CapabilityRouter
         // 小模型优先用「精确替换」；apply_patch 失败后还有 write_file 兜底。
         ("edit", EditWords, ["read_file", "replace_text", "apply_patch", "write_file"]),
         ("pdf", PdfWords, ["pdf_read", "pdf_info", "read_file"]),
+        ("office", OfficeWords,
+            ["office_info", "office_read", "office_write", "pdf_info", "pdf_read", "read_file", "list_files"]),
         ("shell", ShellWords, ["run_powershell", "read_file"]),
         ("run", RunWords, ["run_command", "read_file"]),
         ("web", WebWords, ["web_search"]),
@@ -329,6 +339,7 @@ public static class CapabilityRouter
         "run" => ToolTaskProfile.Run,
         "shell" => ToolTaskProfile.Shell,
         "pdf" => ToolTaskProfile.Document,
+        "office" => ToolTaskProfile.Office,
         "web" => ToolTaskProfile.Web,
         "memory" => ToolTaskProfile.Memory,
         "plan" => ToolTaskProfile.Plan,
@@ -342,6 +353,7 @@ public static class CapabilityRouter
         ToolTaskProfile.Run => "run",
         ToolTaskProfile.Shell => "shell",
         ToolTaskProfile.Document => "pdf",
+        ToolTaskProfile.Office => "office",
         ToolTaskProfile.Web => "web",
         ToolTaskProfile.Memory => "memory",
         ToolTaskProfile.Plan => "plan",

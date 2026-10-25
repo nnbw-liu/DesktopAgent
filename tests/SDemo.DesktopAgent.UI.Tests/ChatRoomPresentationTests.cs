@@ -220,6 +220,41 @@ public sealed class ChatRoomPresentationTests : TestContext
     }
 
     [Fact]
+    public void 工具调用前的正文收进过程组只留最后一段答案()
+    {
+        var session = new ChatSession { Id = "preamble", Title = "过程正文" };
+        session.Messages.Add(new ChatMessageModel(ChatMessageRole.User, "看看 README"));
+
+        var reply = new ChatMessageModel(ChatMessageRole.Assistant, "我先读一下 README。\n\n读完了，结论在这里。")
+        {
+            Reasoning = "先看目录。"
+        };
+
+        reply.ToolTrace.Add(new ToolTraceEntry(
+            "read_file", ToolTraceEntry.StatusOk, null, "README.md", "读取 120 行", 3200, DateTime.Now, null, 5, 8, "call-1"));
+        reply.Steps.Add(new ChatStep(ChatStepKind.Reasoning, "先看目录。"));
+        reply.Steps.Add(new ChatStep(ChatStepKind.Preamble, "我先读一下 README。"));
+        reply.Steps.Add(new ChatStep(ChatStepKind.Tool, string.Empty, 0, 0, "call-1"));
+        reply.Steps.Add(new ChatStep(ChatStepKind.Text, "读完了，结论在这里。"));
+        session.Messages.Add(reply);
+
+        var cut = RenderComponent<ChatRoom>(parameters => parameters
+            .Add(component => component.Session, session));
+
+        // 收起时过程正文跟思维链、工具行一起隐藏，只留最终答案。
+        Assert.Empty(cut.FindAll(".timeline-step--preamble"));
+        Assert.Contains("读完了，结论在这里。", cut.Find(".msg-body--markdown").TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("我先读一下", cut.Find(".msg-body--markdown").TextContent, StringComparison.Ordinal);
+
+        // 展开过程组：过程正文出现在工具行之前，和真实顺序一致。
+        cut.Find(".process-head").Click();
+
+        var preamble = cut.Find(".timeline-step--preamble");
+        Assert.Contains("我先读一下 README。", preamble.TextContent, StringComparison.Ordinal);
+        Assert.Contains("3 步", cut.Find(".process-meta").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void 详细档默认展开过程行()
     {
         _settings.Current.Chat.ProcessMode = ProcessDisplayMode.Detailed;

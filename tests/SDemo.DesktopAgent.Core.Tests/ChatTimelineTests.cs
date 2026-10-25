@@ -30,7 +30,7 @@ public sealed class ChatTimelineTests
                 ChatStepKind.Reasoning,
                 ChatStepKind.Tool,
                 ChatStepKind.Reasoning,
-                ChatStepKind.Text,
+                ChatStepKind.Preamble,
                 ChatStepKind.Tool,
                 ChatStepKind.Reasoning,
                 ChatStepKind.Tool,
@@ -46,6 +46,10 @@ public sealed class ChatTimelineTests
         Assert.Equal("最后改一行。", steps[5].Text);
         Assert.Equal(2, steps[6].ToolIndex);
         Assert.Equal("已经改好了。", steps[7].Text);
+
+        // 工具调用前说的正文属于过程，收起过程组时一起隐藏；最后一段才是答案。
+        Assert.Equal(ChatGroupPart.Process, steps[3].Part);
+        Assert.Equal(ChatGroupPart.Answer, steps[7].Part);
     }
 
     [Fact]

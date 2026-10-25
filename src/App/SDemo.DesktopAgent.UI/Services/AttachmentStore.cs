@@ -8,7 +8,8 @@ namespace SDemo.DesktopAgent.Services;
 /// 上传附件的落盘位置：{AppData}\uploads\{sessionId}\。
 /// 数据库只存路径，文件本身留在这里，重启后仍可读取 / 显示。
 /// 放在 UI 工程是因为它只处理 Blazor 的 <see cref="IBrowserFile"/>。
-/// PDF 会额外尝试提取前几页文本（经沙箱），成功时写 sidecar；提取失败不影响上传。
+/// PDF 会额外尝试提取前几页文本（经沙箱），Office 文档会提取 Markdown；
+/// 成功时写 sidecar，提取失败不影响上传。
 /// </summary>
 public sealed class AttachmentStore
 {
@@ -16,24 +17,35 @@ public sealed class AttachmentStore
 
     private readonly string _root;
     private readonly IReadOnlyList<IPdfAttachmentExtractor> _pdfExtractors;
+    private readonly IReadOnlyList<IOfficeAttachmentExtractor> _officeExtractors;
 
     public AttachmentStore(string root)
-        : this(root, [])
+        : this(root, [], [])
     {
     }
 
     public AttachmentStore(
         string root,
         IEnumerable<IPdfAttachmentExtractor> pdfExtractors)
+        : this(root, pdfExtractors, [])
+    {
+    }
+
+    public AttachmentStore(
+        string root,
+        IEnumerable<IPdfAttachmentExtractor> pdfExtractors,
+        IEnumerable<IOfficeAttachmentExtractor> officeExtractors)
     {
         _root = root;
         _pdfExtractors = pdfExtractors.ToArray();
+        _officeExtractors = officeExtractors.ToArray();
     }
 
     public AttachmentStore(
         IAppPaths paths,
-        IEnumerable<IPdfAttachmentExtractor> pdfExtractors)
-        : this(paths.UploadsRoot, pdfExtractors)
+        IEnumerable<IPdfAttachmentExtractor> pdfExtractors,
+        IEnumerable<IOfficeAttachmentExtractor> officeExtractors)
+        : this(paths.UploadsRoot, pdfExtractors, officeExtractors)
     {
     }
 
@@ -58,7 +70,7 @@ public sealed class AttachmentStore
 
         var displayName = string.IsNullOrWhiteSpace(fileName) ? "附件" : fileName;
 
-        var sidecar = await TryExtractPdfAsync(path, cancellationToken).ConfigureAwait(false);
+        var sidecar = await TryExtractAsync(path, cancellationToken).ConfigureAwait(false);
 
         return new ChatAttachment
         {
@@ -76,6 +88,7 @@ public sealed class AttachmentStore
     {
         TryDelete(attachment.FilePath);
         TryDelete(PdfSidecar.PathFor(attachment.FilePath));
+        TryDelete(OfficeSidecar.PathFor(attachment.FilePath));
         TryDelete(attachment.ExtractedTextPath);
     }
 
@@ -85,12 +98,23 @@ public sealed class AttachmentStore
     /// <summary>
     /// 提取结果只在一次上传里有效：不放到字段上，避免并发上传把两个附件的元信息串在一起。
     /// </summary>
-    private async Task<PdfAttachmentSidecar?> TryExtractPdfAsync(
+    private Task<AttachmentSidecar?> TryExtractAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        if (string.Equals(Path.GetExtension(path), ".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryExtractPdfAsync(path, cancellationToken);
+        }
+
+        return TryExtractOfficeAsync(path, cancellationToken);
+    }
+
+    private async Task<AttachmentSidecar?> TryExtractPdfAsync(
         string pdfPath,
         CancellationToken cancellationToken)
     {
-        if (_pdfExtractors.Count == 0
-            || !string.Equals(Path.GetExtension(pdfPath), ".pdf", StringComparison.OrdinalIgnoreCase))
+        if (_pdfExtractors.Count == 0)
         {
             return null;
         }
@@ -110,7 +134,7 @@ public sealed class AttachmentStore
 
             return sidecarPath is null
                 ? null
-                : new PdfAttachmentSidecar(sidecarPath, result.PageCount, result.HasTextLayer);
+                : new AttachmentSidecar(sidecarPath, result.PageCount, result.HasTextLayer);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
         {
@@ -119,7 +143,47 @@ public sealed class AttachmentStore
         }
     }
 
-    private sealed record PdfAttachmentSidecar(string Path, int PageCount, bool HasTextLayer);
+    /// <summary>
+    /// 上传 .docx / .xlsx / .pptx 时提取 Markdown sidecar：模型下一轮就能直接看到文档内容，
+    /// 不必先猜路径再调 office_read（需要读其他页 / 其他工作表时仍可调工具）。
+    /// </summary>
+    private async Task<AttachmentSidecar?> TryExtractOfficeAsync(
+        string officePath,
+        CancellationToken cancellationToken)
+    {
+        var extension = Path.GetExtension(officePath);
+        if (_officeExtractors.Count == 0
+            || (!extension.Equals(".docx", StringComparison.OrdinalIgnoreCase)
+                && !extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase)
+                && !extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase)))
+        {
+            return null;
+        }
+
+        try
+        {
+            var result = await _officeExtractors[0].ExtractAsync(officePath, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (result is null || string.IsNullOrWhiteSpace(result.Text))
+            {
+                return null;
+            }
+
+            var sidecarPath = await OfficeSidecar.WriteAsync(officePath, result, cancellationToken)
+                .ConfigureAwait(false);
+
+            return sidecarPath is null
+                ? null
+                : new AttachmentSidecar(sidecarPath, PageCount: null, HasTextLayer: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
+    private sealed record AttachmentSidecar(string Path, int? PageCount, bool? HasTextLayer);
 
     private static void TryDelete(string? path)
     {

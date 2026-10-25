@@ -5385,6 +5385,30 @@ a {
     margin-top: 2px;
 }
 
+/* 过程正文：工具调用前说的那段话，属于可收起的「过程」，不是最终答案 */
+.timeline-step--preamble {
+    margin: 1px 0 1px 10px;
+    padding: 1px 0 1px 10px;
+    border-left: 2px dotted var(--border-strong);
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.timeline-step--preamble .preamble-body {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.timeline-step--preamble .preamble-body > :first-child {
+    margin-top: 0;
+}
+
+.timeline-step--preamble .preamble-body > :last-child {
+    margin-bottom: 0;
+}
+
 /* 时间线里的宿主追问：一行提示，不占一条消息 */
 .timeline-step--host {
     display: flex;

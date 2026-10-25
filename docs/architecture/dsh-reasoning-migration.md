@@ -861,7 +861,7 @@ token 计量         ctx.tokenMeter              → ContextReport（已有，�
 |---|---|
 | 步骤模型 | `ChatStep` 增加 `StepIndex` / `CallId` / `StartedAt` / `EndedAt`，并新增**计算属性** `Part`（`Text → Answer`，其余 `Process`）——不用给生产者加字段，也不用迁移存量 JSON |
 | 步骤持久化 | `ChatMessage.Steps` → `messages.StepsJson`（新迁移 `20261024133546_AddMessageSteps`）；`StepsFor` 优先读结构化步骤，旧消息仍回退 `ChatTimelineBuilder.FromTrace`（顺带补上 `CallId`） |
-| 过程组 | `ChatTimeline.razor` 拆成「过程组 + 组外答案」：过程组只装思考/工具/宿主追问，**正文（答案）永远在组外**；组头显示 `过程 · 12.4 s` 与 `N 步 · M 次工具 · 失败 K`，收起时贴一行最新思考 |
+| 过程组 | `ChatTimeline.razor` 拆成「过程组 + 组外答案」：过程组装思考 / 工具 / 宿主追问 / **过程正文**，只有最后一次工具之后的正文留在组外；组头显示 `过程 · 12.4 s` 与 `N 步 · M 次工具 · 失败 K`，收起时贴一行最新思考或过程正文 |
 | 四档显隐 | `ProcessDisplayMode` + `ProcessDisplayPolicy`（四个开关 + 收起时机）落在 Contracts，`ChatPresentationSettings` 进 `AppSettings.Chat`；设置页「通用 → 对话」两个下拉 |
 | 工具行/卡片 | `ToolPresentation`（客户端派生）+ `ChatStepRow.razor`：单行 `名称 · 状态 · 摘要 · 耗时`，点开看目标 / 参数 / 编辑行 / 结果预览；未知工具回落 generic |
 | 工具轨迹补数据 | 记录轨迹时算好 `Title`（命令+前两参数 / 路径 / 模式）、`ArgsJson`（截断 512）、`DurationMs`、`ResultPreview`（前 200 字）；running 条目也带标题，工具一开跑就能看出在做什么 |
@@ -869,7 +869,7 @@ token 计量         ctx.tokenMeter              → ContextReport（已有，�
 
 ### 与计划的偏差（取舍）
 
-1. **答案 = 所有 Text 步骤的拼接**（DSH 的做法），不是「最后一段连续正文」。代价是中途说的话（"我先看一下"）会被提升到答案区；换来的是**不需要任何边界启发式**，折叠永远不会藏住回答。原有的交错顺序在「完全展开」档完整保留。
+1. **过程正文与答案分开**：工具调用之前说的正文（"我先看一下"）在工具一开始就被改判成 `ChatStepKind.Preamble`，跟着过程组一起收起；只有最后一次工具之后的正文是 `Text`，永远在组外。判定不是按字数或时间猜，而是「下一次工具调用」这个确定事件；重开会话时由 `ReasoningChars/TextChars` 边界得到同一结论。没有工具的一次生成，正文始终是答案。
 2. **只要还有 running 的工具，这一轮就不收起**。DSH 用 `turn.status === open` 表达同一件事；我们的工具可能比流更晚结束，所以在 `CanFoldProcess` 里显式判断。
 3. **`LiveProcessDetail` 暂未参与渲染**：运行中的轮次一律展开（用户要看着它跑）。字段保留，等有"简洁档也要运行细节"的需求再接。
 4. **思考正文的可替换渲染（§3.1-(7)）没做**：`ChatStepRow` 已独立成组件，将来抽 `RenderFragment` 只改一处。

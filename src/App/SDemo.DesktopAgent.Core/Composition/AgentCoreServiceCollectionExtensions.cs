@@ -35,6 +35,7 @@ public static class AgentCoreServiceCollectionExtensions
         services.AddAgentTooling();
         services.AddSearchTools();
         services.AddFileTools();
+        services.AddOfficeTools();
         services.AddEditTools();
         services.AddTodoTools();
         services.AddSkillTools();

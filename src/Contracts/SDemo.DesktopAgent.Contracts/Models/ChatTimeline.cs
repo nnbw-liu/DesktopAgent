@@ -37,7 +37,7 @@ public static class ChatTimelineBuilder
             var textTo = entry.TextChars >= 0 ? entry.TextChars : textRead;
 
             AppendSlice(steps, reasoning, ref reasoningRead, reasoningTo, ChatStepKind.Reasoning);
-            AppendSlice(steps, content, ref textRead, textTo, ChatStepKind.Text);
+            AppendSlice(steps, content, ref textRead, textTo, ChatStepKind.Preamble);
             steps.Add(new ChatStep(ChatStepKind.Tool, string.Empty, index, CallId: entry.CallId));
         }
 

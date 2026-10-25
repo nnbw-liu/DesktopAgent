@@ -9,8 +9,14 @@ public enum ChatStepKind
     /// <summary>一次工具调用；具体内容在消息的 <see cref="ChatMessage.ToolTrace"/> 里按索引取。</summary>
     Tool,
 
-    /// <summary>正文片段（模型说话的文本）。</summary>
+    /// <summary>正文片段（模型说话的文本）。只有最后一段留在答案区。</summary>
     Text,
+
+    /// <summary>
+    /// 过程正文：工具调用之前模型说的那几段话。它和思维链一样属于「过程」，
+    /// 要跟着过程组一起收起；只有工具全部结束后的最后一段正文才是答案。
+    /// </summary>
+    Preamble,
 
     /// <summary>宿主追问（无修改回灌 / 自动验证）。只用于界面提示，不新开一条回复。</summary>
     HostPrompt
@@ -49,12 +55,12 @@ public sealed record ChatStep(
     DateTimeOffset? StartedAt = null,
     DateTimeOffset? EndedAt = null)
 {
-    /// <summary>这一步进过程组还是留在组外（答案）。</summary>
+    /// <summary>这一步进过程组还是留在组外（答案）。只有最终正文留在组外。</summary>
     public ChatGroupPart Part => Kind == ChatStepKind.Text ? ChatGroupPart.Answer : ChatGroupPart.Process;
 
     /// <summary>同一类步骤紧挨着到达时合并，避免每个 token 建一个节点。</summary>
     public ChatStep Append(string delta) => this with { Text = Text + delta };
 
     public bool CanAppend(ChatStepKind kind) =>
-        Kind == kind && Kind is ChatStepKind.Reasoning or ChatStepKind.Text;
+        Kind == kind && Kind is ChatStepKind.Reasoning or ChatStepKind.Text or ChatStepKind.Preamble;
 }
