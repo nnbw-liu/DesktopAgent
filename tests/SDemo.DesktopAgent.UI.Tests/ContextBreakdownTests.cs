@@ -205,6 +205,25 @@ public sealed class ContextBreakdownTests : TestContext
         Assert.DoesNotContain("已先修剪工具轨迹", cut.Markup);
     }
 
+    [Fact]
+    public void 超长工具输出落盘后显示条数与回读说明()
+    {
+        var cut = RenderComponent<ContextBreakdown>(parameters => parameters
+            .Add(component => component.Report, Report() with { SpilledResults = 3, SpillFailures = 1 }));
+
+        Assert.Contains("已把 3 条超长工具输出落盘到 .agent/spill", cut.Markup);
+        Assert.Contains("1 条写盘失败，已退回截断", cut.Markup);
+    }
+
+    [Fact]
+    public void 没有落盘时不显示落盘说明()
+    {
+        var cut = RenderComponent<ContextBreakdown>(parameters => parameters
+            .Add(component => component.Report, Report()));
+
+        Assert.DoesNotContain(".agent/spill", cut.Markup);
+    }
+
     private static ContextReport Report() => new(
         ProviderId: "test",
         ModelId: "test",
