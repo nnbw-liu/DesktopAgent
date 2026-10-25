@@ -6,6 +6,7 @@ using SDemo.DesktopAgent.Core.Services;
 using SDemo.DesktopAgent.Editing;
 using SDemo.DesktopAgent.Models;
 using SDemo.DesktopAgent.Plugins;
+using SDemo.DesktopAgent.Plugins.QuickAsk;
 using SDemo.DesktopAgent.Plugins.Summarize;
 using SDemo.DesktopAgent.Plugins.Translate;
 using SDemo.DesktopAgent.Sandbox;
@@ -90,6 +91,7 @@ public static class AgentCoreServiceCollectionExtensions
         // 本地插件仍是 %APPDATA%\...\plugins 下的目录，同 id 覆盖内置。
         services.AddSingleton<IPluginPackage, TranslatePlugin>();
         services.AddSingleton<IPluginPackage, SummarizePlugin>();
+        services.AddSingleton<IPluginPackage, QuickAskPlugin>();
         services.AddSingleton(sp => new PluginCatalog(
             sp.GetRequiredService<IAppPaths>(),
             sp.GetServices<IPluginPackage>()));

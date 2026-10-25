@@ -47,6 +47,9 @@ internal sealed class PluginCapabilityDto
 
     public bool? AllowHistory { get; set; }
 
+    /// <summary>控制「是否关联上下文」的 toggle 参数 key。</summary>
+    public string? ContextParameter { get; set; }
+
     public PluginOutputDto? Output { get; set; }
 
     public PluginPrivacyDto? Privacy { get; set; }
@@ -272,6 +275,7 @@ internal static class PluginManifestJson
             ("skill", null),
             ("allowGlobalSkills", null),
             ("allowHistory", null),
+            ("contextParameter", null),
             ("output", new ObjectSpec(("format", null))),
             ("privacy", new ObjectSpec(("sendsText", null))),
             ("parameters", new ArraySpec(Parameter)));

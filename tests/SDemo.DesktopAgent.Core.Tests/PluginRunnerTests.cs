@@ -88,7 +88,25 @@ public sealed class PluginRunnerTests
     }
 
     [Fact]
-    public async Task 气泡模式永远不带历史()
+    public async Task 气泡模式默认不带历史()
+    {
+        var chat = new StubChatService();
+        var runner = CreateRunner(chat);
+        var descriptor = BuildDescriptor();
+        var history = new List<ChatMessage>
+        {
+            new(ChatMessageRole.User, "历史问题"),
+            new(ChatMessageRole.Assistant, "历史回答")
+        };
+
+        await ConsumeArtifactAsync(runner, descriptor, history, useContext: null);
+
+        var message = Assert.Single(chat.Plan!.Context.Messages);
+        Assert.Contains("待加工的原文", message.Text);
+    }
+
+    [Fact]
+    public async Task 气泡模式在能力允许且上下文打开时带历史()
     {
         var chat = new StubChatService();
         var runner = CreateRunner(chat);
@@ -99,20 +117,83 @@ public sealed class PluginRunnerTests
             new(ChatMessageRole.Assistant, "历史回答")
         };
 
-        await foreach (var _ in runner.RunArtifactAsync(new PluginRunRequest(
-                           descriptor,
-                           descriptor.Mounts[0],
-                           new Dictionary<string, string>(StringComparer.Ordinal) { ["target"] = "ja" },
-                           "待加工的原文",
-                           Provider(),
-                           "test-model",
-                           new AgentRunMetrics(),
-                           history)))
+        await ConsumeArtifactAsync(runner, descriptor, history, useContext: null);
+
+        Assert.Equal(3, chat.Plan!.Context.Messages.Count);
+        Assert.Equal("历史问题", chat.Plan.Context.Messages[0].Text);
+    }
+
+    [Fact]
+    public async Task 气泡模式上下文开关为false时不带历史()
+    {
+        var chat = new StubChatService();
+        var runner = CreateRunner(chat);
+        var descriptor = BuildDescriptor(allowHistory: true, contextParameter: "useContext");
+        var history = new List<ChatMessage>
         {
-        }
+            new(ChatMessageRole.User, "历史问题"),
+            new(ChatMessageRole.Assistant, "历史回答")
+        };
+
+        await ConsumeArtifactAsync(runner, descriptor, history, useContext: false);
 
         var message = Assert.Single(chat.Plan!.Context.Messages);
         Assert.Contains("待加工的原文", message.Text);
+    }
+
+    [Fact]
+    public async Task 上下文开关缺省时按打开处理()
+    {
+        var chat = new StubChatService();
+        var runner = CreateRunner(chat);
+        var descriptor = BuildDescriptor(allowHistory: true, contextParameter: "useContext");
+        var history = new List<ChatMessage>
+        {
+            new(ChatMessageRole.User, "历史问题"),
+            new(ChatMessageRole.Assistant, "历史回答")
+        };
+
+        await ConsumeArtifactAsync(runner, descriptor, history, useContext: null);
+
+        Assert.Equal(3, chat.Plan!.Context.Messages.Count);
+    }
+
+    [Fact]
+    public async Task 加入上下文的派生卡片也计入历史()
+    {
+        var chat = new StubChatService();
+        var runner = CreateRunner(chat);
+        var descriptor = BuildDescriptor(allowHistory: true);
+        var history = new List<ChatMessage>
+        {
+            new(ChatMessageRole.Assistant, string.Empty)
+            {
+                Derived =
+                [
+                    new DerivedArtifact(
+                        "a1",
+                        "translate",
+                        "bubble",
+                        "translate",
+                        new Dictionary<string, string>(StringComparer.Ordinal),
+                        null,
+                        "用户主动加入上下文的卡片内容",
+                        DerivedState.Done,
+                        null,
+                        "test-model",
+                        1,
+                        1,
+                        1,
+                        DateTime.Now,
+                        IncludeInContext: true)
+                ]
+            }
+        };
+
+        await ConsumeArtifactAsync(runner, descriptor, history, useContext: null);
+
+        Assert.Equal(2, chat.Plan!.Context.Messages.Count);
+        Assert.Contains("用户主动加入上下文的卡片内容", chat.Plan.Context.Messages[0].Text);
     }
 
     [Fact]
@@ -160,6 +241,32 @@ public sealed class PluginRunnerTests
         }
     }
 
+    private static async Task ConsumeArtifactAsync(
+        PluginRunner runner,
+        PluginDescriptor descriptor,
+        IReadOnlyList<ChatMessage> history,
+        bool? useContext)
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal) { ["target"] = "ja" };
+        if (useContext is { } flag)
+        {
+            values["useContext"] = flag ? "true" : "false";
+        }
+
+        await foreach (var _ in runner.RunArtifactAsync(new PluginRunRequest(
+                           descriptor,
+                           descriptor.Mounts[0],
+                           values,
+                           "待加工的原文",
+                           Provider(),
+                           "test-model",
+                           new AgentRunMetrics(),
+                           history)))
+        {
+            // 只关心发出去的 plan。
+        }
+    }
+
     private static ModelProvider Provider() => new()
     {
         Id = "test",
@@ -174,8 +281,32 @@ public sealed class PluginRunnerTests
         new PluginPromptComposer(),
         new ContextBuilder(new HeuristicTokenCounter(), new StubSettingsService()));
 
-    private static PluginDescriptor BuildDescriptor(bool allowHistory = false)
+    private static PluginDescriptor BuildDescriptor(
+        bool allowHistory = false,
+        string? contextParameter = null)
     {
+        var parameters = new List<PluginParameter>
+        {
+            new()
+            {
+                Key = "target",
+                Label = "目标语言",
+                Kind = PluginParameterKind.Select,
+                Options = [new PluginParameterOption("ja", "日本語")]
+            }
+        };
+
+        if (contextParameter is not null)
+        {
+            parameters.Add(new PluginParameter
+            {
+                Key = contextParameter,
+                Label = "关联上下文",
+                Kind = PluginParameterKind.Toggle,
+                Default = "true"
+            });
+        }
+
         var capability = new PluginCapability
         {
             Id = "translate",
@@ -190,16 +321,8 @@ public sealed class PluginRunnerTests
                 把文本翻译成 {{target.label}}（{{target}}）。
                 """,
             AllowHistory = allowHistory,
-            Parameters =
-            [
-                new PluginParameter
-                {
-                    Key = "target",
-                    Label = "目标语言",
-                    Kind = PluginParameterKind.Select,
-                    Options = [new PluginParameterOption("ja", "日本語")]
-                }
-            ]
+            ContextParameter = contextParameter,
+            Parameters = parameters
         };
 
         var mount = new PluginMount

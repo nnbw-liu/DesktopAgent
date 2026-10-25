@@ -1,0 +1,113 @@
+@using SDemo.DesktopAgent.Components.Plugins
+
+@* 划词菜单：固定在选区旁；插件按钮复用气泡按钮的图标 + 参数面板。 *@
+<div class="selection-bar @(PlaceAbove ? "is-above" : null)"
+     style="@Style"
+     role="toolbar"
+     aria-label="对选中文本使用插件"
+     @onclick:stopPropagation="true">
+    <span class="selection-bar-hint">已选 @TextLength 字</span>
+
+    @foreach (var entry in VisibleEntries)
+    {
+        <PluginActionButton Plugin="entry.Plugin"
+                            Mount="entry.Mount"
+                            Values="entry.Values"
+                            IsRunning="@(string.Equals(RunningMountKey, entry.Mount.Key, StringComparison.Ordinal))"
+                            Disabled="Busy"
+                            ShowLabel="true"
+                            OnRun="OnRun" />
+    }
+
+    @if (HiddenEntries.Count > 0)
+    {
+        <button type="button"
+                class="selection-bar-more"
+                title="更多插件"
+                @onclick="ToggleMore">
+            @(_moreOpen ? "收起" : $"更多 {HiddenEntries.Count}")
+        </button>
+
+        @if (_moreOpen)
+        {
+            @foreach (var entry in HiddenEntries)
+            {
+                <PluginActionButton Plugin="entry.Plugin"
+                                    Mount="entry.Mount"
+                                    Values="entry.Values"
+                                    IsRunning="@(string.Equals(RunningMountKey, entry.Mount.Key, StringComparison.Ordinal))"
+                                    Disabled="Busy"
+                                    ShowLabel="true"
+                                    OnRun="OnRun" />
+            }
+        }
+    }
+
+    <button type="button"
+            class="selection-bar-close"
+            title="关闭划词菜单"
+            @onclick="() => OnDismiss.InvokeAsync()">
+        ✕
+    </button>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<PluginActionEntry> Entries { get; set; } = [];
+
+    /// <summary>直接显示几个，超出的收进「更多」（来自设置 plugins.maxInSelection）。</summary>
+    [Parameter]
+    public int MaxVisible { get; set; } = 4;
+
+    [Parameter]
+    public double Left { get; set; }
+
+    [Parameter]
+    public double Top { get; set; }
+
+    [Parameter]
+    public double Bottom { get; set; }
+
+    /// <summary>靠近视口底部时翻到选区上方，参数面板向下展开。</summary>
+    [Parameter]
+    public bool PlaceAbove { get; set; }
+
+    [Parameter]
+    public int TextLength { get; set; }
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter]
+    public string? RunningMountKey { get; set; }
+
+    [Parameter]
+    public EventCallback<PluginActionEntry> OnRun { get; set; }
+
+    [Parameter]
+    public EventCallback OnDismiss { get; set; }
+
+    private bool _moreOpen;
+
+    private int EffectiveMax => Math.Max(1, MaxVisible);
+
+    private IEnumerable<PluginActionEntry> VisibleEntries => Entries.Take(EffectiveMax);
+
+    private List<PluginActionEntry> HiddenEntries => Entries.Skip(EffectiveMax).ToList();
+
+    // 不用 transform 定位：transform 会让内部 fixed 的参数面板遮罩只覆盖浮动条，
+    // 翻到上方时直接给一个「条高 + 间距」的估算值即可，参数面板仍然向下展开。
+    private string Style
+    {
+        get
+        {
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            var left = Left.ToString("0.#", culture);
+            return PlaceAbove
+                ? $"left:{left}px; top:{Math.Max(8, Top - 52).ToString("0.#", culture)}px;"
+                : $"left:{left}px; top:{(Bottom + 8).ToString("0.#", culture)}px;";
+        }
+    }
+
+    private void ToggleMore() => _moreOpen = !_moreOpen;
+}

@@ -1,0 +1,33 @@
+{
+  "id": "quick-ask",
+  "name": "简单问答",
+  "version": "1.0.0",
+  "description": "跳过技能与工具，直接给出简洁回答；可选择是否关联上下文。",
+  "icon": { "text": "问" },
+  "capabilities": [
+    {
+      "id": "quick-ask",
+      "name": "简单问答",
+      "skill": "skills/quick-ask.md",
+      "allowGlobalSkills": false,
+      "allowHistory": true,
+      "contextParameter": "useContext",
+      "privacy": { "sendsText": true },
+      "output": { "format": "text" },
+      "parameters": [
+        {
+          "key": "useContext",
+          "label": "关联上下文",
+          "kind": "toggle",
+          "default": "true"
+        }
+      ]
+    }
+  ],
+  "mounts": [
+    { "id": "sidebar", "surface": "sidebar", "capability": "quick-ask", "order": 5 },
+    { "id": "composer", "surface": "composer", "capability": "quick-ask", "order": 5 },
+    { "id": "bubble", "surface": "message", "capability": "quick-ask", "input": "message", "order": 5 },
+    { "id": "selection", "surface": "selection", "capability": "quick-ask", "input": "selection", "order": 5 }
+  ]
+}

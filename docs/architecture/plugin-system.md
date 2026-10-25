@@ -1,8 +1,8 @@
 # 插件系统设计（v1）
 
-> 状态：M0–M6 全部实现（加载器 / 输入框 / 侧栏 / 气泡 / 设置 / 内置翻译 / 双语对照）
+> 状态：M0–M7 全部实现（加载器 / 输入框 / 侧栏 / 气泡 / 设置 / 内置翻译 / 双语对照 / 划词菜单 / 简单问答 / 上下文开关）
 > 适用工程：`SDemo.DesktopAgent`（WPF 宿主 + MAUI 宿主，共用 Core / UI）
-> 首个插件：翻译（`translate`）
+> 首个插件：翻译（`translate`）；M7 新增内置「简单问答」（`quick-ask`）与划词入口
 > 相关代码：`src/App/SDemo.DesktopAgent.Core`、`src/App/SDemo.DesktopAgent.UI`、`src/App/SDemo.DesktopAgent.Core/Data/ChatDbContext.cs`
 
 ---
@@ -39,6 +39,9 @@
 | 3 | 插件模式的生命周期 | **随会话持久**，输入框里的 chip 始终带 `✕`，可随时取消 |
 | 4 | 用户自制插件 | **允许**：把 `plugin.json` + skill 文件丢进插件目录即可生效，无需编译 |
 | 5 | 译文呈现 | **默认双语对照，可切纯译文**；一次运行、切换零成本（不重新请求模型） |
+| 6 | 划词入口 | 新增独立 `surface: "selection"`：在聊天记录中选中文本、鼠标抬起后在选区旁出现浮动插件菜单；入口由设置里的「选中」开关控制，产物与气泡一样是派生卡片 |
+| 7 | 关联上下文 | 能力级 `allowHistory` 是总闸，`contextParameter` 指向一个 toggle 参数，用户可按轮关闭历史；缺省打开，老插件行为不变 |
+| 8 | 派生内容进上下文 | 默认仍**不进**；卡片上的「加入上下文」按钮由用户显式提升，只影响之后的请求，不重新请求模型 |
 
 上一轮方案里未获答复的建议，按原推荐执行，本文已全部吸收：
 
@@ -60,7 +63,7 @@
 ### 目标
 
 1. **通用**：新增一个插件只写 JSON + Markdown，不改 C#、不改 UI。
-2. **多入口**：同一份能力可挂到侧栏、输入框、气泡三个界面，通过配置决定显不显示。
+2. **多入口**：同一份能力可挂到侧栏、输入框、气泡、划词四个界面，通过配置决定显不显示。
 3. **零代码可制作**：翻译、润色、总结、改写、解释代码这类插件，不需要程序集、不需要工具、没有加载风险。
 4. **状态可恢复**：会话记住「上次用了谁」「输入框选的是谁」「上次选的语言」。
 5. **可降级**：插件写坏、被删除、版本不兼容，只影响它自己。
@@ -99,9 +102,20 @@ Run（一次执行） = Mount + 用户输入 + 参数值 → 渲染提示词 →
 
 三条硬规则：
 
-1. **能力定义一次，入口配置多处。** 不要在侧栏、输入框、气泡里各写一套翻译逻辑。
+1. **能力定义一次，入口配置多处。** 不要在侧栏、输入框、气泡、划词里各写一套翻译逻辑。
 2. **插件只产出文本，不产生副作用。** 有副作用的是「工具」，属于另一套体系（见 §13）。
 3. **UI 不认识具体插件。** 组件只消费 `Capability` / `Mount` / `Parameter` 描述符，`translate` 三个字不允许出现在组件代码里。
+
+### 四类入口（surface）
+
+| surface | 触发 | 输入 | 产物 |
+| --- | --- | --- | --- |
+| `sidebar` | 点侧栏插件条目 | 之后的输入框文本 | 一条带插件归属的助手消息 |
+| `composer` | 在输入框选中 chip 后发送 | 输入框文本 | 一条带插件归属的助手消息 |
+| `message` | 点助手消息底部的插件按钮 | 该条消息正文 | 挂在该消息下的派生卡片 |
+| `selection` | 在聊天正文中选中文本、鼠标抬起后点浮动菜单 | 选中文本 | 挂在选区所在消息下的派生卡片 |
+
+`selection` 是 M7 新增的独立入口，不依赖输入框开关；只处理单条消息正文内的选区，跨消息 / 空选区不弹菜单。
 
 ### 三个会话级状态字段（不要合并）
 
@@ -173,7 +187,8 @@ Run（一次执行） = Mount + 用户输入 + 参数值 → 渲染提示词 →
 | `name` | ✅ | string | — | 展示名 |
 | `skill` | ✅ | string | — | 相对插件目录的 `.md` 路径，**不允许 `..` 与绝对路径** |
 | `allowGlobalSkills` | | bool | `false` | 是否把全局技能一并注入（默认关，符合「插件只用自己的 skill」） |
-| `allowHistory` | | bool | `false` | 是否带会话历史（默认关，避免上下文污染） |
+| `allowHistory` | | bool | `false` | 是否允许带会话历史（默认关）；还必须通过 `contextParameter` 的开关 |
+| `contextParameter` | | string | — | 「是否关联上下文」的 toggle 参数 key；必须同时 `allowHistory: true` |
 | `output` | | object | `{ "format": "text" }` | `text` 或 `segments`（见 §10） |
 | `privacy` | | object | `{}` | `{ "sendsText": true }` 时首次使用弹提示 |
 | `parameters` | | array | `[]` | 见 §7 |
@@ -183,9 +198,9 @@ Run（一次执行） = Mount + 用户输入 + 参数值 → 渲染提示词 →
 | 字段 | 必填 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- | --- |
 | `id` | ✅ | string | — | 插件内唯一 |
-| `surface` | ✅ | enum | — | `sidebar` / `composer` / `message` |
+| `surface` | ✅ | enum | — | `sidebar` / `composer` / `message` / `selection` |
 | `capability` | ✅ | string | — | 必须指向本插件已定义的 capability |
-| `input` | | enum | 按 surface 推断 | `composer` / `message` / `selection`（预留） |
+| `input` | | enum | 按 surface 推断 | `composer` / `message` / `selection` |
 | `order` | | int | `100` | 升序，仅同 surface 内比较 |
 | `show` | | bool | `true` | 默认是否显示；用户设置可覆盖 |
 
@@ -194,6 +209,9 @@ Run（一次执行） = Mount + 用户输入 + 参数值 → 渲染提示词 →
 - `surface = composer` → `composer`（输入框里的文字）
 - `surface = message` → `message`（该条消息的正文）
 - `surface = sidebar` → `composer`（先建空会话，等用户输入）
+- `surface = selection` → `selection`（聊天记录里选中的文本）
+
+`selection` 只能配 `input: "selection"`；其它 surface 声明 `input: "selection"` 会让该入口加载失败。
 
 ### 5.4 最小可用清单
 
@@ -229,6 +247,8 @@ Run（一次执行） = Mount + 用户输入 + 参数值 → 渲染提示词 →
 | skill 路径存在且不越界 | 该 capability 不可用 |
 | skill 中占位符 `{{x}}` 在参数中已定义 | 该 capability 不可用（防静默空值） |
 | 参数 `kind` 合法、`select` 必须有 `options` | 该 capability 不可用 |
+| `contextParameter` 指向本能力已定义的 toggle，且 `allowHistory: true` | 该 capability 不可用 |
+| `surface=selection` 与 `input=selection` 一一对应 | 该 mount 不可用 |
 | 同一插件内 mount / capability 的 id 不重复 | 整个插件置为不可用 |
 | `minHostVersion` ≤ 当前版本 | 插件禁用，设置页提示 |
 
@@ -433,7 +453,26 @@ idle ──click──▶ 有参数?
 
 助手消息的归属标记：角色名从 `SDemo` 变为 `翻译 · SDemo`，并在前面加 12 px 插件图标。这解决「同一会话里既有普通回答又有翻译回答」时的辨识问题。
 
-### 8.5 边缘态
+### 8.5 划词菜单（surface = selection）
+
+在聊天记录的消息正文里选中文本、松开鼠标后，在选区旁出现浮动插件条：
+
+```text
+  这条回答的正文……（用户选中「某个片段」）
+                    ┌──────────────────────────────────┐
+                    │ 已选 12 字  [问 简单问答] [译 翻译] ✕ │
+                    └──────────────────────────────────┘
+```
+
+- 只处理**单条消息正文内**的选区；跨消息、空选区、选中时间 / 按钮 / 操作栏都不弹。
+- 浮条用 `position: fixed` 贴选区；接近视口底部时翻到选区上方，参数面板向下展开。
+- 插件列表来自 `Registry.Mounts(Selection)`：只显示「插件启用 + 选中开关打开」的入口；最多 `maxInSelection` 个，其余进「更多」。
+- 点击无参数插件直接执行；有参数（例如「关联上下文」）展开与气泡相同的参数面板。
+- 执行产物与气泡一致：派生卡片挂在选区所在消息下，`InputText` 记录选中文本，重试不会误加工整条消息。
+- 关闭时机：滚动、切换会话、空选区、点击空白、执行完成、设置 / 插件变更、关闭按钮、Esc。
+- 选区过长（> 60,000 字符）不执行，并提示上限；选区所在消息已有 5 张卡片时也不执行。
+
+### 8.6 边缘态
 
 | 情况 | 行为 |
 | --- | --- |
@@ -442,6 +481,8 @@ idle ──click──▶ 有参数?
 | 会话记忆里的语言已被插件移除 | 回落到第一个 option |
 | 面板打开时切换会话 | 面板关闭，状态丢弃 |
 | 生成中切换会话 | 沿用现有逻辑：取消上一轮 |
+| 划词菜单打开时滚动 / 切会话 | 菜单立即关闭，不保留选区 |
+| 划词产物超长 | 卡片截断到 32,000 字符并提示 |
 
 ---
 
@@ -449,12 +490,15 @@ idle ──click──▶ 有参数?
 
 ### 9.1 两种 Run，两种产物
 
-| 触发 | 产物 | 是否进历史 | 是否进上下文 | 说明 |
-| --- | --- | --- | --- | --- |
-| 输入框选中插件后发送 | **一条助手消息**（带 `PluginId`） | 是 | 是（它就是这一轮回答） | 下一轮普通对话会看到它 |
-| 气泡按钮 | **派生卡片**（挂在原消息下） | 是（持久化） | **否** | 只是对既有内容的加工 |
+| 触发 | 输入 | 产物 | 是否进历史 | 是否进上下文 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| 输入框 / 侧栏发送 | 输入框文本 | **一条助手消息**（带 `PluginId`） | 是 | 是（它就是这一轮回答） | 下一轮普通对话会看到它 |
+| 气泡按钮 | 该条消息正文 | **派生卡片**（挂在原消息下） | 是（持久化） | **默认否** | 只是对既有内容的加工 |
+| 划词菜单 | 选中文本 | **派生卡片**（挂在选区所在消息下） | 是（持久化） | **默认否** | `InputText` 记录真实输入 |
+| 卡片「加入上下文」 | — | 不改产物，只改 `IncludeInContext` | 是 | **是** | 只影响之后的请求，不重新请求模型 |
 
-> 为什么不把气泡运行也做成「一条新消息」：译文会污染后续推理、历史被切碎、用户分不清原文与译文。
+> 为什么不把气泡 / 划词运行也做成「一条新消息」：译文会污染后续推理、历史被切碎、用户分不清原文与译文。
+> 用户显式点「加入上下文」时，宿主才把该卡片的文本以 `[插件结果 · <pluginId>]` 追加到所属消息后进入请求。
 
 ### 9.2 流水线
 
@@ -465,13 +509,25 @@ RunRequest
   ├─ 2. 组装 AgentRunPlan
   │      system = 插件 skill（占位符已替换）+ [optional] 全局技能
   │      user   = 定界包裹后的输入文本
-  │      history= allowHistory ? 会话历史 : 空
+  │      history= allowHistory && contextParameter != "false" ? 切片后的会话历史 : 空
   │      tools  = 空（v1 声明式插件不支持工具）
   ├─ 3. 长文本分段（> 4000 字按段落切块，顺序执行）
   ├─ 4. 流式执行 → 解析输出（text / segments）
   ├─ 5. 收尾：写产物、写 LastPluginId、写指标
   └─ 6. 失败/取消：保留已生成部分，标状态，可重试
 ```
+
+**上下文切片规则**（`allowHistory: true` 且「关联上下文」为开）：
+
+| 入口 | 输入 | 带入的历史 |
+| --- | --- | --- |
+| 侧栏 / 输入框 | 输入框文本 | 当前用户消息**之前**的最近 10 条 |
+| 气泡 | 该条消息正文 | 该消息**之前**的最近 10 条（不重复本条） |
+| 划词 | 选中文本 | 该消息**之前**的最近 10 条 + 选区所在消息本身（帮助理解片段出处） |
+
+- 所有历史仍受 10 条 / ≤24,000 字符上限约束；
+- 已「加入上下文」的派生卡片按所属消息计入字符预算；
+- 关掉「关联上下文」时只发当前输入。
 
 ### 9.3 上下文预算
 
@@ -600,7 +656,12 @@ public sealed record DerivedArtifact(
     DerivedState State,          // Running / Done / Canceled / Failed
     string? Error,
     string ModelId, long DurationMs, int InputTokens, int OutputTokens,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    string? InputText = null,    // 划词的真实输入；null 表示回落到消息正文
+    bool IncludeInContext = false); // 用户点「加入上下文」后为 true
+
+// ContributesToContext = IncludeInContext && State == Done && Text 非空
+// 渲染层（AgentMessageMapper）与历史预算（PluginRunner.TakeHistory）共用这个判定。
 
 public sealed record OutputSegment(string Source, string Target);
 ```
@@ -629,6 +690,8 @@ public sealed record OutputSegment(string Source, string Target);
 2. 记录 ↔ 领域模型的映射有**两处**（`ToRecord` / `ToModel`），新增字段要一起改，否则会出现「界面有、重启没了」。
 
 派生卡片存的是**文本快照**，不是对插件或 skill 的引用——插件卸载后历史仍可读。
+`InputText` / `IncludeInContext` 都在 `DerivedJson` 里，**不需要数据库迁移**；老卡片读回时分别为 `null` / `false`。
+`messages.DerivedJson` 只负责持久化，是否进入上下文由 `IncludeInContext` 决定，默认不参与。
 
 ### 11.3 设置
 
@@ -637,10 +700,11 @@ public sealed record OutputSegment(string Source, string Target);
   "enabled": true,
   "maxInComposer": 3,
   "maxInSidebar": 6,
+  "maxInSelection": 4,
   "rememberParameterValues": true,
   "defaultOutputMode": "bilingual",
   "entries": [
-    { "id": "translate", "enabled": true, "inSidebar": true, "inComposer": true, "inMessage": true, "order": 10 }
+    { "id": "translate", "enabled": true, "inSidebar": true, "inComposer": true, "inMessage": true, "inSelection": true, "order": 10 }
   ]
 }
 ```
@@ -650,6 +714,7 @@ public sealed record OutputSegment(string Source, string Target);
 > 入口开关的依赖关系：**侧栏依赖输入框**。侧栏入口只是「新建一个预选该插件的会话」，
 > 输入框入口关闭后进去也看不到插件，所以 `inComposer = false` 时 `inSidebar` 一律视为关闭
 > （设置页把侧栏那一项灰掉并给原因）。`inMessage` 是气泡按钮的独立开关，与输入框无关。
+> `inSelection` 是划词菜单的独立开关，同样与输入框无关；`maxInSelection` 控制浮条里直接显示几个。
 
 ---
 
@@ -663,11 +728,17 @@ public sealed record OutputSegment(string Source, string Target);
   [重新扫描]  [打开插件目录]
 
   内置
-  ┌───────────────────────────────────────────────┐
-  │ [译] 翻译          1.0.0   内置                │
-  │      把文本翻译成指定语言                       │
-  │      侧栏 [✓]   输入框 [✓]   顺序 [10]  [启用] │
-  └───────────────────────────────────────────────┘
+  ┌─────────────────────────────────────────────────────────────┐
+  │ [译] 翻译          1.0.0   内置                              │
+  │      把文本翻译成指定语言                                     │
+  │      侧栏 [✓] 输入框 [✓] 气泡 [✓] 选中 [✓] 顺序 [10] [启用] │
+  └─────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │ [问] 简单问答      1.0.0   内置                              │
+  │      跳过技能与工具，直接给出简洁回答                         │
+  │      侧栏 [✓] 输入框 [✓] 气泡 [✓] 选中 [✓] 顺序 [5]  [启用] │
+  └─────────────────────────────────────────────────────────────┘
 
   本地
   ┌───────────────────────────────────────────────┐
@@ -676,7 +747,7 @@ public sealed record OutputSegment(string Source, string Target);
   │     指向不存在的 capability "translate"         │
   └───────────────────────────────────────────────┘
 
-  输入框最多显示 [3] 个 · 侧栏最多显示 [6] 个
+  输入框最多显示 [3] 个 · 侧栏最多显示 [6] 个 · 划词菜单最多显示 [4] 个
   [✓] 记住每个会话上次选择的参数
   新会话译文默认显示  ( ) 对照  ( ) 纯译文
 ```
@@ -698,6 +769,7 @@ public sealed record OutputSegment(string Source, string Target);
 | skill 路径 | `../../..` 读到系统文件 | `Path.GetFullPath` 后必须以插件目录为前缀，且扩展名必须是 `.md` |
 | 参数值 | 被拼进路径 / 文件名 / 命令 | 参数只做模板替换；v1 的声明式插件没有任何文件或进程操作 |
 | 提示词注入 | 用户文本伪装成指令 | skill 只进 system，输入只进 user 并定界；输入中的定界符做全角转义 |
+| 划词文本 | 选区可能包含敏感内容 | 只在用户主动点插件时发送；与输入框一样受 `privacy.sendsText` 首次确认保护；不自动上传选区 |
 | 插件文本 | 第三方插件 = 提示词投毒面 | v1 只支持本地目录安装，设置页明确提示风险；后续如需分发再加签名 |
 | 隐私 | 文本会发给模型服务商 | `privacy.sendsText = true` 时首次使用弹一次提示，可在设置里关闭 |
 | 资源 | 超大文件拖垮启动 | 清单 512 KB / skill 256 KB / icon 4 KB 上限，超限即拒绝并提示 |
@@ -737,12 +809,14 @@ public sealed record OutputSegment(string Source, string Target);
   ],
   "mounts": [
     { "id": "composer", "surface": "composer", "capability": "polish" },
-    { "id": "bubble", "surface": "message", "capability": "polish", "input": "message" }
+    { "id": "bubble", "surface": "message", "capability": "polish", "input": "message" },
+    { "id": "selection", "surface": "selection", "capability": "polish" }
   ]
 }
 ```
 
-这段配置的效果：输入框底部出现一个「润色」chip；每条助手消息底部出现一个润色按钮；两者都调同一个能力。
+这段配置的效果：输入框底部出现一个「润色」chip；每条助手消息底部出现一个润色按钮；
+在聊天正文里选中文本并松开鼠标，会出现带「润色」的划词菜单；三者都调同一个能力。
 
 ### 14.3 写技能
 
@@ -768,10 +842,11 @@ version: 1.0
 
 「设置 → 插件」→「重新扫描」→ 列表里出现「润色 · 本地」。
 
-测试两条路径：
+测试三条路径：
 
 - 输入框里选中「润色」→ 输入一段话 → 发送。
 - 随便找一条助手回答 → 点底部的润色按钮。
+- 在聊天正文里选中一段文字 → 松开鼠标 → 点浮条里的「润色」。
 
 ### 14.5 加参数
 
@@ -801,6 +876,21 @@ version: 1.0
 
 保存 → 重新扫描 → 输入框的 chip 右侧出现下拉框，气泡上的按钮点击后会展开面板。
 
+#### 关联上下文（可选）
+
+如果希望用户自己决定这一轮带不带历史：
+
+```json
+"allowHistory": true,
+"contextParameter": "useContext",
+"parameters": [
+  { "key": "useContext", "label": "关联上下文", "kind": "toggle", "default": "true" }
+]
+```
+
+`contextParameter` 必须指向本能力的 toggle 参数，且 `allowHistory` 必须为 true；参数为 `false` 时本轮不带历史。
+历史的具体切片规则见 §9。
+
 ### 14.6 双语对照
 
 在 capability 上加一行：
@@ -818,6 +908,7 @@ version: 1.0
 | 列表里没有 | 目录层级错了（必须是 `plugins/<文件夹>/plugin.json`）；或 JSON 有语法错误，看设置页的错误行号 |
 | 显示「加载失败」 | 按提示改；常见是 `mounts[0].capability` 写错、skill 路径写错 |
 | chip 出现了但点了没反应 | 没配置模型；或参数必填但没给默认值 |
+| 划词菜单不出现 | 检查插件的「选中」开关；只支持单条消息正文内、非空的选区 |
 | 输出格式乱 | skill 里要求了「先分析再输出」，把分析部分删掉 |
 | 改了 skill 不生效 | 点「重新扫描」；已打开的会话需要重新选一次插件 |
 
@@ -981,6 +1072,51 @@ UI  ：卡片可切对照/纯译文，可复制、重试、删除
 | 系统语言是 `de-DE` | 不在选项里 → 回落 `fallback: en` |
 | 目标语言选项后续被删 | 记忆值失效，回落到第一个选项 |
 
+### 15.6 内置「简单问答」插件完整示例
+
+清单（`src/Plugins/SDemo.DesktopAgent.Plugin.QuickAsk/plugin.json`）：
+
+```json
+{
+  "id": "quick-ask",
+  "name": "简单问答",
+  "version": "1.0.0",
+  "description": "跳过技能与工具，直接给出简洁回答；可选择是否关联上下文。",
+  "icon": { "text": "问" },
+  "capabilities": [
+    {
+      "id": "quick-ask",
+      "name": "简单问答",
+      "skill": "skills/quick-ask.md",
+      "allowHistory": true,
+      "contextParameter": "useContext",
+      "privacy": { "sendsText": true },
+      "output": { "format": "text" },
+      "parameters": [
+        { "key": "useContext", "label": "关联上下文", "kind": "toggle", "default": "true" }
+      ]
+    }
+  ],
+  "mounts": [
+    { "id": "sidebar",   "surface": "sidebar",   "capability": "quick-ask", "order": 5 },
+    { "id": "composer",  "surface": "composer",  "capability": "quick-ask", "order": 5 },
+    { "id": "bubble",    "surface": "message",   "capability": "quick-ask", "input": "message", "order": 5 },
+    { "id": "selection", "surface": "selection", "capability": "quick-ask", "order": 5 }
+  ]
+}
+```
+
+行为：
+
+| 入口 | 操作 | 结果 |
+| --- | --- | --- |
+| 侧栏 | 点「简单问答」 | 新建空会话，输入框已选中；发送后走单轮直答 |
+| 输入框 | 选中 chip → 输入问题 → 发送 | 跳过全局技能与工具，直接回答；消息角色显示「简单问答 · SDemo」 |
+| 气泡 | 点助手回答底部的「问」 | 对该回答做解释 / 追问；派生卡片，默认不进上下文 |
+| 划词 | 选中一段文本 → 鼠标抬起 → 点「简单问答」 | 以选中文本为输入；卡片挂在选区所在消息下 |
+
+「关联上下文」：打开时按 §9 的切片规则带历史；关闭时只发当前问题 / 片段。参数按会话记忆，默认打开。
+
 ---
 
 ## 16. 验收清单
@@ -995,7 +1131,11 @@ UI  ：卡片可切对照/纯译文，可复制、重试、删除
 - [ ] 插件模式发送后，助手消息显示插件归属（`翻译 · SDemo`）。
 - [ ] 会话图标在插件 Run 后变为插件图标，在普通推理后恢复默认。
 - [ ] 气泡按钮无参数时点击即执行；有参数时展开面板，OK / Cancel 生效。
-- [ ] 派生卡片不新增对话轮，且不出现在下一轮的请求上下文里（可用抓包或日志验证）。
+- [ ] 在聊天正文里选中文本、鼠标抬起后出现划词菜单；只显示设置里「选中」打开的插件。
+- [ ] 划词菜单执行后，派生卡片挂在选区所在消息下；重试使用的是选中文本而不是整条消息。
+- [ ] 跨消息选区、空选区、选中时间 / 按钮不出现划词菜单；滚动 / 切会话 / 关闭按钮能收起。
+- [ ] 「简单问答」四个入口都可用；关闭「关联上下文」时请求不带历史，打开时按切片规则带历史。
+- [ ] 派生卡片默认不新增对话轮、不出现在下一轮的请求上下文里；点「加入上下文」后才进入后续请求。
 - [ ] 对照 / 纯译文切换不产生新的模型请求。
 
 ### 边界
@@ -1009,8 +1149,8 @@ UI  ：卡片可切对照/纯译文，可复制、重试、删除
 
 ### 数据
 
-- [ ] 重启后：会话图标、输入框选中的插件、目标语言都还在。
-- [ ] 老库升级后不报 `no such column`（`sessions` 与 `messages` 都要补列）。
+- [ ] 重启后：会话图标、输入框选中的插件、目标语言、卡片上的「已加入上下文」都还在。
+- [ ] 老库升级后不报 `no such column`（`sessions` 与 `messages` 都要补列）；老卡片读回时 `InputText=null`、`IncludeInContext=false`。
 - [ ] 插件目录为空时，界面与现在完全一致（无插件不显示空区域）。
 
 ### 交互
@@ -1034,13 +1174,14 @@ UI  ：卡片可切对照/纯译文，可复制、重试、删除
 | **M4 设置** | 可管、可关、可排错 | 插件管理页 / 上限 / 重新扫描 | M0 | 1–2 天 |
 | M5 内置翻译 | 用真实插件跑通三条入口 | `plugin.json` + skill + 图标 | M1–M3 | 0.5 天 |
 | M6 双语对照 | segments 输出与切换 | 解析器 / 渲染 / 记忆 | M3 | 2 天 |
+| **M7 划词 + 简单问答** | 选区浮动菜单、上下文开关、卡片加入上下文 | `selection` surface / 划词 JS + 浮条 / `quick-ask` / 设置 | M1–M4 | 2–3 天 |
 
 依赖关系：
 
 ```text
 M0 ──┬──▶ M1 ──┬──▶ M2
-     │         └──▶ M3
-     └──▶ M4
+     │         └──▶ M3 ──▶ M7
+     └──▶ M4 ────────────▶ M7
 ```
 
 - **M0 是唯一硬前置**：没有清单解析，后面全是空转。
@@ -1220,12 +1361,13 @@ M0 ──┬──▶ M1 ──┬──▶ M2
 
 ---
 
-### 17.7 收尾（M5–M6）
+### 17.7 收尾（M5–M7）
 
 | 阶段 | 内容 | 验收 |
 | --- | --- | --- |
 | **M5 内置翻译** | 把 `plugin.json` + `translate.md` + 图标放进内置插件目录 | 三条入口全通，无需手工建目录（清单与 skill 已就位，M2 / M3 完成后三条入口才全通） |
 | **M6 双语对照** | 格式契约、`SegmentedOutputParser`、`SegmentedOutput.razor`、切换记忆、降级 | 切换零请求；模型不按格式输出时降级为纯译文并提示（已实现） |
+| **M7 划词 + 简单问答** | `selection` surface、`chat.js` 选区读取、`SelectionActionBar`、`QuickAsk` 插件、`contextParameter`、卡片「加入上下文」 | 四个入口全通；设置里能开关「选中」；关闭上下文不带历史；卡片加入后下一轮可见 |
 
 M5 建议在 M1 完成后就开始（先手工放目录），别等 M3/M4 全绿——它是检验「通用设计」是否成立的唯一标准。
 
@@ -1236,7 +1378,10 @@ M5 建议在 M1 完成后就开始（先手工放目录），别等 M3/M4 全绿
 | 风险 | 触发 | 影响 | 缓解 |
 | --- | --- | --- | --- |
 | 老库缺列 | 升级后启动 | 直接崩溃 | M1 首提交扩 `UpgradeSchemaAsync`；坏库跳过不影响其它库 |
-| 派生内容污染上下文 | 误把 `Derived` 拼进 history | 推理变差、token 上涨 | 只读 `Content` + 单测断言 |
+| 派生内容污染上下文 | 误把全部 `Derived` 拼进 history | 推理变差、token 上涨 | 默认不参与；只有 `IncludeInContext && Done` 才追加 + 单测断言 |
+| 划词选区丢失 | 点击浮条 / 重渲染 | 执行空输入 | mouseup 时抓取文本与坐标；浮条放消息容器外 |
+| 划词误弹 | 选中时间 / 按钮 / 跨消息 | 干扰阅读 | 只认正文、单条消息、非空选区；滚动即关闭 |
+| 上下文开关失效 | 能力写了 `contextParameter` 但没开 `allowHistory` | 用户以为带历史 | 加载时校验，能力直接标红 |
 | 模型不按 segments 输出 | 换模型 / 超长文本 | 对照不可用 | 降级为纯译文并提示，不抛错 |
 | 插件提示词过长 | 用户堆指令 | 成本与延迟上升 | 建议 4 KB、硬上限 256 KB |
 | 界面状态丢失 | 切会话 / 重启 | 体验断裂 | 会话级字段 + §16 验收项 |
@@ -1245,7 +1390,7 @@ M5 建议在 M1 完成后就开始（先手工放目录），别等 M3/M4 全绿
 
 ### 17.9 文件清单
 
-> 下面是 M0–M6 当时的布局，保留作为设计记录。模块化重构后：插件契约与运行时在 `src/Plugins/SDemo.DesktopAgent.Plugins.Abstractions` / `.Runtime`，内置插件在 `src/Plugins/SDemo.DesktopAgent.Plugin.Translate` / `.Summarize`（嵌入资源），`PluginRunner` 仍在 Core 作为应用编排。
+> 下面是 M0–M7 的布局，保留作为设计记录。模块化重构后：插件契约与运行时在 `src/Plugins/SDemo.DesktopAgent.Plugins.Abstractions` / `.Runtime`，内置插件在 `src/Plugins/SDemo.DesktopAgent.Plugin.Translate` / `.Summarize` / `.QuickAsk`（嵌入资源），`PluginRunner` 仍在 Core 作为应用编排。
 
 #### 新增文件
 
@@ -1266,7 +1411,7 @@ src/App/SDemo.DesktopAgent.Core/Models/
   PluginPreferences.cs       settings.json 的 plugins 节点（开关 / 上限 / 每插件覆盖 / 隐私确认）
 
 src/App/SDemo.DesktopAgent.Core/Services/
-  AgentMessageMapper.cs      请求上下文组装（只读正文与附件，派生卡片不参与）
+  AgentMessageMapper.cs      请求上下文组装（正文 / 附件 / 工具轨迹 + 已加入上下文的派生卡片）
 
 tests/SDemo.DesktopAgent.Core.Tests/
   PluginCatalogTests.cs      扫描 / 校验 / 去重 / 降级 / 体积上限
@@ -1274,18 +1419,28 @@ tests/SDemo.DesktopAgent.Core.Tests/
   PluginModelTests.cs        问题定位文案、参数显示名、宿主版本比较
   CompositionTests.cs        DI 注册与插件目录默认值
 
+src/Plugins/SDemo.DesktopAgent.Plugin.QuickAsk/
+  plugin.json                简单问答清单（四个入口 + useContext）
+  QuickAskPlugin.cs          内置包注册
+  skills/quick-ask.md        直答 skill
+
 src/App/SDemo.DesktopAgent.UI/Components/Plugins/
   PluginIcon.razor           图标渲染（paths / text 兜底）
   PluginChip.razor           输入框 chip（选中态 + ✕）
   PluginParameterControl.razor  单个参数的控件渲染
   PluginParameterPanel.razor    面板（内联 / 展开两种布局）
   PluginRail.razor           侧栏入口区
-  PluginActionButton.razor   气泡按钮 + 展开状态机
-  DerivedCard.razor          派生卡片（对照 / 纯译文切换）
+  PluginActionButton.razor   气泡按钮 + 展开状态机（划词菜单复用，ShowLabel）
+  DerivedCard.razor          派生卡片（对照 / 纯译文、加入 / 移出上下文）
+  SelectionActionBar.razor   划词浮动条（选区定位 + 参数面板 + 更多）
+  SelectionSnapshot.cs       划词选区 DTO（视口坐标 + 消息 id）
   SegmentedOutput.razor      分段渲染（宽屏两列 / 窄屏上下）
 
 src/App/SDemo.DesktopAgent.UI/Components/Settings/
-  PluginSettings.razor       插件管理页
+  PluginSettings.razor       插件管理页（启用 / 输入框 / 侧栏 / 气泡 / 选中 / 顺序 / 划词上限）
+
+src/App/SDemo.DesktopAgent.UI/wwwroot/js/
+  chat.js                    scroll / copy / readSelection（划词选区 + 消息锚点）
 ```
 
 #### 改造文件
@@ -1301,9 +1456,20 @@ src/App/SDemo.DesktopAgent.UI/Components/Settings/
 | `Core/Abstractions/IAppPaths.cs` | 加 `PluginsRoot` |
 | `Core/Composition/AgentCoreServiceCollectionExtensions.cs` | 注册 Catalog / Runner / Resolver |
 | `UI/Components/Chat/ChatComposer.razor` | 插件区、模式切换、参数内联 |
-| `UI/Components/Chat/ChatRoom.razor` | Run 分叉、派生渲染、状态持久化（当前切会话会清空选择，需改） |
+| `UI/Components/Chat/ChatRoom.razor` | Run 分叉、派生渲染、状态持久化；M7 加划词状态 / 消息锚点 / 历史切片 / 卡片加入上下文 |
 | `UI/Components/Sidebar/Sidebar.razor` | 入口区、会话图标 |
 | `UI/Components/Settings/SettingsSection.cs` / `SettingsView.razor` | 新分区 |
+| `Plugins.Abstractions/PluginModels.cs` | M7 加 `Selection` surface / `ContextParameter` / input 推断 |
+| `Plugins.Runtime/PluginManifest.cs` / `PluginValidator.cs` / `PluginRegistry.cs` | 清单字段、selection 校验、`inSelection` 过滤与上限 |
+| `Core/Plugins/PluginRunner.cs` | `allowHistory` + `contextParameter` 双重门控；历史预算计入已加入上下文的卡片 |
+| `Context/AgentMessageMapper.cs` | 只追加 `IncludeInContext && Done` 的派生卡片 |
+| `Contracts/Models/PluginMessage.cs` | `DerivedArtifact` 加 `InputText` / `IncludeInContext` / `ContributesToContext` |
+| `Contracts/Models/PluginPreferences.cs` | 加 `maxInSelection` / `inSelection` |
+| `UI/Components/Plugins/PluginActionButton.razor` | 加 `ShowLabel`，供划词浮条复用 |
+| `UI/Components/Plugins/DerivedCard.razor` | 加「加入 / 移出上下文」与状态标记 |
+| `UI/Components/Settings/PluginSettings.razor` | 加「选中」开关、划词上限、入口摘要 |
+| `UI/wwwroot/js/chat.js` / `css/app.css` | 划词选区读取、浮条样式、上下文标记 |
+| `SDemo.DesktopAgent.sln` / `Core.csproj` / `AgentCoreServiceCollectionExtensions.cs` | 注册 `QuickAskPlugin` |
 | `README.md` | 补一节「插件」并链接本文 |
 
 ---
@@ -1328,8 +1494,11 @@ src/App/SDemo.DesktopAgent.UI/Components/Settings/
 | Plugin | 插件包：一个目录 + `plugin.json` |
 | Capability | 能力：skill + 参数 + 输出格式 |
 | Mount | 入口：能力在某个界面上的挂载配置 |
-| Surface | 界面类型：`sidebar` / `composer` / `message` |
+| Surface | 界面类型：`sidebar` / `composer` / `message` / `selection` |
+| Selection | 划词入口：在聊天正文里选中文本后弹出的浮动插件菜单 |
 | Run | 一次执行 |
-| Derived artifact | 派生卡片：挂在消息下的加工结果，不进上下文 |
+| Context parameter | 控制「是否关联上下文」的 toggle 参数 key（`contextParameter`） |
+| Derived artifact | 派生卡片：挂在消息下的加工结果，默认不进上下文 |
+| Promoted artifact | 用户点「加入上下文」后进入后续请求的派生卡片 |
 | Global skill | 全局技能：`skills/` 根目录下的 md，不绑定插件 |
 | Segment | 对照模式下的一对「原文 / 译文」 |

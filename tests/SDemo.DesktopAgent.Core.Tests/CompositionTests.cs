@@ -29,12 +29,27 @@ public sealed class CompositionTests
 
         Assert.Equal(Path.Combine(temp.Root, "plugins"), catalog.LocalRoot);
         // 内置插件随程序集发布，不再有输出目录下的 plugins\；
-        // 本地目录为空时，仍能扫描到两个内置插件。
+        // 本地目录为空时，仍能扫描到三个内置插件。
         Assert.Null(catalog.BuiltinRoot);
-        Assert.Equal(2, catalog.BuiltinPackageCount);
+        Assert.Equal(3, catalog.BuiltinPackageCount);
         Assert.Equal(Path.Combine(temp.Root, "plugins"), paths.PluginsRoot);
         Assert.False(catalog.Result.IsEmpty);
-        Assert.Equal(["summarize", "translate"], catalog.Result.Usable.Select(plugin => plugin.Id).Order().ToArray());
+        Assert.Equal(
+            ["quick-ask", "summarize", "translate"],
+            catalog.Result.Usable.Select(plugin => plugin.Id).Order().ToArray());
+
+        // 简单问答：四个入口 + 可切换的「关联上下文」。
+        var quickAsk = catalog.Result.Find("quick-ask");
+        Assert.NotNull(quickAsk);
+        Assert.Single(quickAsk!.UsableMounts(PluginSurface.Sidebar));
+        Assert.Single(quickAsk.UsableMounts(PluginSurface.Composer));
+        Assert.Single(quickAsk.UsableMounts(PluginSurface.Message));
+        Assert.Single(quickAsk.UsableMounts(PluginSurface.Selection));
+
+        var capability = Assert.Single(quickAsk.Capabilities);
+        Assert.Equal("useContext", capability.ContextParameter);
+        Assert.True(capability.AllowHistory);
+        Assert.Equal("true", Assert.Single(capability.Parameters).Default);
     }
 
     [Fact]

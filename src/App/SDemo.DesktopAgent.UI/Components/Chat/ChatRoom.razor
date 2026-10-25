@@ -118,8 +118,8 @@
         <TodosPanel Todos="Session.Todos" />
         <VerificationBadge Session="Session" />
 
-        <div class="chat-scroll" @ref="_scrollElement">
-            <div class="chat-messages">
+        <div class="chat-scroll" @ref="_scrollElement" @onscroll="DismissSelectionMenu">
+            <div class="chat-messages" @onmouseup="HandleSelectionMouseUpAsync">
                 @for (var messageIndex = 0; messageIndex < Session.Messages.Count; messageIndex++)
                 {
                     var message = Session.Messages[messageIndex];
@@ -151,7 +151,8 @@
                     else
                     {
                     @* 普通气泡；续答（msg--cont）不重复角色名，视觉上并进上一块。 *@
-                    <article class="msg @(isUser ? "msg--user" : "msg--assistant") @(isContinuation ? "msg--cont" : null)">
+                    <article class="msg @(isUser ? "msg--user" : "msg--assistant") @(isContinuation ? "msg--cont" : null)"
+                             data-message-id="@message.Id">
                         @if (!isContinuation)
                         {
                             <span class="msg-role">@RoleLabel(message)</span>
@@ -422,6 +423,7 @@
                                                  Mode="@ModeFor(artifact.PluginId)"
                                                  SegmentsExpected="@SegmentsExpected(artifact)"
                                                  OnToggleMode="@(mode => SetOutputModeAsync(artifact.PluginId, mode))"
+                                                 OnToggleContext="@(() => ToggleArtifactContextAsync(message, artifact))"
                                                  OnRetry="@(() => RetryArtifactAsync(message, artifact))"
                                                  OnDelete="@(() => DeleteArtifactAsync(message, artifact))" />
                                 }
@@ -449,6 +451,22 @@
                     </div>
                 }
             </div>
+
+            @* 划词菜单：固定在选区旁，不占消息流布局；数据在 mouseup 时已抓取，选区消失也不影响执行。 *@
+            @if (_selection is { } selection && _selectionEntries.Count > 0)
+            {
+                <SelectionActionBar Entries="_selectionEntries"
+                                    MaxVisible="@Registry.MaxFor(PluginSurface.Selection)"
+                                    Left="@selection.Left"
+                                    Top="@selection.Top"
+                                    Bottom="@selection.Bottom"
+                                    PlaceAbove="@selection.PlaceAbove"
+                                    TextLength="@selection.Text.Length"
+                                    Busy="@_isGenerating"
+                                    RunningMountKey="@_runningMountKey"
+                                    OnRun="RunSelectionAsync"
+                                    OnDismiss="DismissSelectionMenu" />
+            }
         </div>
     }
 
@@ -840,6 +858,12 @@
     /// <summary>正在运行的派生卡片对应的入口组合键（按钮上显示转圈）。</summary>
     private string? _runningMountKey;
 
+    /// <summary>当前划词选区；null 表示划词菜单没有打开。</summary>
+    private SelectionSnapshot? _selection;
+
+    /// <summary>划词菜单里可用的插件入口（打开菜单时按设置解析一次）。</summary>
+    private IReadOnlyList<PluginActionEntry> _selectionEntries = [];
+
     /// <summary>插件被停用 / 入口被关掉时，输入框上方的一句提示。</summary>
     private string? _pluginNotice;
 
@@ -1005,6 +1029,8 @@
             _showCompacted = false;
             _modelMenuOpen = false;
             _messagePendingDelete = null;
+            _selection = null;
+            _selectionEntries = [];
             RefreshContextPreview();
         }
         else
@@ -1952,6 +1978,10 @@
 
             // 正在用的插件被停用 / 入口被关掉时，ApplyActiveMount 会回退到全局模式并给出提示。
             ApplyActiveMount(Session.ActiveMountId);
+
+            // 已打开的划词菜单按旧入口解析过，设置一变就关掉，避免点到已停用的插件。
+            _selection = null;
+            _selectionEntries = [];
             StateHasChanged();
         });
 
@@ -2422,6 +2452,10 @@
             return;
         }
 
+        // 输入框刚把这一轮的用户消息写进会话；历史要取它之前的对话，避免同一条内容出现两次。
+        var lastUserIndex = Session.Messages.FindLastIndex(item => item.Role == ChatMessageRole.User);
+        var history = lastUserIndex <= 0 ? [] : Session.Messages.Take(lastUserIndex).ToList();
+
         _isGenerating = true;
         await SetGeneratingAsync(true);
 
@@ -2455,7 +2489,8 @@
                 text,
                 option.Provider,
                 option.ModelId,
-                metrics);
+                metrics,
+                history);
 
             await ConsumePluginAsync(reply, capability, PluginRunner.RunComposerAsync(request, cts.Token));
         }
@@ -2852,27 +2887,171 @@
 
     private string PluginDisplayName(string pluginId) => Registry.DisplayName(pluginId);
 
-    /// <summary>气泡按钮触发：新建一张派生卡片并开始流式加工（原文 = 该条消息的正文）。</summary>
-    private async Task RunArtifactAsync(ChatMessage message, PluginActionEntry entry)
+    /// <summary>划词菜单里可用的入口（selection 界面、已被用户启用），参数按会话记忆解析。</summary>
+    private IReadOnlyList<PluginActionEntry> BuildSelectionPluginActions()
     {
-        if (NeedsPrivacyPrompt(entry.Plugin))
+        var entries = new List<PluginActionEntry>();
+
+        foreach (var mount in Registry.Mounts(PluginSurface.Selection))
         {
-            _privacyPlugin = entry.Plugin;
-            _pendingAfterPrivacy = () => RunArtifactCoreAsync(message, entry);
+            var plugin = Registry.Find(mount.PluginId);
+            if (plugin is null || mount.Capability is not { } capability)
+            {
+                continue;
+            }
+
+            entries.Add(new PluginActionEntry(
+                plugin,
+                mount,
+                ParameterResolver.Resolve(capability, plugin.Id, mount.Id, MemoryForResolve())));
+        }
+
+        return entries;
+    }
+
+    /// <summary>
+    /// 鼠标抬起：读取选区并在选区旁打开划词菜单。
+    /// 只处理「单条消息正文内、非空、未超上限」的选区；其它情况静默关闭。
+    /// </summary>
+    private async Task HandleSelectionMouseUpAsync()
+    {
+        if (_isGenerating)
+        {
+            DismissSelectionMenu();
+            return;
+        }
+
+        SelectionSnapshot? snapshot;
+        try
+        {
+            snapshot = await Js.InvokeAsync<SelectionSnapshot?>("sdChat.readSelection", _scrollElement);
+        }
+        catch (JSException)
+        {
+            return;
+        }
+
+        if (snapshot is null)
+        {
+            DismissSelectionMenu();
+            return;
+        }
+
+        if (snapshot.Text.Length > SDemo.DesktopAgent.Plugins.PluginRunner.MaxInputChars)
+        {
+            _pluginNotice = $"选中内容 {snapshot.Text.Length:N0} 字符，超过 {SDemo.DesktopAgent.Plugins.PluginRunner.MaxInputChars:N0} 字符上限，暂不支持划词执行。";
+            DismissSelectionMenu();
+            return;
+        }
+
+        var anchor = Session.Messages.FirstOrDefault(message =>
+            string.Equals(message.Id, snapshot.MessageId, StringComparison.Ordinal));
+
+        if (anchor is null)
+        {
+            DismissSelectionMenu();
+            return;
+        }
+
+        if (anchor.Derived.Count >= MaxArtifactsPerMessage)
+        {
+            _pluginNotice = $"这条消息下已有 {MaxArtifactsPerMessage} 张插件卡片，先删掉一张再用划词菜单。";
+            DismissSelectionMenu();
+            return;
+        }
+
+        var entries = BuildSelectionPluginActions();
+        if (entries.Count == 0)
+        {
+            DismissSelectionMenu();
+            return;
+        }
+
+        _pluginNotice = null;
+        _selection = snapshot;
+        _selectionEntries = entries;
+        StateHasChanged();
+    }
+
+    /// <summary>划词菜单选中插件：以选中文本为输入，产物挂到选区所在消息下。</summary>
+    private async Task RunSelectionAsync(PluginActionEntry entry)
+    {
+        var selection = _selection;
+        _selection = null;
+        _selectionEntries = [];
+
+        if (selection is null)
+        {
+            return;
+        }
+
+        var message = Session.Messages.FirstOrDefault(item =>
+            string.Equals(item.Id, selection.MessageId, StringComparison.Ordinal));
+
+        if (message is null)
+        {
             StateHasChanged();
             return;
         }
 
-        await RunArtifactCoreAsync(message, entry);
+        await RunArtifactAsync(message, entry, selection.Text);
     }
 
-    private async Task RunArtifactCoreAsync(ChatMessage message, PluginActionEntry entry)
+    private void DismissSelectionMenu()
+    {
+        if (_selection is null && _selectionEntries.Count == 0)
+        {
+            return;
+        }
+
+        _selection = null;
+        _selectionEntries = [];
+        StateHasChanged();
+    }
+
+    /// <summary>这条消息之前的对话（不含它自己）。</summary>
+    private IReadOnlyList<ChatMessage> HistoryBefore(ChatMessage message)
+    {
+        var index = Session.Messages.IndexOf(message);
+        return index <= 0 ? [] : Session.Messages.Take(index).ToList();
+    }
+
+    /// <summary>截至并包含这条消息的对话（划词时把选区出处也带给模型）。</summary>
+    private IReadOnlyList<ChatMessage> HistoryThrough(ChatMessage message)
+    {
+        var index = Session.Messages.IndexOf(message);
+        return index < 0 ? [] : Session.Messages.Take(index + 1).ToList();
+    }
+
+    /// <summary>气泡按钮触发：新建一张派生卡片并开始流式加工（原文 = 该条消息的正文）。</summary>
+    private Task RunArtifactAsync(ChatMessage message, PluginActionEntry entry) =>
+        RunArtifactAsync(message, entry, inputText: null);
+
+    /// <summary>派生卡片触发：<paramref name="inputText"/> 为空时用消息正文，划词时为选中文本。</summary>
+    private async Task RunArtifactAsync(ChatMessage message, PluginActionEntry entry, string? inputText)
+    {
+        if (NeedsPrivacyPrompt(entry.Plugin))
+        {
+            _privacyPlugin = entry.Plugin;
+            _pendingAfterPrivacy = () => RunArtifactCoreAsync(message, entry, inputText);
+            StateHasChanged();
+            return;
+        }
+
+        await RunArtifactCoreAsync(message, entry, inputText);
+    }
+
+    private async Task RunArtifactCoreAsync(ChatMessage message, PluginActionEntry entry, string? inputText)
     {
         // 单飞：同一会话同一时间只允许一个 Run。
         if (_isGenerating || message.Derived.Count >= MaxArtifactsPerMessage)
         {
             return;
         }
+
+        // 划词的输入是片段，把选区所在消息也带进历史（帮助模型理解出处）；
+        // 气泡的输入就是整条消息，历史只取它之前的对话，避免同一条内容出现两次。
+        var history = inputText is null ? HistoryBefore(message) : HistoryThrough(message);
 
         var option = _modelOptions.FirstOrDefault(item => item.Key == _selectedKey);
         if (option is null)
@@ -2891,14 +3070,15 @@
                 0,
                 0,
                 0,
-                DateTime.Now));
+                DateTime.Now,
+                inputText));
 
             StateHasChanged();
             await NotifySessionChangedAsync();
             return;
         }
 
-        // 气泡 Run 也写会话记忆：下次再点同一个插件，语言还是上次选的。
+        // 气泡 / 划词 Run 也写会话记忆：下次再点同一个插件，参数还是上次选的。
         RememberArtifactValues(entry);
 
         message.Derived.Add(new DerivedArtifact(
@@ -2915,9 +3095,10 @@
             0,
             0,
             0,
-            DateTime.Now));
+            DateTime.Now,
+            inputText));
 
-        await ExecuteArtifactAsync(message, message.Derived.Count - 1, entry, option);
+        await ExecuteArtifactAsync(message, message.Derived.Count - 1, entry, option, history);
     }
 
     /// <summary>重试：沿用同一插件 / 参数，把卡片重置成 Running 再跑一次。</summary>
@@ -2969,7 +3150,14 @@
             ModelId = option.ModelId
         };
 
-        await ExecuteArtifactAsync(message, index, new PluginActionEntry(plugin, mount, artifact.Values), option);
+        var history = artifact.InputText is null ? HistoryBefore(message) : HistoryThrough(message);
+
+        await ExecuteArtifactAsync(
+            message,
+            index,
+            new PluginActionEntry(plugin, mount, artifact.Values),
+            option,
+            history);
     }
 
     /// <summary>跑一次派生卡片：流式写入 Text，收尾时写状态与指标。</summary>
@@ -2977,7 +3165,8 @@
         ChatMessage message,
         int index,
         PluginActionEntry entry,
-        ModelOption option)
+        ModelOption option,
+        IReadOnlyList<ChatMessage> history)
     {
         _isGenerating = true;
         _runningMountKey = entry.Mount.Key;
@@ -3000,14 +3189,17 @@
 
         try
         {
+            var inputText = message.Derived[index].InputText ?? message.Content;
+
             var request = new PluginRunRequest(
                 entry.Plugin,
                 entry.Mount,
                 entry.Values,
-                message.Content,
+                inputText,
                 option.Provider,
                 option.ModelId,
-                metrics);
+                metrics,
+                history);
 
             await foreach (var delta in PluginRunner.RunArtifactAsync(request, cts.Token))
             {
@@ -3126,6 +3318,25 @@
             Text = current.Text + note,
             Segments = segments
         };
+    }
+
+    /// <summary>派生卡片「加入 / 移出上下文」：只影响下一轮请求，不重新跑模型。</summary>
+    private async Task ToggleArtifactContextAsync(ChatMessage message, DerivedArtifact artifact)
+    {
+        if (artifact.State != DerivedState.Done || string.IsNullOrWhiteSpace(artifact.Text))
+        {
+            return;
+        }
+
+        var index = message.Derived.FindIndex(item => string.Equals(item.Id, artifact.Id, StringComparison.Ordinal));
+        if (index < 0)
+        {
+            return;
+        }
+
+        message.Derived[index] = artifact with { IncludeInContext = !artifact.IncludeInContext };
+        StateHasChanged();
+        await NotifySessionChangedAsync();
     }
 
     private async Task DeleteArtifactAsync(ChatMessage message, DerivedArtifact artifact)

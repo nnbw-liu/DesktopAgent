@@ -11,8 +11,10 @@ namespace SDemo.DesktopAgent.Services;
 
 /// <summary>
 /// 把领域消息渲染成「实际发给模型的文本」。这里是「消息里哪些东西会进入上下文」的唯一实现：
-/// 只读 <see cref="ChatMessageModel.Content"/>、附件与工具轨迹，<b>派生卡片（Derived）永远不参与</b>——
-/// 译文不该污染下一轮推理。改这个文件前请先看 PluginDerivedContextTests。
+/// 读取正文、附件、工具轨迹，以及<b>用户显式「加入上下文」的派生卡片</b>。
+/// 派生卡片默认不参与——译文 / 加工结果不该自动污染下一轮推理；只有
+/// <see cref="DerivedArtifact.IncludeInContext"/> 为 true 的才追加。
+/// 改这个文件前请先看 PluginDerivedContextTests。
 /// 消息取舍（保留哪几条）由 <see cref="ContextTrimmer"/> 决定，这里只负责渲染。
 /// </summary>
 internal static class AgentMessageMapper
@@ -29,7 +31,9 @@ internal static class AgentMessageMapper
     };
 
     public static bool ShouldInclude(ChatMessageModel message) =>
-        !string.IsNullOrWhiteSpace(message.Content) || message.Attachments.Count > 0;
+        !string.IsNullOrWhiteSpace(message.Content)
+        || message.Attachments.Count > 0
+        || PromotedArtifacts(message).Any();
 
     /// <summary>兼容入口：全量内联附件 + 回放轨迹（测试与旧调用方使用）。</summary>
     public static AIChatMessage ToRequestMessage(ChatMessageModel message) => new(
@@ -56,6 +60,19 @@ internal static class AgentMessageMapper
         string? attachmentBlock = null;
         string? traceBlock = null;
 
+        foreach (var artifact in PromotedArtifacts(message))
+        {
+            if (text.Length > 0)
+            {
+                text.AppendLine().AppendLine();
+            }
+
+            text.Append("[插件结果 · ")
+                .Append(artifact.PluginId)
+                .AppendLine("]")
+                .Append(artifact.Text);
+        }
+
         if (message.Attachments.Count > 0)
         {
             var block = RenderAttachments(message.Attachments, attachmentCharLimit);
@@ -75,6 +92,10 @@ internal static class AgentMessageMapper
 
         return new RenderedContent(text.ToString(), attachmentBlock, traceBlock);
     }
+
+    /// <summary>用户点过「加入上下文」、已完成且确有待发送文本的派生卡片。</summary>
+    private static IEnumerable<DerivedArtifact> PromotedArtifacts(ChatMessageModel message) =>
+        message.Derived.Where(artifact => artifact.ContributesToContext);
 
     private static StringBuilder RenderAttachments(IReadOnlyList<ChatAttachment> attachments, int charLimit)
     {

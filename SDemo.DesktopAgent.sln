@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -114,6 +114,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoutingEval", "tools\routing-eval\RoutingEval.csproj", "{BC721543-9623-4458-A11D-2B5D623E1E50}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SDemo.DesktopAgent.UI.Tests", "tests\SDemo.DesktopAgent.UI.Tests\SDemo.DesktopAgent.UI.Tests.csproj", "{57D73514-017D-4BD2-A8B9-D145DA362EB5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SDemo.DesktopAgent.Plugin.QuickAsk", "src\Plugins\SDemo.DesktopAgent.Plugin.QuickAsk\SDemo.DesktopAgent.Plugin.QuickAsk.csproj", "{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -581,6 +583,18 @@ Global
 		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Release|x64.Build.0 = Release|Any CPU
 		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Release|x86.ActiveCfg = Release|Any CPU
 		{57D73514-017D-4BD2-A8B9-D145DA362EB5}.Release|x86.Build.0 = Release|Any CPU
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Debug|x64.Build.0 = Debug|Any CPU
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Debug|x86.Build.0 = Debug|Any CPU
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Release|x64.ActiveCfg = Release|Any CPU
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Release|x64.Build.0 = Release|Any CPU
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Release|x86.ActiveCfg = Release|Any CPU
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -639,5 +653,6 @@ Global
 		{2428F2E8-4E23-D9E6-2362-288ACBDDD2EC} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 		{BC721543-9623-4458-A11D-2B5D623E1E50} = {2428F2E8-4E23-D9E6-2362-288ACBDDD2EC}
 		{57D73514-017D-4BD2-A8B9-D145DA362EB5} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{C200F93E-B5A5-4DA4-B85A-D0AD2D216532} = {8C42683D-3B3D-4A60-8C62-08168530DF7A}
 	EndGlobalSection
 EndGlobal

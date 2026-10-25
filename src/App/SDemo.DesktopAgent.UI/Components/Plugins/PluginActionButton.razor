@@ -9,6 +9,10 @@
             disabled="@(Disabled || IsRunning)"
             @onclick="HandleButtonClick">
         <PluginIcon Plugin="Plugin" />
+        @if (ShowLabel)
+        {
+            <span class="plugin-action-label">@Plugin.Name</span>
+        }
         @if (IsRunning)
         {
             <span class="plugin-action-spinner" aria-hidden="true"></span>
@@ -59,6 +63,10 @@
     /// <summary>会话忙 / 卡片已达上限时禁用。</summary>
     [Parameter]
     public bool Disabled { get; set; }
+
+    /// <summary>在图标旁显示插件名（划词菜单用；气泡上只显示图标）。</summary>
+    [Parameter]
+    public bool ShowLabel { get; set; }
 
     [Parameter]
     public EventCallback<PluginActionEntry> OnRun { get; set; }

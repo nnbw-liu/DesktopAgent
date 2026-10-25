@@ -18,7 +18,7 @@
         <label class="settings-row settings-row--toggle">
             <span class="settings-row-text">
                 <span class="settings-row-title">启用插件</span>
-                <span class="settings-row-hint">关掉后侧栏、输入框、气泡都不显示插件；已打开的会话会回到普通对话。</span>
+                <span class="settings-row-hint">关掉后侧栏、输入框、气泡、划词菜单都不显示插件；已打开的会话会回到普通对话。</span>
             </span>
             <input type="checkbox" class="switch" checked="@Prefs.Enabled" @onchange="ToggleGlobal" />
         </label>
@@ -43,6 +43,17 @@
                        max="20"
                        value="@Prefs.MaxInSidebar"
                        @onchange="args => SaveLimit(args, composer: false)" />
+                <span class="plugin-limit-unit">个</span>
+            </label>
+
+            <label class="plugin-limit">
+                <span class="plugin-limit-label">划词菜单最多显示</span>
+                <input type="number"
+                       class="field-input plugin-limit-input"
+                       min="1"
+                       max="20"
+                       value="@Prefs.MaxInSelection"
+                       @onchange="SaveSelectionLimit" />
                 <span class="plugin-limit-unit">个</span>
             </label>
         </div>
@@ -190,6 +201,16 @@
                             <span>气泡</span>
                         </label>
 
+                        <label class="plugin-control @(HasSelection(plugin) ? null : "is-disabled")"
+                               title="@(HasSelection(plugin) ? "在聊天记录中选中文本时显示该插件" : "这个插件没有划词入口")">
+                            <input type="checkbox"
+                                   class="switch switch--sm"
+                                   checked="@InSelection(plugin)"
+                                   disabled="@(!HasSelection(plugin))"
+                                   @onchange="args => SetInSelection(plugin, args)" />
+                            <span>选中</span>
+                        </label>
+
                         <label class="plugin-control plugin-control--order" title="数字小的排前面；清空表示用插件清单里的顺序">
                             <span>顺序</span>
                             <input type="number"
@@ -306,6 +327,17 @@
         Settings.Save();
     }
 
+    private void SaveSelectionLimit(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var value))
+        {
+            return;
+        }
+
+        Prefs.MaxInSelection = PluginPreferences.ClampLimit(value);
+        Settings.Save();
+    }
+
     private void SetPluginEnabled(PluginDescriptor plugin, ChangeEventArgs args)
     {
         Prefs.GetOrAddEntry(plugin.Id).Enabled = args.Value is true;
@@ -327,6 +359,12 @@
     private void SetInMessage(PluginDescriptor plugin, ChangeEventArgs args)
     {
         Prefs.GetOrAddEntry(plugin.Id).InMessage = args.Value is true;
+        Settings.Save();
+    }
+
+    private void SetInSelection(PluginDescriptor plugin, ChangeEventArgs args)
+    {
+        Prefs.GetOrAddEntry(plugin.Id).InSelection = args.Value is true;
         Settings.Save();
     }
 
@@ -354,6 +392,8 @@
     private bool InComposer(PluginDescriptor plugin) => Prefs.FindEntry(plugin.Id)?.InComposer ?? true;
 
     private bool InMessage(PluginDescriptor plugin) => Prefs.FindEntry(plugin.Id)?.InMessage ?? true;
+
+    private bool InSelection(PluginDescriptor plugin) => Prefs.FindEntry(plugin.Id)?.InSelection ?? true;
 
     /// <summary>侧栏能不能用：插件本身要有侧栏入口，而且输入框入口得开着（侧栏会进入预选插件的会话）。</summary>
     private bool CanUseSidebar(PluginDescriptor plugin) =>
@@ -393,6 +433,9 @@
     private static bool HasMessage(PluginDescriptor plugin) =>
         plugin.Mounts.Any(mount => mount.IsUsable && mount.Surface == PluginSurface.Message);
 
+    private static bool HasSelection(PluginDescriptor plugin) =>
+        plugin.Mounts.Any(mount => mount.IsUsable && mount.Surface == PluginSurface.Selection);
+
     private static string SurfaceSummary(PluginDescriptor plugin)
     {
         var parts = new List<string>();
@@ -409,6 +452,11 @@
         if (plugin.UsableMounts(PluginSurface.Message).Count > 0)
         {
             parts.Add("气泡");
+        }
+
+        if (plugin.UsableMounts(PluginSurface.Selection).Count > 0)
+        {
+            parts.Add("选中");
         }
 
         return parts.Count == 0 ? "无可用入口" : string.Join(" / ", parts);

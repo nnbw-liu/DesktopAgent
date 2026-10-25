@@ -219,6 +219,7 @@ public sealed class PluginValidator
 
         var parameters = BuildParameters(dto.Parameters, index, issues);
         var parameterKeys = parameters.Select(parameter => parameter.Key).ToHashSet(StringComparer.Ordinal);
+        var contextParameter = ValidateContextParameter(dto, parameters, path, issues);
 
         string? skillContent = null;
         var skillRelative = dto.Skill?.Trim().Replace('\\', '/') ?? string.Empty;
@@ -263,11 +264,49 @@ public sealed class PluginValidator
             SkillVersion = skillVersion,
             AllowGlobalSkills = dto.AllowGlobalSkills ?? false,
             AllowHistory = dto.AllowHistory ?? false,
+            ContextParameter = contextParameter,
             OutputFormat = output,
             SendsText = dto.Privacy?.SendsText ?? false,
             Parameters = parameters,
             Issues = issues
         };
+    }
+
+    /// <summary>
+    /// 「是否关联上下文」参数：必须指向本能力里已定义的 toggle，且能力打开了 allowHistory。
+    /// 返回 null 表示没有声明（历史只由 allowHistory 决定）。
+    /// </summary>
+    private static string? ValidateContextParameter(
+        PluginCapabilityDto dto,
+        IReadOnlyList<PluginParameter> parameters,
+        string capabilityPath,
+        List<PluginIssue> issues)
+    {
+        var contextParameter = dto.ContextParameter?.Trim();
+        if (string.IsNullOrEmpty(contextParameter))
+        {
+            return null;
+        }
+
+        var path = $"{capabilityPath}.contextParameter";
+        var parameter = parameters.FirstOrDefault(item =>
+            string.Equals(item.Key, contextParameter, StringComparison.Ordinal));
+
+        if (parameter is null)
+        {
+            issues.Add(Error($"contextParameter \"{contextParameter}\" 没有对应的参数定义", path));
+        }
+        else if (parameter.Kind != PluginParameterKind.Toggle)
+        {
+            issues.Add(Error($"contextParameter \"{contextParameter}\" 必须指向 toggle 参数", path));
+        }
+
+        if (dto.AllowHistory != true)
+        {
+            issues.Add(Error("contextParameter 需要同时设置 allowHistory: true", path));
+        }
+
+        return contextParameter;
     }
 
     private List<PluginParameter> BuildParameters(List<PluginParameterDto>? dtos, int capabilityIndex, List<PluginIssue> issues)
@@ -457,7 +496,7 @@ public sealed class PluginValidator
         var surface = PluginSurface.Composer;
         if (!TryParseSurface(dto.Surface, out surface))
         {
-            issues.Add(Error($"surface 必须是 sidebar / composer / message，实际是 \"{dto.Surface}\"", $"{path}.surface"));
+            issues.Add(Error($"surface 必须是 sidebar / composer / message / selection，实际是 \"{dto.Surface}\"", $"{path}.surface"));
         }
 
         var capabilityId = dto.Capability?.Trim() ?? string.Empty;
@@ -488,6 +527,16 @@ public sealed class PluginValidator
             {
                 issues.Add(Error($"input 必须是 composer / message / selection，实际是 \"{dto.Input}\"", $"{path}.input"));
             }
+        }
+
+        // selection 是独立入口：不允许 message/composer 挂一个「选中文本」输入，语义会含糊。
+        if (surface == PluginSurface.Selection && input != PluginInput.Selection)
+        {
+            issues.Add(Error("surface selection 只能使用 input selection", $"{path}.input"));
+        }
+        else if (input == PluginInput.Selection && surface != PluginSurface.Selection)
+        {
+            issues.Add(Error("input selection 只能用于 surface selection", $"{path}.input"));
         }
 
         return new PluginMount

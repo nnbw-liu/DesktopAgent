@@ -14,7 +14,10 @@ public enum PluginSurface
 {
     Sidebar,
     Composer,
-    Message
+    Message,
+
+    /// <summary>在聊天记录里选中文本后出现的浮动插件菜单。</summary>
+    Selection
 }
 
 /// <summary>Run 的输入从哪来。</summary>
@@ -26,7 +29,7 @@ public enum PluginInput
     /// <summary>某条消息的正文（气泡按钮）。</summary>
     Message,
 
-    /// <summary>选中文本（预留，v1 不实现）。</summary>
+    /// <summary>聊天记录里选中的文本（划词菜单）。</summary>
     Selection
 }
 
@@ -194,6 +197,12 @@ public sealed record PluginCapability
     /// <summary>是否带会话历史（默认关）。</summary>
     public bool AllowHistory { get; init; }
 
+    /// <summary>
+    /// 控制「是否关联上下文」的 toggle 参数 key；为空表示历史只由 <see cref="AllowHistory"/> 决定。
+    /// 设置了它时，参数值解析为 <c>false</c> 的本轮不带历史。
+    /// </summary>
+    public string? ContextParameter { get; init; }
+
     public PluginOutputFormat OutputFormat { get; init; } = PluginOutputFormat.Text;
 
     /// <summary>会把文本发给模型服务商（用于首次使用提示）。</summary>
@@ -243,6 +252,7 @@ public sealed record PluginMount
     public static PluginInput DefaultInputFor(PluginSurface surface) => surface switch
     {
         PluginSurface.Message => PluginInput.Message,
+        PluginSurface.Selection => PluginInput.Selection,
         _ => PluginInput.Composer
     };
 }
