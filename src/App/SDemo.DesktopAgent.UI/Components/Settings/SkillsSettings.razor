@@ -1,0 +1,233 @@
+@using System.IO
+@implements IDisposable
+@inject SkillCatalog Catalog
+@inject IFileLauncherService Launcher
+
+@* 技能库设置：目录包与旧式单文件的发现结果、版本 / 来源 / 目录哈希，以及打开技能目录。 *@
+<div class="settings-pane">
+    <section class="settings-section">
+        <h2 class="settings-section-title">技能库</h2>
+        <p class="settings-section-hint">
+            支持 Agent Skills 目录包（<code>skills/&lt;name&gt;/SKILL.md</code>）与旧式单文件（<code>skills/&lt;name&gt;.md</code>）。
+            同名时目录包优先；包里的 references / schemas 由 <code>read_skill_file</code> 按需读取，不会整包进上下文。
+        </p>
+
+        <div class="plugin-root">
+            <span class="field-label">技能目录</span>
+            <code class="plugin-path">@Catalog.Root</code>
+        </div>
+
+        <div class="plugin-toolbar">
+            <span class="settings-message">@_status</span>
+            <span class="plugin-toolbar-actions">
+                <button type="button" class="ghost-button" @onclick="OpenRootAsync">打开技能目录</button>
+                <button type="button" class="ghost-button" @onclick="Refresh">重新扫描</button>
+            </span>
+        </div>
+
+        <p class="settings-message">
+            技能正文会进入上下文；引用文件只是参考资料，不是指令。只安装你信任的技能包。
+        </p>
+    </section>
+
+    @if (_skills.Count == 0)
+    {
+        <section class="settings-section">
+            <p class="plugin-empty">
+                还没有发现技能。把包含 SKILL.md 的目录放进上面的技能目录，或放一个 name.md，再点「重新扫描」。
+            </p>
+        </section>
+    }
+    else
+    {
+        <section class="settings-section">
+            <h2 class="settings-section-title">已发现 @_skills.Count 个技能</h2>
+
+            @foreach (var skill in _skills)
+            {
+                <article class="plugin-item">
+                    <div class="plugin-item-head">
+                        <span class="plugin-icon">@skill.Glyph</span>
+                        <span class="plugin-name">@skill.Name</span>
+                        <span class="plugin-badge">@(skill.Kind == SkillKind.Package ? "目录包" : "单文件")</span>
+                        @if (!string.IsNullOrWhiteSpace(skill.Version))
+                        {
+                            <span class="plugin-version">v@skill.Version</span>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(skill.Description))
+                    {
+                        <p class="plugin-desc">@skill.Description</p>
+                    }
+
+                    <p class="plugin-meta">@MetaOf(skill)</p>
+                    <p class="plugin-meta">@skill.RootPath</p>
+
+                    @if (!string.IsNullOrWhiteSpace(skill.Source))
+                    {
+                        <p class="plugin-meta">来源 @skill.Source</p>
+                    }
+
+                    @if (_hashes.TryGetValue(skill.Name, out var snapshot))
+                    {
+                        <p class="plugin-meta" title="@snapshot.Hash">
+                            sha256 @Short(snapshot.Hash) · @snapshot.LastWriteUtc.ToLocalTime():yyyy-MM-dd HH:mm
+                        </p>
+                    }
+                    else if (_hashing)
+                    {
+                        <p class="plugin-meta">sha256 计算中…</p>
+                    }
+
+                    @if (OperatingSystem.IsWindows())
+                    {
+                        <div class="plugin-controls">
+                            <button type="button"
+                                    class="ghost-button"
+                                    @onclick="() => OpenSkillAsync(skill)">
+                                打开目录
+                            </button>
+                        </div>
+                    }
+                </article>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<SkillInfo> _skills = [];
+    private readonly Dictionary<string, string?> _summaries = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, SkillSnapshot> _hashes = new(StringComparer.OrdinalIgnoreCase);
+    private string _status = string.Empty;
+    private bool _hashing;
+    private bool _disposed;
+    private int _generation;
+    private CancellationTokenSource? _hashCts;
+
+    protected override void OnInitialized() => Refresh();
+
+    private void Refresh()
+    {
+        _hashCts?.Cancel();
+        _hashCts?.Dispose();
+        _hashCts = new CancellationTokenSource();
+        var generation = ++_generation;
+
+        _skills = Catalog.List();
+        _summaries.Clear();
+        _hashes.Clear();
+        _hashing = _skills.Count > 0;
+
+        foreach (var skill in _skills)
+        {
+            _summaries[skill.Name] = Catalog.Summary(skill.Name);
+        }
+
+        var packages = _skills.Count(skill => skill.Kind == SkillKind.Package);
+        _status = $"扫描于 {DateTime.Now:HH:mm:ss} · {_skills.Count} 个技能（{packages} 个目录包）";
+
+        _ = ComputeHashesAsync(generation, _hashCts.Token);
+    }
+
+    /// <summary>目录哈希在后台算：大包第一次读可能被磁盘 / 杀毒拖慢，不能卡设置页。</summary>
+    private async Task ComputeHashesAsync(int generation, CancellationToken cancellationToken)
+    {
+        var names = _skills.Select(skill => skill.Name).ToArray();
+
+        try
+        {
+            var results = await Task.Run(
+                () =>
+                {
+                    var snapshots = new List<(string Name, SkillSnapshot? Snapshot)>(names.Length);
+
+                    foreach (var name in names)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        snapshots.Add((name, Catalog.Snapshot(name)));
+                    }
+
+                    return snapshots;
+                },
+                cancellationToken);
+
+            if (_disposed || generation != _generation)
+            {
+                return;
+            }
+
+            await InvokeAsync(() =>
+            {
+                if (generation != _generation)
+                {
+                    return;
+                }
+
+                foreach (var (name, snapshot) in results)
+                {
+                    if (snapshot is not null)
+                    {
+                        _hashes[name] = snapshot;
+                    }
+                }
+
+                _hashing = false;
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // 重新扫描 / 组件卸载：新任务会接手。
+        }
+        catch (Exception)
+        {
+            // 哈希失败不该影响「技能已发现」这个事实；卡片上保留“计算中”以外的信息即可。
+            if (!_disposed)
+            {
+                await InvokeAsync(() =>
+                {
+                    _hashing = false;
+                    StateHasChanged();
+                });
+            }
+        }
+    }
+
+    private string MetaOf(SkillInfo skill) =>
+        _summaries.TryGetValue(skill.Name, out var summary) && !string.IsNullOrWhiteSpace(summary)
+            ? summary!
+            : skill.Kind == SkillKind.Package ? "目录包" : "单文件";
+
+    private static string Short(string hash) => hash[..Math.Min(12, hash.Length)];
+
+    private async Task OpenRootAsync()
+    {
+        try
+        {
+            Directory.CreateDirectory(Catalog.Root);
+            _status = await Launcher.OpenFileAsync(Catalog.Root)
+                ? "已打开技能目录。"
+                : "当前环境不支持打开目录。";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _status = $"打开目录失败：{ex.Message}";
+        }
+    }
+
+    private async Task OpenSkillAsync(SkillInfo skill)
+    {
+        _status = await Launcher.OpenFileAsync(skill.RootPath)
+            ? $"已打开「{skill.Name}」的目录。"
+            : "当前环境不支持打开目录。";
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _hashCts?.Cancel();
+        _hashCts?.Dispose();
+    }
+}

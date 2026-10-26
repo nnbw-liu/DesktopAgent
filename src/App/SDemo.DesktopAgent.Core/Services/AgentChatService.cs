@@ -624,11 +624,26 @@ public sealed class AgentChatService : IAgentChatService
             "search_files" or "glob_files" => Read(arguments, "pattern", "query"),
             "web_search" => Read(arguments, "query", "q"),
             "load_skill" => Read(arguments, "name"),
+            "read_skill_file" => ComposeSkillFile(arguments),
             "todo_write" => null,
             _ => Read(arguments, "path", "file", "query", "pattern", "command")
         };
 
         return title is null ? null : Clip(title, 120);
+    }
+
+    /// <summary>引用文件标题：技能名 + 包内相对路径，方便一眼看出读了哪一篇。</summary>
+    private static string? ComposeSkillFile(IDictionary<string, object?> arguments)
+    {
+        var skill = arguments.TryGetValue("name", out var name) ? name?.ToString() : null;
+        var path = arguments.TryGetValue("path", out var file) ? file?.ToString() : null;
+
+        if (string.IsNullOrWhiteSpace(skill))
+        {
+            return path;
+        }
+
+        return string.IsNullOrWhiteSpace(path) ? skill : $"{skill}/{path}";
     }
 
     /// <summary>命令类工具的标题：命令 + 最多两个参数（够看出在构建什么，不必背整行脚本）。</summary>

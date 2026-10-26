@@ -7,5 +7,6 @@ public enum SettingsSection
     Models,
     Context,
     Tools,
+    Skills,
     Plugins
 }

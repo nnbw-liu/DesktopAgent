@@ -62,7 +62,7 @@ public static class SkillIndexBuilder
 
         var builder = new StringBuilder();
         builder.Append("\n\n## 可用技能（索引）\n");
-        builder.Append("需要正文时调用 load_skill(name)；不要凭名字猜内容。\n");
+        builder.Append("需要正文时调用 load_skill(name)；目录包里的 references 用 read_skill_file(name, path)。不要凭名字猜内容。\n");
 
         foreach (var entry in entries)
         {

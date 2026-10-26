@@ -187,7 +187,7 @@ public sealed class CapabilityRouterTests
     [Fact]
     public void 技能工具与兜底入口各占一个名额()
     {
-        var available = Available.Concat(["load_skill"]).ToArray();
+        var available = Available.Concat(["load_skill", "read_skill_file"]).ToArray();
 
         var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
             "帮我改一下这个文件",
@@ -197,17 +197,19 @@ public sealed class CapabilityRouterTests
             MaxExposedTools: 6));
 
         Assert.Contains(CapabilityRouter.LoadSkillTool, decision.ExposedTools);
+        Assert.Contains(CapabilityRouter.ReadSkillFileTool, decision.ExposedTools);
         Assert.Contains(CapabilityRouter.EscapeHatchTool, decision.ExposedTools);
         Assert.Equal(6, decision.Count);
         Assert.True(decision.ExposedTools.Count(name =>
             !string.Equals(name, CapabilityRouter.LoadSkillTool, StringComparison.Ordinal)
-            && !string.Equals(name, CapabilityRouter.EscapeHatchTool, StringComparison.Ordinal)) <= 4);
+            && !string.Equals(name, CapabilityRouter.ReadSkillFileTool, StringComparison.Ordinal)
+            && !string.Equals(name, CapabilityRouter.EscapeHatchTool, StringComparison.Ordinal)) <= 3);
     }
 
     [Fact]
-    public void Compact也暴露load_skill但总量仍不超过四()
+    public void Compact也暴露技能工具但总量仍不超过四()
     {
-        var available = Available.Concat(["load_skill"]).ToArray();
+        var available = Available.Concat(["load_skill", "read_skill_file"]).ToArray();
 
         var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
             "看一下这个文件",
@@ -218,6 +220,7 @@ public sealed class CapabilityRouterTests
 
         Assert.Equal(CapabilityRouter.CompactMaxTools, decision.Count);
         Assert.Contains(CapabilityRouter.LoadSkillTool, decision.ExposedTools);
+        Assert.Contains(CapabilityRouter.ReadSkillFileTool, decision.ExposedTools);
         Assert.DoesNotContain(CapabilityRouter.EscapeHatchTool, decision.ExposedTools);
     }
 

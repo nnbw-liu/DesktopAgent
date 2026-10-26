@@ -36,6 +36,13 @@
         </button>
         <button type="button"
                 role="tab"
+                aria-selected="@(_tab == SettingsSection.Skills)"
+                class="settings-tab @(_tab == SettingsSection.Skills ? "is-active" : null)"
+                @onclick="() => _tab = SettingsSection.Skills">
+            技能
+        </button>
+        <button type="button"
+                role="tab"
                 aria-selected="@(_tab == SettingsSection.Plugins)"
                 class="settings-tab @(_tab == SettingsSection.Plugins ? "is-active" : null)"
                 @onclick="() => _tab = SettingsSection.Plugins">
@@ -54,6 +61,9 @@
                 break;
             case SettingsSection.Context:
                 <ContextSettingsPanel />
+                break;
+            case SettingsSection.Skills:
+                <SkillsSettings />
                 break;
             case SettingsSection.Plugins:
                 <PluginSettings />

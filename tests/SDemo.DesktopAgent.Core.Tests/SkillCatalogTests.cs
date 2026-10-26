@@ -214,6 +214,195 @@ public sealed class SkillCatalogTests : IDisposable
         Assert.Equal(entry.Description, entry.WhenToUse);
     }
 
+    [Fact]
+    public void 包名带点时不会被当成扩展名截断()
+    {
+        WritePackage("my.skill", "---\ndescription: 带点的包\n---\n", ("references/x.md", "ok"));
+
+        var catalog = new SkillCatalog(_root);
+
+        Assert.Equal("my.skill", Assert.Single(catalog.List()).Name);
+        Assert.True(catalog.ReadFile("my.skill", "references/x.md").IsOk);
+    }
+
+    [Fact]
+    public void 目录包被索引且正文读_SKILL_md()
+    {
+        WritePackage("archify", """
+            ---
+            description: 画架构图。
+            metadata:
+              version: "3.2"
+            ---
+
+            包正文
+            """,
+            ("references/delivery.md", "交付契约"));
+
+        var skill = Assert.Single(new SkillCatalog(_root).List());
+
+        Assert.Equal("archify", skill.Name);
+        Assert.Equal(SkillKind.Package, skill.Kind);
+        Assert.Equal("3.2", skill.Version);
+        Assert.Equal(Path.Combine(_root, "archify"), skill.RootPath);
+        Assert.Contains("包正文", new SkillCatalog(_root).ReadContent("archify"));
+    }
+
+    [Fact]
+    public void 同名目录包优先于扁平文件()
+    {
+        Write("archify.md", "扁平正文");
+        WritePackage("archify", "---\ndescription: 包版本\n---\n包正文");
+
+        var catalog = new SkillCatalog(_root);
+        var skill = Assert.Single(catalog.List());
+
+        Assert.Equal(SkillKind.Package, skill.Kind);
+        Assert.Contains("包正文", catalog.ReadContent("archify"));
+    }
+
+    [Fact]
+    public void 包内引用按相对路径读取()
+    {
+        WritePackage("archify", "---\ndescription: 画图\n---\n", ("references/delivery-contract.md", "错误码 E100"));
+
+        var result = new SkillCatalog(_root).ReadFile("archify", "references\\delivery-contract.md");
+
+        Assert.True(result.IsOk);
+        Assert.Equal("references/delivery-contract.md", result.RelativePath);
+        Assert.Contains("E100", result.Content);
+    }
+
+    [Fact]
+    public void 包内路径越界一律拒绝()
+    {
+        Write("secret.md", "不该读到");
+        WritePackage("archify", "---\ndescription: 画图\n---\n", ("references/ok.md", "ok"));
+
+        var catalog = new SkillCatalog(_root);
+
+        Assert.Equal(SkillFileStatus.InvalidPath, catalog.ReadFile("archify", "../secret.md").Status);
+        Assert.Equal(SkillFileStatus.InvalidPath, catalog.ReadFile("archify", "references/a\u0001.md").Status);
+        Assert.Equal(SkillFileStatus.InvalidPath, catalog.ReadFile("archify", Path.Combine(_root, "secret.md")).Status);
+        Assert.Equal(SkillFileStatus.InvalidPath, catalog.ReadFile("archify", "references/../../secret.md").Status);
+        Assert.Equal(SkillFileStatus.InvalidPath, catalog.ReadFile("archify", "C:\\Windows\\win.ini").Status);
+        Assert.Equal(SkillFileStatus.InvalidPath, catalog.ReadFile("archify", "references/ok.md:stream").Status);
+    }
+
+    [Fact]
+    public void 包内只允许文本引用扩展名()
+    {
+        WritePackage("archify", "---\ndescription: 画图\n---\n", ("logo.png", "binary"));
+
+        Assert.Equal(
+            SkillFileStatus.UnsupportedExtension,
+            new SkillCatalog(_root).ReadFile("archify", "logo.png").Status);
+    }
+
+    [Fact]
+    public void 包内文件不存在时返回_FileNotFound()
+    {
+        WritePackage("archify", "---\ndescription: 画图\n---\n");
+
+        Assert.Equal(
+            SkillFileStatus.FileNotFound,
+            new SkillCatalog(_root).ReadFile("archify", "references/missing.md").Status);
+    }
+
+    [Fact]
+    public void 扁平技能没有包内引用()
+    {
+        Write("总结.md", "正文");
+
+        Assert.Equal(
+            SkillFileStatus.FlatSkill,
+            new SkillCatalog(_root).ReadFile("总结", "references/x.md").Status);
+    }
+
+    [Fact]
+    public void 没有_SKILL_md_的目录与根目录_SKILL_md_都不算技能()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "not-a-skill"));
+        File.WriteAllText(Path.Combine(_root, "not-a-skill", "readme.md"), "普通目录");
+        Write("SKILL.md", "根目录清单");
+        WritePackage("real", "---\ndescription: 真技能\n---\n");
+
+        var skill = Assert.Single(new SkillCatalog(_root).List());
+
+        Assert.Equal("real", skill.Name);
+    }
+
+    [Fact]
+    public void skill_release_的版本与来源优先于_frontmatter()
+    {
+        WritePackage("archify", """
+            ---
+            description: 画图。
+            version: 1.0
+            ---
+            """);
+
+        File.WriteAllText(
+            Path.Combine(_root, "archify", "skill-release.json"),
+            """{"version":"3.2.0","source":{"repository":"https://github.com/tt-a1i/archify"}}""");
+
+        var skill = Assert.Single(new SkillCatalog(_root).List());
+
+        Assert.Equal("3.2.0", skill.Version);
+        Assert.Equal("https://github.com/tt-a1i/archify", skill.Source);
+    }
+
+    [Fact]
+    public void 快照统计文件数与内容哈希_内容变化后哈希变化()
+    {
+        WritePackage("archify", "---\ndescription: 画图\n---\n", ("bin/archify.mjs", "console.log(1)"));
+
+        var catalog = new SkillCatalog(_root);
+        var first = catalog.Snapshot("archify");
+
+        Assert.NotNull(first);
+        Assert.Equal(2, first!.FileCount);
+        Assert.False(string.IsNullOrWhiteSpace(first.Hash));
+
+        File.WriteAllText(Path.Combine(_root, "archify", "bin", "archify.mjs"), "console.log(22)");
+
+        var second = catalog.Snapshot("archify");
+
+        Assert.NotNull(second);
+        Assert.NotEqual(first.Hash, second!.Hash);
+        Assert.Equal(first.Bytes + 1, second.Bytes);
+    }
+
+    [Fact]
+    public void 摘要包含版本与目录包标记()
+    {
+        WritePackage("archify", "---\ndescription: 画图\n---\n", ("skill-release.json", """{"version":"3.2.0"}"""));
+
+        var summary = new SkillCatalog(_root).Summary("archify");
+
+        Assert.NotNull(summary);
+        Assert.Contains("v3.2.0", summary);
+        Assert.Contains("目录包", summary);
+        Assert.Contains("2 个文件", summary);
+    }
+
+    private void WritePackage(
+        string name,
+        string skill,
+        params (string Path, string Content)[] files)
+    {
+        var root = Path.Combine(_root, name);
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Combine(root, "SKILL.md"), skill);
+
+        foreach (var (path, content) in files)
+        {
+            var target = Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.WriteAllText(target, content);
+        }
+    }
+
     private void Write(string fileName, string content) =>
         File.WriteAllText(Path.Combine(_root, fileName), content);
 

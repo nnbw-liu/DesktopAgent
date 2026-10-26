@@ -18,6 +18,7 @@ public sealed class ToolPresentationTests
     [InlineData("search_capabilities", ToolCardKind.Search)]
     [InlineData("web_search", ToolCardKind.Web)]
     [InlineData("load_skill", ToolCardKind.Skill)]
+    [InlineData("read_skill_file", ToolCardKind.Skill)]
     [InlineData("brand_new_tool", ToolCardKind.Generic)]
     public void 工具类型映射到卡片形态(string toolId, ToolCardKind expected)
     {

@@ -65,7 +65,7 @@ public static class ToolPresentation
         "office_info" or "office_read" or "office_write" => ToolCardKind.File,
         "search_files" or "glob_files" or "search_workspace_memory" or "search_capabilities" => ToolCardKind.Search,
         "web_search" or "web_fetch" => ToolCardKind.Web,
-        "load_skill" => ToolCardKind.Skill,
+        "load_skill" or "read_skill_file" => ToolCardKind.Skill,
         _ => ToolCardKind.Generic
     };
 

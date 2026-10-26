@@ -12,6 +12,7 @@ public sealed class ToolExposureProfileTests
     private static readonly string[] Available =
     [
         "read_file", "search_files", "apply_patch", "run_command", "todo_write", "load_skill",
+        "read_skill_file",
         "replace_text", "write_file", "run_powershell", "pdf_read", "pdf_info", "web_search",
         "search_workspace_memory", "read_archived_session", "list_tree", "glob_files",
         "workspace_info", "search_capabilities"
@@ -130,7 +131,7 @@ public sealed class ToolExposureProfileTests
                  {
                      "read_file", "search_files", "glob_files", "apply_patch", "replace_text",
                      "write_file", "run_command", "run_powershell", "pdf_read", "web_search",
-                     "todo_write", "load_skill", "search_capabilities"
+                     "todo_write", "load_skill", "read_skill_file", "search_capabilities"
                  })
         {
             Assert.False(string.IsNullOrWhiteSpace(ToolPlaybooks.RulesFor(tool)), tool);

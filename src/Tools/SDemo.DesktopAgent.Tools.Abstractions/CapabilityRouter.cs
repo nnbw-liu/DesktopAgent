@@ -35,6 +35,9 @@ public static class CapabilityRouter
     /// <summary>技能正文加载（M2）：系统提示只放索引，正文按需读取。</summary>
     public const string LoadSkillTool = "load_skill";
 
+    /// <summary>技能包引用读取（P1）：与 load_skill 成对暴露，目录包的 references 才读得到。</summary>
+    public const string ReadSkillFileTool = "read_skill_file";
+
     /// <summary>工作区知识库检索（M3）。</summary>
     public const string SearchMemoryTool = "search_workspace_memory";
 
@@ -42,11 +45,11 @@ public static class CapabilityRouter
     public const string ReadMemoryTool = "read_archived_session";
 
     /// <summary>
-    /// 核心集（§4.4）：只读、定位、修改、执行、计划各一个代表，外加两个元工具。
+    /// 核心集（§4.4）：只读、定位、修改、执行、计划各一个代表，外加技能正文 / 引用两个元工具。
     /// 只有在可用集合里出现时才会暴露，用户关掉某个包不会凭空多出工具。
     /// </summary>
     public static readonly IReadOnlyList<string> CoreTools =
-        ["read_file", "search_files", "apply_patch", "run_command", "todo_write", LoadSkillTool];
+        ["read_file", "search_files", "apply_patch", "run_command", "todo_write", LoadSkillTool, ReadSkillFileTool];
 
     private static readonly string[] EditWords =
     [
@@ -240,6 +243,7 @@ public static class CapabilityRouter
         {
             if (!canonical.TryGetValue(requested.Trim(), out var name)
                 || string.Equals(name, LoadSkillTool, StringComparison.Ordinal)
+                || string.Equals(name, ReadSkillFileTool, StringComparison.Ordinal)
                 || string.Equals(name, EscapeHatchTool, StringComparison.Ordinal))
             {
                 continue;
@@ -264,6 +268,7 @@ public static class CapabilityRouter
         foreach (var name in fallback.ExposedTools)
         {
             if (!string.Equals(name, LoadSkillTool, StringComparison.Ordinal)
+                && !string.Equals(name, ReadSkillFileTool, StringComparison.Ordinal)
                 && !string.Equals(name, EscapeHatchTool, StringComparison.Ordinal)
                 && !ordered.Contains(name, StringComparer.Ordinal)
                 && Matches(name, available))
@@ -484,18 +489,23 @@ public static class CapabilityRouter
             };
         }
 
-        // M2 的两个元工具（兜底入口 / 技能正文加载）在 Full 暴露；Compact 也暴露 load_skill，
-        // 因为技能索引同样会进入 Compact 的系统提示，模型必须能取正文。
+        // M2 的两个元工具（兜底入口 / 技能正文加载）+ P1 的技能引用读取，在 Full 暴露；
+        // Compact 也暴露技能工具，因为技能索引同样会进入 Compact 的系统提示，模型必须能取正文与引用。
         var hasLoadSkill = !input.ExposeAll
                            && Matches(LoadSkillTool, available);
+        var hasReadSkillFile = !input.ExposeAll
+                               && Matches(ReadSkillFileTool, available);
         var escapeHatch = input.Mode != AgentMode.Compact
                           && input.EscapeHatch
                           && !input.ExposeAll
                           && available.Count > 0;
-        var metaCount = (escapeHatch ? 1 : 0) + (hasLoadSkill ? 1 : 0);
+        var metaCount = (escapeHatch ? 1 : 0)
+                        + (hasLoadSkill ? 1 : 0)
+                        + (hasReadSkillFile ? 1 : 0);
         var realLimit = Math.Max(0, limit - metaCount);
         var realAvailable = available
-            .Where(name => !string.Equals(name, LoadSkillTool, StringComparison.Ordinal))
+            .Where(name => !string.Equals(name, LoadSkillTool, StringComparison.Ordinal)
+                           && !string.Equals(name, ReadSkillFileTool, StringComparison.Ordinal))
             .ToArray();
 
         var ordered = new List<string>();
@@ -518,6 +528,11 @@ public static class CapabilityRouter
         if (hasLoadSkill)
         {
             meta.Add(LoadSkillTool);
+        }
+
+        if (hasReadSkillFile)
+        {
+            meta.Add(ReadSkillFileTool);
         }
 
         var exposed = exposedReal.Concat(meta).ToArray();
