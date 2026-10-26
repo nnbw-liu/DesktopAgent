@@ -365,7 +365,8 @@ internal static class Program
             string workingDirectory,
             TimeSpan timeout,
             int maxOutputChars,
-            CancellationToken cancellationToken = default) =>
+            CancellationToken cancellationToken = default,
+            IReadOnlyDictionary<string, string>? environment = null) =>
             Task.FromResult(new DirectRunResult(0, string.Empty, string.Empty, false, false, 0, false, false));
     }
 

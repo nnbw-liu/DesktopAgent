@@ -235,7 +235,8 @@ public sealed class CommandToolPackTests
             string workingDirectory,
             TimeSpan timeout,
             int maxOutputChars,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            IReadOnlyDictionary<string, string>? environment = null)
         {
             Calls.Add((executable, arguments));
             return Task.FromResult(Result);

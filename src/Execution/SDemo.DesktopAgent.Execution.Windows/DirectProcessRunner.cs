@@ -25,7 +25,10 @@ public interface IDirectProcessRunner
         string workingDirectory,
         TimeSpan timeout,
         int maxOutputChars,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        // 宿主显式补充的环境变量（例如工具需要的浏览器路径 / 关闭联网检查）。
+        // 只由宿主代码传入，不来自模型；调用点应逐项说明用途。
+        IReadOnlyDictionary<string, string>? environment = null);
 }
 
 /// <summary>
@@ -43,7 +46,8 @@ public sealed class DirectProcessRunner : IDirectProcessRunner
         string workingDirectory,
         TimeSpan timeout,
         int maxOutputChars,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
         var resolved = ResolveExecutable(executable)
             ?? throw new FileNotFoundException($"找不到可执行文件：{executable}");
@@ -65,7 +69,7 @@ public sealed class DirectProcessRunner : IDirectProcessRunner
             startInfo.ArgumentList.Add(argument);
         }
 
-        ApplyEnvironment(startInfo);
+        ApplyEnvironment(startInfo, environment);
 
         var stopwatch = Stopwatch.StartNew();
         using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
@@ -183,7 +187,9 @@ public sealed class DirectProcessRunner : IDirectProcessRunner
         return null;
     }
 
-    private static void ApplyEnvironment(ProcessStartInfo startInfo)
+    private static void ApplyEnvironment(
+        ProcessStartInfo startInfo,
+        IReadOnlyDictionary<string, string>? environment)
     {
         var inherited = startInfo.Environment;
         var allowed = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
@@ -193,6 +199,18 @@ public sealed class DirectProcessRunner : IDirectProcessRunner
             if (IsAllowed(key))
             {
                 allowed[key] = inherited[key];
+            }
+        }
+
+        // 宿主要求的额外变量放在白名单之后，允许覆盖（例如把 TMP 指到工作区）。
+        if (environment is not null)
+        {
+            foreach (var (key, value) in environment)
+            {
+                if (!string.IsNullOrWhiteSpace(key))
+                {
+                    allowed[key] = value;
+                }
             }
         }
 

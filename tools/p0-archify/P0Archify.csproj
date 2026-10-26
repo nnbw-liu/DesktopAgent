@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- P0 探针：在 .NET 侧用生产直跑器验证 Archify 3.2.0 的 node + Edge 链路。
+         不是产品代码，验证完成后可删除。 -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <RootNamespace>SDemo.ArchifyP0</RootNamespace>
+    <AssemblyName>archify-p0</AssemblyName>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Execution\SDemo.DesktopAgent.Execution.Windows\SDemo.DesktopAgent.Execution.Windows.csproj" />
+    <ProjectReference Include="..\..\src\Platform\SDemo.DesktopAgent.Windows\SDemo.DesktopAgent.Windows.csproj" />
+  </ItemGroup>
+
+</Project>
