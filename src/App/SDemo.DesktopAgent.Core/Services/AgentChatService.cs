@@ -494,7 +494,8 @@ public sealed class AgentChatService : IAgentChatService
         _workspace.RootPath,
         AgentAttachmentRoots.Build(_paths, plan.SessionId),
         _settings,
-        _approvals,
+        // 聊天室选了「完全权限」时换掉审批服务：确认框不再弹出，其余工具路径不变。
+        plan.Scope?.SkipApprovals == true ? new AutoApprovalService(_approvals) : _approvals,
         _sandbox,
         _audit,
         _reads,

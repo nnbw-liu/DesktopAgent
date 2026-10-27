@@ -1,5 +1,6 @@
 using SDemo.DesktopAgent.Context;
 using SDemo.DesktopAgent.Models;
+using SDemo.DesktopAgent.Sandbox;
 using Xunit;
 
 namespace SDemo.DesktopAgent.Core.Tests;
@@ -127,5 +128,69 @@ public sealed class ScopedSettingsTests
         Assert.Equal(0.8, effective.Context.BudgetRatio);
         Assert.False(effective.Context.ShowContextMeter);
         Assert.False(effective.Agent.WorkspaceMemoryEnabled);
+    }
+
+    [Fact]
+    public void 聊天室可以关掉沙箱并打开完全权限而其余沙箱字段仍继承()
+    {
+        var global = new AppSettings
+        {
+            Sandbox = new SandboxSettings { Enabled = true, TimeoutSeconds = 45, Requirement = SandboxRequirement.Required }
+        };
+
+        var workspace = new Workspace
+        {
+            Id = "w1",
+            Name = "工作区",
+            Path = "C:\\work",
+            ScopedSettings = new ScopedSettings { SandboxEnabled = false }
+        };
+
+        var chat = new ChatSession
+        {
+            Id = "c1",
+            Title = "聊天室",
+            WorkspaceId = workspace.Id,
+            ScopedSettings = new ScopedSettings { SkipApprovals = true }
+        };
+
+        var effective = EffectiveSettings.Resolve(global, workspace, chat);
+
+        // 沙箱来自工作区，完全权限来自聊天室：两级各自生效，互不覆盖。
+        Assert.False(effective.Sandbox.Enabled);
+        Assert.True(effective.SkipApprovals);
+
+        // 没在作用域里写的沙箱字段继续继承通用值。
+        Assert.Equal(45, effective.Sandbox.TimeoutSeconds);
+        Assert.Equal(SandboxRequirement.Required, effective.Sandbox.Requirement);
+
+        // 合并不改通用对象本身：其它聊天室仍然有沙箱、仍然逐次确认。
+        Assert.True(global.Sandbox.Enabled);
+        Assert.False(EffectiveSettings.Resolve(global, null, null).SkipApprovals);
+        Assert.True(EffectiveSettings.Resolve(global, null, null).Sandbox.Enabled);
+    }
+
+    [Fact]
+    public void 聊天室可以重新打开工作区关掉的沙箱()
+    {
+        var global = new AppSettings { Sandbox = new SandboxSettings { Enabled = false } };
+
+        var workspace = new Workspace
+        {
+            Id = "w1",
+            Name = "工作区",
+            Path = "C:\\work",
+            ScopedSettings = new ScopedSettings { SandboxEnabled = false }
+        };
+
+        var chat = new ChatSession
+        {
+            Id = "c1",
+            Title = "聊天室",
+            WorkspaceId = workspace.Id,
+            ScopedSettings = new ScopedSettings { SandboxEnabled = true }
+        };
+
+        Assert.True(EffectiveSettings.Resolve(global, workspace, chat).Sandbox.Enabled);
     }
 }

@@ -366,9 +366,10 @@
         <section class="settings-section">
             <h2 class="settings-section-title">PowerShell</h2>
             <p class="settings-section-hint">
-                PowerShell 只在沙箱内执行（默认 AppContainer，也可以选 Windows Sandbox 虚拟机）：无网络，
+                PowerShell 默认只在沙箱内执行（默认 AppContainer，也可以选 Windows Sandbox 虚拟机）：无网络，
                 只能读写工作区副本；改动需要你在变更面板确认后才写回。
-                沙箱不可用时工具直接不可用，不会退回无沙箱直跑。
+                沙箱不可用时工具直接不可用，不会自动退回直跑；在聊天室输入框里关掉沙箱，那一间才会改成
+                直接在工作区执行。
             </p>
 
         <label class="settings-row settings-row--toggle">
@@ -433,7 +434,7 @@
             </div>
             <span class="field-hint">
                 自动 = 首选沙箱不可用时允许换用其他可用沙箱；强制 = 只用首选沙箱，首选不可用就拒绝。
-                两者都不会回退到无沙箱执行。
+                两者都不会自动换成无沙箱执行；只有你在聊天室输入框里明确关掉沙箱，那一间才会直跑。
             </span>
         </div>
 
@@ -460,7 +461,8 @@
             @if (!Settings.Current.Sandbox.Enabled)
             {
                 <p class="settings-message is-danger">
-                    执行沙箱已关闭：PowerShell 完全不可用，不会退回无沙箱执行。此选项只在调试构建里提供。
+                    执行沙箱已关闭：PowerShell 改为直接在工作区运行（不改副本、不等写回确认），PDF 不可用。
+                    此选项只在调试构建里提供，正常情况下请在聊天室输入框里按需切换。
                 </p>
             }
         }
@@ -813,12 +815,12 @@
         "powershell",
         PowerShellDescriptor?.DefaultEnabled ?? false);
 
-    /// <summary>可用 = 沙箱总开关打开，并且 AppContainer + PowerShell 都通过实测。</summary>
+    /// <summary>可用 = 沙箱实测通过；沙箱关闭时 PowerShell 改为宿主直跑，也不再依赖沙箱。</summary>
     private bool PowerShellAvailable =>
-        Settings.Current.Sandbox.Enabled && _availability is { Available: true, Verified: true };
+        !Settings.Current.Sandbox.Enabled || _availability is { Available: true, Verified: true };
 
     private string PowerShellUnavailableReason => !Settings.Current.Sandbox.Enabled
-        ? "执行沙箱已在设置中关闭。"
+        ? "沙箱已关闭：PowerShell 会直接在工作区运行，改动立即生效、不隔离网络。"
         : _availability switch
         {
             null => "正在检测沙箱…",
@@ -842,7 +844,7 @@
         Settings.Current.Sandbox.Enabled && _appContainerAvailability is { Available: true };
 
     private string PdfUnavailableReason => !Settings.Current.Sandbox.Enabled
-        ? "执行沙箱已在设置中关闭。"
+        ? "沙箱已关闭：PDF 解析只能在沙箱里跑。"
         : _appContainerAvailability switch
         {
             null => "正在检测沙箱…",

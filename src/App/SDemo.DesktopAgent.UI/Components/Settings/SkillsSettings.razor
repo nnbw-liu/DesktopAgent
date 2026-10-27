@@ -5,6 +5,7 @@
 @inject ISkillScriptRunner ScriptRunner
 @inject IArchifyInstaller ArchifyInstaller
 @inject IFolderPickerService FolderPicker
+@inject ISettingsService Settings
 
 @* 技能库设置：目录包与旧式单文件的发现结果、版本 / 来源 / 目录哈希，以及打开技能目录。 *@
 <div class="settings-pane">
@@ -111,6 +112,17 @@
                             </button>
                         </div>
                     }
+
+                    <div class="plugin-controls">
+                        <label class="plugin-control"
+                               title="关掉后这个技能不再在输入框里固定占一个 chip；仍然可以输入 /技能名 或从 / 菜单调用。">
+                            <input type="checkbox"
+                                   class="switch switch--sm"
+                                   checked="@Settings.Current.Skills.IsComposerVisible(skill.Name)"
+                                   @onchange="args => SetComposerVisible(skill, args)" />
+                            <span>在输入框显示</span>
+                        </label>
+                    </div>
                 </article>
             }
         </section>
@@ -294,6 +306,24 @@
             _status = message;
             StateHasChanged();
         }
+    }
+
+    /// <summary>
+    /// 「在输入框显示」开关：只写显示偏好，不动技能文件。
+    /// 关掉的技能仍在技能库里，<c>/技能名</c> 与 <c>/</c> 菜单照常可用。
+    /// </summary>
+    private void SetComposerVisible(SkillInfo skill, ChangeEventArgs args)
+    {
+        var visible = args.Value is true;
+
+        Settings.Current.Skills.SetComposerVisible(skill.Name, visible);
+        Settings.Save();
+
+        _status = visible
+            ? $"「{skill.Name}」已显示在输入框。"
+            : $"「{skill.Name}」已从输入框收起，仍可用 /{skill.Name} 调用。";
+
+        StateHasChanged();
     }
 
     private async Task OpenRootAsync()

@@ -70,6 +70,19 @@ public sealed class ScopedSettings
     /// <summary>是否允许白名单命令在宿主直跑。</summary>
     public bool? DirectRunEnabled { get; set; }
 
+    /// <summary>
+    /// 本作用域是否使用执行沙箱（输入框里的沙箱开关）。null 继承上级；
+    /// 关闭后 PowerShell 直接在宿主执行，改动立即落到真实工作区，PDF 解析等只能在沙箱里跑的
+    /// 能力随之不可用。
+    /// </summary>
+    public bool? SandboxEnabled { get; set; }
+
+    /// <summary>
+    /// 本作用域是否跳过工具审批（输入框里的「完全权限」）。null 继承上级，默认不跳过；
+    /// 打开后文件写入、PowerShell、Office 等工具的确认框都不再弹出，直接执行。
+    /// </summary>
+    public bool? SkipApprovals { get; set; }
+
     /// <summary>复制一份，用于分支会话等需要独立修改的场景。</summary>
     public ScopedSettings Clone() => (ScopedSettings)MemberwiseClone();
 
@@ -94,5 +107,7 @@ public sealed class ScopedSettings
         && WriteFileShrinkGuard is null
         && ConfirmFileWrite is null
         && CheckpointsEnabled is null
-        && DirectRunEnabled is null;
+        && DirectRunEnabled is null
+        && SandboxEnabled is null
+        && SkipApprovals is null;
 }

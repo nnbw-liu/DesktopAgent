@@ -67,4 +67,7 @@ public sealed class AppSettings
 
     /// <summary>对话呈现：过程展示档位与收起时机（P0）。</summary>
     public ChatPresentationSettings Chat { get; set; } = new();
+
+    /// <summary>技能显示偏好（哪些技能在输入框里固定显示 chip）。</summary>
+    public SkillPreferences Skills { get; set; } = new();
 }

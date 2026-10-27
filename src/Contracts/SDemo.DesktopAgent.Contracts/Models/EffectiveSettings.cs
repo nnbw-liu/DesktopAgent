@@ -18,7 +18,17 @@ public sealed class EffectiveSettings
 
     public required CheckpointSettings Checkpoints { get; init; }
 
+    /// <summary>解析后的执行沙箱设置；聊天室的开关已合并进 <see cref="SandboxSettings.Enabled"/>。</summary>
+    public required SandboxSettings Sandbox { get; init; }
+
     public required bool ConfirmFileWrite { get; init; }
+
+    /// <summary>
+    /// 本作用域是否跳过工具审批（「完全权限」）。工具包不直接读它——
+    /// <c>ScopedApprovalGate</c> 在构造 <c>ToolContext</c> 时按它替换审批服务，
+    /// 这样所有工具包的确认框走同一个开关。
+    /// </summary>
+    public bool SkipApprovals { get; init; }
 
     /// <summary>解析后的模型提供商；调用方按 id 到通用设置里找 provider 对象。</summary>
     public string? ProviderId { get; init; }
@@ -41,26 +51,20 @@ public sealed class EffectiveSettings
         Workspace? workspace,
         ChatSession? session)
     {
-        var context = (global.Context ?? new ContextSettings()).Clone();
-        var agent = (global.Agent ?? new AgentSettings()).Clone();
-        var modelRouting = (global.ModelRouting ?? new ModelRoutingSettings()).Clone();
-        var execution = (global.Execution ?? new ExecutionSettings()).Clone();
-        var checkpoints = (global.Checkpoints ?? new CheckpointSettings()).Clone();
-        var confirmFileWrite = global.ConfirmFileWrite;
-        bool? autoModelRouting = null;
+        var resolved = new Resolved(global);
 
-        Apply(workspace?.ScopedSettings, context, agent, execution, checkpoints, ref confirmFileWrite, ref autoModelRouting);
-        Apply(session?.ScopedSettings, context, agent, execution, checkpoints, ref confirmFileWrite, ref autoModelRouting);
+        resolved.Apply(workspace?.ScopedSettings);
+        resolved.Apply(session?.ScopedSettings);
 
         var providerId = global.LastProviderId;
         var modelId = global.LastModelId;
 
         // 旧会话如果已经显式选过模型（没有 AutoModelRouting 标记），视为固定模型，
         // 不因为后来打开全局路由而悄悄换模型；用户可以在模型选择器里重新选「自动」。
-        if (autoModelRouting is null
+        if (resolved.AutoModelRouting is null
             && (HasModelPair(session?.ScopedSettings) || HasModelPair(workspace?.ScopedSettings)))
         {
-            autoModelRouting = false;
+            resolved.AutoModelRouting = false;
         }
 
         // provider / model 必须成对；只设了一个就整对忽略，避免拿 A 家的模型去请求 B 家。
@@ -78,15 +82,17 @@ public sealed class EffectiveSettings
 
         return new EffectiveSettings
         {
-            Context = context,
-            Agent = agent,
-            ModelRouting = modelRouting,
-            Execution = execution,
-            Checkpoints = checkpoints,
-            ConfirmFileWrite = confirmFileWrite,
+            Context = resolved.Context,
+            Agent = resolved.Agent,
+            ModelRouting = resolved.ModelRouting,
+            Execution = resolved.Execution,
+            Checkpoints = resolved.Checkpoints,
+            Sandbox = resolved.Sandbox,
+            ConfirmFileWrite = resolved.ConfirmFileWrite,
+            SkipApprovals = resolved.SkipApprovals,
             ProviderId = providerId,
             ModelId = modelId,
-            AutoModelRouting = autoModelRouting
+            AutoModelRouting = resolved.AutoModelRouting
         };
     }
 
@@ -94,104 +100,143 @@ public sealed class EffectiveSettings
         !string.IsNullOrWhiteSpace(scope?.ProviderId)
         && !string.IsNullOrWhiteSpace(scope.ModelId);
 
-    private static void Apply(
-        ScopedSettings? scope,
-        ContextSettings context,
-        AgentSettings agent,
-        ExecutionSettings execution,
-        CheckpointSettings checkpoints,
-        ref bool confirmFileWrite,
-        ref bool? autoModelRouting)
+    /// <summary>
+    /// 逐层合并的可写状态。每一层只覆盖自己显式设过的项；
+    /// 通用设置先克隆一份，避免作用域解析改到全局对象。
+    /// </summary>
+    private sealed class Resolved
     {
-        if (scope is null)
+        public Resolved(AppSettings global)
         {
-            return;
+            Context = (global.Context ?? new ContextSettings()).Clone();
+            Agent = (global.Agent ?? new AgentSettings()).Clone();
+            ModelRouting = (global.ModelRouting ?? new ModelRoutingSettings()).Clone();
+            Execution = (global.Execution ?? new ExecutionSettings()).Clone();
+            Checkpoints = (global.Checkpoints ?? new CheckpointSettings()).Clone();
+            Sandbox = (global.Sandbox ?? new SandboxSettings()).Clone();
+            ConfirmFileWrite = global.ConfirmFileWrite;
         }
 
-        if (scope.AutoModelRouting is bool autoRouting)
-        {
-            autoModelRouting = autoRouting;
-        }
+        public ContextSettings Context { get; }
 
-        if (scope.ContextEnabled is bool contextEnabled)
-        {
-            context.Enabled = contextEnabled;
-        }
+        public AgentSettings Agent { get; }
 
-        if (scope.BudgetRatio is double budgetRatio)
-        {
-            context.BudgetRatio = budgetRatio;
-        }
+        public ModelRoutingSettings ModelRouting { get; }
 
-        if (scope.KeepRecentTurns is int keepRecentTurns)
-        {
-            context.KeepRecentTurns = keepRecentTurns;
-        }
+        public ExecutionSettings Execution { get; }
 
-        if (scope.AutoCompact is bool autoCompact)
-        {
-            context.AutoCompact = autoCompact;
-        }
+        public CheckpointSettings Checkpoints { get; }
 
-        if (scope.StatePackEnabled is bool statePackEnabled)
-        {
-            context.StatePackEnabled = statePackEnabled;
-        }
+        public SandboxSettings Sandbox { get; }
 
-        if (scope.ShowContextMeter is bool showContextMeter)
-        {
-            context.ShowContextMeter = showContextMeter;
-        }
+        public bool ConfirmFileWrite { get; set; }
 
-        if (scope.MaxPinnedMessages is int maxPinnedMessages)
-        {
-            context.MaxPinnedMessages = maxPinnedMessages;
-        }
+        public bool SkipApprovals { get; set; }
 
-        if (scope.AgentMode is Context.AgentModePreference mode)
-        {
-            agent.Mode = mode;
-        }
+        public bool? AutoModelRouting { get; set; }
 
-        if (scope.SearchCapabilitiesEnabled is bool searchCapabilities)
+        public void Apply(ScopedSettings? scope)
         {
-            agent.SearchCapabilitiesEnabled = searchCapabilities;
-        }
+            if (scope is null)
+            {
+                return;
+            }
 
-        if (scope.SkillIndexEnabled is bool skillIndex)
-        {
-            agent.SkillIndexEnabled = skillIndex;
-        }
+            if (scope.AutoModelRouting is bool autoRouting)
+            {
+                AutoModelRouting = autoRouting;
+            }
 
-        if (scope.WorkspaceMemoryEnabled is bool workspaceMemory)
-        {
-            agent.WorkspaceMemoryEnabled = workspaceMemory;
-        }
+            if (scope.ContextEnabled is bool contextEnabled)
+            {
+                Context.Enabled = contextEnabled;
+            }
 
-        if (scope.ExposeAllTools is bool exposeAllTools)
-        {
-            agent.ExposeAllTools = exposeAllTools;
-        }
+            if (scope.BudgetRatio is double budgetRatio)
+            {
+                Context.BudgetRatio = budgetRatio;
+            }
 
-        if (scope.WriteFileShrinkGuard is bool shrinkGuard)
-        {
-            agent.WriteFileShrinkGuard = shrinkGuard;
-        }
+            if (scope.KeepRecentTurns is int keepRecentTurns)
+            {
+                Context.KeepRecentTurns = keepRecentTurns;
+            }
 
-        if (scope.ConfirmFileWrite is bool confirmWrite)
-        {
-            confirmFileWrite = confirmWrite;
-        }
+            if (scope.AutoCompact is bool autoCompact)
+            {
+                Context.AutoCompact = autoCompact;
+            }
 
-        if (scope.CheckpointsEnabled is bool checkpointsEnabled)
-        {
-            checkpoints.Enabled = checkpointsEnabled;
-        }
+            if (scope.StatePackEnabled is bool statePackEnabled)
+            {
+                Context.StatePackEnabled = statePackEnabled;
+            }
 
-        if (scope.DirectRunEnabled is bool directRun)
-        {
-            execution.DirectRunEnabled = directRun;
-            execution.Mode = directRun ? ExecutionMode.AllowlistDirect : ExecutionMode.SandboxFirst;
+            if (scope.ShowContextMeter is bool showContextMeter)
+            {
+                Context.ShowContextMeter = showContextMeter;
+            }
+
+            if (scope.MaxPinnedMessages is int maxPinnedMessages)
+            {
+                Context.MaxPinnedMessages = maxPinnedMessages;
+            }
+
+            if (scope.AgentMode is Context.AgentModePreference mode)
+            {
+                Agent.Mode = mode;
+            }
+
+            if (scope.SearchCapabilitiesEnabled is bool searchCapabilities)
+            {
+                Agent.SearchCapabilitiesEnabled = searchCapabilities;
+            }
+
+            if (scope.SkillIndexEnabled is bool skillIndex)
+            {
+                Agent.SkillIndexEnabled = skillIndex;
+            }
+
+            if (scope.WorkspaceMemoryEnabled is bool workspaceMemory)
+            {
+                Agent.WorkspaceMemoryEnabled = workspaceMemory;
+            }
+
+            if (scope.ExposeAllTools is bool exposeAllTools)
+            {
+                Agent.ExposeAllTools = exposeAllTools;
+            }
+
+            if (scope.WriteFileShrinkGuard is bool shrinkGuard)
+            {
+                Agent.WriteFileShrinkGuard = shrinkGuard;
+            }
+
+            if (scope.ConfirmFileWrite is bool confirmWrite)
+            {
+                ConfirmFileWrite = confirmWrite;
+            }
+
+            if (scope.CheckpointsEnabled is bool checkpointsEnabled)
+            {
+                Checkpoints.Enabled = checkpointsEnabled;
+            }
+
+            if (scope.DirectRunEnabled is bool directRun)
+            {
+                Execution.DirectRunEnabled = directRun;
+                Execution.Mode = directRun ? ExecutionMode.AllowlistDirect : ExecutionMode.SandboxFirst;
+            }
+
+            if (scope.SandboxEnabled is bool sandboxEnabled)
+            {
+                Sandbox.Enabled = sandboxEnabled;
+            }
+
+            if (scope.SkipApprovals is bool skipApprovals)
+            {
+                SkipApprovals = skipApprovals;
+            }
         }
     }
 }

@@ -1486,6 +1486,15 @@ a {
     cursor: not-allowed;
 }
 
+/* 聊天室关掉沙箱：图标保持可见，用琥珀色提醒「直跑真实工作区」 */
+.composer-tool.is-off {
+    color: #d08a4a;
+}
+
+.composer-tool.is-off:hover {
+    color: #e2a468;
+}
+
 .composer-tool-glyph {
     display: grid;
     place-items: center;

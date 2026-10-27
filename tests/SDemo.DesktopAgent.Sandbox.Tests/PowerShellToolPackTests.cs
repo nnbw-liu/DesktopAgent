@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using SDemo.DesktopAgent.Models;
+using SDemo.DesktopAgent.Platform.Windows.Execution;
 using SDemo.DesktopAgent.Platform.Windows.Tools;
 using SDemo.DesktopAgent.Sandbox;
 using SDemo.DesktopAgent.Services;
@@ -17,7 +18,7 @@ public sealed class PowerShellToolPackTests
     [Fact]
     public void 工具包是内置能力且默认开启()
     {
-        var descriptor = new PowerShellToolPack().Descriptor;
+        var descriptor = new PowerShellToolPack(new RecordingDirectRunner()).Descriptor;
 
         Assert.True(descriptor.BuiltIn);
         Assert.True(descriptor.DefaultEnabled);
@@ -224,7 +225,7 @@ public sealed class PowerShellToolPackTests
                 host.Jobs,
                 audit);
 
-            var pack = new PowerShellToolPack();
+            var pack = new PowerShellToolPack(new RecordingDirectRunner());
             var text = await pack.RunPowerShellAsync(
                 context,
                 "$before = Get-Content -Raw -Path 'a.txt'\n"
@@ -259,6 +260,70 @@ public sealed class PowerShellToolPackTests
         }
     }
 
+    [Fact]
+    public async Task 聊天室关掉沙箱后在工作区直跑并写直跑审计()
+    {
+        var harness = new Harness();
+        harness.Enable();
+        harness.Direct.Result = new DirectRunResult(0, "done\n", string.Empty, false, false, 12, false, false);
+        const string script = "Set-Content -Path a.txt -Value 'hi' -Encoding UTF8";
+
+        var text = await harness.RunAsync(script, "sub", harness.DirectScope());
+
+        Assert.Contains("直跑（无沙箱）：./sub", text);
+        Assert.Contains("done", text);
+        Assert.Contains("改动已经直接写入真实工作区", text);
+
+        // 直跑不碰沙箱作业，也不检查沙箱可用性。
+        Assert.Empty(harness.Jobs.Calls);
+
+        var call = Assert.Single(harness.Direct.Calls);
+        Assert.EndsWith("powershell.exe", call.Executable, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("-EncodedCommand", call.Arguments);
+        Assert.Equal(Path.Combine(harness.Workspace, "sub"), call.WorkingDirectory, ignoreCase: true);
+
+        // 命令行传的是原文：Base64 里解出来必须和模型给的脚本一致。
+        Assert.Equal(script, Encoding.Unicode.GetString(Convert.FromBase64String(call.Arguments[^1])));
+
+        // 审批框要明确这是直跑，不是沙箱副本。
+        var request = Assert.IsType<ToolApprovalRequest>(harness.Approvals.Request);
+        Assert.Equal("直跑 PowerShell 脚本（无沙箱）", request.Title);
+        Assert.Contains("不隔离网络", request.Summary);
+
+        var audit = Assert.Single(harness.Audit.Entries);
+        Assert.Equal(SandboxKind.None, audit.Sandbox);
+        Assert.Equal("direct", audit.Mode);
+        Assert.Equal(0, audit.ExitCode);
+        Assert.Equal("./sub", audit.WorkingDirectory);
+    }
+
+    [Fact]
+    public async Task 直跑同样要过审批拒绝后不执行()
+    {
+        var harness = new Harness();
+        harness.Enable();
+        harness.Approvals.Decision = ToolApprovalDecision.Deny;
+
+        var text = await harness.RunAsync("Remove-Item a.txt", directory: null, harness.DirectScope());
+
+        Assert.Contains("拒绝了", text);
+        Assert.Empty(harness.Direct.Calls);
+        Assert.Empty(harness.Jobs.Calls);
+    }
+
+    [Fact]
+    public async Task 直跑超时说明已终止进程树()
+    {
+        var harness = new Harness();
+        harness.Enable();
+        harness.Direct.Result = new DirectRunResult(0, "partial", string.Empty, true, false, 30_000, false, false);
+
+        var text = await harness.RunAsync("Start-Sleep 60", directory: null, harness.DirectScope());
+
+        Assert.Contains("已超时并终止进程树", text);
+        Assert.Contains("partial", text);
+    }
+
     private static SandboxJobOutcome Outcome(SandboxResult result, params SandboxChange[] changes) =>
         new("session", result.JobId, result, changes, "jobs/job")
         {
@@ -284,11 +349,24 @@ public sealed class PowerShellToolPackTests
 
         public RecordingAuditLog Audit { get; } = new();
 
+        public RecordingDirectRunner Direct { get; } = new();
+
         public void Enable() => Settings.Current.Tools.SetPackEnabled(PowerShellToolPack.PackId, true);
 
-        public Task<string> RunAsync(string script, string? directory = null) =>
-            new PowerShellToolPack().RunPowerShellAsync(
-                new ToolContext("session", Workspace, [], Settings, Approvals, Jobs, Audit),
+        /// <summary>聊天室关掉沙箱的作用域（其余字段沿用通用设置）。</summary>
+        public EffectiveSettings DirectScope() => EffectiveSettings.Resolve(
+            Settings.Current,
+            workspace: null,
+            session: new ChatSession
+            {
+                Id = "session",
+                Title = "直跑",
+                ScopedSettings = new ScopedSettings { SandboxEnabled = false }
+            });
+
+        public Task<string> RunAsync(string script, string? directory = null, EffectiveSettings? scope = null) =>
+            new PowerShellToolPack(Direct).RunPowerShellAsync(
+                new ToolContext("session", Workspace, [], Settings, Approvals, Jobs, Audit, Scope: scope),
                 script,
                 directory,
                 timeoutSeconds: 30);
@@ -392,5 +470,26 @@ public sealed class PowerShellToolPackTests
         public List<ToolAuditEntry> Entries { get; } = [];
 
         public void Write(ToolAuditEntry entry) => Entries.Add(entry);
+    }
+
+    /// <summary>记录直跑参数但不真的起进程。</summary>
+    private sealed class RecordingDirectRunner : IDirectProcessRunner
+    {
+        public DirectRunResult Result { get; set; } = new(0, string.Empty, string.Empty, false, false, 0, false, false);
+
+        public List<(string Executable, IReadOnlyList<string> Arguments, string WorkingDirectory)> Calls { get; } = [];
+
+        public Task<DirectRunResult> RunAsync(
+            string executable,
+            IReadOnlyList<string> arguments,
+            string workingDirectory,
+            TimeSpan timeout,
+            int maxOutputChars,
+            CancellationToken cancellationToken = default,
+            IReadOnlyDictionary<string, string>? environment = null)
+        {
+            Calls.Add((executable, arguments, workingDirectory));
+            return Task.FromResult(Result);
+        }
     }
 }

@@ -223,7 +223,7 @@ internal static class Program
             new EditToolPack(),
             new MemoryToolPack(),
             new PdfToolPack(),
-            new PowerShellToolPack(),
+            new PowerShellToolPack(new NoopRunner()),
             new CommandToolPack(new NoopRunner(), new SessionGrantStore())
         ]);
 

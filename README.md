@@ -187,7 +187,16 @@ $env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
 
 1. **Header**：`HeaderContent` 参数放工作区（空聊天室）；上传的附件由 `ChatComposer` 追加在它下面，没有内容时整块不渲染、不占高度。
 2. **输入区**：`<textarea>` 多行输入，`field-sizing: content` 自动增高（上限 200px 后内部滚动）。
-3. **底部功能区**：左侧是「＋ 上传文件」和常用技能（每个 chip 左侧带一个字形图标，最多直接显示 3 个，超出的进「更多」，菜单里同样是「图标 + 名称 + 说明」）；右侧依次是**搜索**、**文件**两个可同时点亮的图标按钮、模型选择器、发送按钮。`IsGenerating` 为 true 时发送按钮切换为停止图标（`.is-stop`）。模型选择器按提供商分组，组头可收起 / 展开；选中后写入当前聊天室，`lastProviderId` / `lastModelId` 只作为新聊天室的兜底默认值。
+3. **底部功能区**：左侧是「＋ 上传文件」和常用技能（每个 chip 左侧带一个字形图标，最多直接显示 3 个，超出的进「更多」，菜单里同样是「图标 + 名称 + 说明」）；右侧依次是**完全权限**、**沙箱**、**搜索**、**文件**这类可同时点亮的图标按钮、模型选择器、发送按钮。`IsGenerating` 为 true 时发送按钮切换为停止图标（`.is-stop`）。模型选择器按提供商分组，组头可收起 / 展开；选中后写入当前聊天室，`lastProviderId` / `lastModelId` 只作为新聊天室的兜底默认值。
+
+**聊天室级权限（只影响当前聊天室，不改通用设置）**：
+
+| 控件 | 位置 | 行为 |
+| --- | --- | --- |
+| 完全权限 | 工具 chip 最左侧（盾牌 + 对勾） | 打开后本聊天室**跳过所有工具确认框**，并同时关闭沙箱；再点一次回到标准权限（审批恢复、沙箱交回继承） |
+| 沙箱 | 完全权限右边（盾牌） | 单独开关本聊天室的执行沙箱；关闭后 PowerShell 改为宿主直跑，改动直接落到真实工作区。琥珀色表示已关闭 |
+
+两个开关互不替代：只关沙箱、保留审批时，直跑脚本仍会弹确认框；沙箱不可用时开关禁用并显示原因。作用域写入 `ChatSession.ScopedSettings`（`skipApprovals` / `sandboxEnabled`），随聊天室一起持久化。
 
 上传的附件会复制到 `%APPDATA%\SDemo\DesktopAgent\uploads\{sessionId}\`，显示在输入框 Header 里（新建聊天室时在工作区选择器下面）；发送后附件随消息持久化，消息气泡里也会显示。文本类附件（`.md` / `.txt` / `.json` / 常见代码后缀）会内联进模型上下文（单个最多 16K 字符、总量 48K），二进制附件只把名称 / 大小 / 路径告诉模型。也可以把文件直接**拖进输入框**：JS 把 drop 的文件写进 Blazor 的 file input，再走同一套上传逻辑。
 
@@ -220,7 +229,7 @@ $env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
 
 ## 数据存储
 
-设置分三层：通用（设置页）、工作区（侧栏工作区「⋯ → 工作区设置」）、聊天室（聊天室右上角齿轮）。每层只保存自己显式改过的项，未设置的项继续继承上级；优先级为 **聊天室 > 工作区 > 通用**。作用域行标题旁的感叹号会显示属性说明与上级当前值。
+设置分三层：通用（设置页）、工作区（侧栏工作区「⋯ → 工作区设置」）、聊天室（聊天室右上角齿轮，以及输入框里的「完全权限 / 沙箱」开关）。每层只保存自己显式改过的项，未设置的项继续继承上级；优先级为 **聊天室 > 工作区 > 通用**。作用域行标题旁的感叹号会显示属性说明与上级当前值。
 
 设置与会话分开存：
 
@@ -275,7 +284,7 @@ $env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
 
 ## 设置页
 
-右侧整页，顶部分区切换（通用 / 模型 / 上下文 / 工具 / 插件），各分区独立滚动：
+右侧整页，顶部分区切换（通用 / 模型 / 上下文 / 工具 / 技能 / 插件），各分区独立滚动：
 
 **通用设置**
 
@@ -305,6 +314,13 @@ $env:SDEMO_WORKSPACE_ROOT = "$env:TEMP\sdemo-workspace"
 - **联网搜索**：默认「必应 RSS」（免密钥，`https://www.bing.com/search?q=…&format=rss`）；也可以切到「自定义 API」，填接口地址与 Key（同样 DPAPI 加密），按 `POST {"query": …, "top_k": 5}` 调用，返回 JSON 即可（解析是通用的：找第一个对象数组，取 title/url/snippet 一类字段）。
 - 两种后端都有「测试搜索」按钮，结果直接显示在下方。
 - **文件写入**：「写入前需要确认」开关，默认开启；开启时模型调用 `write_file` 会先弹确认框（路径 + 内容预览），拒绝则不落盘。
+- **PowerShell**：开关 + 沙箱模式（自动 / 强制）+ 超时；沙箱关闭时这里显示为「直跑」而不是「不可用」。
+- **同层还有「完全权限」的说明**：审批是逐次确认，不提供「同脚本本会话自动批准」；要免掉确认框，请在聊天室里打开「完全权限」（只作用于那一间）。
+
+**技能设置**
+
+- 列出技能库里的所有技能（目录包 / 单文件、版本、来源、`sha256` 与最后写入时间），可打开目录、重新扫描、安装 Archify。
+- 每个技能一个「在输入框显示」开关：关掉后不再在输入框里固定占 chip，但技能仍在库里，`/技能名` 与 `/` 菜单照常可调用；偏好保存在 `settings.json` 的 `skills.composerVisible`。
 
 设置文件：`%APPDATA%\SDemo\DesktopAgent\settings.json`（损坏时自动备份为 `.bak` 并回退默认值）。
 
@@ -377,8 +393,9 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 - **先判断做什么**：每轮先分「对话 / 问答 / 任务」。聊天、寒暄、致谢不注入任何工具，直接回答；问答只给读 / 搜；只有明确要改文件、跑命令的任务才给写与执行工具。工具是「按需」而不是「每轮都用」。
 
 - **＋ 上传文件**：多选，附件显示在 Header（新聊天室在工作区选择器下面），发送后随消息落库。
-- **常用技能**：直接读取技能库，最多同时显示 3 个，超出的放进「更多」菜单；每个 chip 左侧是技能图标（frontmatter 的 `icon`，没写就取名字首字）。点击后**只显示选中的那一个 chip**（带 `✕` 取消），其余技能隐藏，下一次发送把该技能全文注入系统提示词。
+- **常用技能**：直接读取技能库，最多同时显示 3 个，超出的放进「更多」菜单；每个 chip 左侧是技能图标（frontmatter 的 `icon`，没写就取名字首字）。点击后**只显示选中的那一个 chip**（带 `✕` 取消），其余技能隐藏，下一次发送把该技能全文注入系统提示词。某个技能不想占位置时，在「设置 → 技能」里关掉它的「在输入框显示」：chip 不再出现，但 `/技能名` 与 `/` 菜单照常可用。
 - **模型工具**：右侧只保留「联网搜索」这类可选外部工具，点亮即启用。文件读写、Office 文档是内置能力，默认开启，不再占输入框 chip；在「设置 → 工具设置」可按 `files`（只读）/ `office`（文档）/ `edits`（写入）分包关闭。
+- **权限与沙箱**：工具 chip 最左侧是两个聊天室级开关——「完全权限」（跳过确认 + 关沙箱）和「沙箱」。详见上文「聊天室级权限」。
 
 | 工具 | 下发的工具 | 实现 |
 | --- | --- | --- |
@@ -386,7 +403,7 @@ await foreach (var update in agent.RunStreamingAsync(messages, cancellationToken
 | `files`（只读，内置） | `list_files` / `list_tree` / `read_file` / `search_files` / `glob_files` / `workspace_info` | 按行读带行号与续读；搜索 / glob 纯 .NET；排除 `bin` / `obj` / `.git` 等；路径限制在工作区内 |
 | `office`（内置） | `office_info` / `office_read` / `office_write` | Word / Excel / PowerPoint 以 Markdown 进出：读取时还原标题、段落、列表、表格、幻灯片与备注；写入按扩展名生成 .docx / .xlsx / .pptx；上传附件时自动提取 Markdown sidecar，模型可直接分析 |
 | `edits`（写入，内置） | `apply_patch` / `write_file` | `apply_patch` 应用 unified diff（多文件、全有或全无）；写已有文件前必须先 `read_file`，且审批框显示 diff |
-| `command`（直跑，默认关闭） | `run_command` | 白名单命令（dotnet build / test 等）在宿主直跑；参数不经过 shell、每次审计、可本会话授权；`run_powershell` 仍在沙箱 |
+| `command`（直跑，默认关闭） | `run_command` | 白名单命令（dotnet build / test 等）在宿主直跑；参数不经过 shell、每次审计、可本会话授权；`run_powershell` 默认仍在沙箱，只有在聊天室里关掉沙箱才直跑 |
 
 ### Office 文档（docx / xlsx / pptx）
 
@@ -434,7 +451,8 @@ version: 1.0
 
 ### 沙箱执行（S1–S6 已完成）
 
-PowerShell 与 PDF 解析都在沙箱里运行；沙箱不可用时直接拒绝执行，**不会**退回主进程直跑。
+PowerShell 与 PDF 解析默认在沙箱里运行；沙箱不可用时直接拒绝执行，**不会**自动退回主进程直跑。
+只有用户在聊天室输入框里主动关掉沙箱（或在调试构建里从设置页关闭），那一间才会改成宿主直跑。
 完整开发手册见 [docs/architecture/sandbox-development-manual.md](docs/architecture/sandbox-development-manual.md)，
 S6 验收与偏差见 [docs/reports/sandbox-s6-report.md](docs/reports/sandbox-s6-report.md)，
 UI 逐项验收记录见 [docs/reports/sandbox-ui-acceptance-s6.md](docs/reports/sandbox-ui-acceptance-s6.md)，
@@ -460,8 +478,12 @@ UI 逐项验收记录见 [docs/reports/sandbox-ui-acceptance-s6.md](docs/reports
 S6 行为要点：
 
 - **内置工具无需 chip**：文件读写、PDF、PowerShell 默认开启，模型根据任务自行调用，
-  输入框只保留联网搜索这类可选外部工具。PowerShell 每次执行仍需审批；沙箱不可用时直接拒绝，
-  不会无沙箱直跑。设置页仍可全局关闭某个内置工具。
+  输入框只保留联网搜索这类可选外部工具。PowerShell 每次执行仍需审批；沙箱不可用时直接拒绝。
+  设置页仍可全局关闭某个内置工具。
+- **直跑（无沙箱）**：在聊天室输入框里关掉沙箱（或直接选「完全权限」）后，这一间的 PowerShell 改为
+  宿主直跑——同一份脚本经 `-EncodedCommand` 交给 `powershell.exe`，工作目录仍在工作区内，
+  超时 1–120 秒、输出按上限截断，改动立即落到真实工作区；审计里记为 `sandbox: None`、`mode: direct`。
+  审批不因此消失：只有「完全权限」才会跳过确认。PDF 解析依赖 AppContainer，关沙箱后不可用。
 - **删除类变更**：默认不勾选；确认后移动到 `sandbox\trash\{jobId}\{相对路径}`，不永久删除。
   删除前校验文件仍是快照版本，用户改过就跳过；目录删除不支持。
 - **自动清理**：启动时删除超过 24 小时的 job、1 小时前的残留 `*.tmp` / `*.wsb`、7 天前的 trash；
@@ -525,7 +547,7 @@ S6 行为要点：
 
 使用方式：侧栏「新建聊天室」下方有「翻译」「总结」「简单问答」入口，点一下就是预选该插件的空会话；输入框底部的插件 chip 选中后发送走插件 Run；任意助手消息底部（时间右侧）的插件图标点一下，无参数直接跑、有参数弹出面板，产物是挂在原消息下的卡片。在聊天正文里选中文本、松开鼠标会出现划词菜单，菜单里的插件由「设置 → 插件 → 选中」控制；划词产物同样挂在选区所在消息下。派生卡片默认不进入下一轮上下文，卡片上的「加入上下文」可以显式提升；「简单问答」的「关联上下文」开关决定这一轮是否带历史。`segments` 能力的卡片与消息都带「对照 / 译文」开关，切换只是重新渲染、不重新请求；呈现方式按会话记忆，新会话默认值在「设置 → 插件」。想关掉或调整上限也在「设置 → 插件」。
 
-**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（当前 863 个用例）+ `dotnet test tests/SDemo.DesktopAgent.UI.Tests`（131 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 219 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令、构建 / 测试解析、todo / 验证门 / checkpoint / 循环保护、对话 / 任务判定、小模型模式 / 路由 / 工具修复、插件 / 划词 / 上下文、UI 组件、沙箱与路径安全等。
+**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（当前 950 个用例）+ `dotnet test tests/SDemo.DesktopAgent.UI.Tests`（154 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 222 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令（沙箱与宿主直跑）、构建 / 测试解析、todo / 验证门 / checkpoint / 循环保护、对话 / 任务判定、小模型模式 / 路由 / 工具修复、插件 / 划词 / 上下文、UI 组件、权限与沙箱作用域、沙箱与路径安全等。
 
 ## 主题实现
 

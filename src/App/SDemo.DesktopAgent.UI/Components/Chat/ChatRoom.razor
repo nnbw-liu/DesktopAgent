@@ -484,10 +484,16 @@
                       WorkspaceRoot="@WorkspaceContext.RootPath"
                       IsGenerating="_isGenerating"
                       Skills="_skills"
+                      HiddenSkills="HiddenSkillNames"
                       SelectedSkill="@_selectedSkill"
                       OnSelectSkill="SelectSkill"
                       ToolPacks="_toolPacks"
                       OnToggleToolPack="ToggleToolPack"
+                      SandboxEnabled="SandboxOn"
+                      FullAccess="FullPermissions"
+                      SandboxUnavailableReason="SandboxUnavailableReason"
+                      OnToggleSandbox="ToggleSandboxAsync"
+                      OnToggleFullAccess="ToggleFullAccessAsync"
                       PluginMounts="_composerMounts"
                       PluginById="_composerPlugins"
                       MaxVisiblePlugins="@Registry.MaxFor(PluginSurface.Composer)"
@@ -1457,6 +1463,26 @@
     private EffectiveSettings CurrentScope() =>
         EffectiveSettings.Resolve(Settings.Current, CurrentWorkspace(), Session);
 
+    /// <summary>当前聊天室是否跳过工具确认（只有显式打开才算；工作区 / 通用层不提供这项）。</summary>
+    private bool FullPermissions => Session.ScopedSettings.SkipApprovals == true;
+
+    /// <summary>当前聊天室实际是否使用沙箱（已合并工作区 / 通用设置）。</summary>
+    private bool SandboxOn => CurrentScope().Sandbox.Enabled;
+
+    /// <summary>沙箱不可用的原因；为空表示可以把沙箱重新打开。</summary>
+    private string? SandboxUnavailableReason => _sandboxAvailability is { Available: true }
+        ? null
+        : _toolPackAvailabilityLoading
+            ? "正在检测沙箱…"
+            : _sandboxAvailability?.Reason ?? "沙箱不可用";
+
+    /// <summary>技能设置里取消「在输入框显示」的技能名：输入框不再给它们固定 chip。</summary>
+    private IReadOnlySet<string> HiddenSkillNames =>
+        Settings.Current.Skills.ComposerVisible
+            .Where(pair => !pair.Value)
+            .Select(pair => pair.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     private void DismissContextNotice() => _contextNotice = null;
 
     /// <summary>「上次压缩未完成」的悬浮说明（P2b 事务标记）：什么时候开始的、为什么还在。</summary>
@@ -1705,6 +1731,28 @@
     }
 
     /// <summary>
+    /// 输入框的「完全权限」：只写当前聊天室。打开时同时关闭沙箱（不弹确认 + 直跑真实工作区），
+    /// 关闭时把沙箱开关交回继承，避免上一个聊天室的状态残留在这一间。
+    /// </summary>
+    private async Task ToggleFullAccessAsync(bool enabled)
+    {
+        Session.ScopedSettings.SkipApprovals = enabled ? true : null;
+        Session.ScopedSettings.SandboxEnabled = enabled ? false : null;
+        await NotifySessionChangedAsync();
+        RefreshToolPacks();
+        StateHasChanged();
+    }
+
+    /// <summary>输入框的沙箱开关：只切换当前聊天室的沙箱，不碰审批设置。</summary>
+    private async Task ToggleSandboxAsync()
+    {
+        Session.ScopedSettings.SandboxEnabled = !CurrentScope().Sandbox.Enabled;
+        await NotifySessionChangedAsync();
+        RefreshToolPacks();
+        StateHasChanged();
+    }
+
+    /// <summary>
     /// 重建输入框里的外部工具 chip。文件 / PDF / PowerShell 是内置能力（<c>BuiltIn</c>），
     /// 不出现在 chip 里，由模型按需调用；只有搜索这类可选工具需要用户逐轮选择。
     /// </summary>
@@ -1767,6 +1815,7 @@
     private string? GetUnavailableReason(AgentToolPackDescriptor descriptor)
     {
         var settings = Settings.Current;
+        var scope = CurrentScope();
 
         if (!settings.Tools.IsPackEnabled(descriptor.Id, descriptor.DefaultEnabled))
         {
@@ -1807,12 +1856,8 @@
 
         if (descriptor.Id == "powershell")
         {
-            if (!settings.Sandbox.Enabled)
-            {
-                return "执行沙箱已在设置中关闭";
-            }
-
-            if (_sandboxAvailability is not { Available: true, Verified: true })
+            // 关掉沙箱不是「禁用工具」：PowerShell 改成宿主直跑，所以这里只关心沙箱是否可用。
+            if (scope.Sandbox.Enabled && _sandboxAvailability is not { Available: true, Verified: true })
             {
                 return _toolPackAvailabilityLoading
                     ? "正在检测沙箱…"
@@ -1821,10 +1866,10 @@
         }
         else if (descriptor.Id == "pdf")
         {
-            // PDF helper 只在 AppContainer 里跑；不要求 PowerShell 的 Verified。
-            if (!settings.Sandbox.Enabled)
+            // PDF helper 只在 AppContainer 里跑；不要求 PowerShell 的 Verified，也不能直跑。
+            if (!scope.Sandbox.Enabled)
             {
-                return "执行沙箱已在设置中关闭";
+                return "PDF 解析需要沙箱（当前聊天室已关闭）";
             }
 
             if (_appContainerAvailability is not { Available: true })

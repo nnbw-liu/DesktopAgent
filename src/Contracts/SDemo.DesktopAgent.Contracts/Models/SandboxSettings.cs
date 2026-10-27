@@ -8,7 +8,11 @@ namespace SDemo.DesktopAgent.Models;
 /// </summary>
 public sealed class SandboxSettings
 {
-    /// <summary>沙箱总开关。关闭后 PowerShell / PDF 这类高风险工具必须整体不可用。</summary>
+    /// <summary>
+    /// 沙箱总开关。关闭后 PowerShell 改为宿主直跑（改动直接落到真实工作区），
+    /// PDF 解析这类只能在沙箱里的工具整体不可用。
+    /// 聊天室可以在输入框里单独关掉它；通用设置里的这个值仍是其它聊天室的默认。
+    /// </summary>
     public bool Enabled { get; set; } = true;
 
     /// <summary>Required 时沙箱不可用即拒绝执行；Preferred 允许降级到其他沙箱类型。</summary>
@@ -52,4 +56,7 @@ public sealed class SandboxSettings
     /// 模型仍可用 <c>pdf_read</c> 按需读取。
     /// </summary>
     public bool PdfAutoExtract { get; set; } = true;
+
+    /// <summary>复制一份用于按作用域合并；作用域只改开关，其余字段沿用通用设置。</summary>
+    public SandboxSettings Clone() => (SandboxSettings)MemberwiseClone();
 }

@@ -2396,7 +2396,9 @@ PDF.AutoExtract = true
 回滚：
 
 - 关闭 `PowerShell` Pack（设置或远程开关），不影响文件 / PDF。
-- 关闭 `Sandbox.Enabled` 时，PowerShell 直接不可用，不回到无沙箱执行。
+- 关闭 `Sandbox.Enabled` 时，PowerShell 不再在沙箱里执行；沙箱不可用不会自动降级，
+  只有用户在聊天室输入框里主动关掉沙箱（显式 opt-in，按作用域持久化）时，那一间的
+  PowerShell 才改为宿主直跑，审计记 `sandbox: None` / `mode: direct`。
 - 最坏情况：移除 `PowerShellToolPack` 注册，保留 PDF。
 
 ### 10.7 完成定义（S6）
@@ -2506,7 +2508,7 @@ PDF.AutoExtract = true
 | PowerShell 兼容性差 | 默认隐藏；只保留 Windows Sandbox 路线 |
 | Windows Sandbox 自动化不稳定 | 关闭 S4；不影响 AppContainer |
 | PDF helper 崩溃 | 关闭 PDF 工具 / 自动提取；保留文件工具 |
-| 严重安全问题 | 关闭 `Sandbox.Enabled`；PowerShell 不可用，不回到无沙箱 |
+| 严重安全问题 | 关闭 `Sandbox.Enabled`；PowerShell 默认不再沙箱执行，聊天室可显式切到直跑（有审计） |
 
 ---
 
