@@ -129,6 +129,9 @@ internal static class ChatRoomFixture
         context.Services.AddSingleton(new ChangeApplier());
         // 组件测试不起进程：打开 / 定位文件走兜底实现。
         context.Services.AddSingleton<IFileLauncherService>(new NullFileLauncherService());
+        // P4：测试宿主不映射 WebView2 虚拟源，预览走兜底提示。
+        context.Services.AddSingleton<IArtifactPreviewHost>(new UnavailableArtifactPreviewHost());
+        context.Services.AddSingleton<IArtifactPreviewService, ArtifactPreviewService>();
     }
 
     /// <summary>给设置页的模型目录填一个可用模型（组件渲染需要非空列表）。</summary>

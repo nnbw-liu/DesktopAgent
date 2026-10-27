@@ -1,0 +1,242 @@
+@using System.IO
+@using SDemo.DesktopAgent.Services
+
+@* P4：独立源 iframe 预览。iframe 只给 allow-scripts / allow-downloads，
+   不给 allow-same-origin / allow-top-navigation；HTML 不进入 Markdown。 *@
+<div class="artifact-preview-backdrop" @onclick="Close">
+    <section class="artifact-preview-panel"
+             role="dialog"
+             aria-modal="true"
+             aria-label="Archify 产物预览"
+             @onclick="KeepOpen"
+             @onclick:stopPropagation="true">
+        <header class="artifact-preview-head">
+            <div class="artifact-preview-title">
+                <span class="artifact-preview-kicker">隔离预览</span>
+                <span class="artifact-preview-file">@FileName</span>
+            </div>
+            <div class="artifact-preview-actions">
+                <button type="button" class="ghost-button" @onclick="OpenInBrowserAsync">在浏览器打开</button>
+                <button type="button"
+                        class="primary-button"
+                        disabled="@(_reviewing || string.IsNullOrWhiteSpace(ArtifactRelativePath))"
+                        @onclick="ReviewAsync">
+                    @(_reviewing ? "复核中…" : "视觉复核")
+                </button>
+                @if (!string.IsNullOrWhiteSpace(Host.ExportsRoot))
+                {
+                    <button type="button" class="ghost-button" @onclick="OpenExportsAsync">打开导出目录</button>
+                }
+                <button type="button" class="ghost-button" @onclick="Close">关闭</button>
+            </div>
+        </header>
+
+        <p class="artifact-preview-note">
+            独立源 <code>@Preview.PreviewUri?.Host</code>；iframe sandbox 仅
+            <code>allow-scripts allow-downloads</code>；CSP @(Preview.CspApplied ? "已注入" : "沿用产物自带")。
+            预览不修改工作区原件，也不是校验结论。
+        </p>
+
+        @if (Preview.PreviewUri is null)
+        {
+            <p class="settings-message">预览地址不可用，请改用「在浏览器打开」。</p>
+        }
+        else
+        {
+            <iframe class="artifact-preview-frame"
+                    src="@Preview.PreviewUri"
+                    title="@FileName"
+                    sandbox="allow-scripts allow-downloads"
+                    referrerpolicy="no-referrer"></iframe>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Host.ExportsRoot))
+        {
+            <p class="artifact-preview-note">
+                导出：在预览里使用 Archify 的导出菜单（PNG / JPEG / WebP / SVG / WebM），
+                文件会保存到 <code>@Host.ExportsRoot</code>；只接受这些扩展名。
+            </p>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_status))
+        {
+            <p class="settings-message artifact-preview-status">@_status</p>
+        }
+
+        @if (_review is not null)
+        {
+            <section class="artifact-review">
+                <div class="artifact-review-head">
+                    <span class="artifact-review-title">视觉复核</span>
+                    @if (!string.IsNullOrWhiteSpace(_review.Status))
+                    {
+                        <span class="plugin-badge">@_review.Status</span>
+                    }
+                    <span class="artifact-review-pending">visualReview=@(_review.VisualReview ?? "pending")</span>
+                </div>
+                <p class="settings-message">@_review.Message</p>
+
+                @if (_review.Screenshots is { Count: > 0 } shots)
+                {
+                    <div class="artifact-review-shots">
+                        @foreach (var shot in shots)
+                        {
+                            <button type="button"
+                                    class="ghost-button"
+                                    title="@shot.Path"
+                                    @onclick="() => OpenPathAsync(shot.Path)">
+                                打开 @shot.Width×@shot.Height @ThemeText(shot)
+                            </button>
+                        }
+                    </div>
+                }
+
+                <div class="artifact-review-actions">
+                    @if (!string.IsNullOrWhiteSpace(_review.ContactSheet))
+                    {
+                        <button type="button"
+                                class="ghost-button"
+                                @onclick="() => OpenPathAsync(_review.ContactSheet)">
+                            打开联系表
+                        </button>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_review.Receipt))
+                    {
+                        <button type="button"
+                                class="ghost-button"
+                                @onclick="() => OpenPathAsync(_review.Receipt)">
+                            打开 receipt
+                        </button>
+                    }
+                </div>
+
+                <p class="settings-section-hint">
+                    自动截图和闸门通过不等于人工视觉复核；请自己查看截图后再判断线条、标签与明暗主题。
+                </p>
+            </section>
+        }
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ArtifactPreviewResult Preview { get; set; } = null!;
+
+    [Parameter] public string? WorkspaceRoot { get; set; }
+
+    [Parameter] public string? ArtifactRelativePath { get; set; }
+
+    [Parameter] public string? ArtifactFullPath { get; set; }
+
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    [Inject] private IFileLauncherService Launcher { get; set; } = default!;
+
+    [Inject] private IArtifactPreviewHost Host { get; set; } = default!;
+
+    [Inject] private IArchifyReviewService ReviewService { get; set; } = default!;
+
+    [Inject] private IAppEnvironmentService Environment { get; set; } = default!;
+
+    private ArchifyReviewResult? _review;
+    private string _status = string.Empty;
+    private bool _reviewing;
+
+    private string FileName =>
+        Path.GetFileName(ArtifactRelativePath ?? Preview.OriginalPath ?? "artifact.html");
+
+    private void KeepOpen()
+    {
+        // 点击面板不关闭；背景点击才关闭。
+    }
+
+    private Task Close()
+    {
+        _review = null;
+        _status = string.Empty;
+        return OnClose.InvokeAsync();
+    }
+
+    private async Task OpenInBrowserAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ArtifactFullPath))
+        {
+            _status = "找不到原产物路径。";
+            return;
+        }
+
+        _status = await Launcher.OpenFileAsync(ArtifactFullPath)
+            ? "已交给系统默认浏览器打开。"
+            : "当前环境不支持打开文件。";
+    }
+
+    private async Task OpenExportsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Host.ExportsRoot))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(Host.ExportsRoot);
+            Environment.OpenFolder(Host.ExportsRoot);
+            _status = "已打开导出目录。";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _status = $"打开导出目录失败：{ex.Message}";
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task ReviewAsync()
+    {
+        if (_reviewing)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(WorkspaceRoot)
+            || string.IsNullOrWhiteSpace(ArtifactRelativePath))
+        {
+            _status = "当前会话没有工作区，无法做视觉复核。";
+            return;
+        }
+
+        _reviewing = true;
+        _status = "正在运行自动浏览器校验并截图…";
+        _review = null;
+        StateHasChanged();
+
+        try
+        {
+            _review = await ReviewService.ReviewAsync(WorkspaceRoot, ArtifactRelativePath);
+            _status = _review.Message;
+        }
+        catch (Exception ex)
+        {
+            _status = $"视觉复核失败：{ex.Message}";
+        }
+        finally
+        {
+            _reviewing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenPathAsync(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        _status = await Launcher.OpenFileAsync(path)
+            ? "已打开复核证据。"
+            : "找不到复核证据文件。";
+    }
+
+    private static string ThemeText(ArchifyScreenshot screenshot) =>
+        screenshot.Theme.Equals("dark", StringComparison.OrdinalIgnoreCase) ? "深色" : "浅色";
+}

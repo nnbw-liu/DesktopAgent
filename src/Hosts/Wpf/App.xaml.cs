@@ -107,6 +107,11 @@ public partial class App : Application
         services.AddSingleton<IFileLauncherService, SDemo.DesktopAgent.Platform.Windows.Services.ShellFileLauncher>();
         services.AddSingleton<AttachmentStore>();
 
+        // P4：WebView2 独立源预览 host（Core 里的兜底实现由这里的真实实现覆盖）。
+        services.AddSingleton<WebView2ArtifactPreviewHost>();
+        services.AddSingleton<IArtifactPreviewHost>(sp =>
+            sp.GetRequiredService<WebView2ArtifactPreviewHost>());
+
         // 平台无关：设置、主题、模型、会话、技能、Agent。
         services.AddDesktopAgentCore();
 

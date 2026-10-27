@@ -9,6 +9,17 @@
         <span class="timeline-artifacts-label">产物</span>
         @foreach (var path in _links)
         {
+            @if (PreviewService.IsSupported)
+            {
+                <button type="button"
+                        class="ghost-button timeline-artifact-button"
+                        disabled="@_preparing"
+                        title="在隔离的独立源 iframe 中预览"
+                        @onclick="() => PreviewAsync(path)">
+                    @(_preparing ? "准备预览…" : "应用内预览")
+                </button>
+            }
+
             <button type="button"
                     class="ghost-button timeline-artifact-button"
                     title="@path"
@@ -23,6 +34,15 @@
     </div>
 }
 
+@if (_preview is not null)
+{
+    <ArtifactPreviewPanel Preview="_preview"
+                          WorkspaceRoot="@WorkspaceRoot"
+                          ArtifactRelativePath="@_previewLink"
+                          ArtifactFullPath="@_preview.OriginalPath"
+                          OnClose="ClosePreview" />
+}
+
 @code {
     [Parameter] public string? Text { get; set; }
 
@@ -30,12 +50,67 @@
 
     [Inject] private IFileLauncherService Launcher { get; set; } = default!;
 
+    [Inject] private IArtifactPreviewService PreviewService { get; set; } = default!;
+
     private IReadOnlyList<string> _links = [];
     private string _status = string.Empty;
+    private ArtifactPreviewResult? _preview;
+    private string? _previewLink;
+    private bool _preparing;
 
     protected override void OnParametersSet()
     {
         _links = ArtifactLinkParser.Extract(Text);
+        _status = string.Empty;
+    }
+
+    private async Task PreviewAsync(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(WorkspaceRoot))
+        {
+            _status = "当前会话没有工作区，无法预览产物。";
+            return;
+        }
+
+        if (_preparing)
+        {
+            return;
+        }
+
+        _preparing = true;
+        _status = "正在准备隔离预览…";
+        StateHasChanged();
+
+        try
+        {
+            var result = await PreviewService.PrepareAsync(WorkspaceRoot, relativePath);
+
+            if (result.Success)
+            {
+                _preview = result;
+                _previewLink = relativePath;
+                _status = result.Message;
+            }
+            else
+            {
+                _status = result.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            _status = $"准备预览失败：{ex.Message}";
+        }
+        finally
+        {
+            _preparing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClosePreview()
+    {
+        _preview = null;
+        _previewLink = null;
         _status = string.Empty;
     }
 

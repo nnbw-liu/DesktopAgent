@@ -139,10 +139,19 @@ v1 只做 **技能包脚本**，不开放任意命令：
 - v1：助手消息给相对路径 + “用浏览器打开”（复用宿主文件打开服务）；
   已落地为消息下方的 `ArtifactLinks`：只提取 `.archify/.../*.html`，打开前按工作区根
   收窄并校验文件存在，再交给 `IFileLauncherService`。
-- Phase B：WebView2 虚拟主机映射到独立源 + `iframe sandbox="allow-scripts"` + CSP；
-  不给 `allow-same-origin` / `allow-top-navigation`，HTML 绝不内联进 Markdown。
-- 可选“视觉复核”：用户显式触发时，用本机 Edge 跑 `browser-check` / `visual-check`，
-  截图落 `.archify/<...>/visual-check/`，并如实报告“自动校验已过 / 已做人工视觉复核”。
+- Phase B（P4 已落地）：WebView2 虚拟主机映射到独立源
+  `https://archify-preview.local/`，预览前把产物目录复制到
+  `<DataRoot>/preview/<token>/` 并注入 CSP；Blazor 侧只放
+  `iframe sandbox="allow-scripts allow-downloads"`，不给
+  `allow-same-origin` / `allow-top-navigation`，HTML 绝不内联进 Markdown。
+  工作区原件不改动。
+- 可选“视觉复核”：用户显式触发时，用本机 Edge 跑
+  `visual-check --summary --require-provenance`，截图落
+  `.archify/<...>/visual-check/`；结果如实区分“自动浏览器校验已过”与
+  `visualReview=pending`（尚未人工复核）。
+- 导出：预览内使用 Archify 自带导出菜单；WebView2 `DownloadStarting` 只接受
+  PNG / JPEG / WebP / SVG / WebM，统一落到 `<DataRoot>/preview/exports/`，
+  不弹系统保存框。
 
 ---
 
@@ -170,7 +179,7 @@ v1 只做 **技能包脚本**，不开放任意命令：
 | P1 技能包 | 目录发现 / `read_skill_file` / 版本哈希 / 设置页 / 兼容旧 `.md` | 2 天 | 已完成：[p1-skills.md](../reports/p1-skills.md) |
 | P2 运行器 | `run_skill_script` + 审批 / 审计 / 环境白名单 / 路径 jail / Node 检测 | 2–3 天 | 已完成：[p2-skill-script.md](../reports/p2-skill-script.md) |
 | P3 适配与产物 | 适配技能、安装 Archify 3.2.0、Apache-2.0 与第三方声明、产物打开 | 1–2 天 | 已完成：[p3-archify.md](../reports/p3-archify.md) |
-| P4 预览 / 复核 | 独立源 iframe 预览、可选视觉复核、导出 | 3–5 天 | 预览隔离，不污染聊天 DOM |
+| P4 预览 / 复核 | 独立源 iframe 预览、可选视觉复核、导出 | 3–5 天 | 已完成：[p4-archify.md](../reports/p4-archify.md)；预览隔离，不污染聊天 DOM |
 
 ---
 

@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private const int DwmwcpRound = 2;
 
     private readonly IThemeService _themeService;
+    private readonly WebView2ArtifactPreviewHost _previewHost;
 
     private IntPtr _hwnd;
     private WebView2CompositionControl? _webView;
@@ -34,11 +35,15 @@ public partial class MainWindow : Window
     /// <summary>点击关闭按钮把窗口收进托盘时触发（用于第一次的托盘提示）。</summary>
     public event EventHandler? HiddenToTray;
 
-    public MainWindow(IServiceProvider serviceProvider, IThemeService themeService)
+    public MainWindow(
+        IServiceProvider serviceProvider,
+        IThemeService themeService,
+        WebView2ArtifactPreviewHost previewHost)
     {
         InitializeComponent();
 
         _themeService = themeService;
+        _previewHost = previewHost;
 
         // 让 Blazor 组件复用 WPF 侧构建的同一个 DI 容器。
         BlazorView.Services = serviceProvider;
@@ -193,6 +198,7 @@ public partial class MainWindow : Window
         Microsoft.AspNetCore.Components.WebView.BlazorWebViewInitializedEventArgs args)
     {
         _webView = args.WebView;
+        _previewHost.Attach(args.WebView.CoreWebView2);
         UpdateWebViewBackground(_themeService.Current);
     }
 

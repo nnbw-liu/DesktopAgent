@@ -5523,6 +5523,130 @@ a {
     font-size: 12px;
 }
 
+/* P4：产物预览是覆盖层，iframe 不进入消息正文，也不参与 Markdown 渲染。 */
+.artifact-preview-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    backdrop-filter: blur(2px);
+}
+
+.artifact-preview-panel {
+    display: flex;
+    flex-direction: column;
+    width: min(1280px, 100%);
+    height: min(860px, 100%);
+    min-height: 360px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: 0 24px 80px rgb(0 0 0 / 40%);
+}
+
+.artifact-preview-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.artifact-preview-title {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
+.artifact-preview-kicker {
+    color: var(--text-muted);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+}
+
+.artifact-preview-file {
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.artifact-preview-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.artifact-preview-note {
+    margin: 0;
+    padding: 8px 16px;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.artifact-preview-frame {
+    flex: 1;
+    width: 100%;
+    min-height: 240px;
+    border: 0;
+    background: #fff;
+}
+
+.artifact-preview-status {
+    padding: 0 16px 8px;
+}
+
+.artifact-review {
+    max-height: 240px;
+    overflow: auto;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-hover);
+}
+
+.artifact-review-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.artifact-review-title {
+    font-weight: 600;
+}
+
+.artifact-review-pending {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.artifact-review-shots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0;
+}
+
+.artifact-review-shots .ghost-button {
+    font-size: 12px;
+}
+
+.artifact-review-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
 /* 工具行：可点开看参数与结果预览 */
 .timeline-tool-row {
     display: flex;

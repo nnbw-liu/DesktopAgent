@@ -20,6 +20,8 @@ public sealed class ArtifactLinksTests : TestContext
 
         var launcher = new RecordingFileLauncherService();
         Services.AddSingleton<IFileLauncherService>(launcher);
+        Services.AddSingleton<IArtifactPreviewHost, UnavailableArtifactPreviewHost>();
+        Services.AddSingleton<IArtifactPreviewService, ArtifactPreviewService>();
 
         var cut = RenderComponent<ArtifactLinks>(parameters => parameters
             .Add(component => component.Text, "已生成：`.archify/architecture-order/order.html`")
@@ -32,11 +34,46 @@ public sealed class ArtifactLinksTests : TestContext
     }
 
     [Fact]
+    public void 点击应用内预览打开隔离_iframe()
+    {
+        using var temp = new TempDirectory();
+        var preview = new StubArtifactPreviewService();
+        var launcher = new RecordingFileLauncherService();
+        var review = new StubArchifyReviewService();
+        var environment = new StubAppEnvironmentService();
+
+        Services.AddSingleton(launcher);
+        Services.AddSingleton<IFileLauncherService>(launcher);
+        Services.AddSingleton(preview);
+        Services.AddSingleton<IArtifactPreviewService>(preview);
+        Services.AddSingleton<IArtifactPreviewHost, StubArtifactPreviewHost>();
+        Services.AddSingleton(review);
+        Services.AddSingleton<IArchifyReviewService>(review);
+        Services.AddSingleton(environment);
+        Services.AddSingleton<IAppEnvironmentService>(environment);
+
+        var cut = RenderComponent<ArtifactLinks>(parameters => parameters
+            .Add(component => component.Text, "已生成：`.archify/order/order.html`")
+            .Add(component => component.WorkspaceRoot, temp.Root));
+
+        cut.FindAll("button")
+            .First(button => button.TextContent.Contains("应用内预览", StringComparison.Ordinal))
+            .Click();
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("iframe")));
+        Assert.Equal(
+            "allow-scripts allow-downloads",
+            cut.Find("iframe").GetAttribute("sandbox"));
+    }
+
+    [Fact]
     public void 文件不存在时按钮给可恢复提示且不启动进程()
     {
         using var temp = new TempDirectory();
         var launcher = new RecordingFileLauncherService();
         Services.AddSingleton<IFileLauncherService>(launcher);
+        Services.AddSingleton<IArtifactPreviewHost, UnavailableArtifactPreviewHost>();
+        Services.AddSingleton<IArtifactPreviewService, ArtifactPreviewService>();
 
         var cut = RenderComponent<ArtifactLinks>(parameters => parameters
             .Add(component => component.Text, "`.archify/a/missing.html`")
