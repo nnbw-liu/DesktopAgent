@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDemo.DesktopAgent 架构图</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171f2e;
+    --panel-2: #1d2738;
+    --line: #2b3a52;
+    --fg: #e6edf7;
+    --muted: #93a4bd;
+    --accent: #4f9cf9;
+    --accent-2: #37c08a;
+    --accent-3: #d98b3a;
+    --accent-4: #a06bf0;
+    --edge: #4a5c78;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --panel-2: #eef3fa;
+      --line: #d4deeb;
+      --fg: #17202e;
+      --muted: #5b6b82;
+      --accent: #1f6fd0;
+      --accent-2: #178a5f;
+      --accent-3: #a9681f;
+      --accent-4: #7a45c9;
+      --edge: #9fb0c6;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 56px;
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.55 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  header { max-width: 1180px; margin: 0 auto 26px; }
+  h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: .2px; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .note {
+    margin-top: 14px; padding: 10px 14px; font-size: 12.5px;
+    color: var(--muted); background: var(--panel-2);
+    border: 1px dashed var(--line); border-left: 3px solid var(--accent-3);
+    border-radius: 6px;
+  }
+  .canvas { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 0; }
+  .band {
+    position: relative; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px 16px;
+  }
+  .band > .band-title {
+    font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 12px; font-weight: 600;
+  }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row.center { justify-content: center; }
+  .node {
+    flex: 1 1 150px; min-width: 140px;
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px;
+    border-top: 3px solid var(--accent);
+  }
+  .node .n-title { font-weight: 600; font-size: 13.5px; }
+  .node .n-sub { color: var(--muted); font-size: 11.5px; margin-top: 3px; }
+  .node.host { border-top-color: var(--accent-2); }
+  .node.core { border-top-color: var(--accent-3); }
+  .node.cap { border-top-color: var(--accent-4); }
+  .node.ext { border-top-color: var(--muted); border-style: dashed; }
+  .node.security { border-top-color: #e05a5a; }
+  .arrow {
+    text-align: center; color: var(--edge); font-size: 12px;
+    padding: 6px 0; letter-spacing: .1em; user-select: none;
+  }
+  .arrow span { background: var(--bg); padding: 0 8px; }
+  .cards {
+    max-width: 1180px; margin: 26px auto 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .card h3 {
+    margin: 0 0 10px; font-size: 13px; letter-spacing: .04em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .card.d2 .dot { background: var(--accent-2); }
+  .card.d3 .dot { background: var(--accent-3); }
+  .card.d4 .dot { background: var(--accent-4); }
+  .card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12.5px; }
+  .card li { margin: 4px 0; }
+  code {
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 12px; background: var(--panel-2);
+    padding: 1px 5px; border-radius: 4px; color: var(--fg);
+  }
+  .legend { max-width: 1180px; margin: 18px auto 0; display: flex; gap: 20px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SDemo.DesktopAgent 架构图</h1>
+  <div class="sub">双宿主桌面 Agent 应用 · 分层依赖：Contracts → 能力层 → Tools → Storage → Core（组合根）→ UI / Hosts</div>
+  <div class="note">
+    说明：本图由助手依据仓库 README 与 <code>SDemo.DesktopAgent.sln</code> 的分层证据手写生成，
+    用于快速理解结构；<strong>未经 Archify CLI（finalize）闸门校验</strong>，不等同于 Archify 正式交付件。
+    对应输入草稿：<code>.archify/architecture-sdemo-desktopagent-20261027/candidate.json</code>。
+  </div>
+</header>
+
+<main class="canvas">
+
+  <section class="band">
+    <div class="band-title">Hosts · 宿主层（双宿主）</div>
+    <div class="row">
+      <div class="node host">
+        <div class="n-title">WPF 宿主</div>
+        <div class="n-sub">src/Hosts/Wpf · 主入口</div>
+      </div>
+      <div class="node host">
+        <div class="n-title">MAUI 宿主</div>
+        <div class="n-sub">src/Hosts/Maui · Windows 默认 / Android 可选</div>
+      </div>
+      <div class="node host">
+        <div class="n-title">UI（Razor 组件）</div>
+        <div class="n-sub">SDemo.DesktopAgent.UI · 两宿主共享</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="arrow"><span>▼ 共享 UI 组件 + 组合根注入</span></div>
+
+  <section class="band">
+    <div class="band-title">Composition Roots · 组合根</div>
+    <div class="row">
+      <div class="node core">
+        <div class="n-title">Core</div>
+        <div class="n-sub">SDemo.DesktopAgent.Core · DI 装配</div>
+      </div>
+      <div class="node core">
+        <div class="n-title">Windows 组合根</div>
+        <div class="n-sub">SDemo.DesktopAgent.Windows · 平台实现注册</div>
+      </div>
+      <div class="node core">
+        <div class="n-title">Platform 抽象（5 接口）</div>
+        <div class="n-sub">IAppPaths / ISecureStore / ISystemThemeProvider<br>IFolderPickerService / IAppEnvironmentService</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="arrow"><span>▼ 依赖能力层（接口消费方）</span></div>
+
+  <section class="band">
+    <div class="band-title">Capabilities · 能力层</div>
+    <div class="row">
+      <div class="node cap">
+        <div class="n-title">Agents</div>
+        <div class="n-sub">IAgentRuntime · Microsoft.Agents.AI 1.25.0<br>OpenAI 兼容流式输出</div>
+      </div>
+      <div class="node cap">
+        <div class="n-title">Context</div>
+        <div class="n-sub">会话上下文装配</div>
+      </div>
+      <div class="node cap">
+        <div class="n-title">Editing</div>
+        <div class="n-sub">编辑能力</div>
+      </div>
+      <div class="node cap">
+        <div class="n-title">Execution</div>
+        <div class="n-sub">执行抽象 + Execution.Windows 实现</div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="node cap">
+        <div class="n-title">Plugins</div>
+        <div class="n-sub">Abstractions → Runtime（扫描/校验/注册表/提示词）<br>内置：Translate / Summarize / QuickAsk</div>
+      </div>
+      <div class="node cap">
+        <div class="n-title">Sandbox</div>
+        <div class="n-sub">Sandbox.Contracts（零依赖协议）<br>→ Sandbox（平台中立）→ Sandbox.Windows</div>
+      </div>
+      <div class="node security">
+        <div class="n-title">安全边界</div>
+        <div class="n-sub">AppContainer · Job Object<br>Windows Sandbox</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="arrow"><span>▼ 工具包注册与路由</span></div>
+
+  <section class="band">
+    <div class="band-title">Tools · 工具层</div>
+    <div class="row">
+      <div class="node">
+        <div class="n-title">Tools.Abstractions</div>
+        <div class="n-sub">IAgentToolPack · ToolContext · 注册表 / 路由</div>
+      </div>
+      <div class="node">
+        <div class="n-title">Tools.Files / .Search / .Edits / .Todo</div>
+        <div class="n-sub">跨平台工具包</div>
+      </div>
+      <div class="node">
+        <div class="n-title">Tools.Windows</div>
+        <div class="n-sub">Windows 专属工具实现</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="arrow"><span>▼ 持久化与协议</span></div>
+
+  <section class="band">
+    <div class="band-title">Infrastructure · 基础设施</div>
+    <div class="row">
+      <div class="node core">
+        <div class="n-title">Storage</div>
+        <div class="n-sub">EF Core + SQLite 会话库</div>
+      </div>
+      <div class="node">
+        <div class="n-title">Contracts</div>
+        <div class="n-sub">SDemo.DesktopAgent.Contracts · 零依赖协议层</div>
+      </div>
+      <div class="node ext">
+        <div class="n-title">LLM 服务（外部）</div>
+        <div class="n-sub">OpenAI 兼容协议 · 流式</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><i style="background:var(--accent)"></i>协议 / 通用能力</span>
+    <span><i style="background:var(--accent-2)"></i>宿主</span>
+    <span><i style="background:var(--accent-3)"></i>组合根 / 存储</span>
+    <span><i style="background:var(--accent-4)"></i>能力层</span>
+    <span><i style="background:#e05a5a"></i>安全边界</span>
+    <span><i style="background:var(--muted)"></i>外部系统（虚线）</span>
+  </div>
+</main>
+
+<section class="cards">
+  <div class="card">
+    <h3><span class="dot"></span>分层依赖顺序（单向）</h3>
+    <ul>
+      <li><code>Contracts</code> 位于最底层，零依赖，所有层可引用</li>
+      <li>能力层：<code>Editing / Context / Execution / Sandbox / Agents / Plugins</code></li>
+      <li><code>Tools.*</code> 工具包聚合在能力层之上</li>
+      <li><code>Storage</code> 只被组合根与能力层消费</li>
+      <li><code>Core</code> 是唯一组合根，向上被 UI / Hosts 引用</li>
+    </ul>
+  </div>
+  <div class="card d2">
+    <h3><span class="dot"></span>双宿主策略</h3>
+    <ul>
+      <li>WPF 为主入口，MAUI 覆盖 Windows（默认）与 Android（可选）</li>
+      <li>两者共享 <code>SDemo.DesktopAgent.UI</code> 的 Razor 组件</li>
+      <li>差异收敛到 5 个平台接口，不扩散到业务层</li>
+      <li>平台实现集中在 <code>Execution.Windows</code> / <code>Sandbox.Windows</code> / <code>Tools.Windows</code></li>
+      <li>由 <code>SDemo.DesktopAgent.Windows</code> 统一注册</li>
+    </ul>
+  </div>
+  <div class="card d3">
+    <h3><span class="dot"></span>Agent 与插件体系</h3>
+    <ul>
+      <li>入口唯一：<code>IAgentRuntime</code>（src/Agents）</li>
+      <li>基于 <code>Microsoft.Agents.AI</code> 1.25.0</li>
+      <li>插件链：Abstractions → Runtime → 内置插件</li>
+      <li>内置插件以嵌入资源随包分发</li>
+      <li>插件提示词由 Runtime 统一组装</li>
+    </ul>
+  </div>
+  <div class="card d4">
+    <h3><span class="dot"></span>沙箱与安全</h3>
+    <ul>
+      <li><code>Sandbox.Contracts</code> 保持零依赖协议</li>
+      <li>平台中立层与 Windows 实现分离</li>
+      <li>隔离手段：AppContainer / Job Object / Windows Sandbox</li>
+      <li>独立测试工程 <code>SDemo.DesktopAgent.Sandbox.Tests</code></li>
+    </ul>
+  </div>
+</section>
+
+<footer class="legend" style="justify-content:center;margin-top:26px">
+  生成依据：README.md 分层说明 · SDemo.DesktopAgent.sln 工程顺序 · src 下各 csproj 引用关系
+</footer>
+</body>
+</html>

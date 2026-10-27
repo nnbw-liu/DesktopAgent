@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "SDemo.DesktopAgent 架构图",
+    "subtitle": "双宿主桌面 Agent：WPF + MAUI 共用 Razor UI，分层依赖单向收敛",
+    "output": "sdemo-desktopagent.html",
+    "locale": "zh-CN"
+  },
+  "layout": {
+    "mode": "grid",
+    "cols": 4,
+    "cellW": 210,
+    "cellH": 108,
+    "gapX": 56,
+    "gapY": 52
+  },
+  "components": [
+    {
+      "id": "host-wpf",
+      "type": "external",
+      "label": "WPF 宿主",
+      "sublabel": "src/Hosts/Wpf · 主入口",
+      "row": 0,
+      "col": 0
+    },
+    {
+      "id": "host-maui",
+      "type": "external",
+      "label": "MAUI 宿主",
+      "sublabel": "src/Hosts/Maui · Windows / Android",
+      "row": 0,
+      "col": 1
+    },
+    {
+      "id": "ui",
+      "type": "backend",
+      "label": "共享 UI",
+      "sublabel": "Razor 组件 · SDemo.DesktopAgent.UI",
+      "row": 0,
+      "col": 2
+    },
+    {
+      "id": "windows-root",
+      "type": "backend",
+      "label": "Windows 组合根",
+      "sublabel": "SDemo.DesktopAgent.Windows",
+      "row": 0,
+      "col": 3
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "Core",
+      "sublabel": "应用编排 · DI 组合根",
+      "row": 1,
+      "col": 0
+    },
+    {
+      "id": "agents",
+      "type": "backend",
+      "label": "Agents",
+      "sublabel": "IAgentRuntime · 唯一 Agent 入口",
+      "row": 1,
+      "col": 1
+    },
+    {
+      "id": "plugins",
+      "type": "backend",
+      "label": "插件体系",
+      "sublabel": "Abstractions / Runtime / 内置插件",
+      "row": 1,
+      "col": 2
+    },
+    {
+      "id": "llm",
+      "type": "cloud",
+      "label": "OpenAI 兼容 LLM",
+      "sublabel": "流式对话 · 外部服务",
+      "row": 1,
+      "col": 3
+    },
+    {
+      "id": "tools",
+      "type": "backend",
+      "label": "工具包",
+      "sublabel": "Abstractions / Files / Search / Edits / Todo",
+      "row": 2,
+      "col": 0
+    },
+    {
+      "id": "editing",
+      "type": "backend",
+      "label": "Editing",
+      "sublabel": "文件编辑能力",
+      "row": 2,
+      "col": 1
+    },
+    {
+      "id": "context",
+      "type": "backend",
+      "label": "Context",
+      "sublabel": "上下文构建",
+      "row": 2,
+      "col": 2
+    },
+    {
+      "id": "execution",
+      "type": "backend",
+      "label": "Execution",
+      "sublabel": "命令执行（平台中立 + .Windows）",
+      "row": 2,
+      "col": 3
+    },
+    {
+      "id": "storage",
+      "type": "database",
+      "label": "Storage",
+      "sublabel": "EF Core + SQLite 会话库",
+      "row": 3,
+      "col": 0
+    },
+    {
+      "id": "sandbox",
+      "type": "security",
+      "label": "Sandbox",
+      "sublabel": "Contracts / 内核 / Sandbox.Windows",
+      "row": 3,
+      "col": 1
+    },
+    {
+      "id": "contracts",
+      "type": "backend",
+      "label": "Contracts",
+      "sublabel": "零依赖接口与 DTO",
+      "row": 3,
+      "col": 2
+    },
+    {
+      "id": "win-services",
+      "type": "backend",
+      "label": "平台实现（*.Windows）",
+      "sublabel": "Sandbox / Execution / Tools 的 Windows 侧",
+      "row": 3,
+      "col": 3
+    }
+  ],
+  "connections": [
+    {
+      "id": "c-wpf-ui",
+      "from": "host-wpf",
+      "to": "ui",
+      "variant": "emphasis"
+    },
+    {
+      "id": "c-maui-ui",
+      "from": "host-maui",
+      "to": "ui",
+      "variant": "emphasis"
+    },
+    {
+      "id": "c-ui-core",
+      "from": "ui",
+      "to": "core",
+      "label": "ViewModels / 服务"
+    },
+    {
+      "id": "c-win-core",
+      "from": "windows-root",
+      "to": "core",
+      "label": "统一注册"
+    },
+    {
+      "id": "c-core-agents",
+      "from": "core",
+      "to": "agents"
+    },
+    {
+      "id": "c-core-plugins",
+      "from": "core",
+      "to": "plugins"
+    },
+    {
+      "id": "c-core-tools",
+      "from": "core",
+      "to": "tools"
+    },
+    {
+      "id": "c-agents-llm",
+      "from": "agents",
+      "to": "llm",
+      "label": "MAF 1.25 · 流式",
+      "variant": "dashed"
+    },
+    {
+      "id": "c-tools-editing",
+      "from": "tools",
+      "to": "editing"
+    },
+    {
+      "id": "c-tools-context",
+      "from": "tools",
+      "to": "context"
+    },
+    {
+      "id": "c-tools-exec",
+      "from": "tools",
+      "to": "execution"
+    },
+    {
+      "id": "c-tools-storage",
+      "from": "tools",
+      "to": "storage",
+      "label": "会话持久化",
+      "variant": "dashed"
+    },
+    {
+      "id": "c-tools-sandbox",
+      "from": "tools",
+      "to": "sandbox",
+      "label": "受控执行",
+      "variant": "security"
+    },
+    {
+      "id": "c-exec-sandbox",
+      "from": "execution",
+      "to": "sandbox",
+      "variant": "security"
+    },
+    {
+      "id": "c-win-services",
+      "from": "windows-root",
+      "to": "win-services",
+      "variant": "dashed"
+    },
+    {
+      "id": "c-services-sandbox",
+      "from": "win-services",
+      "to": "sandbox",
+      "label": "AppContainer / Job Object",
+      "variant": "dashed"
+    },
+    {
+      "id": "c-services-exec",
+      "from": "win-services",
+      "to": "execution",
+      "variant": "dashed"
+    },
+    {
+      "id": "c-core-contracts",
+      "from": "core",
+      "to": "contracts",
+      "label": "全层依赖契约",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "title": "分层依赖顺序（单向）",
+      "items": [
+        "Contracts → Editing / Context / Execution / Sandbox / Agents / Plugins",
+        "→ Tools（各工具包）→ Storage",
+        "→ Core（组合根）→ UI / Hosts"
+      ]
+    },
+    {
+      "title": "双宿主共用一套 UI",
+      "items": [
+        "WPF 为主入口；MAUI Windows 默认、Android 可选",
+        "平台差异收敛为 5 个接口：IAppPaths / ISecureStore / ISystemThemeProvider / IFolderPickerService / IAppEnvironmentService",
+        "平台实现集中在 Sandbox.Windows / Execution.Windows / Tools.Windows"
+      ]
+    },
+    {
+      "title": "Agent 与插件",
+      "items": [
+        "Agent 入口唯一：IAgentRuntime（src/Agents）",
+        "Microsoft.Agents.AI 1.25.0 + OpenAI 兼容协议流式输出",
+        "插件：Plugins.Abstractions → Plugins.Runtime（扫描/校验/注册表/提示词组装）",
+        "内置插件 Translate / Summarize / QuickAsk 以嵌入资源分发"
+      ]
+    }
+  ]
+}
