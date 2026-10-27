@@ -173,7 +173,8 @@
                                           IsLive="@(thinking && _isGenerating)"
                                           Foldable="@CanFoldProcess(message, processPolicy)"
                                           ElapsedMs="message.DurationMs"
-                                          Policy="processPolicy" />
+                                          Policy="processPolicy"
+                                          WorkspaceRoot="@WorkspaceContext.RootPath" />
                         }
                         else
                         {

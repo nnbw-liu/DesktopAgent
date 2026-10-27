@@ -55,6 +55,8 @@ public static class AgentCoreServiceCollectionExtensions
         // R1.4：按 provider / model 汇总 token 成本（设置页只读展示）。
         services.AddSingleton<UsageCostService>();
         services.AddSingleton<SkillCatalog>();
+        // P3：Archify 3.2.0 安装入口（复制到技能库 + 适配 SKILL.md + 许可声明）。
+        services.AddSingleton<IArchifyInstaller, ArchifyInstaller>();
         // M2：技能库的契约视图，供工具包（load_skill）与上下文层共用。
         services.AddSingleton<ISkillLibrary>(sp => sp.GetRequiredService<SkillCatalog>());
         // P0.5：输入框 `@` 补全的工作区路径索引（只给路径、30 秒缓存）。

@@ -22,6 +22,8 @@
                              IsThinking="@(IsLive && index == Steps.Count - 1)"
                              PreviewEnabled="Policy.SettledReasoningPreview" />
             }
+
+            <ArtifactLinks Text="@answerText" WorkspaceRoot="@WorkspaceRoot" />
         }
         else
         {
@@ -63,6 +65,8 @@
                 <div class="msg-body msg-body--markdown timeline-answer">
                     @((MarkupString)MarkdownRenderer.ToHtml(answerText))
                 </div>
+
+                <ArtifactLinks Text="@answerText" WorkspaceRoot="@WorkspaceRoot" />
             }
         }
     </div>
@@ -83,6 +87,9 @@
 
     /// <summary>本回合耗时（毫秒）；0 表示未知。</summary>
     [Parameter] public long ElapsedMs { get; set; }
+
+    /// <summary>工作区根；用来把助手消息里的 .archify 相对路径限缩在产物目录内。</summary>
+    [Parameter] public string? WorkspaceRoot { get; set; }
 
     /// <summary>过程展示策略。</summary>
     [Parameter] public ProcessDisplayPolicy Policy { get; set; } = ProcessDisplayPolicy.For(ProcessDisplayMode.Standard);

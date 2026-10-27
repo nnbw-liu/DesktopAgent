@@ -53,6 +53,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- P3：Archify 安装器写入的适配入口与第三方声明（随 Core 程序集分发，不依赖安装源）。 -->
+    <EmbeddedResource Include="Assets\archify-desktop-SKILL.md"
+                      LogicalName="SDemo.DesktopAgent.Assets.archify-desktop-SKILL.md" />
+    <EmbeddedResource Include="Assets\archify-THIRD_PARTY_NOTICES.md"
+                      LogicalName="SDemo.DesktopAgent.Assets.archify-THIRD_PARTY_NOTICES.md" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- 单元测试要直接构造内部 DTO（PluginManifestDto）验证清单解析 -->
     <InternalsVisibleTo Include="SDemo.DesktopAgent.Core.Tests" />
   </ItemGroup>

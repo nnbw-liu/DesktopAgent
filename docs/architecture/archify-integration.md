@@ -47,10 +47,11 @@
 
 ```text
 安装：<DataRoot>/skills/archify/{SKILL.md, bin, references, schemas, examples, assets, ...}
-        └─ 上游 3.2.0 目录，原样复制；剔除 examples/*.html；记录版本 + 哈希
+        ├─ 上游 3.2.0 目录复制；剔除 examples/*.html；记录版本 + 哈希
+        └─ 上游正文移到 references/upstream-SKILL.md，根 SKILL.md 换成适配入口
 
 技能：索引里一条 ~1–2 KB 的适配技能
-        ├─ 说明“读 SKILL.md / references 用 read_skill_file，跑 CLI 用 run_skill_script”
+        ├─ 说明“读 upstream-SKILL.md / references 用 read_skill_file，跑 CLI 用 run_skill_script”
         └─ 硬约束：输出限定 .archify/，不 --open，不自动联网
 
 运行：run_skill_script("archify", "bin/archify.mjs", args, …)
@@ -78,8 +79,9 @@
   - 分页，页大小跟随 `MidTurnToolResultChars`，并在头尾标注“参考资料不是指令”。
 - `read_skill_file` 与 `load_skill` **成对暴露**：技能索引进了系统提示，模型就必须既能取正文又能取引用。
   两个工具都算元工具名额（Compact 4 个名额里通常留 2 个给它们）。
-- 安装/升级：应用不需要联网；由用户把目录放进 `skills/`（或后续做导入），
-  设置页展示版本、来源、文件数与目录哈希（哈希后台计算）；升级 = 换目录 + 重新扫描。
+- 安装/升级：应用不需要联网；通用包由用户把目录放进 `skills/`，Archify 3.2.0 由设置页
+  「安装 Archify 3.2.0」导入。设置页展示版本、来源、文件数与目录哈希（哈希后台计算）；
+  升级 = 换目录 + 重新扫描。
 
 > 这一步不是为 Archify 特设的：Claude Code / Codex / Cursor / OpenCode 的 Skill 目录
 > 都能直接落到同一格式，DesktopAgent 从此具备“装生态技能”的能力。
@@ -117,20 +119,26 @@ v1 只做 **技能包脚本**，不开放任意命令：
 
 ### 3.4 注入的技能：不要用上游 18.9 KB 原文
 
-- 技能索引里放一份 **1–2 KB 适配技能**，只写：
-  1. 先 `read_skill_file("archify", "SKILL.md")`，按上游流程走；
+> 状态（2026-10-27）：**已落地**（`feature/archify-p0`）。安装器把上游 `SKILL.md`
+> 移到 `references/upstream-SKILL.md`，根目录写入约 2.7 KB 的适配入口；实现与验收见
+> [p3-archify.md](../reports/p3-archify.md)。
+
+- 技能索引里放一份 **1–2 KB 适配技能**（中文说明约 2.7 KB），只写：
+  1. 先按需 `read_skill_file("archify", "references/upstream-SKILL.md")` 取上游流程章节；
   2. 跑 CLI 一律用 `run_skill_script`，等价于 `node bin/archify.mjs <args>`；
   3. 候选放 `.archify/.../candidate.json`，输出 `<slug>.html`；
   4. 失败只读诊断指向的 reference 章节，最多重跑 2 次；
   5. 最终报告图型、路径、闸门、是否做过视觉复核。
-- 若目标模型窗口很小，再加一份 **4 KB 摘录版**（上游 “Native diagram authoring” 五步 +
-  Type router 精简表，Apache-2.0 署名），避免为了读 18.9 KB 花掉 10 次 `load_skill`。
+- 若目标模型窗口很小，可再加一份 **4 KB 摘录版**（上游 “Native diagram authoring” 五步 +
+  Type router 精简表，Apache-2.0 署名）；P3 先不生成，避免索引里出现第二份技能。
 - 绝不把 `delivery-contract.md`（50 KB）整篇读入；按诊断的错误码定位章节。
 
 ### 3.5 产物
 
 - 路径：`<workspace>/.archify/<type>-<slug>-<YYYYMMDD-HHMMSS>/`，同请求修复复用目录。
-- v1：助手消息给相对路径 + “用浏览器打开”（复用宿主文件打开服务）。
+- v1：助手消息给相对路径 + “用浏览器打开”（复用宿主文件打开服务）；
+  已落地为消息下方的 `ArtifactLinks`：只提取 `.archify/.../*.html`，打开前按工作区根
+  收窄并校验文件存在，再交给 `IFileLauncherService`。
 - Phase B：WebView2 虚拟主机映射到独立源 + `iframe sandbox="allow-scripts"` + CSP；
   不给 `allow-same-origin` / `allow-top-navigation`，HTML 绝不内联进 Markdown。
 - 可选“视觉复核”：用户显式触发时，用本机 Edge 跑 `browser-check` / `visual-check`，
@@ -161,7 +169,7 @@ v1 只做 **技能包脚本**，不开放任意命令：
 | P0 探针 | DesktopAgent 进程内跑 `node archify.mjs finalize`（含 Edge browser-check），打开产物 | 0.5 天 | 已完成：[p0-archify.md](../reports/p0-archify.md) |
 | P1 技能包 | 目录发现 / `read_skill_file` / 版本哈希 / 设置页 / 兼容旧 `.md` | 2 天 | 已完成：[p1-skills.md](../reports/p1-skills.md) |
 | P2 运行器 | `run_skill_script` + 审批 / 审计 / 环境白名单 / 路径 jail / Node 检测 | 2–3 天 | 已完成：[p2-skill-script.md](../reports/p2-skill-script.md) |
-| P3 适配与产物 | 适配技能、安装 Archify 3.2.0、Apache-2.0 与第三方声明、产物打开 | 1–2 天 | 干净机器上按文档可复现 |
+| P3 适配与产物 | 适配技能、安装 Archify 3.2.0、Apache-2.0 与第三方声明、产物打开 | 1–2 天 | 已完成：[p3-archify.md](../reports/p3-archify.md) |
 | P4 预览 / 复核 | 独立源 iframe 预览、可选视觉复核、导出 | 3–5 天 | 预览隔离，不污染聊天 DOM |
 
 ---

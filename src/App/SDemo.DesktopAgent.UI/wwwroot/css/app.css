@@ -5495,6 +5495,34 @@ a {
     margin-top: 2px;
 }
 
+/* P3：助手消息里的 Archify 产物入口；只负责交给系统默认浏览器。 */
+.timeline-artifacts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+}
+
+.timeline-artifacts-label {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.timeline-artifact-button {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.timeline-artifacts-status {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
 /* 工具行：可点开看参数与结果预览 */
 .timeline-tool-row {
     display: flex;

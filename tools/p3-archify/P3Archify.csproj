@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- P3 安装探针：把上游 Archify 3.2.0 装进技能库，并检查适配入口 / 上游正文 / 许可。 -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SDemo.DesktopAgent.Probes.P3</RootNamespace>
+    <AssemblyName>P3ArchifyProbe</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\App\SDemo.DesktopAgent.Core\SDemo.DesktopAgent.Core.csproj" />
+    <ProjectReference Include="..\..\src\Contracts\SDemo.DesktopAgent.Contracts\SDemo.DesktopAgent.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

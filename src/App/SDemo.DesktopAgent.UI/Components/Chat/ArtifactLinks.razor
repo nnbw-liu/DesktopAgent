@@ -1,0 +1,79 @@
+@using System.IO
+@using SDemo.DesktopAgent.Services
+
+@* P3：助手消息里的 `.archify/...html` 给一个「用浏览器打开」入口。
+   只接受工作区 .archify 下的真实文件；打开动作交给宿主的 IFileLauncherService。 *@
+@if (_links.Count > 0)
+{
+    <div class="timeline-artifacts">
+        <span class="timeline-artifacts-label">产物</span>
+        @foreach (var path in _links)
+        {
+            <button type="button"
+                    class="ghost-button timeline-artifact-button"
+                    title="@path"
+                    @onclick="() => OpenAsync(path)">
+                用浏览器打开 @Path.GetFileName(path)
+            </button>
+        }
+        @if (!string.IsNullOrWhiteSpace(_status))
+        {
+            <span class="timeline-artifacts-status">@_status</span>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string? Text { get; set; }
+
+    [Parameter] public string? WorkspaceRoot { get; set; }
+
+    [Inject] private IFileLauncherService Launcher { get; set; } = default!;
+
+    private IReadOnlyList<string> _links = [];
+    private string _status = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        _links = ArtifactLinkParser.Extract(Text);
+        _status = string.Empty;
+    }
+
+    private async Task OpenAsync(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(WorkspaceRoot))
+        {
+            _status = "当前会话没有工作区，无法打开产物。";
+            return;
+        }
+
+        try
+        {
+            var root = Path.GetFullPath(WorkspaceRoot);
+            var artifactRoot = Path.TrimEndingDirectorySeparator(Path.Combine(root, ".archify"));
+            var full = Path.GetFullPath(
+                Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+            if (!full.StartsWith(artifactRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                _status = "只允许打开工作区 .archify 下的产物。";
+                return;
+            }
+
+            if (!File.Exists(full))
+            {
+                _status = $"产物不存在：{relativePath}";
+                return;
+            }
+
+            _status = await Launcher.OpenFileAsync(full)
+                ? "已交给系统默认浏览器打开。"
+                : "当前环境不支持打开文件。";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or ArgumentException or NotSupportedException)
+        {
+            _status = $"打开失败：{ex.Message}";
+        }
+    }
+}

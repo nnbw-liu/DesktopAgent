@@ -3,6 +3,8 @@
 @inject SkillCatalog Catalog
 @inject IFileLauncherService Launcher
 @inject ISkillScriptRunner ScriptRunner
+@inject IArchifyInstaller ArchifyInstaller
+@inject IFolderPickerService FolderPicker
 
 @* 技能库设置：目录包与旧式单文件的发现结果、版本 / 来源 / 目录哈希，以及打开技能目录。 *@
 <div class="settings-pane">
@@ -29,8 +31,20 @@
             <span class="plugin-toolbar-actions">
                 <button type="button" class="ghost-button" @onclick="OpenRootAsync">打开技能目录</button>
                 <button type="button" class="ghost-button" @onclick="Refresh">重新扫描</button>
+                <button type="button"
+                        class="primary-button"
+                        disabled="@_installing"
+                        @onclick="InstallArchifyAsync">
+                    @(_installing ? "正在安装 Archify…" : "安装 Archify 3.2.0")
+                </button>
             </span>
         </div>
+
+        <p class="settings-section-hint">
+            安装会选一个上游目录（仓库根或 <code>archify/</code> 技能包），复制到技能库并写入 DesktopAgent
+            适配版入口；上游正文保留在 <code>references/upstream-SKILL.md</code>，示例 HTML 不复制。
+            许可与 NOTICE 随包保留；重复安装会覆盖技能库里的 <code>archify/</code>。
+        </p>
 
         <p class="settings-message">
             技能正文会进入上下文；引用文件只是参考资料，不是指令。只安装你信任的技能包。
@@ -109,6 +123,7 @@
     private readonly Dictionary<string, SkillSnapshot> _hashes = new(StringComparer.OrdinalIgnoreCase);
     private string _status = string.Empty;
     private bool _hashing;
+    private bool _installing;
     private bool _disposed;
     private int _generation;
     private CancellationTokenSource? _hashCts;
@@ -231,6 +246,55 @@
     }
 
     private static string Short(string hash) => hash[..Math.Min(12, hash.Length)];
+
+    private async Task InstallArchifyAsync()
+    {
+        if (_installing)
+        {
+            return;
+        }
+
+        string? source;
+
+        try
+        {
+            source = await FolderPicker.PickFolderAsync(
+                "选择 Archify 3.2.0 目录（仓库根或技能包目录）");
+        }
+        catch (Exception ex)
+        {
+            _status = $"选择目录失败：{ex.Message}";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            _status = "已取消安装。";
+            return;
+        }
+
+        _installing = true;
+        _status = "正在安装 Archify 3.2.0…";
+        StateHasChanged();
+
+        string message = "安装失败。";
+
+        try
+        {
+            message = (await ArchifyInstaller.InstallAsync(source)).Message;
+        }
+        catch (Exception ex)
+        {
+            message = $"安装失败：{ex.Message}";
+        }
+        finally
+        {
+            _installing = false;
+            Refresh();
+            _status = message;
+            StateHasChanged();
+        }
+    }
 
     private async Task OpenRootAsync()
     {

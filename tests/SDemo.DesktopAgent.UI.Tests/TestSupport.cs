@@ -64,6 +64,35 @@ internal sealed class StubAppPaths : IAppPaths
     public string SandboxRoot { get; }
 }
 
+/// <summary>记录打开请求的启动器；组件测试不真的起浏览器。</summary>
+internal sealed class RecordingFileLauncherService : IFileLauncherService
+{
+    public List<string> Opened { get; } = [];
+
+    public List<string> Revealed { get; } = [];
+
+    public bool Result { get; set; } = true;
+
+    public Task<bool> OpenFileAsync(string path)
+    {
+        Opened.Add(path);
+        return Task.FromResult(Result);
+    }
+
+    public Task<bool> RevealFileAsync(string path)
+    {
+        Revealed.Add(path);
+        return Task.FromResult(Result);
+    }
+}
+
+/// <summary>组件测试用的文件夹选择器：永远取消。</summary>
+internal sealed class NullFolderPickerService : IFolderPickerService
+{
+    public Task<string?> PickFolderAsync(string title, string? initialDirectory = null) =>
+        Task.FromResult<string?>(null);
+}
+
 /// <summary>可配置结果的验证器：记录被调用次数，不真的跑构建。</summary>
 internal sealed class FakeVerificationRunner(VerificationRecord? result) : SDemo.DesktopAgent.Execution.IVerificationRunner
 {
