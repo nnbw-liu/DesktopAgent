@@ -41,5 +41,8 @@ public enum ToolTaskProfile
     Memory,
 
     /// <summary>多步计划。</summary>
-    Plan
+    Plan,
+
+    /// <summary>技能包脚本（例如 Archify 生成架构图）。</summary>
+    Skill
 }

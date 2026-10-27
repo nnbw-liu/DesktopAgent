@@ -63,6 +63,56 @@ public sealed record SkillFileReadResult(
         new(status, null, relativePath);
 }
 
+/// <summary>技能包内一次脚本解析的结果状态。</summary>
+public enum SkillScriptStatus
+{
+    /// <summary>解析成功，可以交给执行器。</summary>
+    Ok,
+
+    /// <summary>没有这个技能。</summary>
+    SkillNotFound,
+
+    /// <summary>技能是旧式单文件，没有脚本可运行。</summary>
+    FlatSkill,
+
+    /// <summary>路径越界、绝对路径、含 ..、重解析点，或不在 bin/ scripts/ 下。</summary>
+    InvalidPath,
+
+    /// <summary>路径合法，但文件不存在。</summary>
+    ScriptNotFound,
+
+    /// <summary>扩展名不是 .mjs / .js。</summary>
+    UnsupportedScript,
+
+    /// <summary>脚本超过允许的大小。</summary>
+    TooLarge
+}
+
+/// <summary>
+/// 一次脚本解析的结果：绝对路径只给宿主执行器，模型只能看到技能名与包内相对路径。
+/// <see cref="Sha256"/> 是脚本内容的哈希（小写十六进制），用于审批会话键与审计。
+/// </summary>
+public sealed record SkillScriptTarget(
+    string SkillName,
+    string RelativePath,
+    string FullPath,
+    string Sha256,
+    long Bytes,
+    string Root,
+    string Source = "");
+
+public sealed record SkillScriptResolution(
+    SkillScriptStatus Status,
+    SkillScriptTarget? Target = null)
+{
+    public bool IsOk => Status == SkillScriptStatus.Ok && Target is not null;
+
+    public static SkillScriptResolution Ok(SkillScriptTarget target) =>
+        new(SkillScriptStatus.Ok, target);
+
+    public static SkillScriptResolution Fail(SkillScriptStatus status) => new(status);
+}
+
 /// <summary>
 /// 本地技能库的最小契约：索引、正文读取与包内引用读取。
 /// 实现由应用层（<c>SkillCatalog</c>）提供，工具包 / 上下文层只依赖这个接口。
@@ -81,4 +131,10 @@ public interface ISkillLibrary
     /// 单文件技能没有包内文件，返回 <see cref="SkillFileStatus.FlatSkill"/>。
     /// </summary>
     SkillFileReadResult ReadFile(string? name, string? path);
+
+    /// <summary>
+    /// 解析技能包内可运行的脚本：只允许 <c>bin/</c> 或 <c>scripts/</c> 下的
+    /// <c>.mjs</c> / <c>.js</c>，并做与 <see cref="ReadFile"/> 相同的路径 jail。
+    /// </summary>
+    SkillScriptResolution ResolveScript(string? name, string? script);
 }

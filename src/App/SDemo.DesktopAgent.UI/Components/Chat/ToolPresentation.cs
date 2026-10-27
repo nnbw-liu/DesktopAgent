@@ -59,7 +59,7 @@ public static class ToolPresentation
     /// <summary>工具 id → 卡片形态。未知工具一律 generic，永不空白。</summary>
     public static ToolCardKind KindOf(string toolId) => toolId switch
     {
-        "run_command" or "run_powershell" => ToolCardKind.Terminal,
+        "run_command" or "run_powershell" or "run_skill_script" => ToolCardKind.Terminal,
         "replace_text" or "apply_patch" => ToolCardKind.Diff,
         "read_file" or "write_file" or "list_tree" or "list_dir" => ToolCardKind.File,
         "office_info" or "office_read" or "office_write" => ToolCardKind.File,

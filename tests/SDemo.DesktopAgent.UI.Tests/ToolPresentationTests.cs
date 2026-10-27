@@ -10,6 +10,7 @@ public sealed class ToolPresentationTests
     [Theory]
     [InlineData("run_command", ToolCardKind.Terminal)]
     [InlineData("run_powershell", ToolCardKind.Terminal)]
+    [InlineData("run_skill_script", ToolCardKind.Terminal)]
     [InlineData("apply_patch", ToolCardKind.Diff)]
     [InlineData("replace_text", ToolCardKind.Diff)]
     [InlineData("read_file", ToolCardKind.File)]

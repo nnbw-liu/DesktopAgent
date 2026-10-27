@@ -625,6 +625,7 @@ public sealed class AgentChatService : IAgentChatService
             "web_search" => Read(arguments, "query", "q"),
             "load_skill" => Read(arguments, "name"),
             "read_skill_file" => ComposeSkillFile(arguments),
+            "run_skill_script" => ComposeSkillScript(arguments),
             "todo_write" => null,
             _ => Read(arguments, "path", "file", "query", "pattern", "command")
         };
@@ -644,6 +645,20 @@ public sealed class AgentChatService : IAgentChatService
         }
 
         return string.IsNullOrWhiteSpace(path) ? skill : $"{skill}/{path}";
+    }
+
+    /// <summary>技能脚本标题：技能名 + 脚本名，不必把整串 argv 塞进时间线。</summary>
+    private static string? ComposeSkillScript(IDictionary<string, object?> arguments)
+    {
+        var skill = arguments.TryGetValue("skill", out var name) ? name?.ToString() : null;
+        var script = arguments.TryGetValue("script", out var file) ? file?.ToString() : null;
+
+        if (string.IsNullOrWhiteSpace(skill))
+        {
+            return script;
+        }
+
+        return string.IsNullOrWhiteSpace(script) ? skill : $"{skill}/{script}";
     }
 
     /// <summary>命令类工具的标题：命令 + 最多两个参数（够看出在构建什么，不必背整行脚本）。</summary>

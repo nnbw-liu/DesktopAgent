@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject SkillCatalog Catalog
 @inject IFileLauncherService Launcher
+@inject ISkillScriptRunner ScriptRunner
 
 @* 技能库设置：目录包与旧式单文件的发现结果、版本 / 来源 / 目录哈希，以及打开技能目录。 *@
 <div class="settings-pane">
@@ -10,6 +11,12 @@
         <p class="settings-section-hint">
             支持 Agent Skills 目录包（<code>skills/&lt;name&gt;/SKILL.md</code>）与旧式单文件（<code>skills/&lt;name&gt;.md</code>）。
             同名时目录包优先；包里的 references / schemas 由 <code>read_skill_file</code> 按需读取，不会整包进上下文。
+        </p>
+
+        <p class="settings-section-hint">
+            包内 <code>bin/</code>、<code>scripts/</code> 下的 <code>.mjs</code> / <code>.js</code>
+            可由 <code>run_skill_script</code> 在宿主直跑；需先在「工具设置 → 内循环」打开直跑，
+            每次首跑 / 脚本变化都会请求审批。@ScriptHostText
         </p>
 
         <div class="plugin-root">
@@ -199,6 +206,29 @@
         _summaries.TryGetValue(skill.Name, out var summary) && !string.IsNullOrWhiteSpace(summary)
             ? summary!
             : skill.Kind == SkillKind.Package ? "目录包" : "单文件";
+
+    private string ScriptHostText
+    {
+        get
+        {
+            var host = ScriptRunner.Host;
+
+            if (!host.NodeAvailable)
+            {
+                return string.IsNullOrWhiteSpace(host.Detail)
+                    ? "脚本运行器未就绪。"
+                    : host.Detail;
+            }
+
+            var node = string.IsNullOrWhiteSpace(host.NodeVersion)
+                ? "Node 已找到"
+                : $"Node {host.NodeVersion}";
+
+            return host.ChromePath is null
+                ? $"{node}；未找到 Edge / Chrome，Archify browser-check 可能失败。"
+                : $"{node}；浏览器已找到。";
+        }
+    }
 
     private static string Short(string hash) => hash[..Math.Min(12, hash.Length)];
 

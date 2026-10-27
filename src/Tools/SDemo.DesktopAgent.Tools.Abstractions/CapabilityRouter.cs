@@ -38,6 +38,9 @@ public static class CapabilityRouter
     /// <summary>技能包引用读取（P1）：与 load_skill 成对暴露，目录包的 references 才读得到。</summary>
     public const string ReadSkillFileTool = "read_skill_file";
 
+    /// <summary>技能包脚本运行（P2）：与技能索引配套，目录包才能真的产出图表 / 文档。</summary>
+    public const string RunSkillScriptTool = "run_skill_script";
+
     /// <summary>工作区知识库检索（M3）。</summary>
     public const string SearchMemoryTool = "search_workspace_memory";
 
@@ -73,6 +76,13 @@ public static class CapabilityRouter
     ];
 
     private static readonly string[] ShellWords = ["powershell", "脚本", "沙箱"];
+
+    /// <summary>技能包脚本：Archify 这类「读技能 → 写候选 → 跑 CLI」的任务。</summary>
+    private static readonly string[] SkillWords =
+    [
+        "架构图", "流程图", "时序图", "状态图", "数据流图", "类图", "画图", "绘图", "图表",
+        "技能", "diagram", "mermaid", "archify", "architecture diagram"
+    ];
 
     private static readonly string[] WebWords = ["联网", "网上", "网页", "web", "搜索一下"];
 
@@ -112,6 +122,8 @@ public static class CapabilityRouter
         ("pdf", PdfWords, ["pdf_read", "pdf_info", "read_file"]),
         ("office", OfficeWords,
             ["office_info", "office_read", "office_write", "pdf_info", "pdf_read", "read_file", "list_files"]),
+        ("skill", SkillWords,
+            [RunSkillScriptTool, "read_file", ReadSkillFileTool, LoadSkillTool]),
         ("shell", ShellWords, ["run_powershell", "read_file"]),
         ("run", RunWords, ["run_command", "read_file"]),
         ("web", WebWords, ["web_search"]),
@@ -160,13 +172,24 @@ public static class CapabilityRouter
         // P1b §3.2.3：先定任务档，再补本句意图。档内工具集固定，相邻轮只增不减——
         // 这一句没有任务信号时沿用上一轮的档，而不是让工具面随关键词抖动。
         var (profile, inherited) = ResolveProfile(input);
+
+        // 用户手选了技能：即使这句话没有任务关键词，也按技能任务给工具；
+        // 否则技能正文里写好的 CLI 步骤没有 run_skill_script 可调用。
+        if (input.HasSelectedSkill && profile != ToolTaskProfile.Skill)
+        {
+            profile = ToolTaskProfile.Skill;
+            inherited = false;
+        }
+
         var profileTools = ToolsOfProfile(profile);
+        var skillTools = profile == ToolTaskProfile.Skill ? new[] { RunSkillScriptTool } : [];
         var ordered = new List<string>();
 
         if (input.Mode == AgentMode.Compact)
         {
             // Compact 保持 P6 行为：任务档优先，本句意图补包，最近用过的工具插到最前面，
-            // 末位兜底四件套。
+            // 末位兜底四件套。技能任务把 run_skill_script 放到最前，避免被核心集挤掉。
+            AddCandidates(ordered, skillTools, available);
             AddCandidates(ordered, profileTools, available);
             AddCandidates(ordered, intentTools, available);
 
@@ -182,8 +205,9 @@ public static class CapabilityRouter
         }
         else
         {
-            // Full：核心集先来，再按任务档与意图补包，最后接最近用过的工具。
+            // Full：技能任务先给 run_skill_script，再核心集；其余任务保持核心集优先。
             // 不再用「全部可用工具」填满剩余名额：名额是上限，不是指标。
+            AddCandidates(ordered, skillTools, available);
             AddCandidates(ordered, CoreTools, available);
             AddCandidates(ordered, profileTools, available);
             AddCandidates(ordered, intentTools, available);
@@ -348,6 +372,7 @@ public static class CapabilityRouter
         "web" => ToolTaskProfile.Web,
         "memory" => ToolTaskProfile.Memory,
         "plan" => ToolTaskProfile.Plan,
+        "skill" => ToolTaskProfile.Skill,
         _ => ToolTaskProfile.General
     };
 
@@ -362,6 +387,7 @@ public static class CapabilityRouter
         ToolTaskProfile.Web => "web",
         ToolTaskProfile.Memory => "memory",
         ToolTaskProfile.Plan => "plan",
+        ToolTaskProfile.Skill => "skill",
         _ => "unknown"
     };
 

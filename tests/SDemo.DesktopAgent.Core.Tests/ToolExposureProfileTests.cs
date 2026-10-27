@@ -131,7 +131,8 @@ public sealed class ToolExposureProfileTests
                  {
                      "read_file", "search_files", "glob_files", "apply_patch", "replace_text",
                      "write_file", "run_command", "run_powershell", "pdf_read", "web_search",
-                     "todo_write", "load_skill", "read_skill_file", "search_capabilities"
+                     "todo_write", "load_skill", "read_skill_file", "run_skill_script",
+                     "search_capabilities"
                  })
         {
             Assert.False(string.IsNullOrWhiteSpace(ToolPlaybooks.RulesFor(tool)), tool);

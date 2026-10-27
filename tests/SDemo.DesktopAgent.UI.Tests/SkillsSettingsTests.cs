@@ -27,6 +27,7 @@ public sealed class SkillsSettingsTests : TestContext
 
         Services.AddSingleton(new SkillCatalog(temp.Root));
         Services.AddSingleton<IFileLauncherService, NullFileLauncherService>();
+        Services.AddSingleton<ISkillScriptRunner, UnavailableSkillScriptRunner>();
 
         var cut = RenderComponent<SkillsSettings>();
 

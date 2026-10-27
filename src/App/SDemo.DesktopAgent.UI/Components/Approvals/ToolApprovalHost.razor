@@ -66,6 +66,9 @@
         ToolApprovalKind.FileEdit => "模型请求修改工作区文件；下方是统一 diff，确认后才会落盘。",
         ToolApprovalKind.ProcessExecution when request.ToolId == "run_command" =>
             "模型请求在宿主直跑这条命令：不受沙箱网络隔离，可访问真实工作区；参数不经过 shell。",
+        ToolApprovalKind.ProcessExecution when request.ToolId == "run_skill_script" =>
+            "模型请求在宿主直跑技能包脚本（Node）：不受沙箱网络隔离，可访问真实工作区；"
+            + "参数按 argv 直接传入，不经过 shell。脚本 hash 会写入审计。",
         ToolApprovalKind.ProcessExecution =>
             "脚本将在一个没有网络、只能访问工作区副本的沙箱中运行。请确认脚本内容与实际执行一致。",
         ToolApprovalKind.ApplyChanges => "将把沙箱内的改动写回真实工作区。",

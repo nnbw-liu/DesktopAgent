@@ -233,6 +233,8 @@
         <h2 class="settings-section-title">内循环（直跑）</h2>
         <p class="settings-section-hint">
             构建 / 测试可以走宿主直跑，跳过沙箱复制的等待；参数不经过 shell，只放行白名单命令。
+            技能包脚本（<code>run_skill_script</code>）也走这条通道：只允许技能包 <code>bin/</code>、<code>scripts/</code>
+            下的 <code>.mjs</code> / <code>.js</code>，需要 Node 20+，首跑 / 脚本变化会请求审批。
         </p>
         <p class="settings-message is-danger">
             直跑不受沙箱网络隔离，可以访问网络与真实工作区。默认关闭；打开后每次仍先请求审批，安全命令可本会话授权。
@@ -240,8 +242,8 @@
 
         <label class="settings-row settings-row--toggle">
             <span class="settings-row-text">
-                <span class="settings-row-title">启用直跑命令（run_command）</span>
-                <span class="settings-row-hint">dotnet build / dotnet test 等；run_powershell 始终留在沙箱。</span>
+                <span class="settings-row-title">启用直跑命令（run_command / run_skill_script）</span>
+                <span class="settings-row-hint">dotnet build / dotnet test 与技能包脚本；run_powershell 始终留在沙箱。</span>
             </span>
             <input type="checkbox"
                    class="switch"

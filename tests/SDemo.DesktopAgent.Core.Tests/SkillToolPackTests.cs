@@ -1,4 +1,6 @@
 using Microsoft.Extensions.AI;
+using SDemo.DesktopAgent.Execution;
+using SDemo.DesktopAgent.Models;
 using SDemo.DesktopAgent.Sandbox;
 using SDemo.DesktopAgent.Services;
 using Xunit;
@@ -187,6 +189,310 @@ public sealed class SkillToolPackTests : IDisposable
         WritePackage("archify", ("references/empty.md", string.Empty));
 
         Assert.Contains("空", await ReadFile("archify", "references/empty.md"));
+    }
+
+    [Fact]
+    public async Task 运行脚本需要审批_批准后执行并审计()
+    {
+        WritePackage("archify", ("bin/archify.mjs", "console.log('ok');"));
+        var harness = Harness();
+
+        var invocation = InvokeAsync(
+            harness.Context,
+            harness.Pack,
+            SkillToolPack.RunScriptFunctionId,
+            new Dictionary<string, object?>
+            {
+                ["skill"] = "archify",
+                ["script"] = "bin/archify.mjs",
+                ["args"] = new[] { "finalize", "architecture" }
+            });
+
+        await WaitUntilAsync(() => harness.Approvals.Current is not null);
+
+        var request = harness.Approvals.Current!;
+        Assert.Equal(ToolApprovalKind.ProcessExecution, request.Kind);
+        Assert.True(request.AllowSessionRemember);
+        Assert.Contains("sha256", request.Detail);
+        Assert.Contains("bin/archify.mjs", request.Detail);
+
+        harness.Approvals.Resolve(ToolApprovalDecision.ApproveOnce);
+        var result = await invocation;
+
+        Assert.Contains("退出码：0", result);
+        Assert.EndsWith(Path.Combine("bin", "archify.mjs"), harness.Runner.Requests.Single().ScriptPath);
+        Assert.Equal(["finalize", "architecture"], harness.Runner.Requests.Single().Arguments);
+        Assert.Equal(Path.GetFullPath(_root), harness.Runner.Requests.Single().WorkingDirectory);
+        Assert.Equal("ApproveOnce", harness.Audit.Entries.Single().Approval);
+        Assert.Equal("direct", harness.Audit.Entries.Single().Mode);
+        Assert.StartsWith("sha256:", harness.Audit.Entries.Single().ScriptSha256);
+        Assert.StartsWith("sha256:", harness.Audit.Entries.Single().CommandSha256);
+    }
+
+    [Fact]
+    public async Task 会话授权后同一脚本第二次不再审批()
+    {
+        WritePackage("archify", ("bin/archify.mjs", "console.log('ok');"));
+        var harness = Harness();
+
+        var first = InvokeAsync(
+            harness.Context,
+            harness.Pack,
+            SkillToolPack.RunScriptFunctionId,
+            Arguments());
+        await WaitUntilAsync(() => harness.Approvals.Current is not null);
+        harness.Approvals.Resolve(ToolApprovalDecision.ApproveForSession);
+        Assert.Contains("退出码：0", await first);
+
+        var second = await InvokeAsync(
+            harness.Context,
+            harness.Pack,
+            SkillToolPack.RunScriptFunctionId,
+            Arguments());
+
+        Assert.Contains("退出码：0", second);
+        Assert.Null(harness.Approvals.Current);
+        Assert.Equal(2, harness.Runner.Requests.Count);
+        Assert.Equal(2, harness.Audit.Entries.Count);
+        Assert.Equal("SessionGrant", harness.Audit.Entries[^1].Approval);
+    }
+
+    [Fact]
+    public async Task 拒绝审批不执行且写审计()
+    {
+        WritePackage("archify", ("bin/archify.mjs", "console.log('ok');"));
+        var harness = Harness();
+
+        var invocation = InvokeAsync(
+            harness.Context,
+            harness.Pack,
+            SkillToolPack.RunScriptFunctionId,
+            Arguments());
+        await WaitUntilAsync(() => harness.Approvals.Current is not null);
+        harness.Approvals.Resolve(ToolApprovalDecision.Deny);
+
+        var result = await invocation;
+
+        Assert.Contains("拒绝", result);
+        Assert.Empty(harness.Runner.Requests);
+        Assert.Equal("Deny", harness.Audit.Entries.Single().Approval);
+    }
+
+    [Fact]
+    public async Task 没有_Node_时不请求审批()
+    {
+        WritePackage("archify", ("bin/archify.mjs", "console.log('ok');"));
+        var harness = Harness(nodeAvailable: false);
+
+        var result = await InvokeAsync(
+            harness.Context,
+            harness.Pack,
+            SkillToolPack.RunScriptFunctionId,
+            Arguments());
+
+        Assert.Contains("Node", result);
+        Assert.Null(harness.Approvals.Current);
+        Assert.Empty(harness.Runner.Requests);
+    }
+
+    [Fact]
+    public async Task 脚本路径越界不请求审批()
+    {
+        WritePackage("archify", ("bin/archify.mjs", "console.log('ok');"));
+        var harness = Harness();
+
+        var result = await InvokeAsync(
+            harness.Context,
+            harness.Pack,
+            SkillToolPack.RunScriptFunctionId,
+            new Dictionary<string, object?>
+            {
+                ["skill"] = "archify",
+                ["script"] = "../outside.mjs",
+                ["args"] = Array.Empty<string>()
+            });
+
+        Assert.Contains("不合法", result);
+        Assert.Null(harness.Approvals.Current);
+        Assert.Empty(harness.Runner.Requests);
+    }
+
+    [Fact]
+    public async Task 直跑未开启时不请求审批()
+    {
+        WritePackage("archify", ("bin/archify.mjs", "console.log('ok');"));
+        var harness = Harness(directRun: false);
+
+        var result = await InvokeAsync(
+            harness.Context,
+            harness.Pack,
+            SkillToolPack.RunScriptFunctionId,
+            Arguments());
+
+        Assert.Contains("直跑", result);
+        Assert.Null(harness.Approvals.Current);
+        Assert.Empty(harness.Runner.Requests);
+    }
+
+    [Fact]
+    public async Task 非零退出码以执行失败开头()
+    {
+        WritePackage("archify", ("bin/archify.mjs", "process.exit(1);"));
+        var harness = Harness();
+        harness.Runner.Result = new SkillScriptRunResult(
+            true, "C:\\node.exe", "v24", 1, "{\"status\":\"fail\"}", string.Empty,
+            false, false, 42, false, false);
+
+        var invocation = InvokeAsync(
+            harness.Context,
+            harness.Pack,
+            SkillToolPack.RunScriptFunctionId,
+            Arguments());
+        await WaitUntilAsync(() => harness.Approvals.Current is not null);
+        harness.Approvals.Resolve(ToolApprovalDecision.ApproveOnce);
+
+        var result = await invocation;
+
+        Assert.StartsWith("执行失败", result);
+        Assert.Contains("退出码 1", result);
+        Assert.Contains("status", result);
+    }
+
+    [Fact]
+    public async Task 超时结果带超时标记并写审计()
+    {
+        WritePackage("archify", ("bin/archify.mjs", "console.log('slow');"));
+        var harness = Harness();
+        harness.Runner.Result = new SkillScriptRunResult(
+            true, "C:\\node.exe", "v24", -1, string.Empty, "timeout", true, false, 5000, false, false);
+
+        var invocation = InvokeAsync(
+            harness.Context,
+            harness.Pack,
+            SkillToolPack.RunScriptFunctionId,
+            Arguments());
+        await WaitUntilAsync(() => harness.Approvals.Current is not null);
+        harness.Approvals.Resolve(ToolApprovalDecision.ApproveOnce);
+
+        var result = await invocation;
+
+        Assert.Contains("超时", result);
+        Assert.True(harness.Audit.Entries.Single().TimedOut);
+    }
+
+    private Dictionary<string, object?> Arguments() => new()
+    {
+        ["skill"] = "archify",
+        ["script"] = "bin/archify.mjs",
+        ["args"] = new[] { "finalize" }
+    };
+
+    private ScriptHarness Harness(bool directRun = true, bool nodeAvailable = true)
+    {
+        var settings = new StubSettingsService();
+        settings.Current.Execution.DirectRunEnabled = directRun;
+        settings.Current.Execution.Mode = directRun ? ExecutionMode.AllowlistDirect : ExecutionMode.SandboxFirst;
+
+        var catalog = new SkillCatalog(_root);
+        var runner = new FakeScriptRunner(nodeAvailable);
+        var audit = new RecordingAudit();
+        var approvals = new ToolApprovalService();
+        var grants = new SessionGrantStore();
+
+        var context = new ToolContext(
+            "session",
+            _root,
+            [],
+            settings,
+            approvals,
+            new StubSandboxJobService(),
+            audit,
+            Skills: catalog);
+
+        return new ScriptHarness(
+            context,
+            new SkillToolPack(runner, grants),
+            approvals,
+            audit,
+            runner);
+    }
+
+    private async Task<string> InvokeAsync(
+        ToolContext context,
+        SkillToolPack pack,
+        string functionName,
+        Dictionary<string, object?> arguments)
+    {
+        var tool = Assert.IsAssignableFrom<AIFunction>(
+            pack.Create(context).Single(item => string.Equals(item.Name, functionName, StringComparison.Ordinal)));
+
+        var result = await tool.InvokeAsync(new AIFunctionArguments(arguments));
+
+        return result?.ToString() ?? string.Empty;
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        for (var index = 0; index < 100; index++)
+        {
+            if (condition())
+            {
+                return;
+            }
+
+            await Task.Delay(10);
+        }
+
+        Assert.Fail("等待条件超时。");
+    }
+
+    private sealed record ScriptHarness(
+        ToolContext Context,
+        SkillToolPack Pack,
+        ToolApprovalService Approvals,
+        RecordingAudit Audit,
+        FakeScriptRunner Runner);
+
+    private sealed class FakeScriptRunner : ISkillScriptRunner
+    {
+        public FakeScriptRunner(bool nodeAvailable)
+        {
+            Host = nodeAvailable
+                ? new SkillScriptHostInfo(true, "C:\\node.exe", "v24.21.0", "C:\\msedge.exe", "ok")
+                : SkillScriptHostInfo.Unavailable("没有找到 Node.js。");
+        }
+
+        public SkillScriptHostInfo Host { get; }
+
+        public List<SkillScriptRequest> Requests { get; } = [];
+
+        public SkillScriptRunResult Result { get; set; } = new(
+            true,
+            "C:\\node.exe",
+            "v24.21.0",
+            0,
+            "{\"ok\":true}",
+            string.Empty,
+            false,
+            false,
+            12,
+            false,
+            false);
+
+        public Task<SkillScriptRunResult> RunAsync(
+            SkillScriptRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Requests.Add(request);
+            return Task.FromResult(Result);
+        }
+    }
+
+    private sealed class RecordingAudit : IToolAuditLog
+    {
+        public List<ToolAuditEntry> Entries { get; } = [];
+
+        public void Write(ToolAuditEntry entry) => Entries.Add(entry);
     }
 
     private async Task<string> Load(string name, int offset = 0)

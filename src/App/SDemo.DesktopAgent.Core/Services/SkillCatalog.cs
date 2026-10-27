@@ -85,8 +85,16 @@ public sealed class SkillCatalog : ISkillLibrary
     /// <summary>单次 <c>read_skill_file</c> 允许读入的最大文件，避免把大资产塞进内存。</summary>
     public const long MaxReferenceBytes = 1_000_000;
 
+    /// <summary>技能脚本上限；Archify 最大的 CLI 约 288 KB，4 MB 足够容纳打包脚本。</summary>
+    public const long MaxScriptBytes = 4_000_000;
+
     private static readonly HashSet<string> AllowedExtensions =
         new(StringComparer.OrdinalIgnoreCase) { ".md", ".json", ".txt" };
+
+    private static readonly HashSet<string> AllowedScriptExtensions =
+        new(StringComparer.OrdinalIgnoreCase) { ".mjs", ".js" };
+
+    private static readonly string[] ScriptDirectories = ["bin", "scripts"];
 
     private static readonly HashSet<string> ReservedNames =
         new(StringComparer.OrdinalIgnoreCase)
@@ -184,7 +192,114 @@ public sealed class SkillCatalog : ISkillLibrary
             return SkillFileReadResult.Fail(SkillFileStatus.UnsupportedExtension, normalized);
         }
 
-        string full;
+        var status = TryResolveInsidePackage(skill, normalized, out var full, out var info);
+
+        if (status != SkillFileStatus.Ok || info is null)
+        {
+            return SkillFileReadResult.Fail(status, normalized);
+        }
+
+        if (info.Length > MaxReferenceBytes)
+        {
+            return SkillFileReadResult.Fail(SkillFileStatus.TooLarge, normalized);
+        }
+
+        try
+        {
+            return SkillFileReadResult.Ok(File.ReadAllText(full), normalized, info.Length);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return SkillFileReadResult.Fail(SkillFileStatus.FileNotFound, normalized);
+        }
+    }
+
+    /// <summary>
+    /// 解析技能脚本：只允许 <c>bin/</c> / <c>scripts/</c> 下的 <c>.mjs</c> / <c>.js</c>。
+    /// 返回值里带脚本哈希，供审批会话键与审计使用。
+    /// </summary>
+    public SkillScriptResolution ResolveScript(string? name, string? script)
+    {
+        var skill = Find(name);
+
+        if (skill is null)
+        {
+            return SkillScriptResolution.Fail(SkillScriptStatus.SkillNotFound);
+        }
+
+        if (!skill.IsPackage)
+        {
+            return SkillScriptResolution.Fail(SkillScriptStatus.FlatSkill);
+        }
+
+        var normalized = NormalizeRelativePath(script);
+
+        if (normalized is null)
+        {
+            return SkillScriptResolution.Fail(SkillScriptStatus.InvalidPath);
+        }
+
+        var segments = normalized.Split('/');
+
+        if (segments.Length < 2
+            || !ScriptDirectories.Contains(segments[0], StringComparer.OrdinalIgnoreCase))
+        {
+            return SkillScriptResolution.Fail(SkillScriptStatus.InvalidPath);
+        }
+
+        if (!AllowedScriptExtensions.Contains(Path.GetExtension(normalized)))
+        {
+            return SkillScriptResolution.Fail(SkillScriptStatus.UnsupportedScript);
+        }
+
+        var status = TryResolveInsidePackage(skill, normalized, out var full, out var info);
+
+        if (status == SkillFileStatus.InvalidPath)
+        {
+            return SkillScriptResolution.Fail(SkillScriptStatus.InvalidPath);
+        }
+
+        if (status != SkillFileStatus.Ok || info is null)
+        {
+            return SkillScriptResolution.Fail(SkillScriptStatus.ScriptNotFound);
+        }
+
+        if (info.Length > MaxScriptBytes)
+        {
+            return SkillScriptResolution.Fail(SkillScriptStatus.TooLarge);
+        }
+
+        try
+        {
+            var source = ToInfo(skill).Source;
+
+            return SkillScriptResolution.Ok(new SkillScriptTarget(
+                skill.Name,
+                normalized,
+                full,
+                Sha256File(full),
+                info.Length,
+                skill.Root,
+                source));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return SkillScriptResolution.Fail(SkillScriptStatus.ScriptNotFound);
+        }
+    }
+
+    /// <summary>
+    /// 把包内相对路径解析成绝对路径，并保证它仍在包目录内、逐段不经过重解析点。
+    /// 文件不存在时返回 <see cref="SkillFileStatus.FileNotFound"/>。
+    /// </summary>
+    private static SkillFileStatus TryResolveInsidePackage(
+        SkillDescriptor skill,
+        string normalized,
+        out string full,
+        out FileInfo? info)
+    {
+        full = string.Empty;
+        info = null;
 
         try
         {
@@ -192,14 +307,14 @@ public sealed class SkillCatalog : ISkillLibrary
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or IOException)
         {
-            return SkillFileReadResult.Fail(SkillFileStatus.InvalidPath, normalized);
+            return SkillFileStatus.InvalidPath;
         }
 
         var rootPrefix = Path.TrimEndingDirectorySeparator(skill.Root) + Path.DirectorySeparatorChar;
 
         if (!full.StartsWith(rootPrefix, PathComparison))
         {
-            return SkillFileReadResult.Fail(SkillFileStatus.InvalidPath, normalized);
+            return SkillFileStatus.InvalidPath;
         }
 
         try
@@ -213,32 +328,21 @@ public sealed class SkillCatalog : ISkillLibrary
 
                 if (!File.Exists(current) && !Directory.Exists(current))
                 {
-                    return SkillFileReadResult.Fail(SkillFileStatus.FileNotFound, normalized);
+                    return SkillFileStatus.FileNotFound;
                 }
 
                 if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
                 {
-                    return SkillFileReadResult.Fail(SkillFileStatus.InvalidPath, normalized);
+                    return SkillFileStatus.InvalidPath;
                 }
             }
 
-            var info = new FileInfo(current);
-
-            if (!info.Exists)
-            {
-                return SkillFileReadResult.Fail(SkillFileStatus.FileNotFound, normalized);
-            }
-
-            if (info.Length > MaxReferenceBytes)
-            {
-                return SkillFileReadResult.Fail(SkillFileStatus.TooLarge, normalized);
-            }
-
-            return SkillFileReadResult.Ok(File.ReadAllText(current), normalized, info.Length);
+            info = new FileInfo(current);
+            return info.Exists ? SkillFileStatus.Ok : SkillFileStatus.FileNotFound;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return SkillFileReadResult.Fail(SkillFileStatus.FileNotFound, normalized);
+            return SkillFileStatus.FileNotFound;
         }
     }
 

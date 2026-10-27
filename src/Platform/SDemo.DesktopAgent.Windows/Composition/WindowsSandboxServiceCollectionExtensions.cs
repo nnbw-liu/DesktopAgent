@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SDemo.DesktopAgent.Execution;
 using SDemo.DesktopAgent.Services;
+using SDemo.DesktopAgent.Platform.Windows.Execution;
 using SDemo.DesktopAgent.Platform.Windows.Sandbox;
 using SDemo.DesktopAgent.Platform.Windows.Tools;
 
@@ -55,6 +56,9 @@ public static class WindowsSandboxServiceCollectionExtensions
         services.AddSingleton<SDemo.DesktopAgent.Platform.Windows.Execution.IDirectProcessRunner,
             SDemo.DesktopAgent.Platform.Windows.Execution.DirectProcessRunner>();
         services.AddSingleton<IAgentToolPack, CommandToolPack>();
+
+        // P2：技能包脚本运行器（Node + Edge 环境注入）；Core 注册的不可用实现由这里替换。
+        services.Replace(ServiceDescriptor.Singleton<ISkillScriptRunner, SkillScriptRunner>());
         services.AddSingleton<SDemo.DesktopAgent.Execution.IWorkspaceWarmupService,
             SDemo.DesktopAgent.Platform.Windows.Execution.WorkspaceWarmupService>();
         services.AddSingleton<SDemo.DesktopAgent.Execution.IVerificationRunner,

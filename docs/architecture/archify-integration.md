@@ -86,19 +86,26 @@
 
 ### 3.3 运行器（先窄后宽）
 
+> 状态（2026-10-27）：**已落地**（`feature/archify-p0`）。实现与真实验收见
+> [p2-skill-script.md](../reports/p2-skill-script.md)。
+
 v1 只做 **技能包脚本**，不开放任意命令：
 
 | 项 | 约束 |
 | --- | --- |
-| 脚本位置 | 只允许 `<skill>/bin/**`、`<skill>/scripts/**` 下的 `.mjs` / `.js` |
-| 解释器 | `node`（白名单命令，已存在于 `ExecutionSettings.Allowlist`） |
-| 参数 | `string[]`，长度受限；不允许绝对路径 / UNC / `..`；输出路径必须在工作区内 |
-| 工作目录 | 工作区根（Archify 的 `.archify/` 约定依赖它） |
-| 环境 | 仅 `PATH`、`TEMP`、`SYSTEMROOT` 等必要项；**不继承** API Key 等宿主变量；`ARCHIFY_UPDATE_CHECK_DISABLED=1`、宿主解析出的 `ARCHIFY_CHROME`、`ARCHIFY_CHROME_NO_SANDBOX=1`（见下） |
-| 审批 | 每次运行展示完整 argv；可申请“本会话对该脚本授权” |
-| 审计 | 脚本哈希、argv、cwd、退出码、耗时、沙箱与否 |
-| 默认执行位置 | **宿主进程**（`browser-check` 需要 Edge）；设置提供“沙箱内运行（跳过浏览器校验）” |
-| 信任边界 | 只对声明了 scripts 的技能包开放；首次启用弹风险说明（脚本 = 代码执行） |
+| 脚本位置 | 只允许 `<skill>/bin/**`、`<skill>/scripts/**` 下的 `.mjs` / `.js`；单脚本上限 4 MB |
+| 解释器 | `node`（白名单命令，已存在于 `ExecutionSettings.Allowlist`）；启动时解析 PATH / ProgramFiles / nvm，设置页展示版本 |
+| 参数 | `string[]`（≤32 个，单参数 ≤2048 字符，总长 ≤4096）；不允许绝对路径 / UNC / 盘符 / `~` / `..` / 控制字符；参数直接进 argv，**不经过 shell** |
+| 工作目录 | 默认工作区根，可在工作区内指定相对目录；绝对路径与越界一律拒绝 |
+| 环境 | `DirectProcessRunner` 白名单 + `ARCHIFY_UPDATE_CHECK_DISABLED=1`；仅 Archify 来源额外注入宿主解析的 `ARCHIFY_CHROME` 与 `ARCHIFY_CHROME_NO_SANDBOX=1`；**不继承** API Key 等宿主变量 |
+| 审批 | 首跑与脚本哈希变化都要审批，展示完整 argv / 脚本哈希 / Node / 浏览器 / cwd / 超时；可“本会话对该脚本授权” |
+| 审计 | `ScriptSha256`、argv 哈希（`CommandSha256`）、cwd、退出码、耗时、`Mode=direct`、`Sandbox=None`；不写脚本正文 / argv 明文 |
+| 默认执行位置 | **宿主进程**（`browser-check` 需要 Edge）；不受沙箱网络隔离，审批卡会明示 |
+| 信任边界 | 技能包内的脚本就是代码执行：只有目录包的 `bin/` / `scripts/` 能被解析，仍需直跑开关 + 审批；关闭直跑即整体不可用 |
+
+> 实现拆成三层：`SkillCatalog.ResolveScript` 只做包内路径 jail 与哈希；
+> `SkillScriptPolicy` 只做直跑 / Node 白名单 / argv / cwd / 超时；
+> `SkillScriptRunner` 只做 Node / Edge 解析与直跑。工具层负责审批、会话授权、审计与结果格式化。
 
 > P0 已确认两件事：①直跑器的环境白名单不含 `PROGRAMFILES`，宿主必须解析 Edge 并以
 > `ARCHIFY_CHROME` 注入；②Edge 的渲染沙箱与直跑器的 Job Object 不兼容，需要
@@ -153,7 +160,7 @@ v1 只做 **技能包脚本**，不开放任意命令：
 | --- | --- | --- | --- |
 | P0 探针 | DesktopAgent 进程内跑 `node archify.mjs finalize`（含 Edge browser-check），打开产物 | 0.5 天 | 已完成：[p0-archify.md](../reports/p0-archify.md) |
 | P1 技能包 | 目录发现 / `read_skill_file` / 版本哈希 / 设置页 / 兼容旧 `.md` | 2 天 | 已完成：[p1-skills.md](../reports/p1-skills.md) |
-| P2 运行器 | `run_skill_script` + 审批 / 审计 / 环境白名单 / 路径 jail / Node 检测 | 2–3 天 | 模型完成“画图 → 失败修复 → 交付”，无 shell 拼接 |
+| P2 运行器 | `run_skill_script` + 审批 / 审计 / 环境白名单 / 路径 jail / Node 检测 | 2–3 天 | 已完成：[p2-skill-script.md](../reports/p2-skill-script.md) |
 | P3 适配与产物 | 适配技能、安装 Archify 3.2.0、Apache-2.0 与第三方声明、产物打开 | 1–2 天 | 干净机器上按文档可复现 |
 | P4 预览 / 复核 | 独立源 iframe 预览、可选视觉复核、导出 | 3–5 天 | 预览隔离，不污染聊天 DOM |
 

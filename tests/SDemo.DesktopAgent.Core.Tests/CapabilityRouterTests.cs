@@ -225,6 +225,61 @@ public sealed class CapabilityRouterTests
     }
 
     [Fact]
+    public void 技能意图优先_run_skill_script_且不被元工具挤掉()
+    {
+        var available = Available
+            .Concat([CapabilityRouter.RunSkillScriptTool, "load_skill", "read_skill_file"])
+            .ToArray();
+
+        var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
+            "画一张系统架构图",
+            [],
+            available,
+            AgentMode.Full,
+            MaxExposedTools: 6));
+
+        Assert.Equal(CapabilityRouter.RunSkillScriptTool, decision.ExposedTools[0]);
+        Assert.Contains("意图=skill", decision.Reason);
+        Assert.Contains(CapabilityRouter.LoadSkillTool, decision.ExposedTools);
+        Assert.Contains(CapabilityRouter.ReadSkillFileTool, decision.ExposedTools);
+        Assert.True(decision.Count <= 6);
+    }
+
+    [Fact]
+    public void 手选技能时即使没有关键词也优先脚本工具()
+    {
+        var available = Available
+            .Concat([CapabilityRouter.RunSkillScriptTool, "load_skill", "read_skill_file"])
+            .ToArray();
+
+        var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
+            "按这个做",
+            [],
+            available,
+            AgentMode.Compact,
+            MaxExposedTools: 12,
+            HasSelectedSkill: true));
+
+        Assert.Equal(CapabilityRouter.RunSkillScriptTool, decision.ExposedTools[0]);
+        Assert.Equal(CapabilityRouter.CompactMaxTools, decision.Count);
+        Assert.Contains(CapabilityRouter.LoadSkillTool, decision.ExposedTools);
+    }
+
+    [Fact]
+    public void 技能脚本工具不可用时不会被硬塞()
+    {
+        var decision = CapabilityRouter.Route(new CapabilityRoutingInput(
+            "画架构图",
+            [],
+            Available,
+            AgentMode.Full,
+            MaxExposedTools: 6));
+
+        Assert.DoesNotContain(CapabilityRouter.RunSkillScriptTool, decision.ExposedTools);
+        Assert.Contains("read_file", decision.ExposedTools);
+    }
+
+    [Fact]
     public void 回忆意图补知识库工具且不会被沙箱关键词抢走()
     {
         var available = Available

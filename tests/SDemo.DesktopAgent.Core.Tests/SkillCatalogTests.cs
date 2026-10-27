@@ -249,6 +249,65 @@ public sealed class SkillCatalogTests : IDisposable
     }
 
     [Fact]
+    public void 技能脚本只允许_bin_和_scripts_下的_mjs_js()
+    {
+        WritePackage(
+            "archify",
+            "---\ndescription: 画图\nmetadata:\n  version: \"3.2\"\n---\n",
+            ("bin/archify.mjs", "console.log('ok');"),
+            ("scripts/helper.js", "module.exports = 1;"),
+            ("references/not-script.js", "not a script"));
+
+        var catalog = new SkillCatalog(_root);
+
+        var ok = catalog.ResolveScript("archify", "bin/archify.mjs");
+        Assert.True(ok.IsOk);
+        Assert.Equal("archify", ok.Target!.SkillName);
+        Assert.Equal("bin/archify.mjs", ok.Target.RelativePath);
+        Assert.Equal(64, ok.Target.Sha256.Length);
+        Assert.Equal("3.2", catalog.List().Single().Version);
+
+        Assert.True(catalog.ResolveScript("archify", "scripts/helper.js").IsOk);
+        Assert.Equal(SkillScriptStatus.InvalidPath,
+            catalog.ResolveScript("archify", "references/not-script.js").Status);
+        Assert.Equal(SkillScriptStatus.InvalidPath,
+            catalog.ResolveScript("archify", "bin/../references/x.js").Status);
+        Assert.Equal(SkillScriptStatus.UnsupportedScript,
+            catalog.ResolveScript("archify", "bin/readme.md").Status);
+        Assert.Equal(SkillScriptStatus.ScriptNotFound,
+            catalog.ResolveScript("archify", "bin/missing.mjs").Status);
+        Assert.Equal(SkillScriptStatus.SkillNotFound,
+            catalog.ResolveScript("missing", "bin/x.mjs").Status);
+
+        Write("summary.md", "单文件");
+        Assert.Equal(SkillScriptStatus.FlatSkill,
+            catalog.ResolveScript("summary", "bin/x.mjs").Status);
+    }
+
+    [Fact]
+    public void 技能脚本解析带出发布来源与哈希()
+    {
+        WritePackage(
+            "archify",
+            "---\ndescription: 画图\n---\n",
+            ("bin/archify.mjs", "console.log('v1');"),
+            ("skill-release.json", """{"version":"3.2.0","source":{"repository":"https://github.com/tt-a1i/archify"}}"""));
+
+        var catalog = new SkillCatalog(_root);
+        var first = catalog.ResolveScript("archify", "bin/archify.mjs").Target!;
+
+        Assert.Equal("https://github.com/tt-a1i/archify", first.Source);
+        Assert.Equal("bin/archify.mjs", first.RelativePath);
+        Assert.Equal(File.ReadAllText(Path.Combine(_root, "archify", "bin", "archify.mjs")),
+            File.ReadAllText(first.FullPath));
+
+        File.WriteAllText(Path.Combine(_root, "archify", "bin", "archify.mjs"), "console.log('v2');");
+        var second = catalog.ResolveScript("archify", "bin/archify.mjs").Target!;
+
+        Assert.NotEqual(first.Sha256, second.Sha256);
+    }
+
+    [Fact]
     public void 同名目录包优先于扁平文件()
     {
         Write("archify.md", "扁平正文");
