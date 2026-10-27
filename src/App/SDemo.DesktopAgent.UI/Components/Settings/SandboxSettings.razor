@@ -1,0 +1,868 @@
+@using SDemo.DesktopAgent.Execution
+@using SDemo.DesktopAgent.Sandbox
+@inject ISettingsService Settings
+@inject ISandboxJobService Sandbox
+@inject ISandboxMaintenance Maintenance
+@inject IAppEnvironmentService Environment
+@inject IAppPaths Paths
+@inject AgentToolRegistry ToolRegistry
+@inject SessionGrantStore Grants
+
+@* 执行与沙箱：直跑命令 / PowerShell / PDF / 沙箱自检 / 审计数据。 *@
+<div class="settings-pane">
+    <details class="settings-section settings-collapsible" open="open">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <div class="settings-fold-text">
+                <span class="settings-section-title">直跑命令</span>
+                <p class="settings-section-hint">
+                构建 / 测试可以走宿主直跑，跳过沙箱复制的等待；参数不经过 shell，只放行白名单命令。
+                技能包脚本（<code>run_skill_script</code>）也走这条通道：只允许技能包 <code>bin/</code>、<code>scripts/</code>
+                下的 <code>.mjs</code> / <code>.js</code>，需要 Node 20+，首跑 / 脚本变化会请求审批。
+                </p>
+            </div>
+        </summary>
+
+        <div class="settings-section-body">
+            <p class="settings-message is-danger">
+                直跑不受沙箱网络隔离，可以访问网络与真实工作区。默认关闭；打开后每次仍先请求审批，安全命令可本会话授权。
+            </p>
+
+            <label class="settings-row settings-row--toggle">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">启用直跑命令（run_command / run_skill_script）</span>
+                    <span class="settings-row-hint">dotnet build / dotnet test 与技能包脚本；run_powershell 始终留在沙箱。</span>
+                </span>
+                <input type="checkbox"
+                       class="switch"
+                       checked="@Settings.Current.Execution.DirectRunEnabled"
+                       @onchange="ToggleDirectRun" />
+            </label>
+
+            <div class="field field--wide">
+                <span class="field-label">白名单（逗号分隔）</span>
+                <input class="field-input" @bind="_allowlistText" @bind:event="oninput" />
+                <span class="field-hint">默认 dotnet / npm / pnpm / node / git / python / cargo / go；git 只允许只读子命令。</span>
+            </div>
+
+            <div class="settings-grid">
+                <label class="field">
+                    <span class="field-label">默认超时（秒）</span>
+                    <input class="field-input" type="number" min="1" max="600"
+                           value="@Settings.Current.Execution.DefaultTimeoutSeconds"
+                           @onchange="ChangeExecutionTimeout" />
+                </label>
+                <label class="field">
+                    <span class="field-label">构建 / 测试超时（秒）</span>
+                    <input class="field-input" type="number" min="1" max="900"
+                           value="@Settings.Current.Execution.BuildTimeoutSeconds"
+                           @onchange="ChangeBuildTimeout" />
+                </label>
+            </div>
+
+            <div class="editor-footer">
+                <button type="button" class="primary-button" @onclick="SaveExecutionPolicy">保存直跑设置</button>
+            </div>
+
+            @if (Grants.List().Count > 0)
+            {
+                <div class="settings-subsection">
+                    <span class="field-label">已授权的直跑命令（重启失效）</span>
+                    @foreach (var grant in Grants.List())
+                    {
+                        <div class="settings-row">
+                            <span class="settings-row-text">
+                                <span class="settings-row-title">@grant.Prefix</span>
+                                <span class="settings-row-hint">会话 @grant.SessionId；@grant.GrantedAt.ToString("HH:mm")</span>
+                            </span>
+                            <button type="button" class="ghost-button" @onclick="() => RevokeGrant(grant)">
+                                撤销
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (_executionMessage is not null)
+            {
+                <p class="settings-message">@_executionMessage</p>
+            }
+        </div>
+    </details>
+
+    @if (PowerShellDescriptor is not null)
+    {
+        <details class="settings-section settings-collapsible" open="open">
+            <summary class="settings-fold-head">
+                <span class="settings-fold-caret" aria-hidden="true">▸</span>
+                <div class="settings-fold-text">
+                    <span class="settings-section-title">PowerShell</span>
+                    <p class="settings-section-hint">
+                    PowerShell 默认只在沙箱内执行（默认 AppContainer，也可以选 Windows Sandbox 虚拟机）：无网络，
+                    只能读写工作区副本；改动需要你在变更面板确认后才写回。
+                    沙箱不可用时工具直接不可用，不会自动退回直跑；在聊天室输入框里关掉沙箱，那一间才会改成直接在工作区执行。
+                    </p>
+                </div>
+            </summary>
+
+            <div class="settings-section-body">
+                <label class="settings-row settings-row--toggle">
+                    <span class="settings-row-text">
+                        <span class="settings-row-title">允许模型使用 PowerShell（默认开启）</span>
+                        <span class="settings-row-hint">
+                            @(PowerShellAvailable
+                                ? "内置能力：不需要在输入框里选 chip，模型需要时会自行调用；每次执行仍需审批。"
+                                : PowerShellUnavailableReason)
+                        </span>
+                    </span>
+                    <input type="checkbox"
+                           class="switch"
+                           checked="@PowerShellEnabled"
+                           disabled="@(!PowerShellAvailable)"
+                           @onchange="TogglePowerShell" />
+                </label>
+
+                <label class="settings-row settings-row--toggle">
+                    <span class="settings-row-text">
+                        <span class="settings-row-title">每次执行都需要确认（固定开启）</span>
+                        <span class="settings-row-hint">
+                            审批框会展示完整脚本；批准一次只对这一次执行有效，不支持“同脚本本会话自动批准”。
+                        </span>
+                    </span>
+                    <input type="checkbox" class="switch" checked disabled />
+                </label>
+            </div>
+        </details>
+    }
+
+    @if (PdfDescriptor is not null)
+    {
+        <details class="settings-section settings-collapsible" open="open">
+            <summary class="settings-fold-head">
+                <span class="settings-fold-caret" aria-hidden="true">▸</span>
+                <div class="settings-fold-text">
+                    <span class="settings-section-title">PDF</span>
+                    <p class="settings-section-hint">
+                    PDF 在沙箱里解析（固定 AppContainer，不开虚拟机）：不能联网，只能读工作区和当前会话的附件。
+                    解析器崩溃只影响沙箱内的 helper 进程，不会拖垮应用；加密文件、扫描件会明确告诉你原因。
+                    </p>
+                </div>
+            </summary>
+
+            <div class="settings-section-body">
+                <label class="settings-row settings-row--toggle">
+                    <span class="settings-row-text">
+                        <span class="settings-row-title">允许模型使用 PDF（默认开启）</span>
+                        <span class="settings-row-hint">
+                            @(PdfAvailable
+                                ? "内置能力：不需要在输入框里选 chip，模型需要时会自行调用 pdf_read / pdf_info。"
+                                : PdfUnavailableReason)
+                        </span>
+                    </span>
+                    <input type="checkbox"
+                           class="switch"
+                           checked="@PdfEnabled"
+                           disabled="@(!PdfAvailable)"
+                           @onchange="TogglePdf" />
+                </label>
+
+                <label class="settings-row settings-row--toggle">
+                    <span class="settings-row-text">
+                        <span class="settings-row-title">上传 PDF 时自动提取前 3 页</span>
+                        <span class="settings-row-hint">
+                            提取结果只用于聊天上下文；关闭后附件仍可用 pdf_read 按需读取。
+                        </span>
+                    </span>
+                    <input type="checkbox"
+                           class="switch"
+                           checked="@Settings.Current.Sandbox.PdfAutoExtract"
+                           disabled="@(!Settings.Current.Sandbox.Enabled)"
+                           @onchange="TogglePdfAutoExtract" />
+                </label>
+
+                <ul class="sandbox-checks">
+                    <li class="@KindClass(_appContainerAvailability)">
+                        PDF 解析沙箱（AppContainer）：@KindText(_appContainerAvailability)
+                    </li>
+                </ul>
+
+                <p class="settings-message">
+                    上限：单次 50 页 / 40,000 字符；工作区文件 50MB，上传附件 25MB。
+                    扫描件没有文本层，当前不启用 OCR。
+                </p>
+            </div>
+        </details>
+    }
+
+    <details class="settings-section settings-collapsible" open="open">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <div class="settings-fold-text">
+                <span class="settings-section-title">执行沙箱</span>
+                <p class="settings-section-hint">
+                PowerShell 与 PDF 解析都在沙箱中运行；沙箱不可用时直接拒绝执行，不会退回无沙箱直跑。
+                AppContainer 启动快、全版本可用；Windows Sandbox 是虚拟机级强隔离，仅 Pro / Enterprise / Education 可用，
+                每次启动约 10–30 秒。
+                </p>
+            </div>
+        </summary>
+
+        <div class="settings-section-body">
+            <div class="settings-subsection">
+                <span class="field-label">沙箱模式</span>
+                <div class="segmented">
+                    <button type="button"
+                            class="segmented-item @(IsSandboxMode(SandboxRequirement.Preferred) ? "is-active" : null)"
+                            @onclick="() => SetSandboxMode(SandboxRequirement.Preferred)">
+                        自动
+                    </button>
+                    <button type="button"
+                            class="segmented-item @(IsSandboxMode(SandboxRequirement.Required) ? "is-active" : null)"
+                            @onclick="() => SetSandboxMode(SandboxRequirement.Required)">
+                        强制
+                    </button>
+                    @if (IsDebugBuild && !Settings.Current.Sandbox.Enabled)
+                    {
+                        <button type="button" class="segmented-item is-active is-danger" disabled>
+                            关闭（仅开发）
+                        </button>
+                    }
+                </div>
+                <span class="field-hint">
+                    自动 = 首选沙箱不可用时允许换用其他可用沙箱；强制 = 只用首选沙箱，首选不可用就拒绝。
+                    两者都不会自动换成无沙箱执行；只有你在聊天室输入框里明确关掉沙箱，那一间才会直跑。
+                </span>
+            </div>
+
+            <div class="settings-subsection">
+                <span class="field-label">首选沙箱</span>
+                <div class="segmented">
+                    <button type="button"
+                            class="segmented-item @(Settings.Current.Sandbox.Preferred == SandboxKind.AppContainer ? "is-active" : null)"
+                            @onclick="() => SetPreferredSandboxAsync(SandboxKind.AppContainer)">
+                        AppContainer
+                    </button>
+                    <button type="button"
+                            class="segmented-item @(Settings.Current.Sandbox.Preferred == SandboxKind.WindowsSandbox ? "is-active" : null)"
+                            @onclick="() => SetPreferredSandboxAsync(SandboxKind.WindowsSandbox)">
+                        Windows Sandbox
+                    </button>
+                </div>
+                <span class="field-hint">自动模式：首选不可用时允许换用另一种沙箱；强制模式：只用首选，不可用就拒绝。</span>
+            </div>
+
+            <div class="sandbox-status">
+                <span class="sandbox-badge @SandboxBadgeClass">@SandboxBadgeText</span>
+                <span class="settings-message">@EffectiveAvailabilityText</span>
+            </div>
+
+            <ul class="sandbox-checks">
+                <li class="@KindClass(_appContainerAvailability)">
+                    AppContainer：@KindText(_appContainerAvailability)
+                </li>
+                <li class="@KindClass(_windowsSandboxAvailability)">
+                    Windows Sandbox：@KindText(_windowsSandboxAvailability)
+                </li>
+            </ul>
+
+            @if (_windowsSandboxAvailability is { Available: true, Verified: false })
+            {
+                <p class="settings-message">
+                    Windows Sandbox 还没通过自检：点「测试 Windows Sandbox」启动一次虚拟机（约 10–30 秒）后才能启用 PowerShell。
+                </p>
+            }
+
+            <div class="settings-grid">
+                <label class="field">
+                    <span class="field-label">超时（秒）</span>
+                    <input class="field-input"
+                           type="number"
+                           min="1"
+                           max="120"
+                           value="@Settings.Current.Sandbox.TimeoutSeconds"
+                           @onchange="ChangeTimeout" />
+                    <span class="field-hint">1–120；模型请求的超时也受这个范围约束。</span>
+                </label>
+
+                <label class="field">
+                    <span class="field-label">内存上限（MB）</span>
+                    <input class="field-input"
+                           type="number"
+                           min="64"
+                           max="8192"
+                           value="@Settings.Current.Sandbox.MemoryLimitMB"
+                           @onchange="ChangeMemory" />
+                    <span class="field-hint">单个沙箱进程的上限；整个 Job 另有 2 倍上限。</span>
+                </label>
+
+                <label class="field">
+                    <span class="field-label">Windows Sandbox 内存（MB）</span>
+                    <input class="field-input"
+                           type="number"
+                           min="2048"
+                           max="16384"
+                           value="@Settings.Current.Sandbox.WindowsSandboxMemoryMB"
+                           @onchange="ChangeWindowsSandboxMemory" />
+                    <span class="field-hint">仅虚拟机模式使用；下限 2048 由系统规定。</span>
+                </label>
+            </div>
+
+            <div class="editor-footer">
+                <button type="button" class="ghost-button" disabled="@_isSandboxTesting" @onclick="RunSandboxSelfTestAsync">
+                    @(_isSandboxTesting ? "自检中…（会启动真实进程）" : "执行沙箱自检")
+                </button>
+                <button type="button"
+                        class="ghost-button"
+                        disabled="@(_isWindowsSandboxTesting || _windowsSandboxAvailability is not { Available: true })"
+                        @onclick="RunWindowsSandboxSelfTestAsync">
+                    @(_isWindowsSandboxTesting ? "启动虚拟机自检中…（约 10–30 秒）" : "测试 Windows Sandbox")
+                </button>
+            </div>
+
+            @if (_sandboxMessage is not null)
+            {
+                <p class="settings-message">@_sandboxMessage</p>
+            }
+
+            @if (_sandboxReport is not null)
+            {
+                <ul class="sandbox-checks">
+                    <li class="@CheckClass(_sandboxReport.CmdOk)">基本进程：能在沙箱内启动 cmd</li>
+                    <li class="@CheckClass(_sandboxReport.PowerShellOk)">PowerShell：能执行脚本并正确输出 UTF-8 中文</li>
+                    <li class="@CheckClass(_sandboxReport.CannotReadUserProfile)">隔离：不能读取用户目录里的文件</li>
+                    <li class="@CheckClass(_sandboxReport.CannotWriteWorkspace)">隔离：不能写入工作区</li>
+                    <li class="@CheckClass(_sandboxReport.NoNetwork)">隔离：没有网络访问</li>
+                    <li class="@CheckClass(_sandboxReport.SubprocessOk)">子进程：允许在 Job 内启动</li>
+                    <li class="@CheckClass(_sandboxReport.TimeoutOk)">超时：到点终止整棵进程树</li>
+                </ul>
+
+                @if (!string.IsNullOrWhiteSpace(_sandboxReport.Detail))
+                {
+                    <pre class="search-preview">@_sandboxReport.Detail</pre>
+                }
+            }
+
+            @if (_windowsSandboxMessage is not null)
+            {
+                <p class="settings-message">@_windowsSandboxMessage</p>
+            }
+
+            @if (_windowsSandboxReport is not null)
+            {
+                <ul class="sandbox-checks">
+                    <li class="@CheckClass(_windowsSandboxReport.Launched)">启动：能启动 Windows Sandbox 虚拟机并跑完 run.ps1</li>
+                    <li class="@CheckClass(_windowsSandboxReport.PowerShellOk)">PowerShell：能在虚拟机内执行脚本</li>
+                    <li class="@CheckClass(_windowsSandboxReport.NoNetwork)">网络：虚拟机没有网络访问</li>
+                </ul>
+
+                @if (!string.IsNullOrWhiteSpace(_windowsSandboxReport.Detail))
+                {
+                    <pre class="search-preview">@_windowsSandboxReport.Detail</pre>
+                }
+            }
+
+            @if (_windowsSandboxReport is { AllPassed: false } && _appContainerAvailability is { Available: true })
+            {
+                <div class="editor-footer">
+                    <button type="button"
+                            class="ghost-button"
+                            @onclick="() => SetPreferredSandboxAsync(SandboxKind.AppContainer)">
+                        改用 AppContainer
+                    </button>
+                </div>
+            }
+
+            @if (IsDebugBuild)
+            {
+                <div class="editor-footer">
+                    <button type="button"
+                            class="ghost-button"
+                            @onclick="() => SetSandboxEnabled(!Settings.Current.Sandbox.Enabled)">
+                        @(Settings.Current.Sandbox.Enabled ? "关闭执行沙箱（仅开发）" : "重新启用执行沙箱")
+                    </button>
+                </div>
+
+                @if (!Settings.Current.Sandbox.Enabled)
+                {
+                    <p class="settings-message is-danger">
+                        执行沙箱已关闭：PowerShell 改为直接在工作区运行（不改副本、不等写回确认），PDF 不可用。
+                        此选项只在调试构建里提供，正常情况下请在聊天室输入框里按需切换。
+                    </p>
+                }
+            }
+        </div>
+    </details>
+
+    <details class="settings-section settings-collapsible">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <span class="settings-fold-text">
+                <span class="settings-section-title">审计与数据</span>
+                <span class="settings-section-hint">
+                    审计日志每天一个 JSONL 文件，只记录工具、job、沙箱类型、脚本 hash / 长度、退出码与审批结果，
+                    默认不写脚本正文与 stdout / stderr。沙箱作业与回收站也在这里清理。
+                </span>
+            </span>
+        </summary>
+
+        <div class="settings-section-body">
+        <p class="settings-section-hint">
+            审计日志默认保留 7 天；沙箱数据启动时自动清理超过 24 小时的作业与 7 天前的回收站条目。
+        </p>
+
+        <label class="settings-row settings-row--toggle">
+            <span class="settings-row-text">
+                <span class="settings-row-title">在审计日志中保留脚本正文（前 4KB）</span>
+                <span class="settings-row-hint">默认关闭；打开后脚本内容会落盘，敏感脚本请勿开启。</span>
+            </span>
+            <input type="checkbox"
+                   class="switch"
+                   checked="@Settings.Current.Sandbox.RetainScriptsInAuditLog"
+                   @onchange="ToggleRetainScripts" />
+        </label>
+
+        <div class="settings-grid">
+            <label class="field">
+                <span class="field-label">审计日志保留天数</span>
+                <input class="field-input"
+                       type="number"
+                       min="1"
+                       max="365"
+                       value="@Settings.Current.Sandbox.AuditRetentionDays"
+                       @onchange="ChangeAuditRetention" />
+                <span class="field-hint">默认 7 天；下次启动写日志时清理更早的文件，单文件超过 10MB 会轮转。</span>
+            </label>
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-row-text">
+                <span class="settings-row-title">审计日志目录</span>
+                <span class="settings-row-hint">@AuditDirectory</span>
+            </span>
+            <button type="button" class="ghost-button" @onclick="OpenAuditFolder">打开</button>
+        </div>
+
+        <div class="settings-subsection">
+            <span class="field-label">沙箱数据</span>
+            <span class="field-hint">
+                启动时自动清理超过 24 小时的作业、残留 <code>*.tmp</code> / <code>*.wsb</code> 与 7 天前的回收站条目；
+                有未应用变更的作业会保留，等你确认后再清。
+            </span>
+            <div class="editor-footer">
+                <button type="button" class="ghost-button" disabled="@_isMaintaining" @onclick="RunCleanupAsync">
+                    @(_isMaintaining ? "清理中…" : "清理过期数据")
+                </button>
+                @if (!_confirmingPurge)
+                {
+                    <button type="button" class="ghost-button" disabled="@_isMaintaining" @onclick="() => _confirmingPurge = true">
+                        清理沙箱数据…
+                    </button>
+                }
+            </div>
+
+            @if (_confirmingPurge)
+            {
+                <p class="settings-message is-danger">
+                    确定清空所有沙箱作业与回收站，并删除 AppContainer profile？未应用的变更也会丢失；
+                    host 程序会保留，下次使用沙箱时重新创建 profile。
+                </p>
+                <div class="editor-footer">
+                    <button type="button" class="ghost-button" disabled="@_isMaintaining" @onclick="() => _confirmingPurge = false">
+                        取消
+                    </button>
+                    <button type="button" class="ghost-button" disabled="@_isMaintaining" @onclick="PurgeAsync">
+                        @(_isMaintaining ? "清理中…" : "确认清理")
+                    </button>
+                </div>
+            }
+
+            @if (_maintenanceMessage is not null)
+            {
+                <p class="settings-message">@_maintenanceMessage</p>
+            }
+        </div>
+        </div>
+    </details>
+</div>
+
+@code {
+    private string _allowlistText = string.Empty;
+    private string? _executionMessage;
+    private SandboxAvailability? _availability;
+    private SandboxAvailability? _appContainerAvailability;
+    private SandboxAvailability? _windowsSandboxAvailability;
+    private SandboxProbeReport? _sandboxReport;
+    private string? _sandboxMessage;
+    private bool _isSandboxTesting;
+    private WindowsSandboxSelfTestReport? _windowsSandboxReport;
+    private string? _windowsSandboxMessage;
+    private bool _isWindowsSandboxTesting;
+    private bool _isMaintaining;
+    private bool _confirmingPurge;
+    private string? _maintenanceMessage;
+
+    private string AuditDirectory => Path.Combine(Paths.DataRoot, "logs");
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allowlistText = string.Join(", ", Settings.Current.Execution.Allowlist);
+
+        // 启动清理是后台任务；如果它已经跳过某些 job，这里直接把“待处理”展示出来。
+        if (Maintenance.LastReport is { PendingJobs: > 0 } report)
+        {
+            _maintenanceMessage =
+                $"启动清理跳过了 {report.PendingJobs} 个作业（还有未应用的变更）："
+                + string.Join("、", report.PendingJobIds) + "。";
+        }
+
+        await RefreshAvailabilityAsync();
+    }
+
+    /// <summary>刷新“当前策略下的可用性”与两种沙箱各自的状态。</summary>
+    private async Task RefreshAvailabilityAsync()
+    {
+        _availability = await Sandbox.GetAvailabilityAsync();
+        _appContainerAvailability = await Sandbox.GetAvailabilityAsync(SandboxKind.AppContainer);
+        _windowsSandboxAvailability = await Sandbox.GetAvailabilityAsync(SandboxKind.WindowsSandbox);
+    }
+
+    private static string KindText(SandboxAvailability? availability) => availability switch
+    {
+        null => "检测中…",
+        { Available: true, Verified: true } => "可用（已验证）",
+        { Available: true } => "可用（未验证）",
+        _ => string.IsNullOrWhiteSpace(availability.Reason)
+            ? "不可用"
+            : $"不可用：{availability.Reason}"
+    };
+
+    private static string KindClass(SandboxAvailability? availability) => availability switch
+    {
+        { Available: true, Verified: true } => "sandbox-check is-pass",
+        { Available: true } => "sandbox-check is-warn",
+        _ => "sandbox-check is-fail"
+    };
+
+    private string EffectiveAvailabilityText => _availability switch
+    {
+        null => "正在检测沙箱…",
+        { Available: true, Verified: true } => "当前策略下沙箱可用，PowerShell 可以使用。",
+        { Reason: not null } => _availability.Reason!,
+        _ => "沙箱不可用。"
+    };
+
+    private string SandboxBadgeClass => _availability switch
+    {
+        { Available: true, Verified: true } => "sandbox-badge--ok",
+        { Available: true } => "sandbox-badge--warn",
+        _ => "sandbox-badge--off"
+    };
+
+    private string SandboxBadgeText => _availability switch
+    {
+        { Available: true, Verified: true } => "已就绪",
+        { Available: true } => "仅基本进程可用",
+        _ => "不可用"
+    };
+
+    private AgentToolPackDescriptor? PowerShellDescriptor => ToolRegistry.Find("powershell");
+
+    /// <summary>PowerShell 工具包的用户开关；没有记录时按描述里的默认值（关闭）。</summary>
+    private bool PowerShellEnabled => Settings.Current.Tools.IsPackEnabled(
+        "powershell",
+        PowerShellDescriptor?.DefaultEnabled ?? false);
+
+    /// <summary>可用 = 沙箱实测通过；沙箱关闭时 PowerShell 改为宿主直跑，也不再依赖沙箱。</summary>
+    private bool PowerShellAvailable =>
+        !Settings.Current.Sandbox.Enabled || _availability is { Available: true, Verified: true };
+
+    private string PowerShellUnavailableReason => !Settings.Current.Sandbox.Enabled
+        ? "沙箱已关闭：PowerShell 会直接在工作区运行，改动立即生效、不隔离网络。"
+        : _availability switch
+        {
+            null => "正在检测沙箱…",
+            { Available: false } => _availability.Reason ?? "沙箱不可用。",
+            { Verified: false } => _availability.Reason ?? "PowerShell 尚未通过沙箱自检。",
+            _ => "沙箱可用。"
+        };
+
+    private bool IsSandboxMode(SandboxRequirement requirement) =>
+        Settings.Current.Sandbox.Enabled && Settings.Current.Sandbox.Requirement == requirement;
+
+    private AgentToolPackDescriptor? PdfDescriptor => ToolRegistry.Find("pdf");
+
+    /// <summary>PDF 工具包的用户开关；没有记录时按描述里的默认值（开启，只读）。</summary>
+    private bool PdfEnabled => Settings.Current.Tools.IsPackEnabled(
+        "pdf",
+        PdfDescriptor?.DefaultEnabled ?? true);
+
+    /// <summary>PDF 解析固定在 AppContainer：只要它能启动进程即可，不要求 PowerShell 自检通过。</summary>
+    private bool PdfAvailable =>
+        Settings.Current.Sandbox.Enabled && _appContainerAvailability is { Available: true };
+
+    private string PdfUnavailableReason => !Settings.Current.Sandbox.Enabled
+        ? "沙箱已关闭：PDF 解析只能在沙箱里跑。"
+        : _appContainerAvailability switch
+        {
+            null => "正在检测沙箱…",
+            { Available: false } => _appContainerAvailability.Reason ?? "AppContainer 沙箱不可用。",
+            _ => "沙箱可用。"
+        };
+
+    private void TogglePdf(ChangeEventArgs args)
+    {
+        Settings.Current.Tools.SetPackEnabled("pdf", args.Value is true);
+        Settings.Save();
+    }
+
+    private void TogglePdfAutoExtract(ChangeEventArgs args)
+    {
+        Settings.Current.Sandbox.PdfAutoExtract = args.Value is true;
+        Settings.Save();
+    }
+
+    private void TogglePowerShell(ChangeEventArgs args)
+    {
+        Settings.Current.Tools.SetPackEnabled("powershell", args.Value is true);
+        Settings.Save();
+    }
+
+    private void ToggleDirectRun(ChangeEventArgs args)
+    {
+        var enabled = args.Value is true;
+        Settings.Current.Execution.DirectRunEnabled = enabled;
+        Settings.Current.Execution.Mode = enabled ? ExecutionMode.AllowlistDirect : ExecutionMode.SandboxFirst;
+
+        if (enabled)
+        {
+            Settings.Current.Tools.SetPackEnabled("command", true);
+        }
+
+        Settings.Save();
+        _executionMessage = enabled ? "直跑已开启；下次运行命令会请求审批。" : "直跑已关闭，命令回到沙箱。";
+    }
+
+    private void SaveExecutionPolicy()
+    {
+        var allowlist = _allowlistText
+            .Split([',', ';', ' ', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (allowlist.Count == 0)
+        {
+            _executionMessage = "白名单不能为空；至少保留 dotnet。";
+            return;
+        }
+
+        Settings.Current.Execution.Allowlist = allowlist;
+        Settings.Save();
+        _allowlistText = string.Join(", ", allowlist);
+        _executionMessage = "直跑设置已保存。";
+    }
+
+    private void ChangeExecutionTimeout(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var seconds))
+        {
+            Settings.Current.Execution.DefaultTimeoutSeconds = Math.Clamp(seconds, 1, 600);
+            Settings.Save();
+        }
+    }
+
+    private void ChangeBuildTimeout(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var seconds))
+        {
+            Settings.Current.Execution.BuildTimeoutSeconds = Math.Clamp(seconds, 1, 900);
+            Settings.Save();
+        }
+    }
+
+    private void RevokeGrant(SessionGrant grant)
+    {
+        Grants.Revoke(grant.SessionId, grant.Prefix);
+        _executionMessage = $"已撤销：{grant.Prefix}";
+    }
+
+    private void ChangeTimeout(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var seconds))
+        {
+            Settings.Current.Sandbox.TimeoutSeconds = Math.Clamp(seconds, 1, 120);
+            Settings.Save();
+        }
+    }
+
+    private void ChangeMemory(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var megabytes))
+        {
+            Settings.Current.Sandbox.MemoryLimitMB = Math.Clamp(megabytes, 64, 8192);
+            Settings.Current.Sandbox.JobMemoryLimitMB = Math.Max(1024, Settings.Current.Sandbox.MemoryLimitMB * 2);
+            Settings.Save();
+        }
+    }
+
+    private void ChangeWindowsSandboxMemory(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var megabytes))
+        {
+            Settings.Current.Sandbox.WindowsSandboxMemoryMB = Math.Clamp(megabytes, 2048, 16384);
+            Settings.Save();
+        }
+    }
+
+    private void SetSandboxMode(SandboxRequirement requirement)
+    {
+        Settings.Current.Sandbox.Enabled = true;
+        Settings.Current.Sandbox.Requirement = requirement;
+        Settings.Save();
+    }
+
+    private void SetSandboxEnabled(bool enabled)
+    {
+        Settings.Current.Sandbox.Enabled = enabled;
+        Settings.Save();
+    }
+
+    private async Task SetPreferredSandboxAsync(SandboxKind kind)
+    {
+        Settings.Current.Sandbox.Preferred = kind;
+        Settings.Save();
+        await RefreshAvailabilityAsync();
+    }
+
+    private static string CheckClass(bool passed) => passed ? "sandbox-check is-pass" : "sandbox-check is-fail";
+
+    private async Task RunSandboxSelfTestAsync()
+    {
+        _isSandboxTesting = true;
+        _sandboxReport = null;
+        _sandboxMessage = null;
+
+        try
+        {
+            _sandboxReport = await Sandbox.RunSelfTestAsync();
+            await RefreshAvailabilityAsync();
+            _sandboxMessage = _sandboxReport.AllPassed ? "自检全部通过。" : "自检未全部通过，详见下方。";
+        }
+        catch (Exception ex)
+        {
+            _sandboxMessage = $"自检执行失败：{ex.Message}";
+        }
+        finally
+        {
+            _isSandboxTesting = false;
+        }
+    }
+
+    /// <summary>Windows Sandbox 自检会真的启动一次虚拟机，失败不影响 AppContainer。</summary>
+    private async Task RunWindowsSandboxSelfTestAsync()
+    {
+        _isWindowsSandboxTesting = true;
+        _windowsSandboxReport = null;
+        _windowsSandboxMessage = null;
+
+        try
+        {
+            _windowsSandboxReport = await Sandbox.RunWindowsSandboxSelfTestAsync();
+            await RefreshAvailabilityAsync();
+            _windowsSandboxMessage = _windowsSandboxReport.AllPassed
+                ? $"Windows Sandbox 自检通过（耗时 {_windowsSandboxReport.Duration.TotalSeconds:0.#} 秒）。"
+                : "Windows Sandbox 自检未通过；PowerShell 不会使用它。";
+        }
+        catch (Exception ex)
+        {
+            _windowsSandboxMessage = $"Windows Sandbox 自检执行失败：{ex.Message}";
+        }
+        finally
+        {
+            _isWindowsSandboxTesting = false;
+        }
+    }
+
+    private void ToggleRetainScripts(ChangeEventArgs args)
+    {
+        Settings.Current.Sandbox.RetainScriptsInAuditLog = args.Value is true;
+        Settings.Save();
+    }
+
+    private void ChangeAuditRetention(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var days))
+        {
+            Settings.Current.Sandbox.AuditRetentionDays = Math.Clamp(days, 1, 365);
+            Settings.Save();
+        }
+    }
+
+    private void OpenAuditFolder()
+    {
+        try
+        {
+            Environment.OpenFolder(AuditDirectory);
+            _maintenanceMessage = null;
+        }
+        catch (Exception ex)
+        {
+            _maintenanceMessage = $"打开日志目录失败：{ex.Message}";
+        }
+    }
+
+    private async Task RunCleanupAsync()
+    {
+        _isMaintaining = true;
+        _maintenanceMessage = null;
+
+        try
+        {
+            var report = await Maintenance.CleanupAsync();
+            _maintenanceMessage = $"已清理 {report.DeletedJobs} 个过期作业、{report.DeletedTrashEntries} 个回收站条目、"
+                                  + $"{report.DeletedTempFiles} 个临时文件。"
+                                  + (report.PendingJobs > 0
+                                      ? $" 有 {report.PendingJobs} 个作业还有未应用的变更，已跳过：{string.Join("、", report.PendingJobIds)}。"
+                                      : string.Empty);
+        }
+        catch (Exception ex)
+        {
+            _maintenanceMessage = $"清理失败：{ex.Message}";
+        }
+        finally
+        {
+            _isMaintaining = false;
+        }
+    }
+
+    private async Task PurgeAsync()
+    {
+        _isMaintaining = true;
+        _maintenanceMessage = null;
+
+        try
+        {
+            var report = await Maintenance.PurgeAsync();
+            _confirmingPurge = false;
+            _maintenanceMessage = $"已清空沙箱数据：{report.DeletedJobs} 个作业、{report.DeletedTrashEntries} 个回收站条目、"
+                                  + $"{report.DeletedTempFiles} 个临时文件；"
+                                  + (report.ProfileDeleted == false
+                                      ? "AppContainer profile 删除失败（可能被占用），下次使用会自动重建。"
+                                      : "AppContainer profile 已删除。");
+            await RefreshAvailabilityAsync();
+        }
+        catch (Exception ex)
+        {
+            _maintenanceMessage = $"清理沙箱数据失败：{ex.Message}";
+        }
+        finally
+        {
+            _isMaintaining = false;
+        }
+    }
+
+#if DEBUG
+    private static readonly bool IsDebugBuild = true;
+#else
+    private static readonly bool IsDebugBuild = false;
+#endif
+}

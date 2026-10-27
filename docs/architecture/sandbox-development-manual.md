@@ -986,7 +986,7 @@ public sealed class SandboxProbe
 
 #### 5.4.7 设置页自检区
 
-在“设置 → 工具设置”里新增一节“执行沙箱”（S1 阶段可以先不新增独立 tab）：
+在“设置 → 执行与沙箱”里新增一节“执行沙箱”：
 
 ```text
 执行沙箱
@@ -1723,7 +1723,7 @@ A out/report.md
 
 ### 7.7 设置
 
-在“设置 → 工具设置”增加：
+在“设置 → 执行与沙箱”增加：
 
 ```text
 PowerShell
@@ -1996,7 +1996,7 @@ return NotAvailable              # Preferred 也不回退到无沙箱
 
 ### 8.7 设置与 UI
 
-- 设置 → 工具设置 → 执行沙箱：
+- 设置 → 执行与沙箱 → 执行沙箱：
   - 首选：`AppContainer` / `Windows Sandbox`
   - 状态：可用 / 不可用 / 未验证
   - `[测试 Windows Sandbox]` 按钮（启动一次小自检，约 10–30 秒）

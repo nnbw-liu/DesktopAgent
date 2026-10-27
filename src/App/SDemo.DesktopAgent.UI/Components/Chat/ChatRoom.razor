@@ -540,8 +540,8 @@
                                         aria-checked="@(_autoRouting ? "true" : "false")"
                                         disabled="@(Settings.Current.ModelRouting.Mode == ModelRoutingMode.Off)"
                                         title="@(Settings.Current.ModelRouting.Mode == ModelRoutingMode.Off
-                                            ? "先在 设置 → 模型设置 → 智能模型路由 里启用"
-                                            : "按任务类型自动选择模型；在设置 → 模型设置里配置映射")"
+                                            ? "先在 设置 → 模型 → 智能模型路由 里启用"
+                                            : "按任务类型自动选择模型；在设置 → 模型里配置映射")"
                                         @onclick="SelectAutoModel">
                                     <span class="model-picker-option-name">自动选择</span>
                                     <span class="model-picker-option-hint">
@@ -745,7 +745,7 @@
     [Parameter]
     public EventCallback<(ChatSession Session, bool IsGenerating)> OnGeneratingChanged { get; set; }
 
-    /// <summary>直接跳到设置的「模型设置」分区。</summary>
+    /// <summary>直接跳到设置的「模型」分区。</summary>
     [Parameter]
     public EventCallback OnOpenModelSettings { get; set; }
 
@@ -1819,7 +1819,7 @@
 
         if (!settings.Tools.IsPackEnabled(descriptor.Id, descriptor.DefaultEnabled))
         {
-            return "在「设置 → 工具设置」中启用";
+            return "在「设置 → 工具」或「执行与沙箱」中启用";
         }
 
         // 技能工具没有素材时不必暴露：系统提示不会产生索引，load_skill 也读不到正文。
@@ -2214,7 +2214,7 @@
         {
             Session.Messages.Add(new ChatMessage(
                 ChatMessageRole.Assistant,
-                "还没有可用的模型。请到「设置 → 模型设置」添加模型提供商，并把模型加入目录。"));
+                "还没有可用的模型。请到「设置 → 模型」添加模型提供商，并把模型加入目录。"));
             await NotifySessionChangedAsync();
             return;
         }
@@ -3159,7 +3159,7 @@
                 null,
                 string.Empty,
                 DerivedState.Failed,
-                "未配置模型：请先到「设置 → 模型设置」添加模型",
+                "未配置模型：请先到「设置 → 模型」添加模型",
                 string.Empty,
                 0,
                 0,
@@ -3227,7 +3227,7 @@
         var option = _modelOptions.FirstOrDefault(item => item.Key == _selectedKey);
         if (option is null)
         {
-            message.Derived[index] = artifact with { State = DerivedState.Failed, Error = "未配置模型：请先到「设置 → 模型设置」添加模型" };
+            message.Derived[index] = artifact with { State = DerivedState.Failed, Error = "未配置模型：请先到「设置 → 模型」添加模型" };
             StateHasChanged();
             await NotifySessionChangedAsync();
             return;

@@ -3,7 +3,7 @@ using Microsoft.Extensions.AI;
 
 namespace SDemo.DesktopAgent.Services;
 
-/// <summary>联网搜索工具包。默认关闭；搜索后端同「设置 → 工具设置」。</summary>
+/// <summary>联网搜索工具包。默认关闭；搜索后端同「设置 → 工具 → 联网搜索」。</summary>
 public sealed class SearchToolPack : IAgentToolPack
 {
     private readonly ISearchService _search;

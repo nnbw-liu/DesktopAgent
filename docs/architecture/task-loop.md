@@ -59,7 +59,7 @@ dirty        = lastEditAt > lastVerified（或从未成功验证）
 "checkpoints": { "enabled": true, "keep": 20 }
 ```
 
-设置页「内循环」可关闭自动验证提示与检查点。
+设置弹窗「工具 → 验证与检查点」可关闭自动验证提示与检查点。
 
 ## 6. 边界
 

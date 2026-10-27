@@ -16,7 +16,7 @@ public enum AgentModePreference { Auto, Full, Compact }
 2. `SupportsTools == false`；
 3. 模型名含 `3b` / `4b` / `7b` / `1.5b` / `tiny` / `mini`。
 
-手动 `Full` / `Compact` 覆盖自动规则。设置页「内循环 → 小模型模式」保存默认值。
+手动 `Full` / `Compact` 覆盖自动规则。设置弹窗「工具 → 工具暴露与路由」保存默认值。
 
 | 项 | Full | Compact |
 | --- | --- | --- |

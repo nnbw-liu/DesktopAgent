@@ -9,7 +9,7 @@ namespace SDemo.DesktopAgent.Services;
 /// <summary>
 /// 写入工具包：<c>apply_patch</c>（统一 diff、多文件、全有或全无）与 <c>write_file</c>。
 /// 两个工具都要求「先读后写」：本会话读过该文件且内容 hash 未变；新建文件除外。
-/// 编辑审批只给 diff，允许关闭确认（设置 → 工具设置）。
+/// 编辑审批只给 diff，允许关闭确认（设置 → 工具 → 代码与文件工具）。
 /// </summary>
 public sealed class EditToolPack : IAgentToolPack
 {

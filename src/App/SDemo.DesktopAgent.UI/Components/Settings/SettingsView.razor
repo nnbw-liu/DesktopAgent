@@ -1,86 +1,213 @@
-@* 设置页：右侧整页。顶部分区切换，下面是各自独立滚动的设置内容。 *@
-<section class="settings">
-    <header class="settings-header">
-        <h1>全局设置</h1>
-        <p>这里只放全局默认值；工作区与聊天室可以在各自入口覆盖，优先级为聊天室 &gt; 工作区 &gt; 全局。</p>
-    </header>
+@implements IDisposable
+@inject IJSRuntime Js
 
-    <nav class="settings-tabs" role="tablist">
-        <button type="button"
-                role="tab"
-                aria-selected="@(_tab == SettingsSection.General)"
-                class="settings-tab @(_tab == SettingsSection.General ? "is-active" : null)"
-                @onclick="() => _tab = SettingsSection.General">
-            通用设置
-        </button>
-        <button type="button"
-                role="tab"
-                aria-selected="@(_tab == SettingsSection.Models)"
-                class="settings-tab @(_tab == SettingsSection.Models ? "is-active" : null)"
-                @onclick="() => _tab = SettingsSection.Models">
-            模型设置
-        </button>
-        <button type="button"
-                role="tab"
-                aria-selected="@(_tab == SettingsSection.Context)"
-                class="settings-tab @(_tab == SettingsSection.Context ? "is-active" : null)"
-                @onclick="() => _tab = SettingsSection.Context">
-            上下文
-        </button>
-        <button type="button"
-                role="tab"
-                aria-selected="@(_tab == SettingsSection.Tools)"
-                class="settings-tab @(_tab == SettingsSection.Tools ? "is-active" : null)"
-                @onclick="() => _tab = SettingsSection.Tools">
-            工具设置
-        </button>
-        <button type="button"
-                role="tab"
-                aria-selected="@(_tab == SettingsSection.Skills)"
-                class="settings-tab @(_tab == SettingsSection.Skills ? "is-active" : null)"
-                @onclick="() => _tab = SettingsSection.Skills">
-            技能
-        </button>
-        <button type="button"
-                role="tab"
-                aria-selected="@(_tab == SettingsSection.Plugins)"
-                class="settings-tab @(_tab == SettingsSection.Plugins ? "is-active" : null)"
-                @onclick="() => _tab = SettingsSection.Plugins">
-            插件
-        </button>
-    </nav>
+@* 设置弹窗：遮罩 + 居中面板；左侧分组导航固定，右侧内容区独立滚动。
+   打开时聊天室仍保持挂载（不做视图切换），推理不会中断。 *@
+<div class="settings-backdrop" @onclick="CloseAsync">
+    <div class="settings-dialog"
+         role="dialog"
+         aria-modal="true"
+         aria-label="设置"
+         tabindex="-1"
+         @ref="_dialogElement"
+         @onclick:stopPropagation="true">
+        <div class="settings">
+            <aside class="settings-nav">
+                <header class="settings-nav-head">
+                    <h1>设置</h1>
+                    <p>全局默认值 · 优先级：聊天室 &gt; 工作区 &gt; 全局</p>
+                </header>
 
-    <div class="settings-body">
-        @switch (_tab)
-        {
-            case SettingsSection.General:
-                <GeneralSettings />
-                break;
-            case SettingsSection.Models:
-                <ModelSettings />
-                break;
-            case SettingsSection.Context:
-                <ContextSettingsPanel />
-                break;
-            case SettingsSection.Skills:
-                <SkillsSettings />
-                break;
-            case SettingsSection.Plugins:
-                <PluginSettings />
-                break;
-            default:
-                <ToolsSettings />
-                break;
-        }
+                <nav class="settings-nav-scroll" aria-label="设置分区">
+                    @foreach (var group in NavGroups)
+                    {
+                        <div class="settings-nav-group">
+                            <span class="settings-nav-group-title">@group.Title</span>
+
+                            @foreach (var item in group.Items)
+                            {
+                                var isActive = _tab == item.Section;
+
+                                <button type="button"
+                                        class="settings-nav-item @(isActive ? "is-active" : null)"
+                                        aria-current="@(isActive ? "page" : null)"
+                                        @onclick="() => _tab = item.Section">
+                                    <svg class="settings-nav-icon"
+                                         viewBox="0 0 16 16"
+                                         aria-hidden="true"
+                                         fill="none"
+                                         stroke="currentColor"
+                                         stroke-width="1.3"
+                                         stroke-linecap="round"
+                                         stroke-linejoin="round">
+                                        @((MarkupString)item.Icon)
+                                    </svg>
+                                    <span class="settings-nav-label">@item.Label</span>
+                                </button>
+                            }
+                        </div>
+                    }
+                </nav>
+            </aside>
+
+            <div class="settings-stage">
+                <header class="settings-stage-head">
+                    <div class="settings-stage-heading">
+                        <h2>@Current.Title</h2>
+                        <p>@Current.Summary</p>
+                    </div>
+                    <div class="settings-stage-actions">
+                        <span class="settings-stage-scope">全局默认</span>
+                        <button type="button"
+                                class="settings-close"
+                                title="关闭设置（Esc）"
+                                aria-label="关闭设置"
+                                @onclick="CloseAsync">✕</button>
+                    </div>
+                </header>
+
+                <div class="settings-body">
+                    @switch (_tab)
+                    {
+                        case SettingsSection.General:
+                            <GeneralSettings />
+                            break;
+                        case SettingsSection.Models:
+                            <ModelSettings />
+                            break;
+                        case SettingsSection.Context:
+                            <ContextSettingsPanel />
+                            break;
+                        case SettingsSection.Tools:
+                            <ToolsSettings />
+                            break;
+                        case SettingsSection.Skills:
+                            <SkillsSettings />
+                            break;
+                        case SettingsSection.Plugins:
+                            <PluginSettings />
+                            break;
+                        case SettingsSection.Sandbox:
+                            <SandboxSettings />
+                            break;
+                        default:
+                            <AboutSettings />
+                            break;
+                    }
+                </div>
+            </div>
+        </div>
     </div>
-</section>
+</div>
 
 @code {
+    private sealed record NavItem(SettingsSection Section, string Label, string Icon);
+
+    private sealed record NavGroup(string Title, IReadOnlyList<NavItem> Items);
+
+    private sealed record SectionHeader(string Title, string Summary);
+
+    /// <summary>导航分组：基础配置、能力开关、运行环境。</summary>
+    private static readonly IReadOnlyList<NavGroup> NavGroups =
+    [
+        new("基础",
+        [
+            new NavItem(SettingsSection.General, "通用",
+                """<path d="M2.8 5.2h10.4M2.8 10.8h10.4"/><circle cx="6" cy="5.2" r="1.7"/><circle cx="10" cy="10.8" r="1.7"/>"""),
+            new NavItem(SettingsSection.Models, "模型",
+                """<rect x="4.2" y="4.2" width="7.6" height="7.6" rx="1.8"/><path d="M6.4 4.2V2.6M9.6 4.2V2.6M6.4 13.4v-1.6M9.6 13.4v-1.6M4.2 6.4H2.6M4.2 9.6H2.6M13.4 6.4h-1.6M13.4 9.6h-1.6"/>""")
+        ]),
+        new("能力",
+        [
+            new NavItem(SettingsSection.Context, "上下文",
+                """<ellipse cx="8" cy="4.4" rx="4.8" ry="1.9"/><path d="M3.2 4.4v3.2c0 1 2.1 1.9 4.8 1.9s4.8-.8 4.8-1.9V4.4"/><path d="M3.2 7.6v3.2c0 1 2.1 1.9 4.8 1.9s4.8-.8 4.8-1.9V7.6"/>"""),
+            new NavItem(SettingsSection.Tools, "工具",
+                """<path d="M9.9 2.9a3.3 3.3 0 0 0-4 4.2l-3.4 3.3a1.4 1.4 0 0 0 2 2l3.3-3.4a3.3 3.3 0 0 0 4.2-4l-1.9 1.9-2.1-2.1z"/>"""),
+            new NavItem(SettingsSection.Skills, "技能",
+                """<path d="M8 2.6l1.4 2.9 3.1.4-2.3 2.1.6 3.1-2.8-1.5-2.8 1.5.6-3.1L3.5 5.9l3.1-.4z"/>"""),
+            new NavItem(SettingsSection.Plugins, "插件",
+                """<path d="M6 2.6v2.9M10 2.6v2.9"/><path d="M4.6 5.5h6.8v2.3a3.4 3.4 0 0 1-6.8 0z"/><path d="M8 11.2v2.2"/>""")
+        ]),
+        new("系统",
+        [
+            new NavItem(SettingsSection.Sandbox, "执行与沙箱",
+                """<rect x="2.6" y="3.6" width="10.8" height="8.8" rx="1.7"/><path d="M5.2 6.9l1.7 1.4-1.7 1.4M8.7 9.7h2.3"/>"""),
+            new NavItem(SettingsSection.About, "关于",
+                """<circle cx="8" cy="8" r="5.4"/><path d="M8 7.3v3.6M8 5.4v.1"/>""")
+        ])
+    ];
+
+    private static readonly IReadOnlyDictionary<SettingsSection, SectionHeader> Headers =
+        new Dictionary<SettingsSection, SectionHeader>
+        {
+            [SettingsSection.General] = new("通用", "外观、语言与对话表现，改完立即生效。"),
+            [SettingsSection.Models] = new("模型", "智能路由按任务换模型；提供商走标准 OpenAI 接口。"),
+            [SettingsSection.Context] = new("上下文", "预算、裁剪、摘要与宿主快照，决定每轮实际发出去多少。"),
+            [SettingsSection.Tools] = new("工具", "联网搜索、工具包与文件写入策略；执行相关的在「执行与沙箱」。"),
+            [SettingsSection.Skills] = new("技能", "从技能目录发现技能包，控制输入框里的快捷入口。"),
+            [SettingsSection.Plugins] = new("插件", "插件总开关、入口数量与每个插件的启用状态。"),
+            [SettingsSection.Sandbox] = new("执行与沙箱", "直跑命令、PowerShell / PDF 与沙箱、审计与数据清理。"),
+            [SettingsSection.About] = new("关于", "版本信息与本地数据位置，排查问题时一并提供。")
+        };
+
     /// <summary>打开设置时默认显示的分区（例如从聊天页的「未配置模型」跳过来）。</summary>
     [Parameter]
     public SettingsSection InitialSection { get; set; } = SettingsSection.General;
 
+    /// <summary>请求关闭弹窗（遮罩点击、Esc 或右上角 ✕）。</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
     private SettingsSection _tab = SettingsSection.General;
 
-    protected override void OnInitialized() => _tab = InitialSection;
+    private ElementReference _dialogElement;
+
+    private DotNetObjectReference<SettingsView>? _self;
+
+    private SectionHeader Current => Headers[_tab];
+
+    protected override void OnInitialized()
+    {
+        _tab = InitialSection;
+        _self = DotNetObjectReference.Create(this);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        // 焦点先给弹窗本身：Esc 由 window 监听兜底，输入框/按钮聚焦时也不会漏。
+        await _dialogElement.FocusAsync();
+
+        try
+        {
+            await Js.InvokeVoidAsync("sdSettings.bind", _self);
+        }
+        catch (JSException)
+        {
+            // 脚本缺失时只损失 Esc/Tab 辅助，弹窗本身仍可用遮罩与 ✕ 关闭。
+        }
+    }
+
+    [JSInvokable]
+    public Task EscapeAsync() => CloseAsync();
+
+    private async Task CloseAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("sdSettings.unbind");
+        }
+        catch (JSException)
+        {
+            // 关闭动作优先，脚本不可用时不阻塞。
+        }
+
+        await OnClose.InvokeAsync();
+    }
+
+    public void Dispose() => _self?.Dispose();
 }

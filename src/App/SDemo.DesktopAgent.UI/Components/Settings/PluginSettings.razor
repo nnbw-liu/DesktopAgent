@@ -8,113 +8,120 @@
 
 @* 插件设置：全局开关 / 显示上限 / 参数记忆 / 默认呈现，以及每个插件的启用、入口与顺序。 *@
 <div class="settings-pane">
-    <section class="settings-section">
-        <h2 class="settings-section-title">插件</h2>
-        <p class="settings-section-hint">
-            插件是「plugin.json + skill 文件」组成的声明式能力包，把文件夹放进插件目录就能生效，不需要编译。
-            开关、上限与顺序改完立即生效，不需要重启。
-        </p>
+    <details class="settings-section settings-collapsible" open="open">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <div class="settings-fold-text">
+                <span class="settings-section-title">插件</span>
+                <p class="settings-section-hint">
+                插件是「plugin.json + skill 文件」组成的声明式能力包，把文件夹放进插件目录就能生效，不需要编译。
+                开关、上限与顺序改完立即生效，不需要重启。
+                </p>
+            </div>
+        </summary>
 
-        <label class="settings-row settings-row--toggle">
-            <span class="settings-row-text">
-                <span class="settings-row-title">启用插件</span>
-                <span class="settings-row-hint">关掉后侧栏、输入框、气泡、划词菜单都不显示插件；已打开的会话会回到普通对话。</span>
-            </span>
-            <input type="checkbox" class="switch" checked="@Prefs.Enabled" @onchange="ToggleGlobal" />
-        </label>
-
-        <div class="plugin-limits">
-            <label class="plugin-limit">
-                <span class="plugin-limit-label">输入框最多显示</span>
-                <input type="number"
-                       class="field-input plugin-limit-input"
-                       min="1"
-                       max="20"
-                       value="@Prefs.MaxInComposer"
-                       @onchange="args => SaveLimit(args, composer: true)" />
-                <span class="plugin-limit-unit">个</span>
+        <div class="settings-section-body">
+            <label class="settings-row settings-row--toggle">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">启用插件</span>
+                    <span class="settings-row-hint">关掉后侧栏、输入框、气泡、划词菜单都不显示插件；已打开的会话会回到普通对话。</span>
+                </span>
+                <input type="checkbox" class="switch" checked="@Prefs.Enabled" @onchange="ToggleGlobal" />
             </label>
 
-            <label class="plugin-limit">
-                <span class="plugin-limit-label">侧栏最多显示</span>
-                <input type="number"
-                       class="field-input plugin-limit-input"
-                       min="1"
-                       max="20"
-                       value="@Prefs.MaxInSidebar"
-                       @onchange="args => SaveLimit(args, composer: false)" />
-                <span class="plugin-limit-unit">个</span>
+            <div class="plugin-limits">
+                <label class="plugin-limit">
+                    <span class="plugin-limit-label">输入框最多显示</span>
+                    <input type="number"
+                           class="field-input plugin-limit-input"
+                           min="1"
+                           max="20"
+                           value="@Prefs.MaxInComposer"
+                           @onchange="args => SaveLimit(args, composer: true)" />
+                    <span class="plugin-limit-unit">个</span>
+                </label>
+
+                <label class="plugin-limit">
+                    <span class="plugin-limit-label">侧栏最多显示</span>
+                    <input type="number"
+                           class="field-input plugin-limit-input"
+                           min="1"
+                           max="20"
+                           value="@Prefs.MaxInSidebar"
+                           @onchange="args => SaveLimit(args, composer: false)" />
+                    <span class="plugin-limit-unit">个</span>
+                </label>
+
+                <label class="plugin-limit">
+                    <span class="plugin-limit-label">划词菜单最多显示</span>
+                    <input type="number"
+                           class="field-input plugin-limit-input"
+                           min="1"
+                           max="20"
+                           value="@Prefs.MaxInSelection"
+                           @onchange="SaveSelectionLimit" />
+                    <span class="plugin-limit-unit">个</span>
+                </label>
+            </div>
+
+            <label class="settings-row settings-row--toggle">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">记住每个会话上次选中的参数</span>
+                    <span class="settings-row-hint">关掉后，每次都用插件清单里的默认值（例如系统语言）。</span>
+                </span>
+                <input type="checkbox"
+                       class="switch"
+                       checked="@Prefs.RememberParameterValues"
+                       @onchange="ToggleRemember" />
             </label>
 
-            <label class="plugin-limit">
-                <span class="plugin-limit-label">划词菜单最多显示</span>
-                <input type="number"
-                       class="field-input plugin-limit-input"
-                       min="1"
-                       max="20"
-                       value="@Prefs.MaxInSelection"
-                       @onchange="SaveSelectionLimit" />
-                <span class="plugin-limit-unit">个</span>
-            </label>
-        </div>
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">新会话译文默认呈现</span>
+                    <span class="settings-row-hint">新会话（还没手动切换过对照 / 译文）的默认呈现方式。</span>
+                </span>
 
-        <label class="settings-row settings-row--toggle">
-            <span class="settings-row-text">
-                <span class="settings-row-title">记住每个会话上次选中的参数</span>
-                <span class="settings-row-hint">关掉后，每次都用插件清单里的默认值（例如系统语言）。</span>
-            </span>
-            <input type="checkbox"
-                   class="switch"
-                   checked="@Prefs.RememberParameterValues"
-                   @onchange="ToggleRemember" />
-        </label>
-
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">新会话译文默认呈现</span>
-                <span class="settings-row-hint">新会话（还没手动切换过对照 / 译文）的默认呈现方式。</span>
-            </span>
-
-            <div class="segmented plugin-mode-segmented">
-                <button type="button"
-                        class="segmented-item @(Prefs.DefaultOutputMode == PluginOutputMode.Bilingual ? "is-active" : null)"
-                        @onclick="() => SetOutputMode(PluginOutputMode.Bilingual)">
-                    对照
-                </button>
-                <button type="button"
-                        class="segmented-item @(Prefs.DefaultOutputMode == PluginOutputMode.Translation ? "is-active" : null)"
-                        @onclick="() => SetOutputMode(PluginOutputMode.Translation)">
-                    纯译文
-                </button>
+                <div class="segmented plugin-mode-segmented">
+                    <button type="button"
+                            class="segmented-item @(Prefs.DefaultOutputMode == PluginOutputMode.Bilingual ? "is-active" : null)"
+                            @onclick="() => SetOutputMode(PluginOutputMode.Bilingual)">
+                        对照
+                    </button>
+                    <button type="button"
+                            class="segmented-item @(Prefs.DefaultOutputMode == PluginOutputMode.Translation ? "is-active" : null)"
+                            @onclick="() => SetOutputMode(PluginOutputMode.Translation)">
+                        纯译文
+                    </button>
+                </div>
             </div>
-        </div>
 
-        <div class="plugin-roots">
-            <div class="plugin-root">
-                <span class="field-label">本地插件目录</span>
-                <code class="plugin-path">@Catalog.LocalRoot</code>
+            <div class="plugin-roots">
+                <div class="plugin-root">
+                    <span class="field-label">本地插件目录</span>
+                    <code class="plugin-path">@Catalog.LocalRoot</code>
+                </div>
+                <div class="plugin-root">
+                    <span class="field-label">内置插件</span>
+                    <code class="plugin-path">随应用编译（@Catalog.BuiltinPackageCount 个，不需要目录）</code>
+                </div>
             </div>
-            <div class="plugin-root">
-                <span class="field-label">内置插件</span>
-                <code class="plugin-path">随应用编译（@Catalog.BuiltinPackageCount 个，不需要目录）</code>
+
+            <div class="plugin-toolbar">
+                <span class="settings-message">@_status</span>
+                <span class="plugin-toolbar-actions">
+                    @if (OperatingSystem.IsWindows())
+                    {
+                        <button type="button" class="ghost-button" @onclick="OpenDirectory">打开插件目录</button>
+                    }
+                    <button type="button" class="ghost-button" @onclick="Rescan">重新扫描</button>
+                </span>
             </div>
-        </div>
 
-        <div class="plugin-toolbar">
-            <span class="settings-message">@_status</span>
-            <span class="plugin-toolbar-actions">
-                @if (OperatingSystem.IsWindows())
-                {
-                    <button type="button" class="ghost-button" @onclick="OpenDirectory">打开插件目录</button>
-                }
-                <button type="button" class="ghost-button" @onclick="Rescan">重新扫描</button>
-            </span>
+            <p class="settings-message">
+                本地插件的内容会进入系统提示词，只安装你信任的插件。
+            </p>
         </div>
-
-        <p class="settings-message">
-            本地插件的内容会进入系统提示词，只安装你信任的插件。
-        </p>
-    </section>
+    </details>
 
     @if (_result.IsEmpty)
     {
@@ -128,135 +135,151 @@
 
     @if (_result.Plugins.Count > 0)
     {
-        <section class="settings-section">
-            <h2 class="settings-section-title">已加载</h2>
+        <details class="settings-section settings-collapsible" open="open">
+            <summary class="settings-fold-head">
+                <span class="settings-fold-caret" aria-hidden="true">▸</span>
+                <div class="settings-fold-text">
+                    <span class="settings-section-title">已加载</span>
 
-            @foreach (var plugin in _result.Plugins)
-            {
-                <article class="plugin-item @(plugin.IsUsable ? null : "is-inactive") @(plugin.HasErrors ? "is-error" : null)">
-                    <div class="plugin-item-head">
-                        <span class="plugin-icon">@plugin.Initial</span>
-                        <span class="plugin-name">@plugin.Name</span>
-                        <span class="plugin-version">@plugin.Version</span>
-                        <span class="plugin-badge">@(plugin.Source == PluginSource.Builtin ? "内置" : "本地")</span>
-                        @if (plugin.IsOverridden)
+                </div>
+            </summary>
+
+            <div class="settings-section-body">
+                @foreach (var plugin in _result.Plugins)
+                {
+                    <article class="plugin-item @(plugin.IsUsable ? null : "is-inactive") @(plugin.HasErrors ? "is-error" : null)">
+                        <div class="plugin-item-head">
+                            <span class="plugin-icon">@plugin.Initial</span>
+                            <span class="plugin-name">@plugin.Name</span>
+                            <span class="plugin-version">@plugin.Version</span>
+                            <span class="plugin-badge">@(plugin.Source == PluginSource.Builtin ? "内置" : "本地")</span>
+                            @if (plugin.IsOverridden)
+                            {
+                                <span class="plugin-badge plugin-badge--warn">已覆盖</span>
+                            }
+                            @if (plugin.StateText is { } stateText)
+                            {
+                                <span class="plugin-badge plugin-badge--warn">@stateText</span>
+                            }
+                            @if (!IsPluginEnabled(plugin))
+                            {
+                                <span class="plugin-badge plugin-badge--warn">已停用</span>
+                            }
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(plugin.Description))
                         {
-                            <span class="plugin-badge plugin-badge--warn">已覆盖</span>
+                            <p class="plugin-desc">@plugin.Description</p>
                         }
-                        @if (plugin.StateText is { } stateText)
+
+                        <p class="plugin-meta">
+                            入口：@SurfaceSummary(plugin) · @plugin.Capabilities.Count 个能力 · 目录 @plugin.DirectoryName
+                        </p>
+
+                        <div class="plugin-controls">
+                            <label class="plugin-control" title="停用后所有入口都不显示">
+                                <input type="checkbox"
+                                       class="switch switch--sm"
+                                       checked="@IsPluginEnabled(plugin)"
+                                       @onchange="args => SetPluginEnabled(plugin, args)" />
+                                <span>启用</span>
+                            </label>
+
+                            <label class="plugin-control @(HasComposer(plugin) ? null : "is-disabled")"
+                                   title="@(HasComposer(plugin) ? "在输入框显示 chip" : "这个插件没有输入框入口")">
+                                <input type="checkbox"
+                                       class="switch switch--sm"
+                                       checked="@InComposer(plugin)"
+                                       disabled="@(!HasComposer(plugin))"
+                                       @onchange="args => SetInComposer(plugin, args)" />
+                                <span>输入框</span>
+                            </label>
+
+                            <label class="plugin-control @(CanUseSidebar(plugin) ? null : "is-disabled")"
+                                   title="@SidebarHint(plugin)">
+                                <input type="checkbox"
+                                       class="switch switch--sm"
+                                       checked="@IsSidebarOn(plugin)"
+                                       disabled="@(!CanUseSidebar(plugin))"
+                                       @onchange="args => SetInSidebar(plugin, args)" />
+                                <span>侧栏</span>
+                            </label>
+
+                            <label class="plugin-control @(HasMessage(plugin) ? null : "is-disabled")"
+                                   title="@(HasMessage(plugin) ? "在助手消息底部显示插件按钮" : "这个插件没有气泡入口")">
+                                <input type="checkbox"
+                                       class="switch switch--sm"
+                                       checked="@InMessage(plugin)"
+                                       disabled="@(!HasMessage(plugin))"
+                                       @onchange="args => SetInMessage(plugin, args)" />
+                                <span>气泡</span>
+                            </label>
+
+                            <label class="plugin-control @(HasSelection(plugin) ? null : "is-disabled")"
+                                   title="@(HasSelection(plugin) ? "在聊天记录中选中文本时显示该插件" : "这个插件没有划词入口")">
+                                <input type="checkbox"
+                                       class="switch switch--sm"
+                                       checked="@InSelection(plugin)"
+                                       disabled="@(!HasSelection(plugin))"
+                                       @onchange="args => SetInSelection(plugin, args)" />
+                                <span>选中</span>
+                            </label>
+
+                            <label class="plugin-control plugin-control--order" title="数字小的排前面；清空表示用插件清单里的顺序">
+                                <span>顺序</span>
+                                <input type="number"
+                                       class="field-input plugin-order-input"
+                                       min="0"
+                                       max="999"
+                                       value="@OrderOf(plugin)"
+                                       @onchange="args => SetOrder(plugin, args)" />
+                            </label>
+                        </div>
+
+                        @if (plugin.DisabledReason is { } reason)
                         {
-                            <span class="plugin-badge plugin-badge--warn">@stateText</span>
+                            <p class="plugin-issue">@reason</p>
                         }
-                        @if (!IsPluginEnabled(plugin))
+
+                        @foreach (var issue in AllIssues(plugin))
                         {
-                            <span class="plugin-badge plugin-badge--warn">已停用</span>
+                            <p class="plugin-issue @(issue.IsError ? "plugin-issue--error" : null)">@issue.ToDisplayString()</p>
                         }
-                    </div>
-
-                    @if (!string.IsNullOrWhiteSpace(plugin.Description))
-                    {
-                        <p class="plugin-desc">@plugin.Description</p>
-                    }
-
-                    <p class="plugin-meta">
-                        入口：@SurfaceSummary(plugin) · @plugin.Capabilities.Count 个能力 · 目录 @plugin.DirectoryName
-                    </p>
-
-                    <div class="plugin-controls">
-                        <label class="plugin-control" title="停用后所有入口都不显示">
-                            <input type="checkbox"
-                                   class="switch switch--sm"
-                                   checked="@IsPluginEnabled(plugin)"
-                                   @onchange="args => SetPluginEnabled(plugin, args)" />
-                            <span>启用</span>
-                        </label>
-
-                        <label class="plugin-control @(HasComposer(plugin) ? null : "is-disabled")"
-                               title="@(HasComposer(plugin) ? "在输入框显示 chip" : "这个插件没有输入框入口")">
-                            <input type="checkbox"
-                                   class="switch switch--sm"
-                                   checked="@InComposer(plugin)"
-                                   disabled="@(!HasComposer(plugin))"
-                                   @onchange="args => SetInComposer(plugin, args)" />
-                            <span>输入框</span>
-                        </label>
-
-                        <label class="plugin-control @(CanUseSidebar(plugin) ? null : "is-disabled")"
-                               title="@SidebarHint(plugin)">
-                            <input type="checkbox"
-                                   class="switch switch--sm"
-                                   checked="@IsSidebarOn(plugin)"
-                                   disabled="@(!CanUseSidebar(plugin))"
-                                   @onchange="args => SetInSidebar(plugin, args)" />
-                            <span>侧栏</span>
-                        </label>
-
-                        <label class="plugin-control @(HasMessage(plugin) ? null : "is-disabled")"
-                               title="@(HasMessage(plugin) ? "在助手消息底部显示插件按钮" : "这个插件没有气泡入口")">
-                            <input type="checkbox"
-                                   class="switch switch--sm"
-                                   checked="@InMessage(plugin)"
-                                   disabled="@(!HasMessage(plugin))"
-                                   @onchange="args => SetInMessage(plugin, args)" />
-                            <span>气泡</span>
-                        </label>
-
-                        <label class="plugin-control @(HasSelection(plugin) ? null : "is-disabled")"
-                               title="@(HasSelection(plugin) ? "在聊天记录中选中文本时显示该插件" : "这个插件没有划词入口")">
-                            <input type="checkbox"
-                                   class="switch switch--sm"
-                                   checked="@InSelection(plugin)"
-                                   disabled="@(!HasSelection(plugin))"
-                                   @onchange="args => SetInSelection(plugin, args)" />
-                            <span>选中</span>
-                        </label>
-
-                        <label class="plugin-control plugin-control--order" title="数字小的排前面；清空表示用插件清单里的顺序">
-                            <span>顺序</span>
-                            <input type="number"
-                                   class="field-input plugin-order-input"
-                                   min="0"
-                                   max="999"
-                                   value="@OrderOf(plugin)"
-                                   @onchange="args => SetOrder(plugin, args)" />
-                        </label>
-                    </div>
-
-                    @if (plugin.DisabledReason is { } reason)
-                    {
-                        <p class="plugin-issue">@reason</p>
-                    }
-
-                    @foreach (var issue in AllIssues(plugin))
-                    {
-                        <p class="plugin-issue @(issue.IsError ? "plugin-issue--error" : null)">@issue.ToDisplayString()</p>
-                    }
-                </article>
-            }
-        </section>
+                    </article>
+                }
+            </div>
+        </details>
     }
 
     @if (_result.Failures.Count > 0)
     {
-        <section class="settings-section">
-            <h2 class="settings-section-title">加载失败</h2>
+        <details class="settings-section settings-collapsible" open="open">
+            <summary class="settings-fold-head">
+                <span class="settings-fold-caret" aria-hidden="true">▸</span>
+                <div class="settings-fold-text">
+                    <span class="settings-section-title">加载失败</span>
 
-            @foreach (var failure in _result.Failures)
-            {
-                <article class="plugin-item is-error">
-                    <div class="plugin-item-head">
-                        <span class="plugin-icon">!</span>
-                        <span class="plugin-name">@failure.DisplayName</span>
-                        <span class="plugin-badge">@(failure.Source == PluginSource.Builtin ? "内置" : "本地")</span>
-                    </div>
-                    <p class="plugin-meta">目录 @failure.DirectoryPath</p>
-                    @foreach (var issue in failure.Issues)
-                    {
-                        <p class="plugin-issue @(issue.IsError ? "plugin-issue--error" : null)">@issue.ToDisplayString()</p>
-                    }
-                </article>
-            }
-        </section>
+                </div>
+            </summary>
+
+            <div class="settings-section-body">
+                @foreach (var failure in _result.Failures)
+                {
+                    <article class="plugin-item is-error">
+                        <div class="plugin-item-head">
+                            <span class="plugin-icon">!</span>
+                            <span class="plugin-name">@failure.DisplayName</span>
+                            <span class="plugin-badge">@(failure.Source == PluginSource.Builtin ? "内置" : "本地")</span>
+                        </div>
+                        <p class="plugin-meta">目录 @failure.DirectoryPath</p>
+                        @foreach (var issue in failure.Issues)
+                        {
+                            <p class="plugin-issue @(issue.IsError ? "plugin-issue--error" : null)">@issue.ToDisplayString()</p>
+                        }
+                    </article>
+                }
+            </div>
+        </details>
     }
 </div>
 

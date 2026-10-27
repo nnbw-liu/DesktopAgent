@@ -10,7 +10,7 @@
 | `office_read` | 读成 Markdown，支持 `sheet` / `range` / `slides` / `maxChars` | 低 |
 | `office_write` | Markdown 写成 `.docx` / `.xlsx` / `.pptx`，覆盖需 `overwrite=true` | 中，走审批 |
 
-工具包 id 是 `office`，内置、默认开启；在「设置 → 工具设置」可以整包关闭。
+工具包 id 是 `office`，内置、默认开启；在「设置 → 工具 → 代码与文件工具」可以整包关闭。
 
 ## 上传即读
 

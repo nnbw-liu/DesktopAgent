@@ -3,224 +3,258 @@
 
 @* P2 §3.4 设置 → 上下文：预算、保留轮次、自动压缩、摘要模型、宿主上下文快照、校准。 *@
 <div class="settings-pane">
-    <section class="settings-section">
-        <h2 class="settings-section-title">预算与裁剪</h2>
-        <p class="settings-section-hint">
-            每次请求都会先估算 token 并按预算裁剪；原始消息不会被删除，只是不发送。
-        </p>
+    <details class="settings-section settings-collapsible" open="open">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <div class="settings-fold-text">
+                <span class="settings-section-title">预算与裁剪</span>
+                <p class="settings-section-hint">
+                每次请求都会先估算 token 并按预算裁剪；原始消息不会被删除，只是不发送。
+                </p>
+            </div>
+        </summary>
 
-        <label class="settings-row settings-row--toggle">
-            <span class="settings-row-text">
-                <span class="settings-row-title">启用上下文预算</span>
-                <span class="settings-row-hint">关闭后等价于旧行为（直通），仍会记录报告。</span>
-            </span>
-            <input type="checkbox" class="switch" checked="@Context.Enabled" @onchange="ToggleEnabled" />
-        </label>
+        <div class="settings-section-body">
+            <label class="settings-row settings-row--toggle">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">启用上下文预算</span>
+                    <span class="settings-row-hint">关闭后等价于旧行为（直通），仍会记录报告。</span>
+                </span>
+                <input type="checkbox" class="switch" checked="@Context.Enabled" @onchange="ToggleEnabled" />
+            </label>
 
-        <label class="settings-row settings-row--toggle">
-            <span class="settings-row-text">
-                <span class="settings-row-title">显示占用环</span>
-                <span class="settings-row-hint">输入框下方的估算 token 占用（新聊天室不显示）；点开可看分段明细。</span>
-            </span>
-            <input type="checkbox" class="switch" checked="@Context.ShowContextMeter" @onchange="ToggleMeter" />
-        </label>
+            <label class="settings-row settings-row--toggle">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">显示占用环</span>
+                    <span class="settings-row-hint">输入框下方的估算 token 占用（新聊天室不显示）；点开可看分段明细。</span>
+                </span>
+                <input type="checkbox" class="switch" checked="@Context.ShowContextMeter" @onchange="ToggleMeter" />
+            </label>
 
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">预算占窗口比例</span>
-                <span class="settings-row-hint">0.1 – 0.95；默认 0.85，越大越激进。</span>
-            </span>
-            <input type="number" class="field-input field-input--number" step="0.01" min="0.1" max="0.95"
-                   @bind="Context.BudgetRatio" @bind:after="SaveSettings" />
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">预算占窗口比例</span>
+                    <span class="settings-row-hint">0.1 – 0.95；默认 0.85，越大越激进。</span>
+                </span>
+                <input type="number" class="field-input field-input--number" step="0.01" min="0.1" max="0.95"
+                       @bind="Context.BudgetRatio" @bind:after="SaveSettings" />
+            </div>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">保留最近轮次</span>
+                    <span class="settings-row-hint">普通模型 / ≤8K 小模型分别设置；其余历史交给摘要。</span>
+                </span>
+                <span class="settings-inline-fields">
+                    <input type="number" class="field-input field-input--number" min="1" max="50"
+                           @bind="Context.KeepRecentTurns" @bind:after="SaveSettings" />
+                    <span class="settings-inline-sep">/</span>
+                    <input type="number" class="field-input field-input--number" min="1" max="50"
+                           @bind="Context.SmallModelKeepRecentTurns" @bind:after="SaveSettings" />
+                </span>
+            </div>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">工具轨迹回放预算</span>
+                    <span class="settings-row-hint">每条助手消息最多回放多少 token 的工具轨迹。</span>
+                </span>
+                <input type="number" class="field-input field-input--number" min="0" max="2000"
+                       @bind="Context.ToolTraceTokenBudget" @bind:after="SaveSettings" />
+            </div>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">附件内联上限</span>
+                    <span class="settings-row-hint">当前轮附件最多内联多少 token；超出只留文件名与路径。</span>
+                </span>
+                <input type="number" class="field-input field-input--number" min="0" max="16384"
+                       @bind="Context.AttachmentInlineTokens" @bind:after="SaveSettings" />
+            </div>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">pin 数量上限</span>
+                    <span class="settings-row-hint">pin 的消息永不淘汰 / 压缩；默认 20 条。</span>
+                </span>
+                <input type="number" class="field-input field-input--number" min="0" max="200"
+                       @bind="Context.MaxPinnedMessages" @bind:after="SaveSettings" />
+            </div>
         </div>
+    </details>
 
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">保留最近轮次</span>
-                <span class="settings-row-hint">普通模型 / ≤8K 小模型分别设置；其余历史交给摘要。</span>
-            </span>
-            <span class="settings-inline-fields">
-                <input type="number" class="field-input field-input--number" min="1" max="50"
-                       @bind="Context.KeepRecentTurns" @bind:after="SaveSettings" />
-                <span class="settings-inline-sep">/</span>
-                <input type="number" class="field-input field-input--number" min="1" max="50"
-                       @bind="Context.SmallModelKeepRecentTurns" @bind:after="SaveSettings" />
-            </span>
+    <details class="settings-section settings-collapsible" open="open">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <div class="settings-fold-text">
+                <span class="settings-section-title">压缩与摘要</span>
+                <p class="settings-section-hint">
+                超预算时先把较早历史压成摘要，再按预算裁剪。摘要失败会自动退回确定性摘要，不会阻塞回答。
+                </p>
+            </div>
+        </summary>
+
+        <div class="settings-section-body">
+            <label class="settings-row settings-row--toggle">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">自动压缩</span>
+                    <span class="settings-row-hint">超预算时增量生成摘要；关闭后只做硬裁剪。</span>
+                </span>
+                <input type="checkbox" class="switch" checked="@Context.AutoCompact" @onchange="ToggleAutoCompact" />
+            </label>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">摘要模型</span>
+                    <span class="settings-row-hint">@_summaryHint</span>
+                </span>
+                <select class="field-input field-input--select" value="@_summaryKey" @onchange="HandleSummaryModelChanged">
+                    <option value="">当前会话模型（默认）</option>
+                    @foreach (var option in SummaryOptions())
+                    {
+                        <option value="@option.Key">@option.Text</option>
+                    }
+                </select>
+            </div>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">摘要上限</span>
+                    <span class="settings-row-hint">摘要正文 token 上限；默认 800。</span>
+                </span>
+                <input type="number" class="field-input field-input--number" min="128" max="4096"
+                       @bind="Context.SummaryMaxTokens" @bind:after="SaveSettings" />
+            </div>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">单次摘要输入上限</span>
+                    <span class="settings-row-hint">超过就分块增量摘要；默认 6000 token。</span>
+                </span>
+                <input type="number" class="field-input field-input--number" min="512" max="24000"
+                       @bind="Context.SummaryInputMaxTokens" @bind:after="SaveSettings" />
+            </div>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">摘要超时</span>
+                    <span class="settings-row-hint">秒；超时 / 5xx / 格式不符都会走确定性兜底。</span>
+                </span>
+                <input type="number" class="field-input field-input--number" min="1" max="300"
+                       @bind="Context.SummaryTimeoutSeconds" @bind:after="SaveSettings" />
+            </div>
         </div>
+    </details>
 
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">工具轨迹回放预算</span>
-                <span class="settings-row-hint">每条助手消息最多回放多少 token 的工具轨迹。</span>
-            </span>
-            <input type="number" class="field-input field-input--number" min="0" max="2000"
-                   @bind="Context.ToolTraceTokenBudget" @bind:after="SaveSettings" />
+    <details class="settings-section settings-collapsible" open="open">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <div class="settings-fold-text">
+                <span class="settings-section-title">宿主上下文快照</span>
+                <p class="settings-section-hint">
+                每轮在历史末尾追加一条「宿主上下文快照」（不是用户输入）：按段渲染工作区、策略、改动、
+                验证、计划、时间，并把「本快照取代之前的快照」写进正文。放在末尾而不是系统提示词尾部，
+                系统前缀在会话内就不再每轮抖动。
+                </p>
+            </div>
+        </summary>
+
+        <div class="settings-section-body">
+            <label class="settings-row settings-row--toggle">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">工作区结构 / 改动 / 动作</span>
+                    <span class="settings-row-hint">关闭后这一段不扫盘、成本为 0；策略与验证仍会发送。</span>
+                </span>
+                <input type="checkbox" class="switch" checked="@Context.StatePackEnabled" @onchange="ToggleStatePack" />
+            </label>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">快照上限</span>
+                    <span class="settings-row-hint">普通模型 / ≤8K 小模型（默认 800 / 500 token）；必需段不受此限制。</span>
+                </span>
+                <span class="settings-inline-fields">
+                    <input type="number" class="field-input field-input--number" min="64" max="2048"
+                           @bind="Context.StatePackTokenBudget" @bind:after="SaveSettings" />
+                    <span class="settings-inline-sep">/</span>
+                    <input type="number" class="field-input field-input--number" min="64" max="2048"
+                           @bind="Context.StatePackSmallModelTokenBudget" @bind:after="SaveSettings" />
+                </span>
+            </div>
+
+            <label class="settings-row settings-row--toggle">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">时间读数</span>
+                    <span class="settings-row-hint">宿主时钟 + IANA 时区 + 距上一条模型可见消息的时长；关闭后成本为 0。</span>
+                </span>
+                <input type="checkbox" class="switch" checked="@Context.TimeContextEnabled" @onchange="ToggleTimeContext" />
+            </label>
+
+            <label class="settings-row settings-row--toggle">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">当前计划</span>
+                    <span class="settings-row-hint">把会话 Todo 列表放进快照；没有计划时本来就零成本。</span>
+                </span>
+                <input type="checkbox" class="switch" checked="@Context.PlanContextEnabled" @onchange="TogglePlanContext" />
+            </label>
         </div>
+    </details>
 
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">附件内联上限</span>
-                <span class="settings-row-hint">当前轮附件最多内联多少 token；超出只留文件名与路径。</span>
-            </span>
-            <input type="number" class="field-input field-input--number" min="0" max="16384"
-                   @bind="Context.AttachmentInlineTokens" @bind:after="SaveSettings" />
+    <details class="settings-section settings-collapsible" open="open">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <div class="settings-fold-text">
+                <span class="settings-section-title">工具路由模型</span>
+                <p class="settings-section-hint">
+                规则看不出该给哪些工具时，才用这个模型做一次结构化路由；超时 / 失败 / 输出非法都会自动回落规则，不影响对话。
+                </p>
+            </div>
+        </summary>
+
+        <div class="settings-section-body">
+            <label class="settings-row settings-row--toggle">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">启用小模型路由</span>
+                    <span class="settings-row-hint">关闭后只用关键词规则；Compact 模式始终只用规则。</span>
+                </span>
+                <input type="checkbox" class="switch" checked="@Agent.SmallModelRoutingEnabled" @onchange="ToggleSmallModelRouting" />
+            </label>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">路由模型</span>
+                    <span class="settings-row-hint">@_routingHint</span>
+                </span>
+                <select class="field-input field-input--select" value="@_routingKey" @onchange="HandleRoutingModelChanged">
+                    <option value="">摘要模型 / 当前会话模型（默认）</option>
+                    @foreach (var option in ModelOptions())
+                    {
+                        <option value="@option.Key">@option.Text</option>
+                    }
+                </select>
+            </div>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">路由超时</span>
+                    <span class="settings-row-hint">秒；超时直接回落规则，不重试。</span>
+                </span>
+                <input type="number" class="field-input field-input--number" min="1" max="60"
+                       @bind="Agent.RoutingTimeoutSeconds" @bind:after="SaveSettings" />
+            </div>
         </div>
+    </details>
 
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">pin 数量上限</span>
-                <span class="settings-row-hint">pin 的消息永不淘汰 / 压缩；默认 20 条。</span>
+    <details class="settings-section settings-collapsible">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <span class="settings-fold-text">
+                <span class="settings-section-title">高级</span>
+                <span class="settings-section-hint">排查预算异常时再动这里；默认值适合大多数情况。</span>
             </span>
-            <input type="number" class="field-input field-input--number" min="0" max="200"
-                   @bind="Context.MaxPinnedMessages" @bind:after="SaveSettings" />
-        </div>
-    </section>
+        </summary>
 
-    <section class="settings-section">
-        <h2 class="settings-section-title">压缩与摘要</h2>
-        <p class="settings-section-hint">
-            超预算时先把较早历史压成摘要，再按预算裁剪。摘要失败会自动退回确定性摘要，不会阻塞回答。
-        </p>
-
-        <label class="settings-row settings-row--toggle">
-            <span class="settings-row-text">
-                <span class="settings-row-title">自动压缩</span>
-                <span class="settings-row-hint">超预算时增量生成摘要；关闭后只做硬裁剪。</span>
-            </span>
-            <input type="checkbox" class="switch" checked="@Context.AutoCompact" @onchange="ToggleAutoCompact" />
-        </label>
-
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">摘要模型</span>
-                <span class="settings-row-hint">@_summaryHint</span>
-            </span>
-            <select class="field-input field-input--select" value="@_summaryKey" @onchange="HandleSummaryModelChanged">
-                <option value="">当前会话模型（默认）</option>
-                @foreach (var option in SummaryOptions())
-                {
-                    <option value="@option.Key">@option.Text</option>
-                }
-            </select>
-        </div>
-
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">摘要上限</span>
-                <span class="settings-row-hint">摘要正文 token 上限；默认 800。</span>
-            </span>
-            <input type="number" class="field-input field-input--number" min="128" max="4096"
-                   @bind="Context.SummaryMaxTokens" @bind:after="SaveSettings" />
-        </div>
-
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">单次摘要输入上限</span>
-                <span class="settings-row-hint">超过就分块增量摘要；默认 6000 token。</span>
-            </span>
-            <input type="number" class="field-input field-input--number" min="512" max="24000"
-                   @bind="Context.SummaryInputMaxTokens" @bind:after="SaveSettings" />
-        </div>
-
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">摘要超时</span>
-                <span class="settings-row-hint">秒；超时 / 5xx / 格式不符都会走确定性兜底。</span>
-            </span>
-            <input type="number" class="field-input field-input--number" min="1" max="300"
-                   @bind="Context.SummaryTimeoutSeconds" @bind:after="SaveSettings" />
-        </div>
-    </section>
-
-    <section class="settings-section">
-        <h2 class="settings-section-title">宿主上下文快照</h2>
-        <p class="settings-section-hint">
-            每轮在历史末尾追加一条「宿主上下文快照」（不是用户输入）：按段渲染工作区、策略、改动、
-            验证、计划、时间，并把「本快照取代之前的快照」写进正文。放在末尾而不是系统提示词尾部，
-            系统前缀在会话内就不再每轮抖动。
-        </p>
-
-        <label class="settings-row settings-row--toggle">
-            <span class="settings-row-text">
-                <span class="settings-row-title">工作区结构 / 改动 / 动作</span>
-                <span class="settings-row-hint">关闭后这一段不扫盘、成本为 0；策略与验证仍会发送。</span>
-            </span>
-            <input type="checkbox" class="switch" checked="@Context.StatePackEnabled" @onchange="ToggleStatePack" />
-        </label>
-
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">快照上限</span>
-                <span class="settings-row-hint">普通模型 / ≤8K 小模型（默认 800 / 500 token）；必需段不受此限制。</span>
-            </span>
-            <span class="settings-inline-fields">
-                <input type="number" class="field-input field-input--number" min="64" max="2048"
-                       @bind="Context.StatePackTokenBudget" @bind:after="SaveSettings" />
-                <span class="settings-inline-sep">/</span>
-                <input type="number" class="field-input field-input--number" min="64" max="2048"
-                       @bind="Context.StatePackSmallModelTokenBudget" @bind:after="SaveSettings" />
-            </span>
-        </div>
-
-        <label class="settings-row settings-row--toggle">
-            <span class="settings-row-text">
-                <span class="settings-row-title">时间读数</span>
-                <span class="settings-row-hint">宿主时钟 + IANA 时区 + 距上一条模型可见消息的时长；关闭后成本为 0。</span>
-            </span>
-            <input type="checkbox" class="switch" checked="@Context.TimeContextEnabled" @onchange="ToggleTimeContext" />
-        </label>
-
-        <label class="settings-row settings-row--toggle">
-            <span class="settings-row-text">
-                <span class="settings-row-title">当前计划</span>
-                <span class="settings-row-hint">把会话 Todo 列表放进快照；没有计划时本来就零成本。</span>
-            </span>
-            <input type="checkbox" class="switch" checked="@Context.PlanContextEnabled" @onchange="TogglePlanContext" />
-        </label>
-    </section>
-
-    <section class="settings-section">
-        <h2 class="settings-section-title">工具路由模型</h2>
-        <p class="settings-section-hint">
-            规则看不出该给哪些工具时，才用这个模型做一次结构化路由；超时 / 失败 / 输出非法都会自动回落规则，不影响对话。
-        </p>
-
-        <label class="settings-row settings-row--toggle">
-            <span class="settings-row-text">
-                <span class="settings-row-title">启用小模型路由</span>
-                <span class="settings-row-hint">关闭后只用关键词规则；Compact 模式始终只用规则。</span>
-            </span>
-            <input type="checkbox" class="switch" checked="@Agent.SmallModelRoutingEnabled" @onchange="ToggleSmallModelRouting" />
-        </label>
-
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">路由模型</span>
-                <span class="settings-row-hint">@_routingHint</span>
-            </span>
-            <select class="field-input field-input--select" value="@_routingKey" @onchange="HandleRoutingModelChanged">
-                <option value="">摘要模型 / 当前会话模型（默认）</option>
-                @foreach (var option in ModelOptions())
-                {
-                    <option value="@option.Key">@option.Text</option>
-                }
-            </select>
-        </div>
-
-        <div class="settings-row">
-            <span class="settings-row-text">
-                <span class="settings-row-title">路由超时</span>
-                <span class="settings-row-hint">秒；超时直接回落规则，不重试。</span>
-            </span>
-            <input type="number" class="field-input field-input--number" min="1" max="60"
-                   @bind="Agent.RoutingTimeoutSeconds" @bind:after="SaveSettings" />
-        </div>
-    </section>
-
-    <section class="settings-section">
-        <h2 class="settings-section-title">高级</h2>
-        <p class="settings-section-hint">排查预算异常时再动这里；默认值适合大多数情况。</p>
-
+        <div class="settings-section-body">
         <label class="settings-row settings-row--toggle">
             <span class="settings-row-text">
                 <span class="settings-row-title">工具循环中途裁剪</span>
@@ -263,7 +297,8 @@
             </span>
             <button type="button" class="ghost-button" @onclick="ResetCalibration">重置校准</button>
         </div>
-    </section>
+        </div>
+    </details>
 </div>
 
 @code {

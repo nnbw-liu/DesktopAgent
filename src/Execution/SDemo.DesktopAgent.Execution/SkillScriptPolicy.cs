@@ -43,14 +43,14 @@ public static class SkillScriptPolicy
         if (!settings.DirectRunEnabled || settings.Mode != ExecutionMode.AllowlistDirect)
         {
             return SkillScriptPolicyResult.Deny(
-                "技能脚本需要直跑：请在「设置 → 工具设置 → 内循环」打开直跑命令。");
+                "技能脚本需要直跑：请在「设置 → 执行与沙箱 → 直跑命令」打开直跑命令。");
         }
 
         var allowlist = settings.Allowlist ?? [];
         if (!allowlist.Any(item => string.Equals(item?.Trim(), "node", StringComparison.OrdinalIgnoreCase)))
         {
             return SkillScriptPolicyResult.Deny(
-                "直跑白名单里没有 node；请把 node 加回「设置 → 工具设置 → 内循环」的白名单。");
+                "直跑白名单里没有 node；请把 node 加回「设置 → 执行与沙箱 → 直跑命令」的白名单。");
         }
 
         var values = (arguments ?? []).ToArray();

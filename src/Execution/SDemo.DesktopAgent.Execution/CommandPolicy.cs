@@ -55,7 +55,7 @@ public static class CommandPolicy
         if (!settings.DirectRunEnabled || settings.Mode != ExecutionMode.AllowlistDirect)
         {
             return CommandPolicyResult.Deny(
-                "直跑未开启（默认走沙箱）。要启用请在「设置 → 工具设置 → 内循环」打开。",
+                "直跑未开启（默认走沙箱）。要启用请在「设置 → 执行与沙箱 → 直跑命令」打开。",
                 settings.Mode);
         }
 
@@ -77,7 +77,7 @@ public static class CommandPolicy
         if (!allowlist.Any(item => string.Equals(item?.Trim(), value, StringComparison.OrdinalIgnoreCase)))
         {
             return CommandPolicyResult.Deny(
-                $"命令不在白名单：{value}。可在「设置 → 工具设置 → 内循环」调整，或改用 run_powershell 进沙箱。",
+                $"命令不在白名单：{value}。可在「设置 → 执行与沙箱 → 直跑命令」调整，或改用 run_powershell 进沙箱。",
                 settings.Mode);
         }
 

@@ -1,0 +1,108 @@
+@using System.IO
+@inject IAppEnvironmentService Environment
+@inject IAppPaths Paths
+
+@* 关于：版本信息与本地数据位置，排查问题时一并提供。 *@
+<div class="settings-pane">
+    <details class="settings-section settings-collapsible" open="open">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <div class="settings-fold-text">
+                <span class="settings-section-title">版本信息</span>
+                <p class="settings-section-hint">排查问题时把这几项一起发过来即可。</p>
+            </div>
+        </summary>
+
+        <div class="settings-section-body">
+            <dl class="info-list">
+                <div class="info-row">
+                    <dt>应用版本</dt>
+                    <dd>@Environment.Version</dd>
+                </div>
+                <div class="info-row">
+                    <dt>.NET 运行时</dt>
+                    <dd>@Environment.RuntimeDescription</dd>
+                </div>
+                <div class="info-row">
+                    <dt>操作系统</dt>
+                    <dd>@Environment.OsDescription</dd>
+                </div>
+                <div class="info-row">
+                    <dt>宿主</dt>
+                    <dd>@Environment.HostName</dd>
+                </div>
+                <div class="info-row">
+                    <dt>WebView</dt>
+                    <dd>@Environment.WebViewVersion</dd>
+                </div>
+            </dl>
+        </div>
+    </details>
+
+    <details class="settings-section settings-collapsible" open="open">
+        <summary class="settings-fold-head">
+            <span class="settings-fold-caret" aria-hidden="true">▸</span>
+            <div class="settings-fold-text">
+                <span class="settings-section-title">本地数据</span>
+                <p class="settings-section-hint">
+                会话、设置与技能库都在应用数据目录下；日志只记工具与沙箱事件，不含聊天正文。
+                </p>
+            </div>
+        </summary>
+
+        <div class="settings-section-body">
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">数据目录</span>
+                    <span class="settings-row-hint">@Paths.DataRoot</span>
+                </span>
+                <button type="button" class="ghost-button" @onclick="() => Open(Paths.DataRoot)">打开</button>
+            </div>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">设置文件</span>
+                    <span class="settings-row-hint">@Paths.SettingsFile</span>
+                </span>
+                <button type="button" class="ghost-button" @onclick="() => Open(Path.GetDirectoryName(Paths.SettingsFile))">打开所在目录</button>
+            </div>
+
+            <div class="settings-row">
+                <span class="settings-row-text">
+                    <span class="settings-row-title">日志目录</span>
+                    <span class="settings-row-hint">@LogDirectory</span>
+                </span>
+                <button type="button" class="ghost-button" @onclick="() => Open(LogDirectory)">打开</button>
+            </div>
+
+            @if (_message is not null)
+            {
+                <p class="settings-message">@_message</p>
+            }
+        </div>
+    </details>
+</div>
+
+@code {
+    private string? _message;
+
+    private string LogDirectory => Path.Combine(Paths.DataRoot, "logs");
+
+    private void Open(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        try
+        {
+            Environment.OpenFolder(path);
+            _message = null;
+        }
+        catch (Exception ex)
+        {
+            _message = $"打开目录失败：{ex.Message}";
+        }
+    }
+}

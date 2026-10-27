@@ -66,7 +66,7 @@ tokens = ceil(cjk * 0.7 + (len - cjk) / 3.8) + 4 + extraOverhead
 
 - 键为 `{providerId}/{modelId}`；用服务端返回的 `usage.input_tokens` 除以上述估算得到比值。
 - 因子是 EMA：`factor = factor * 0.7 + clamp(ratio, 0.7, 1.6) * 0.3`，初始 1.0。
-- 连续 3 次偏差 > 25% 自动停用，避免把误差放大进预算；设置页「重置校准」清空全部记录。
+- 连续 3 次偏差 > 25% 自动停用，避免把误差放大进预算；设置弹窗「上下文 → 高级」的「重置校准」清空全部记录。
 - 服务端不返回 usage 时跳过校准（报告标 `ActualInputTokens = null`），不影响发送。
 
 ## 5. L1 确定性裁剪（`ContextTrimmer`）
@@ -138,7 +138,7 @@ MAF 1.25 的 `FunctionInvokingChatClient`（FICC）插在装饰器**外层**，�
 | `PinnedShareLimit` | `0.30` | pin 占消息预算上限 |
 | `PinnedTruncateChars` | `500` | pin 超量时保留字符 |
 
-设置页「通用 → 上下文」展示当前生效值，并提供「重置校准」；模型编辑器里每个模型可以单独选窗口档位（自动 / 8K / 32K / 128K / 200K）。
+设置弹窗「上下文 → 高级」展示当前生效值，并提供「重置校准」；模型编辑器里每个模型可以单独选窗口档位（自动 / 8K / 32K / 128K / 200K）。
 
 ## 10. 报告与 UI
 

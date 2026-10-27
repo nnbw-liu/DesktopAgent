@@ -14,10 +14,10 @@
 <div class="app-shell">
     <Sidebar Workspaces="Workspaces"
              Sessions="SortedSessions"
-             ActiveSessionId="@(_view == MainView.Chat ? _activeSession?.Id : null)"
-             ActiveWorkspaceId="@(_view == MainView.Chat ? _activeSession?.WorkspaceId : null)"
-             ActiveSessionIsEmpty="@(_view == MainView.Chat && _activeSession is { Messages.Count: 0 })"
-             IsSettingsActive="@(_view == MainView.Settings)"
+             ActiveSessionId="@_activeSession?.Id"
+             ActiveWorkspaceId="@_activeSession?.WorkspaceId"
+             ActiveSessionIsEmpty="@(_activeSession is { Messages.Count: 0 })"
+             IsSettingsActive="_settingsOpen"
              PluginEntries="_pluginRailEntries"
              MaxPluginEntries="@PluginRegistry.MaxFor(PluginSurface.Sidebar)"
              Plugins="PluginRegistry.Plugins"
@@ -37,11 +37,7 @@
              OnOpenWorkspaceSettings="OpenWorkspaceSettings" />
 
     <main class="main-area">
-        @if (_view == MainView.Settings)
-        {
-            <SettingsView InitialSection="_settingsSection" />
-        }
-        else if (_activeSession is null)
+        @if (_activeSession is null)
         {
             <div class="landing">
                 <div class="empty-state">
@@ -55,7 +51,7 @@
         @* 每个正在生成的会话保留自己的 ChatRoom 实例：切走后按设置决定中断还是后台继续。 *@
         @foreach (var session in MountedSessions)
         {
-            var isActive = _view == MainView.Chat && ReferenceEquals(session, _activeSession);
+            var isActive = ReferenceEquals(session, _activeSession);
 
             <ChatRoom @key="session.Id"
                       Session="session"
@@ -73,6 +69,12 @@
                       OnArchiveChanged="OnArchiveChanged" />
         }
     </main>
+
+    @* 设置以弹窗覆盖在聊天之上：聊天室不卸载、不转入后台，正在生成的回复继续流式输出。 *@
+    @if (_settingsOpen)
+    {
+        <SettingsView InitialSection="_settingsSection" OnClose="CloseSettings" />
+    }
 
     @* 审批宿主放在 AppShell 顶层：切换会话 / 页面时，待确认的请求不会跟着消失。 *@
     <ToolApprovalHost />
@@ -101,12 +103,6 @@
 </div>
 
 @code {
-    private enum MainView
-    {
-        Chat,
-        Settings
-    }
-
     private List<ChatSession> _sessions = [];
 
     /// <summary>侧栏插件入口（启动 / 重新扫描后刷新）。</summary>
@@ -115,7 +111,8 @@
     // 启动后默认就是一个新建的空聊天室（尚不进入历史列表，等有内容才加入）。
     private ChatSession? _activeSession;
 
-    private MainView _view = MainView.Chat;
+    /// <summary>全局设置弹窗是否打开；不改变当前视图，聊天继续在下面运行。</summary>
+    private bool _settingsOpen;
 
     private SettingsSection _settingsSection = SettingsSection.General;
 
@@ -150,9 +147,7 @@
                 .Where(session => session.IsGenerating)
                 .ToList();
 
-            if (_view == MainView.Chat
-                && _activeSession is not null
-                && !mounted.Contains(_activeSession))
+            if (_activeSession is not null && !mounted.Contains(_activeSession))
             {
                 mounted.Insert(0, _activeSession);
             }
@@ -230,8 +225,8 @@
     /// </summary>
     private void StartNewChat(string? mountKey)
     {
-        _view = MainView.Chat;
         CloseScopeSettings();
+        CloseSettings();
 
         var session = ChatSession.CreateEmpty();
         if (!string.IsNullOrWhiteSpace(mountKey))
@@ -250,8 +245,8 @@
     /// <summary>在指定工作区里新建聊天室。</summary>
     private void NewChatInWorkspace(Workspace workspace)
     {
-        _view = MainView.Chat;
         CloseScopeSettings();
+        CloseSettings();
         _activeSession = ChatSession.CreateEmpty(workspace.Id);
         UpdateWorkspaceRoot();
     }
@@ -259,8 +254,8 @@
     /// <summary>打开聊天室（历史聊天或工作区里的都可以）。</summary>
     private void OpenSession(ChatSession session)
     {
-        _view = MainView.Chat;
         CloseScopeSettings();
+        CloseSettings();
         _activeSession = session;
         UpdateWorkspaceRoot();
     }
@@ -281,12 +276,7 @@
     private void OpenSettingsSession(string sessionId)
     {
         OpenSessionById(sessionId);
-
-        if (_activeSession is not null
-            && string.Equals(_activeSession.Id, sessionId, StringComparison.Ordinal))
-        {
-            _view = MainView.Chat;
-        }
+        CloseSettings();
     }
 
     /// <summary>M3：侧栏「归档 / 取消归档」。归档后侧栏隐藏，但当前打开的会话保持可见。</summary>
@@ -309,23 +299,25 @@
     private void OnArchiveChanged(ChatSession session) =>
         _ = InvokeAsync(StateHasChanged);
 
-    /// <summary>打开设置：右侧整页显示。</summary>
+    /// <summary>打开设置弹窗：默认从「通用」开始，聊天继续在弹窗下面运行。</summary>
     private void OpenSettings()
     {
         _settingsSection = SettingsSection.General;
-        _view = MainView.Settings;
+        _settingsOpen = true;
         _usageOpen = false;
         CloseScopeSettings();
     }
 
-    /// <summary>直接打开设置里的「模型设置」分区。</summary>
+    /// <summary>直接打开设置里的「模型」分区。</summary>
     private void OpenModelSettings()
     {
         _settingsSection = SettingsSection.Models;
-        _view = MainView.Settings;
+        _settingsOpen = true;
         _usageOpen = false;
         CloseScopeSettings();
     }
+
+    private void CloseSettings() => _settingsOpen = false;
 
     private async Task TogglePin(ChatSession session)
     {
@@ -349,7 +341,6 @@
 
         if (ReferenceEquals(_activeSession, session))
         {
-            _view = MainView.Chat;
             CloseScopeSettings();
             _activeSession = ChatSession.CreateEmpty(session.WorkspaceId);
             UpdateWorkspaceRoot();
@@ -598,8 +589,8 @@
         _sessions.Insert(0, branch);
         await ChatStore.SaveSessionAsync(branch);
 
-        _view = MainView.Chat;
         CloseScopeSettings();
+        CloseSettings();
         _activeSession = branch;
         UpdateWorkspaceRoot();
     }

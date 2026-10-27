@@ -87,7 +87,7 @@ public sealed class PowerShellToolPack : IAgentToolPack
 
         if (!context.Settings.Current.Tools.IsPackEnabled(PackId, Descriptor.DefaultEnabled))
         {
-            return "ERROR: PowerShell 工具未启用。请在「设置 → 工具设置」中打开 PowerShell。";
+            return "ERROR: PowerShell 工具未启用。请在「设置 → 执行与沙箱 → PowerShell」中打开。";
         }
 
         if (string.IsNullOrWhiteSpace(script))

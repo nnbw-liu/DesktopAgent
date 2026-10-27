@@ -85,7 +85,7 @@ public sealed class SearchService : ISearchService, IDisposable
     {
         if (string.IsNullOrWhiteSpace(config.Endpoint))
         {
-            return "搜索接口未配置，请到「设置 → 工具设置」填写地址。";
+            return "搜索接口未配置，请到「设置 → 工具 → 联网搜索」填写地址。";
         }
 
         if (!Uri.TryCreate(config.Endpoint, UriKind.Absolute, out var uri) ||

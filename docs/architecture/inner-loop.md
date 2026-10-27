@@ -16,7 +16,7 @@ public enum ExecutionMode
 
 - `SandboxFirst` + `DirectRunEnabled=false` 是默认值；两个条件同时满足才允许直跑。
 - `run_powershell` 永远走沙箱，不受直跑设置影响。
-- 直跑开启后，设置页用红字说明：**不受沙箱网络隔离，可访问网络与真实工作区**。
+- 直跑开启后，设置弹窗「执行与沙箱 → 直跑命令」用红字说明：**不受沙箱网络隔离，可访问网络与真实工作区**。
 - 直跑只影响 `run_command`；文件读写仍走 P3 的读前写 / 审批。
 
 ## 2. `run_command`
@@ -26,7 +26,7 @@ run_command(command, args = "", workingDirectory = ".", timeoutSeconds = 0, purp
 ```
 
 - `command` 只能是不带路径的可执行文件名，例如 `dotnet`；拒绝 `C:\...\dotnet.exe`、`cmd /c`、`powershell -Command`。
-- 默认白名单：`dotnet`、`npm`、`pnpm`、`node`、`git`、`python`、`cargo`、`go`，可在设置页修改。
+- 默认白名单：`dotnet`、`npm`、`pnpm`、`node`、`git`、`python`、`cargo`、`go`，可在设置弹窗「执行与沙箱 → 直跑命令」修改。
 - `args` 按空白 / 引号切分，直接放进 `ProcessStartInfo.ArgumentList`，**从不拼 shell 字符串**。
 - 拒绝参数里的 `& | > < ; $ ( ) \` ^ %`、换行、`..`、绝对路径 / UNC；单条参数总长 ≤ 4KB。
 - `git` 只允许 `status` / `diff` / `log` / `show` / `rev-parse`；`git reset` / `git clean` 永远逐次审批。
@@ -52,7 +52,7 @@ run_command(command, args = "", workingDirectory = ".", timeoutSeconds = 0, purp
 - 默认每次直跑都弹审批；安全命令可点「本会话允许」。
 - 授权键是「可执行文件 + 前两个参数」：例如 `dotnet build Demo.sln`；同前缀后续直接执行。
 - 高风险命令（`rm` / `del` / `format` / `rd` / `git reset` / `git clean` 等）**不显示**会话授权按钮。
-- 授权只存内存（`SessionGrantStore`），应用重启全部失效；设置页列出当前授权并可单个撤销。
+- 授权只存内存（`SessionGrantStore`），应用重启全部失效；设置弹窗「执行与沙箱 → 直跑命令」列出当前授权并可单个撤销。
 - 每次执行都写 `ToolAuditEntry`：`mode=direct`、`commandSha256`、`workingDirectory`、退出码、耗时、`approval=ApproveOnce/SessionGrant/Deny`。
 
 ## 5. 构建 / 测试结果
@@ -75,7 +75,7 @@ dotnet test Demo.sln → 失败（12 passed / 1 failed：OptionsTests.RejectsEmp
 
 ## 6. 工作区命令与预 restore
 
-- 工作区新增 `BuildCommand` / `TestCommand`；设置页「内循环」可按当前工作区填写、自动探测并保存。
+- 工作区新增 `BuildCommand` / `TestCommand`；设置弹窗「执行与沙箱 → 直跑命令」可按当前工作区填写、自动探测并保存。
 - 探测规则：根目录有 `.sln` → `dotnet build <sln> -v minimal`；只有 `.csproj` → 对应项目；`package.json` → `npm/pnpm run build` / `test`。
 - `workspace_info` 返回已保存的构建 / 测试命令，模型可直接用于 `run_command`。
 - 「预热包缓存」按钮在宿主执行一次固定的 `dotnet restore`（用户点击即授权），**不开启直跑模式**；restore 后沙箱内构建可加 `--no-restore`。

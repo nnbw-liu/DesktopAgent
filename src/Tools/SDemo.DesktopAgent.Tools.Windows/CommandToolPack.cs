@@ -79,7 +79,7 @@ public sealed class CommandToolPack : IAgentToolPack
 
         if (!context.Settings.Current.Tools.IsPackEnabled(PackId, Descriptor.DefaultEnabled))
         {
-            return "ERROR: 直跑命令工具未启用。请在「设置 → 工具设置 → 内循环」打开。";
+            return "ERROR: 直跑命令工具未启用。请在「设置 → 执行与沙箱 → 直跑命令」打开。";
         }
 
         var policy = CommandPolicy.Evaluate(
