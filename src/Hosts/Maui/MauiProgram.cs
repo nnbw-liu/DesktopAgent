@@ -43,6 +43,16 @@ public static class MauiProgram
 
         var app = builder.Build();
 
+        // 内置技能：把随应用发布的技能包补进技能库；失败不能挡住启动。
+        try
+        {
+            app.Services.GetRequiredService<BundledSkillInstaller>().EnsureInstalled();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"内置技能安装失败：{ex.Message}");
+        }
+
         // S6：启动时清理过期沙箱数据；Android 是空实现，不会做任何 IO。
         _ = app.Services.GetRequiredService<ISandboxMaintenance>().CleanupAsync();
 

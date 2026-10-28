@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "source": {
+    "repository": "https://github.com/nnbw-liu/DesktopAgent"
+  },
+  "notes": "DesktopAgent 内置技能：声明式插件制作与仓库内置插件开发。随应用启动安装到技能库。"
+}

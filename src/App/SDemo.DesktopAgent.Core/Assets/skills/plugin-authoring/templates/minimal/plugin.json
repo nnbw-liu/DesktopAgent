@@ -1,0 +1,19 @@
+{
+  // 最小可用清单：只有一个输入框入口。
+  // 复制到 <插件目录>/my-plugin/plugin.json，再写 skills/main.md，然后「设置 → 插件 → 重新扫描」。
+  "id": "my-plugin",
+  "name": "我的插件",
+  "version": "1.0.0",
+  "description": "一句话说明这个插件做什么。",
+  "icon": { "text": "我" },
+  "capabilities": [
+    {
+      "id": "main",
+      "name": "我的插件",
+      "skill": "skills/main.md"
+    }
+  ],
+  "mounts": [
+    { "id": "composer", "surface": "composer", "capability": "main" }
+  ]
+}

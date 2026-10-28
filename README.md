@@ -518,6 +518,8 @@ S6 行为要点：
 
 插件是**零代码**的声明式能力包：一个目录 + `plugin.json` + 若干 `.md` 技能文件，不需要编译、不需要重装应用。完整设计见 [docs/architecture/plugin-system.md](docs/architecture/plugin-system.md)；**自己写插件请看 [插件开发手册](docs/features/plugin-authoring.md)**（清单字段、参数、入口、双语对照、报错对照表、可复制模板）。
 
+应用还自带一个 `plugin-authoring` 内置技能（启动时补进技能库）：直接对 Agent 说「帮我做一个插件」，它会按手册规则写清单与技能，并用 `templates/` 里的模板带你验收；内置插件的 C# 开发路径也在技能包的 `references/builtin.md` 里。详见 [插件开发手册 §16](docs/features/plugin-authoring.md#16-让-agent-自己做插件内置技能)。
+
 目录：
 
 | 来源 | 位置 | 说明 |
@@ -566,7 +568,7 @@ S6 行为要点：
 
 使用方式：侧栏「新建聊天室」下方有「翻译」「总结」「简单问答」入口，点一下就是预选该插件的空会话；输入框底部的插件 chip 选中后发送走插件 Run；任意助手消息底部（时间右侧）的插件图标点一下，无参数直接跑、有参数弹出面板，产物是挂在原消息下的卡片。在聊天正文里选中文本、松开鼠标会出现划词菜单，菜单里的插件由「设置 → 插件 → 选中」控制；划词产物同样挂在选区所在消息下。派生卡片默认不进入下一轮上下文，卡片上的「加入上下文」可以显式提升；「简单问答」的「关联上下文」开关决定这一轮是否带历史。`segments` 能力的卡片与消息都带「对照 / 译文」开关，切换只是重新渲染、不重新请求；呈现方式按会话记忆，新会话默认值在「设置 → 插件」。想关掉或调整上限也在「设置 → 插件」。
 
-**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（当前 950 个用例）+ `dotnet test tests/SDemo.DesktopAgent.UI.Tests`（154 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 222 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令（沙箱与宿主直跑）、构建 / 测试解析、todo / 验证门 / checkpoint / 循环保护、对话 / 任务判定、小模型模式 / 路由 / 工具修复、插件 / 划词 / 上下文、UI 组件、权限与沙箱作用域、沙箱与路径安全等。
+**测试**：`dotnet test tests/SDemo.DesktopAgent.Core.Tests`（当前 958 个用例）+ `dotnet test tests/SDemo.DesktopAgent.UI.Tests`（154 个用例）+ `dotnet test tests/SDemo.DesktopAgent.Sandbox.Tests`（Windows 222 通过 / 1 跳过），覆盖上下文、压缩、文件读取 / 搜索 / 补丁、读前写、直跑命令（沙箱与宿主直跑）、构建 / 测试解析、todo / 验证门 / checkpoint / 循环保护、对话 / 任务判定、小模型模式 / 路由 / 工具修复、插件 / 划词 / 上下文、内置技能安装、UI 组件、权限与沙箱作用域、沙箱与路径安全等。
 
 ## 主题实现
 

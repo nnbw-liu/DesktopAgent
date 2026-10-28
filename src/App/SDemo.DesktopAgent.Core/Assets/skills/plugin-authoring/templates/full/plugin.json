@@ -1,0 +1,43 @@
+{
+  // 完整示例：参数 + 四条入口 + 隐私提示。
+  // 复制到 <插件目录>/tone/plugin.json，再写 skills/main.md，然后「设置 → 插件 → 重新扫描」。
+  "id": "tone",
+  "name": "语气改写",
+  "version": "1.0.0",
+  "description": "按指定语气改写文本，并保留段落结构。",
+  "icon": { "text": "语" },
+  "capabilities": [
+    {
+      "id": "tone",
+      "name": "语气改写",
+      "skill": "skills/main.md",
+      "privacy": { "sendsText": true },
+      "output": { "format": "text" },
+      "parameters": [
+        {
+          "key": "tone",
+          "label": "语气",
+          "kind": "select",
+          "default": "neutral",
+          "options": [
+            { "value": "neutral", "label": "中性" },
+            { "value": "formal", "label": "正式" },
+            { "value": "casual", "label": "口语" }
+          ]
+        },
+        {
+          "key": "keepFormat",
+          "label": "保留格式",
+          "kind": "toggle",
+          "default": "true"
+        }
+      ]
+    }
+  ],
+  "mounts": [
+    { "id": "sidebar", "surface": "sidebar", "capability": "tone", "order": 20 },
+    { "id": "composer", "surface": "composer", "capability": "tone", "order": 20 },
+    { "id": "bubble", "surface": "message", "capability": "tone", "input": "message", "order": 20 },
+    { "id": "selection", "surface": "selection", "capability": "tone", "input": "selection", "order": 20 }
+  ]
+}

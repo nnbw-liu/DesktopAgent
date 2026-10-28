@@ -58,6 +58,10 @@
                       LogicalName="SDemo.DesktopAgent.Assets.archify-desktop-SKILL.md" />
     <EmbeddedResource Include="Assets\archify-THIRD_PARTY_NOTICES.md"
                       LogicalName="SDemo.DesktopAgent.Assets.archify-THIRD_PARTY_NOTICES.md" />
+    <!-- 内置技能：资源逻辑名就是技能库里的相对路径（skills/plugin-authoring/**），
+         启动时由 BundledSkillInstaller 原样写进技能库。 -->
+    <EmbeddedResource Include="Assets\skills\plugin-authoring\**\*"
+                      LogicalName="skills/plugin-authoring/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

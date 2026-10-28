@@ -36,6 +36,9 @@ public partial class App : Application
 
         _serviceProvider = CreateServiceProvider();
 
+        // 内置技能：把随应用发布的技能包补进技能库；失败不能挡住启动。
+        EnsureBundledSkills(_serviceProvider);
+
         // 先应用主题资源，再显示窗口，避免启动瞬间出现配色不一致。
         _themeService = _serviceProvider.GetRequiredService<IThemeService>();
         ThemeResources.Apply(_themeService.Current);
@@ -133,6 +136,19 @@ public partial class App : Application
         catch (WebView2RuntimeNotFoundException)
         {
             return false;
+        }
+    }
+
+    /// <summary>补装内置技能；技能库写不进去时只记调试输出，不弹窗、不影响启动。</summary>
+    private static void EnsureBundledSkills(ServiceProvider provider)
+    {
+        try
+        {
+            provider.GetRequiredService<BundledSkillInstaller>().EnsureInstalled();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"内置技能安装失败：{ex.Message}");
         }
     }
 }

@@ -2,6 +2,9 @@
 
 > 面向「不给应用写一行 C#，只写 `plugin.json` + Markdown」的插件作者。
 > 完整设计理由见 [plugin-system.md](../architecture/plugin-system.md)；本手册只讲**当前版本实际能做什么、怎么做、踩坑怎么查**。
+>
+> 应用还自带一个同名内置技能（`plugin-authoring`）：直接让 Agent「帮我做一个插件」即可，
+> 它会按本手册的规则写清单、写技能并带你验收。见 [§16](#16-让-agent-自己做插件内置技能)。
 
 ---
 
@@ -22,6 +25,7 @@
 13. [可复制模板](#13-可复制模板)
 14. [当前版本不支持的能力](#14-当前版本不支持的能力)
 15. [附录：设置与记忆键](#15-附录设置与记忆键)
+16. [让 Agent 自己做插件（内置技能）](#16-让-agent-自己做插件内置技能)
 
 ---
 
@@ -788,6 +792,46 @@ version: 1.0
 | `PluginMemory` | 上面的记忆键值对 |
 | `messages.PluginJson` | 这条回答由哪个插件、用什么参数生成（含段落） |
 | `messages.DerivedJson` | 挂在消息下的派生卡片；含 `InputText`（划词输入）与 `IncludeInContext`（是否已加入上下文），默认不进上下文 |
+
+---
+
+## 16. 让 Agent 自己做插件（内置技能）
+
+应用启动时会把一个名为 `plugin-authoring` 的技能包补进技能库
+（`%APPDATA%\SDemo\DesktopAgent\skills\plugin-authoring\`），所以「怎么做一个插件」这件事模型自己就知道。
+
+### 16.1 怎么用
+
+- 直接说「帮我做一个润色插件 / 把总结插件改成带语气参数」，或者
+- 在输入框输入 `/plugin-authoring` 手选该技能（会全文注入），或者
+- 不提技能名也行：输入里出现「插件」「plugin.json」时，它会进入模型的技能索引。
+
+Agent 会先和你确认四件事（目标、挂哪几个入口、参数、输出格式），再写 `plugin.json` 与
+`skills/main.md`；能写插件目录时直接建目录，不能写时给你完整文件内容与保存路径。
+它**不会**替你点「重新扫描」，写完仍要到「设置 → 插件」扫描并逐条验收。
+
+### 16.2 包里有什么
+
+| 文件 | 内容 |
+| --- | --- |
+| `SKILL.md` | 工作流、硬规则（哪些写法必然加载失败）、落地文件的方式 |
+| `references/declarative.md` | 包结构、加载规则、`plugin.json` 全字段、参数、四条入口、执行限制 |
+| `references/skill-file.md` | 插件技能文件的写法、占位符、常见反例 |
+| `references/validation.md` | 报错对照表与按现象排查 |
+| `references/examples.md` | 润色 / 翻译（`segments`）/ 简单问答（关联上下文）/ 总结四份完整清单与技能 |
+| `references/builtin.md` | 在本仓库新增内置插件（C# 类库 / 嵌入资源 / DI 注册 / 测试） |
+| `templates/minimal/`、`templates/full/` | 可直接复制、能通过校验的插件模板 |
+
+### 16.3 维护
+
+- 技能源码在 `src/App/SDemo.DesktopAgent.Core/Assets/skills/plugin-authoring/`，
+  构建时按 `skills/plugin-authoring/**` 作为嵌入资源打进 Core 程序集。
+- 启动时由 `BundledSkillInstaller` 按 `desktop-install.json` 里的版本决定是否重装。
+  **改内容必须同时递增 `BundledSkillInstaller.BundledVersion`**，否则已安装的旧副本不会被替换。
+- 技能库里已有同名但**不是内置安装**的目录时保持原样：用户手写的同名技能优先。
+- 技能里的规则必须与实现一致。改校验规则时同步改 `references/validation.md`，
+  并跑 `dotnet test tests/SDemo.DesktopAgent.Core.Tests --filter BundledSkillTests`
+  （这些用例会校验模板能通过 `PluginCatalog`，并检查 SKILL.md 引用的文件都存在）。
 
 ---
 

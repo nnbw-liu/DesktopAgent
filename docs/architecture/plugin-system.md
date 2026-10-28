@@ -783,6 +783,8 @@ public sealed record OutputSegment(string Source, string Target);
 
 > 目标：不写一行 C#，10 分钟内做出一个可用插件。
 > **面向作者的完整手册（含报错对照表与模板）见 [plugin-authoring.md](../features/plugin-authoring.md)**；本节保留设计视角的最短路径。
+> 应用自带同名内置技能 `plugin-authoring`：它把本节的规则与手册的字段表、模板一起交给模型，
+> 用户可以直接让 Agent 代写插件（见 [§16](../features/plugin-authoring.md#16-让-agent-自己做插件内置技能)）。
 
 ### 14.1 准备
 
