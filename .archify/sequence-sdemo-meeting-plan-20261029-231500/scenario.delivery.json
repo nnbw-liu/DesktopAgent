@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "1c82ace5-58cb-43d5-9262-47450285c010",
+  "status": "current",
+  "command": "deliver",
+  "type": "sequence",
+  "input": "F:\\AI\\Code\\SDemo\\DesktopAgent\\.archify\\sequence-sdemo-meeting-plan-20261029-231500\\candidate.json",
+  "output": "F:\\AI\\Code\\SDemo\\DesktopAgent\\.archify\\sequence-sdemo-meeting-plan-20261029-231500\\scenario.html",
+  "specification": {
+    "sha256": "b48f5aaeefeb1711957c67d44f6e9bbf624b32f7df8cf2528631586e5a71ec5e",
+    "bytes": 4642
+  },
+  "artifact": {
+    "sha256": "610be78e9675a5a13f3f6458fc4465893bc6aae3e44b14bbc6d4b5a64a06e7d3",
+    "bytes": 761644
+  }
+}

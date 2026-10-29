@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "场景交互：周会 → 纪要 → 工作计划",
+    "locale": "zh-CN",
+    "output": ".archify/sequence-sdemo-meeting-plan-20261029-231500/scenario.html",
+    "viewBox": [1060, 680],
+    "column_fit": "spread",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "user", "type": "external", "label": "用户", "sublabel": "桌面操作", "icon": "person" },
+    { "id": "meeting", "type": "backend", "label": "sdemo.meeting", "sublabel": "录音 · 本地转写" },
+    { "id": "agent", "type": "backend", "label": "DesktopAgent", "sublabel": "智能体 · 总控" },
+    { "id": "llm", "type": "external", "label": "模型服务", "sublabel": "唯一出口" },
+    { "id": "kb", "type": "backend", "label": "sdemo.kb", "sublabel": "文档版本" },
+    { "id": "planner", "type": "backend", "label": "sdemo.planner", "sublabel": "待办 + 日历" }
+  ],
+  "segments": [
+    { "from": 150, "to": 240, "label": "① 开会 · 录音 · 转写" },
+    { "from": 240, "to": 406, "label": "② 提取候选（只产草稿）" },
+    { "from": 406, "to": 580, "label": "③ 审阅 · 落库 · 回写" }
+  ],
+  "messages": [
+    { "id": "start-recording", "from": "user", "to": "meeting", "y": 168, "label": "点「开始记录」", "variant": "default" },
+    { "id": "stop-recording", "from": "user", "to": "meeting", "y": 196, "label": "结束会议（录音落盘）", "variant": "default" },
+    { "id": "ask-arrange", "from": "user", "to": "agent", "y": 224, "label": "「按周会安排计划」", "variant": "default" },
+    { "id": "fetch-actions", "from": "agent", "to": "meeting", "y": 252, "label": "meeting_actions", "variant": "default" },
+    { "id": "actions-return", "from": "meeting", "to": "agent", "y": 280, "label": "议题 · 决议 · 候选", "variant": "return" },
+    { "id": "llm-extract", "from": "agent", "to": "llm", "y": 308, "label": "抽取决议 / 拆待办", "variant": "emphasis" },
+    { "id": "llm-draft", "from": "llm", "to": "agent", "y": 336, "label": "结构化草稿", "variant": "return" },
+    { "id": "plan-from-text", "from": "agent", "to": "planner", "y": 364, "label": "todo_plan_from_text", "variant": "default" },
+    { "id": "draft-return", "from": "planner", "to": "agent", "y": 392, "label": "draftId + 重复提示", "variant": "return" },
+    { "id": "user-review", "from": "user", "to": "agent", "y": 420, "label": "审阅：采纳 3 条", "variant": "default" },
+    { "id": "accept-draft", "from": "agent", "to": "planner", "y": 448, "label": "todo_accept_draft", "variant": "default" },
+    { "id": "commit-return", "from": "planner", "to": "agent", "y": 476, "label": "写入待办 · 更新日历", "variant": "return" },
+    { "id": "kb-writeback", "from": "agent", "to": "kb", "y": 504, "label": "kb_update（回写决议）", "variant": "security", "note": "高风险写：需用户确认" },
+    { "id": "kb-version", "from": "kb", "to": "agent", "y": 532, "label": "新版本 v1.1", "variant": "return" },
+    { "id": "mark-intaken", "from": "agent", "to": "meeting", "y": 560, "label": "meeting_mark_action", "variant": "dashed" }
+  ],
+  "activations": [
+    { "participant": "meeting", "from": 162, "to": 300, "type": "backend" },
+    { "participant": "agent", "from": 218, "to": 572, "type": "backend" },
+    { "participant": "llm", "from": 302, "to": 340, "type": "external" },
+    { "participant": "planner", "from": 358, "to": 396, "type": "backend" },
+    { "participant": "planner", "from": 442, "to": 480, "type": "backend" },
+    { "participant": "kb", "from": 498, "to": 536, "type": "backend" },
+    { "participant": "meeting", "from": 554, "to": 570, "type": "backend" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "场景",
+      "items": [
+        "一场周会横跨 3 个项目：议题各自挂到对应文档与清单，会议本身不属于任何项目",
+        "录音与转写都在 sdemo.meeting 内部完成，不进聊天上下文"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "三条约束",
+      "items": [
+        "转写走本地 whisper：音频不出本机、不耗模型额度",
+        "应用不持有模型凭证，唯一调模型的是 DesktopAgent",
+        "应用之间不直连，跨应用动作由智能体编排"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "审批门",
+      "items": [
+        "kb_update 属高风险写，必须弹确认",
+        "草稿 ≥10 条时才要求确认，少量直接采纳",
+        "删除 / 清空列表永远确认，不可关闭"
+      ]
+    }
+  ]
+}
