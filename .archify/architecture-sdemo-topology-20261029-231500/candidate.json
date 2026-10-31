@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "SDemo 个人工作台 · 产品蓝图与拓扑",
+    "locale": "zh-CN",
+    "output": ".archify/architecture-sdemo-topology-20261029-231500/topology.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "user", "type": "external", "label": "用户", "sublabel": "桌面操作", "icon": "person", "pos": [40, 118], "size": [130, 60] },
+    { "id": "assembly", "type": "backend", "label": "DesktopAssembly", "sublabel": "常驻外壳 · 托盘", "tag": "窗口托管 / 进程管家", "pos": [570, 110], "size": [180, 76] },
+    { "id": "agent", "type": "backend", "label": "DesktopAgent", "sublabel": "智能体 · 总控", "tag": "唯一持有模型凭证", "pos": [570, 560], "size": [180, 86] },
+    { "id": "planner", "type": "backend", "label": "sdemo.planner", "sublabel": "待办 + 日历", "pos": [180, 330], "size": [160, 72] },
+    { "id": "kb", "type": "backend", "label": "sdemo.kb", "sublabel": "文档版本 · 检索", "pos": [580, 330], "size": [160, 72] },
+    { "id": "meeting", "type": "backend", "label": "sdemo.meeting", "sublabel": "录音 · 转写 · 纪要", "pos": [980, 330], "size": [160, 72] },
+    { "id": "planner_db", "type": "database", "label": "planner.db", "sublabel": "todo / event", "pos": [380, 334], "size": [140, 64] },
+    { "id": "kb_db", "type": "database", "label": "kb.db", "sublabel": "版本链 · 块 · 索引", "pos": [780, 334], "size": [140, 64] },
+    { "id": "meeting_db", "type": "database", "label": "meeting.db", "sublabel": "纪要 · 录音存档", "pos": [1180, 334], "size": [140, 64] },
+    { "id": "llm", "type": "external", "label": "模型服务", "sublabel": "OpenAI 兼容 / 本地", "pos": [40, 571], "size": [160, 64] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "单机 · Windows 桌面（唯一出网的只有模型服务）", "wraps": ["assembly", "agent", "planner", "kb", "meeting", "planner_db", "kb_db", "meeting_db"] }
+  ],
+  "connections": [
+    { "id": "user-opens-shell", "from": "user", "to": "assembly", "label": "打开 / 托盘", "fromSide": "right", "toSide": "left", "route": "straight" },
+    { "id": "shell-launch-planner", "from": "assembly", "to": "planner", "label": "拉起", "fromSide": "left", "toSide": "top" },
+    { "id": "shell-launch-kb", "from": "assembly", "to": "kb", "label": "拉起", "fromSide": "bottom", "toSide": "top", "route": "straight" },
+    { "id": "shell-launch-meeting", "from": "assembly", "to": "meeting", "label": "拉起", "fromSide": "right", "toSide": "top" },
+    { "id": "planner-store", "from": "planner", "to": "planner_db", "fromSide": "right", "toSide": "left", "route": "straight" },
+    { "id": "kb-store", "from": "kb", "to": "kb_db", "fromSide": "right", "toSide": "left", "route": "straight" },
+    { "id": "meeting-store", "from": "meeting", "to": "meeting_db", "fromSide": "right", "toSide": "left", "route": "straight" },
+    { "id": "agent-mcp-planner", "from": "agent", "to": "planner", "label": "MCP", "variant": "security", "fromSide": "left", "toSide": "bottom" },
+    { "id": "agent-mcp-kb", "from": "agent", "to": "kb", "label": "MCP", "variant": "security", "fromSide": "top", "toSide": "bottom", "route": "straight" },
+    { "id": "agent-mcp-meeting", "from": "agent", "to": "meeting", "label": "MCP", "variant": "security", "fromSide": "right", "toSide": "bottom" },
+    { "id": "agent-model", "from": "agent", "to": "llm", "label": "HTTPS · 模型调用", "variant": "emphasis", "fromSide": "left", "toSide": "right", "route": "straight" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "定位",
+      "items": [
+        "一个会做事的智能体 + 一块能把工具摆上桌面的壳 + 各管一摊数据的应用",
+        "智能体负责理解与编排，应用负责存与找，壳只负责窗口与进程"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "三条不变式",
+      "items": [
+        "宿主无业务数据：DesktopAssembly 不与应用交换业务数据",
+        "应用零模型凭证：唯一持有 Key 的是 DesktopAgent",
+        "应用之间不直连：只存 URI 引用，跨应用动作由智能体编排"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "数据归属",
+      "items": [
+        "planner：todo（可完成）+ event（日程），同库不同表",
+        "kb：文档版本链 + 块级内容寻址 + 检索索引",
+        "meeting：议题/决议 + 录音存档 + Agent 分析履历"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "进程模型",
+      "items": [
+        "常驻只有 DesktopAssembly（托盘、开机自启）",
+        "应用内核按需拉起，空闲 5 分钟退出，单实例互斥",
+        "宿主只用进程控制与窗口句柄：拉起、保活、置顶、穿透、位置记忆"
+      ]
+    }
+  ]
+}

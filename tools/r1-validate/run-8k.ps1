@@ -16,8 +16,13 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
+# 工作区与日志一律放仓外：基准会复制整仓并产生大量文件，塞回工作区会污染
+# agent 的搜索范围与 token 预算。可用 P5_SCRATCH_ROOT 指定位置。
+$scratch = if ($env:P5_SCRATCH_ROOT) { $env:P5_SCRATCH_ROOT } else { Join-Path (Split-Path -Parent $repo) '_scratch' }
+if (-not (Test-Path $scratch)) { New-Item -ItemType Directory -Path $scratch -Force | Out-Null }
+
 if ([string]::IsNullOrWhiteSpace($Workspace)) {
-    $Workspace = Join-Path $repo '.tmp\r1-8k-workspace'
+    $Workspace = Join-Path $scratch 'r1-8k-workspace'
 }
 
 function Prepare-Workspace {
@@ -67,8 +72,8 @@ for ($round = 1; $round -le $Rounds; $round++) {
     $out = Join-Path $repo "eval/results/r1/8k-round$round"
     New-Item -ItemType Directory -Path $out -Force | Out-Null
 
-    $env:P5_TOOL_LOG = Join-Path $repo ".tmp/r1-8k-round$round-tools.log"
-    $console = Join-Path $repo ".tmp/r1-8k-round$round-console.log"
+    $env:P5_TOOL_LOG = Join-Path $scratch "r1-8k-round$round-tools.log"
+    $console = Join-Path $scratch "r1-8k-round$round-console.log"
 
     Write-Host "`n=== 8K Round $round ==="
     dotnet run --project (Join-Path $repo 'tools/p5-bench/P5Bench.csproj') -c Release --no-build `

@@ -1,7 +1,7 @@
 # 插件开发手册
 
 > 面向「不给应用写一行 C#，只写 `plugin.json` + Markdown」的插件作者。
-> 完整设计理由见 [plugin-system.md](../architecture/plugin-system.md)；本手册只讲**当前版本实际能做什么、怎么做、踩坑怎么查**。
+> 完整设计理由见 [plugin-system.md](../architecture/detail/plugin-system.md)；本手册只讲**当前版本实际能做什么、怎么做、踩坑怎么查**。
 >
 > 应用还自带一个同名内置技能（`plugin-authoring`）：直接让 Agent「帮我做一个插件」即可，
 > 它会按本手册的规则写清单、写技能并带你验收。见 [§16](#16-让-agent-自己做插件内置技能)。

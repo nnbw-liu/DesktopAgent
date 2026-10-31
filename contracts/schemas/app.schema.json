@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdemo.local/contracts/schemas/app.schema.json",
+  "title": "DesktopAssembly app.json",
+  "description": "应用清单：怎么把进程跑起来。窗口长什么样由 widget.json 描述。",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "version",
+    "executable",
+    "sha256",
+    "singleInstanceMutex"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9-]+)+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "executable": {
+      "type": "string",
+      "minLength": 1,
+      "description": "相对 apps/<appId>/ 的路径；不接受绝对路径与 .."
+    },
+    "arguments": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "singleInstanceMutex": {
+      "type": "string",
+      "pattern": "^SDemo\\.App\\.[a-z0-9]+(\\.[a-z0-9-]+)+$"
+    },
+    "startupTimeoutMs": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 60000,
+      "default": 8000
+    },
+    "idleTimeoutMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400000,
+      "default": 300000,
+      "description": "0 表示常驻不退出"
+    },
+    "startup": {
+      "type": "string",
+      "enum": ["onDemand", "host", "manual"],
+      "default": "onDemand",
+      "description": "host：壳启动后按策略错峰拉起；manual：只由用户或 Agent 拉起"
+    },
+    "minHostApiVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "default": "1.0"
+    },
+    "mcp": {
+      "type": "object",
+      "required": ["transport", "path"],
+      "properties": {
+        "transport": {
+          "type": "string",
+          "enum": ["http"]
+        },
+        "path": {
+          "type": "string",
+          "default": "/mcp"
+        },
+        "port": {
+          "oneOf": [
+            { "type": "string", "enum": ["runtime"] },
+            { "type": "integer", "minimum": 1, "maximum": 65535 }
+          ],
+          "default": "runtime"
+        },
+        "token": {
+          "type": "string",
+          "enum": ["runtime"],
+          "default": "runtime"
+        },
+        "toolsVersion": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+$"
+        },
+        "toolHints": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 200 },
+          "maxItems": 10
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

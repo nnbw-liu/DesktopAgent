@@ -298,7 +298,7 @@
 | P1–P7 报告 | [p1](p1-report.md) · [p2](p2-report.md) · [p3](p3-report.md) · [p4](p4-report.md) · [p5](p5-report.md) · [p6](p6-report.md) · [p7](p7-report.md) |
 | 能力路由 M1–M4 | [capability-routing.md](../architecture/capability-routing.md) · [m1](m1-report.md) · [m2](m2-report.md) · [m3](m3-report.md) · [m4](m4-report.md) |
 | 跨期评测矩阵 | [eval-matrix.md](eval-matrix.md) |
-| 插件设计 | [plugin-system.md](../architecture/plugin-system.md) |
-| 沙箱手册与验收 | [sandbox-development-manual.md](../architecture/sandbox-development-manual.md) · [sandbox-s6-report.md](sandbox-s6-report.md) |
+| 插件设计 | [plugin-system.md](../architecture/detail/plugin-system.md) |
+| 沙箱手册与验收 | [sandbox-development-manual.md](../architecture/detail/sandbox-development-manual.md) · [sandbox-s6-report.md](sandbox-s6-report.md) |
 | 工作区知识库 | [workspace-memory.md](../architecture/workspace-memory.md) |
 | 上下文 / 压缩 / 编辑 / 内循环 / 任务循环 / 小模型 | [context-budget.md](../architecture/context-budget.md) · [context-compaction.md](../architecture/context-compaction.md) · [code-editing.md](../architecture/code-editing.md) · [inner-loop.md](../architecture/inner-loop.md) · [task-loop.md](../architecture/task-loop.md) · [small-model-mode.md](../architecture/small-model-mode.md) |

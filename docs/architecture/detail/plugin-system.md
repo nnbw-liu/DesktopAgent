@@ -382,7 +382,7 @@ version: 1.0
 - 条目 = 图标（20 px 底板 + 15 px 图标）+ 名称，样式复用现有 `.sidebar-item`；`padding-left: 18px`，图标和名称之间 9 px。
 - 数量上限 `maxInSidebar`（默认 6），超出进「更多插件」菜单。
 - 点击 → 与「新建聊天室」走**同一条路径**（`AppShell.StartNewChat`），只多做两件事：`OriginMountId = ActiveMountId = <mount>`，并写入空会话。
-- 之后是否落库、落到历史还是工作区，完全沿用现有规则（[首次发送消息才落库](../../README.md)）。
+- 之后是否落库、落到历史还是工作区，完全沿用现有规则（[首次发送消息才落库](../../../README.md)）。
 - 分割线用 `.plugin-rail` 的上下 `border` 实现，不新增 DOM 层级。
 
 ### 8.2 输入框（surface = composer）
@@ -782,9 +782,9 @@ public sealed record OutputSegment(string Source, string Target);
 ## 14. 如何制作一个插件
 
 > 目标：不写一行 C#，10 分钟内做出一个可用插件。
-> **面向作者的完整手册（含报错对照表与模板）见 [plugin-authoring.md](../features/plugin-authoring.md)**；本节保留设计视角的最短路径。
+> **面向作者的完整手册（含报错对照表与模板）见 [plugin-authoring.md](../../features/plugin-authoring.md)**；本节保留设计视角的最短路径。
 > 应用自带同名内置技能 `plugin-authoring`：它把本节的规则与手册的字段表、模板一起交给模型，
-> 用户可以直接让 Agent 代写插件（见 [§16](../features/plugin-authoring.md#16-让-agent-自己做插件内置技能)）。
+> 用户可以直接让 Agent 代写插件（见 [§16](../../features/plugin-authoring.md#16-让-agent-自己做插件内置技能)）。
 
 ### 14.1 准备
 

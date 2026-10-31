@@ -1,7 +1,7 @@
 # P2 报告：压缩与工作记忆
 
 > 期次：P2（第 2 期）　分支：`feature/vibe-p2-compaction`　状态：✅ 完成
-> 配套文档：[context-compaction.md](../architecture/context-compaction.md)、[p2-golden-questions.md](p2-golden-questions.md)、[p2-golden-data.json](p2-golden-data.json)、[p2-golden-32k-data.json](p2-golden-32k-data.json)、[p2-golden-fallback-data.json](p2-golden-fallback-data.json)
+> 配套文档：[context-compaction.md](../architecture/context-compaction.md)、[p2-golden-questions.md](p2-golden-questions.md)、[p2-golden-data.json](data/p2-golden-data.json)、[p2-golden-32k-data.json](data/p2-golden-32k-data.json)、[p2-golden-fallback-data.json](data/p2-golden-fallback-data.json)
 > 原始计划：[p2-compaction-memory.md](p2-compaction-memory.md)
 
 ## 1. 交付物

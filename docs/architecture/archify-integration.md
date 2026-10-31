@@ -3,7 +3,7 @@
 > 状态：方案复核完成，未实施
 > 上游：`git@github.com:tt-a1i/archify.git`，本地 clone HEAD `81c6be8`（2026-10-25），Skill 版本 **3.2.0**
 > 上一版（基于 DSH 插件 1.0.0 / Archify 3.0.1）的结论已部分失效，本文取代之
-> 相关：`docs/architecture/plugin-system.md`、`docs/architecture/capability-routing.md`、`docs/architecture/sandbox-development-manual.md`
+> 相关：`docs/architecture/detail/plugin-system.md`、`docs/architecture/capability-routing.md`、`docs/architecture/detail/sandbox-development-manual.md`
 
 ---
 

@@ -83,7 +83,7 @@ services.AddSingleton<IPluginPackage, MyPlugin>();   // ← 新增
   扫描内置包（`new PluginCatalog([new MyPlugin()], 临时空目录)`），断言无失败、
   capability 可用、入口数量、参数与图标；
 - 新增清单或技能后跑 `dotnet test tests/SDemo.DesktopAgent.Core.Tests`；
-- 在 `docs/features/plugin-authoring.md` 与 `docs/architecture/plugin-system.md`
+- 在 `docs/features/plugin-authoring.md` 与 `docs/architecture/detail/plugin-system.md`
   的示例里补一节，方便用户理解这个内置插件能做什么；
 - 不要改 `PluginValidator` 来「放行」自己的清单：规则对本地插件同样生效。
 

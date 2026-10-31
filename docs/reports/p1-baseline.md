@@ -1,7 +1,7 @@
 # P1 基线：真实 token 计量与 8K 预算压测
 
 > 目的：在开始 P1 之前，用真实模型量出「启发式估算 vs 服务端 usage」的误差，并验证「8K 模型 + 200 轮 + 50KB 附件」不再 400。
-> 原始数据：[p1-baseline-data.json](p1-baseline-data.json)。复现工具：`tools/p1-baseline`（`dotnet run --project tools/p1-baseline -c Release`）。
+> 原始数据：[p1-baseline-data.json](data/p1-baseline-data.json)。复现工具：`tools/p1-baseline`（`dotnet run --project tools/p1-baseline -c Release`）。
 
 ## 1. 环境
 

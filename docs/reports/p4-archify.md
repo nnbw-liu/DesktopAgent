@@ -106,9 +106,9 @@ P4 预览与复核检查通过。
 加载并截图；产物正常渲染、主题 / Export 工具条可见，说明内联脚本仍被 CSP
 放行、没有依赖同源能力：
 
-![CSP 暂存副本](assets/p4-staged-csp.png)
+![CSP 暂存副本](../assets/p4-staged-csp.png)
 
-![Sandbox iframe](assets/p4-sandboxed-iframe.png)
+![Sandbox iframe](../assets/p4-sandboxed-iframe.png)
 
 ## 5. 测试
 

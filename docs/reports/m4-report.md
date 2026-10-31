@@ -27,7 +27,7 @@
 | 指标 | `Contracts/Services/AgentRunMetrics.cs`（暴露 / 调用 / 未用 / 越权） |
 | 界面 | `ChatRoom.razor`（异步预览 + 版本号）、`ContextBreakdown.razor`（来源）、`ToolsSettings.razor`（开关 + 超时） |
 | 评测 | 新工程 `tools/routing-eval`；`eval/routing/cases.json`；`AgentEval` transcript 增加 `Routing` 每轮记录 |
-| 数据 | `docs/reports/m4-routing-eval.json`、`m4-routing-eval-live.json`、`m4-routing-eval-live-always.json` |
+| 数据 | `docs/reports/data/m4-routing-eval.json`、`m4-routing-eval-live.json`、`m4-routing-eval-live-always.json` |
 | 文档 | 本文 + `capability-routing.md` §11 + `eval/README.md` |
 
 ## 3. 验收核对
@@ -71,17 +71,17 @@
 ```powershell
 # 离线规则评测（无网络、无模型）
 dotnet run --project tools/routing-eval -c Release -- --mode rules `
-  --out docs/reports/m4-routing-eval.json
+  --out docs/reports/data/m4-routing-eval.json
 
 # 在线小模型路由（DeepSeek Flash；从 %APPDATA% 读取并解密 Key）
 dotnet run --project tools/routing-eval -c Release -- --mode live `
   --provider ds --model deepseek-flash `
-  --out docs/reports/m4-routing-eval-live.json
+  --out docs/reports/data/m4-routing-eval-live.json
 
 # 对全部 case 施压（验证建议不会挤掉必要工具）
 dotnet run --project tools/routing-eval -c Release -- --mode live `
   --provider ds --model deepseek-flash --always-advise `
-  --out docs/reports/m4-routing-eval-live-always.json
+  --out docs/reports/data/m4-routing-eval-live-always.json
 
 # 8K 长任务（需要先加载 8K 模型；本轮未执行）
 dotnet run --project tools/AgentEval -c Release -- `

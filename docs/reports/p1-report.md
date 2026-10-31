@@ -1,7 +1,7 @@
 # P1 报告：上下文预算与硬裁剪
 
 > 期次：P1（第 1 期）　分支：`feature/vibe-p1-context`　状态：✅ 完成
-> 配套文档：[context-budget.md](../architecture/context-budget.md)、[p1-baseline.md](p1-baseline.md)、[p1-baseline-data.json](p1-baseline-data.json)
+> 配套文档：[context-budget.md](../architecture/context-budget.md)、[p1-baseline.md](p1-baseline.md)、[p1-baseline-data.json](data/p1-baseline-data.json)
 > 原始计划：[p1-context-budget.md](p1-context-budget.md)
 
 ## 1. 交付物
