@@ -1,0 +1,19 @@
+{
+  "id": "kb",
+  "title": "sdemo.kb（知识库）",
+  "status": "planned",
+  "paths": [
+    "src/Apps/Kb"
+  ],
+  "readOnlyPaths": [],
+  "entry": "workspaces/kb.md",
+  "build": "dotnet build SDemo.Kb.slnf -c Release",
+  "test": "dotnet test tests/Apps/Kb -c Release",
+  "deny": [
+    "docs/architecture/detail",
+    "docs/reports/data",
+    ".archify",
+    "obj",
+    "bin"
+  ]
+}

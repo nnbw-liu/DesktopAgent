@@ -39,17 +39,18 @@
 
 ## 3. 工作区定义
 
-一级 **6 个工作区**，`agent` 内部再分两个二级区（它已是 20 个工程，仍然最大）。
+一级 **6 个工作区**：
 
-| id | 覆盖路径 | 构建 | 测试 |
-| --- | --- | --- | --- |
-| `shared` | `src/Shared/` `tests/Shared/` + `docs/architecture/` 中的**契约文档** | `SDemo.Shared.slnf` | `tests/Shared` |
-| `agent-core` | `src/Context` `src/Editing` `src/Execution` `src/Sandbox` `src/Storage` `src/Tools` `src/Agents` `src/Plugins` + `tests/*Core*` `tests/*Sandbox*` | `SDemo.DesktopAgent.Wpf.slnf` | Core / Sandbox |
-| `agent-ui` | `src/App/` `src/Hosts/` `src/Platform/` `tests/*UI*` | `SDemo.DesktopAgent.Wpf.slnf` | UI（bUnit） |
-| `shell` | `src/Shell/` `tests/Shell/` | `SDemo.Shell.slnf` | `tests/Shell` |
-| `planner` | `src/Apps/Planner/` `tests/Apps/Planner/` | `SDemo.Planner.slnf` | 同左 |
-| `kb` | `src/Apps/Kb/` `tests/Apps/Kb/` | `SDemo.Kb.slnf` | 同左 |
-| `meeting` | `src/Apps/Meeting/` `tests/Apps/Meeting/` | `SDemo.Meeting.slnf` | 同左 |
+| id | 覆盖路径 | 状态 | 构建 | 测试 |
+| --- | --- | --- | --- | --- |
+| `agent` | 现有 Agent 全部：`src/App` `Agents` `Context` `Contracts` `Editing` `Execution` `Hosts` `Platform` `Plugins` `Sandbox` `Storage` `Tools` + `tests` | ✅ | `SDemo.DesktopAgent.Wpf.slnf` | Core / UI（bUnit） |
+| `shared` | `src/Shared` `tests/Shared` + 契约文档 | 🚧 | `SDemo.Shared.slnf` | `tests/Shared` |
+| `shell` | `src/Shell` `tests/Shell` | 🚧 | `SDemo.Shell.slnf` | `tests/Shell` |
+| `planner` | `src/Apps/Planner` `tests/Apps/Planner` | 🚧 | `SDemo.Planner.slnf` | 同左 |
+| `kb` | `src/Apps/Kb` `tests/Apps/Kb` | 🚧 | `SDemo.Kb.slnf` | 同左 |
+| `meeting` | `src/Apps/Meeting` `tests/Apps/Meeting` | 🚧 | `SDemo.Meeting.slnf` | 同左 |
+
+**为什么不把 agent 再按 core / ui 拆开**（原计划的 `agent-core` / `agent-ui` 已取消）：最常见的改动是「加一个设置」——它同时要动 `Contracts` + `Core` + `UI` + 存储，按层拆会让这类改动每次跨两个工作区，摩擦大于收益。等 agent 真成为瓶颈（比如文件数破 3000）再拆，`workspaces/<id>.json` 的 `paths` 字段本来就支持多区。
 
 **跨区依赖怎么处理**：应用工作区可以**只读** `src/Shared/` 与 `src/Shell/Contracts/`（它们要依赖契约），但**不得修改**——想改契约就切到 `shared` 工作区。这条写进每个 `AGENTS.md`，也由 CI 检查（改 `shared` 的 PR 必须带契约文档更新）。
 
@@ -59,13 +60,13 @@
 
 | 文件 | 上限 | 只放什么 | 不放什么 |
 | --- | --- | --- | --- |
-| 根 `AGENTS.md` | ≤ 100 行 | 仓库是什么、产品表、五条铁律、常用命令、禁区、文档地图 | 任何设计细节 |
-| `<工作区>/AGENTS.md` | ≤ 120 行 | 本区职责一句话、目录地图（≤15 行）、必读契约（≤3 个链接）、构建/测试命令、本区特有的坑 | 复制设计文档内容 |
+| 根 `AGENTS.md` | ≤ 100 行 | 仓库是什么、工作区表、五条铁律、常用命令、禁区、文档地图 | 任何设计细节 |
+| `workspaces/<id>.md`（工作区入口） | ≤ 120 行 | 本区职责一句话、目录地图（≤15 行）、必读契约（≤3 个链接）、命令、本区特有的坑 | 复制设计文档内容 |
 | `docs/architecture/*.md` | ≤ 60 KB | 设计本身 | 命令速查 |
 
-**为什么禁止复制**：设计文档会改，`AGENTS.md` 里复制一份就变成双份维护；而且复制的内容每次会话都被全额计费。`AGENTS.md` 只做**指针**。
+**为什么禁止复制**：设计文档会改，入口里复制一份就变成双份维护；而且复制的内容每次会话都被全额计费。入口只做**指针**。
 
-占位策略：还没建的工作区先放一个 10 行的占位 `AGENTS.md`（写明"未开工，规划见 X"），避免 agent 找不到入口就去翻全仓。
+入口放在 `workspaces/` 而不是各产品的代码目录里，是因为一个工作区常常横跨多个 `src/` 子目录（`agent` 就横跨 12 个），放进任何单个目录都等于宣称"其余目录不重要"。代价是不能靠"就近自动发现"加载，所以由根 `AGENTS.md` 显式指向。
 
 ## 5. 机器可读的工作区清单
 
@@ -77,20 +78,26 @@
   "title": "sdemo.planner（待办 + 日历）",
   "status": "planned",
   "paths": ["src/Apps/Planner", "tests/Apps/Planner"],
-  "readOnlyPaths": ["src/Shared", "src/Shell/Contracts"],
-  "entry": "src/Apps/Planner/AGENTS.md",
+  "readOnlyPaths": [],
+  "entry": "workspaces/planner.md",
   "build": "dotnet build SDemo.Planner.slnf -c Release",
-   "test": "dotnet test tests/Apps/Planner -c Release",
-  "deny": [".tmp", ".archify", "docs/reports", "TestResults", "obj", "bin"]
+  "test": "dotnet test tests/Apps/Planner -c Release",
+  "deny": ["docs/architecture/detail", "docs/reports/data", ".archify", "obj", "bin"]
 }
 ```
 
-`tools/ws.ps1` 做三件事：
+`status` 只有两个取值：
+
+- `planned`：目录还没建，守卫**跳过路径校验**，但入口文件必须存在（否则 agent 找不到地方看）；
+- `active`：路径必须全部存在，且入口 ≤120 行。
+
+`tools/ws.ps1`：
 
 ```powershell
-ws.ps1 list                 # 列出工作区与状态
-ws.ps1 planner              # 打印该区的入口摘要（AGENTS.md 路径 + 命令 + 只读区）
-ws.ps1 planner -Sparse      # 可选：git sparse-checkout 到该区（高级用法，见 §7）
+pwsh tools/ws.ps1              # 列出全部工作区与状态
+pwsh tools/ws.ps1 agent        # 入口路径 + 路径 + 构建/测试命令 + 只读区 + 禁读区
+pwsh tools/ws.ps1 agent -Json  # 机器可读（供其它工具消费）
+pwsh tools/ws.ps1 planner -Sparse  # 打印独立 worktree + sparse-checkout 命令
 ```
 
 ## 6. 文档瘦身（L3）
@@ -154,7 +161,7 @@ git sparse-checkout set --cone src/Apps/Planner src/Shared src/Shell/Contracts t
 | W0 | 根 `AGENTS.md`（✅ 已建） | — |
 | W1 | ✅ **2026-10-31 完成**：`.tmp` 移仓外、`TestResults` 移出并进 `.gitignore`、`.agent/spill/` 忽略。reports 数据移位并入 W2（涉及 8 篇文档 13 处链接） | 0.5 天 |
 | W2 | ✅ **2026-10-31 完成**：README 66 KB→5.1 KB + `docs/guide/` 七篇；三份超大文档进 `detail/`；reports 数据进 `data/`（13 处链接已改）；`run-8k.ps1` 改写仓外；新增 `tools/check-doc-links.ps1`（100 文档 0 死链） | 1 天 |
-| W3 | `workspaces/*.json` + `tools/ws.ps1` + 已存在区的 `AGENTS.md`（shared / agent-core / agent-ui） | 0.5 天 |
+| W3 | ✅ **2026-10-31 完成**：`workspaces/*.json` 六个（agent 为 active，其余 planned）+ `workspaces/<id>.md` 入口 + `tools/ws.ps1`；取消 core/ui 拆分（理由见 §3） | 0.5 天 |
 | W4 | `contracts.yml` 守卫 | 0.5 天 |
 | W5 | 新建产品时同步建工作区入口（Shell/Planner/Kb/Meeting） | 随产品 |
 

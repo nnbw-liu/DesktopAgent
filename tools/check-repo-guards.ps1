@@ -73,13 +73,28 @@ Check 'workspaces' {
     $issues = @()
     Get-ChildItem 'workspaces' -File -Filter *.json | ForEach-Object {
         try { $m = Get-Content $_.FullName -Raw | ConvertFrom-Json } catch { $issues += "$($_.Name)：JSON 解析失败"; return }
+        foreach ($k in 'id', 'title', 'status', 'entry', 'paths', 'build', 'test') {
+            if (-not $m.$k) { $issues += "$($_.Name)：缺字段 $k" }
+        }
         if ($m.id -ne $_.BaseName) { $issues += "$($_.Name)：id 与文件名不一致（$($m.id)）" }
-        if ($m.entry -and -not (Test-Path $m.entry)) { $issues += "$($_.Name)：entry 不存在 $($m.entry)" }
-        foreach ($p in @($m.paths)) { if ($p -and -not (Test-Path $p)) { $issues += "$($_.Name)：paths 不存在 $p" } }
-        foreach ($p in @($m.readOnlyPaths)) { if ($p -and -not (Test-Path $p)) { $issues += "$($_.Name)：readOnlyPaths 不存在 $p" } }
+        if ($m.status -and $m.status -notin @('active', 'planned')) { $issues += "$($_.Name)：status 只能是 active / planned" }
+        if ($m.entry) {
+            if (-not (Test-Path $m.entry)) {
+                $issues += "$($_.Name)：entry 不存在 $($m.entry)"
+            }
+            else {
+                $lines = (Get-Content $m.entry).Count
+                if ($lines -gt 120) { $issues += "$($m.entry)：$lines 行 > 120" }
+            }
+        }
+        # 规划中的工作区目录还不存在，跳过路径校验
+        if ($m.status -eq 'active') {
+            foreach ($p in @($m.paths)) { if ($p -and -not (Test-Path $p)) { $issues += "$($_.Name)：paths 不存在 $p" } }
+            foreach ($p in @($m.readOnlyPaths)) { if ($p -and -not (Test-Path $p)) { $issues += "$($_.Name)：readOnlyPaths 不存在 $p" } }
+        }
     }
     $issues
-} 'workspaces/*.json 路径与入口有效'
+} 'workspaces/*.json：字段齐全、入口存在、active 的路径有效'
 
 # 6) 依赖边（arch-guard 的种子；Apps / Shell 建立后自动收紧）
 Check 'dependency-edges' {

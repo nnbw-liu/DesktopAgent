@@ -7,14 +7,16 @@
 
 一个仓库，四个可独立发布的产品：
 
-| 产品 | 状态 | 工作区入口 |
+| 工作区 | 状态 | 入口 |
 | --- | --- | --- |
-| DesktopAgent（智能体客户端） | ✅ 已有 | `src/App/AGENTS.md` |
-| DesktopAssembly（桌面外壳） | 🚧 规划中 | `src/Shell/AGENTS.md`（待建） |
-| sdemo.planner（待办 + 日历） | 🚧 规划中 | `src/Apps/Planner/AGENTS.md`（待建） |
-| sdemo.kb（知识库） | 🚧 规划中 | `src/Apps/Kb/AGENTS.md`（待建） |
-| sdemo.meeting（会议） | 🚧 规划中 | `src/Apps/Meeting/AGENTS.md`（待建） |
-| 跨产品契约 / 共享层 | ✅ 已有(部分) | `src/Shared/AGENTS.md`（待建） |
+| `agent`（DesktopAgent） | ✅ 已有 | `workspaces/agent.md` |
+| `shared`（跨产品契约与共享层） | 🚧 规划中 | `workspaces/shared.md` |
+| `shell`（DesktopAssembly 桌面外壳） | 🚧 规划中 | `workspaces/shell.md` |
+| `planner`（sdemo.planner 待办 + 日历） | 🚧 规划中 | `workspaces/planner.md` |
+| `kb`（sdemo.kb 知识库） | 🚧 规划中 | `workspaces/kb.md` |
+| `meeting`（sdemo.meeting 会议） | 🚧 规划中 | `workspaces/meeting.md` |
+
+机器可读清单在 `workspaces/*.json`：`pwsh tools/ws.ps1 list` 列出全部，`pwsh tools/ws.ps1 agent` 看某一个。
 
 ## 铁律（改代码前先看这五条）
 
@@ -31,6 +33,7 @@ dotnet build SDemo.DesktopAgent.Wpf.slnf -c Release      # 现有 Agent 门禁
 dotnet test tests/SDemo.DesktopAgent.Core.Tests -c Release
 dotnet test tests/SDemo.DesktopAgent.UI.Tests   -c Release
 pwsh tools/check-repo-guards.ps1                          # 文档/布局守卫（改了文档就跑）
+pwsh tools/ws.ps1 list                                    # 工作区清单
 ```
 
 新产品的 slnf 建好后各自补一条（见 `docs/architecture/repository-layout.md` §7）。
