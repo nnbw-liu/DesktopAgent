@@ -208,6 +208,8 @@ state != ready → POST ensure → 成功后再连
 | POST | `/v1/widgets/{id}/request` | `{ kind, value }` | 策略意图（`layer` / `alwaysOnTop` / `clickThrough`） |
 | GET | `/v1/host/info` | — | 主题 / 强调色 / 语言 / 显示器集合 |
 
+> `request` 的 `kind` 取值：`layer` / `alwaysOnTop` / `clickThrough`（宿主可拒绝）与 `idleHold`（宿主只改内存计时，不落盘；`false` 或进程退出即恢复默认）。`idleHold` 不写 `widgets.json`，也不存提醒时间。
+
 鉴权规则：
 
 1. `Authorization: Bearer <appToken>`；`appId` 与 token 身份不匹配 → `403 HOST_SCOPE_DENIED`。

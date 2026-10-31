@@ -44,9 +44,8 @@
 
 ### DesktopAssembly（P1）
 
-- **已定**：常驻托盘、按需拉起、单实例、空闲退出、崩溃退避重启；`widget.json` 字段与两种 renderer；宿主只做 6 个 Win32 窗口操作（禁止 `SetParent` 用于 native）；native 不支持贴桌面层；位置按 DIP + 显示器标识记忆。
+- **已定**：常驻托盘、按需拉起、单实例、空闲退出、崩溃退避重启；`widget.json` 字段与两种 renderer；宿主只做 6 个 Win32 窗口操作（禁止 `SetParent` 用于 native）；native 不支持贴桌面层；位置按 DIP + 显示器标识记忆；组件上限默认 8（可配置）、壳自启默认开；`idleHold`、`startup` 策略、壳单实例、空态安装入口、Win10 19041+/Win11 x64。
 - **已补**：回环端点与 token 身份（[host-endpoints](host-endpoints.md)）、壳状态文件 Schema（[shell-storage](shell-storage.md)）、MCP 发现注册表与 `ensure`（需求 DA-90–92）。
-- **未定**：组件数量上限（建议 4）、宿主自身是否要开机自启默认开。
 - **缺口**：窗口管控的实现细节（`GetWindowRect` 回写、多屏拔插的迁移算法）目前只写在协议里，还没有单独的实现文档；**Win+D 需 P1 实测 A/B（`SC_MINIMIZE` 拦不住 Win+D）**。
 
 ### sdemo.planner（P2）

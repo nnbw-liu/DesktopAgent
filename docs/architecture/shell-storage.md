@@ -33,7 +33,7 @@
 
 - `%APPDATA%` 文件权限继承用户目录 ACL；token 与端口一律在 `%LOCALAPPDATA%`。
 - 文件编码 UTF-8（无 BOM），缩进 2 空格，camelCase；文本换行 LF。
-- 单文件上限 256KB；组件上限 8（默认 4）。
+- 单文件上限 256KB；组件上限默认 8（`settings.json.components.limit` 可调 1–8）。
 
 ## 3. `settings.json`
 
@@ -45,7 +45,7 @@
     "startHidden": true
   },
   "components": {
-    "limit": 4
+    "limit": 8
   },
   "hotkeys": {
     "toggleClickThrough": "Ctrl+Alt+X",
@@ -64,7 +64,7 @@
 | `schemaVersion` | int | `1` | 不兼容变更时 +1 |
 | `startup.launchAtLogin` | bool | `true` | 壳自身开机自启（Q6）；**只有壳注册 Run 项**，应用由壳拉起 |
 | `startup.startHidden` | bool | `true` | 启动后只在托盘，不弹面板 |
-| `components.limit` | int | `4` | 组件数量上限（1–8，Q5） |
+| `components.limit` | int | `8` | 组件数量上限（1–8，Q5） |
 | `hotkeys.toggleClickThrough` | string\|null | `null` | 穿透切换热键；`null` = 不注册 |
 | `hotkeys.toggleWidgets` | string\|null | `null` | 全部组件显示/隐藏；与 Win+D 无关（Q11） |
 | `language` | string | `zh-CN` | v1 只允许 `zh-CN` |
@@ -93,6 +93,7 @@
         "sid:5b1e0c33|2560x1440|120": { "x": 2180, "y": 24, "width": 320, "height": 420 }
       },
       "config": { "showCompleted": false, "maxItems": 8 },
+      "startupOverride": null,
       "permissions": {
         "http-localhost": "granted",
         "notifications": "ask"
@@ -106,6 +107,7 @@
 | --- | --- | --- |
 | `enabled` | bool | 允许加载；`false` 时组件不加载、`ensure` 返回 `APP_DISABLED` |
 | `visible` | bool | 当前是否显示；用户「隐藏」只改这个 |
+| `startupOverride` | enum\|null | `onDemand` / `host` / `manual`；`null` 表示用 `app.json.startup` 的默认（Q16） |
 | `layer` | enum | `floating` / `desktop`；v1 仅 native = `floating`，`desktop` 留给 wasm |
 | `alwaysOnTop` | bool | 用户当前置顶状态；`layer=desktop` 时强制 `false` |
 | `clickThrough` | bool | 当前穿透状态；与热键/菜单同步 |
@@ -204,8 +206,10 @@ widget.json（应用提供，只读）
    ├─ permissions                            → 生成默认授权状态
    └─ layer / behavior                       → 提供默认值，用户覆盖存 widgets.json
 
+app.json.startup（应用提供）                 → widgets.json.startupOverride（用户覆盖，null = 用清单）
+
 widgets.json（宿主独占写）
-   └─ 只覆盖「用户可改」的部分：显隐、层级、置顶、穿透、透明度、位置、config 值、权限
+   └─ 只覆盖「用户可改」的部分：显隐、层级、置顶、穿透、透明度、位置、config 值、权限、启动策略覆盖
 ```
 
 **不要**把清单字段复制进 `widgets.json`；清单升级后应自然生效。

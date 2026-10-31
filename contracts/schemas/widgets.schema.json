@@ -58,6 +58,12 @@
           "type": "boolean",
           "description": "当前是否显示；与 enabled 独立"
         },
+        "startupOverride": {
+          "type": ["string", "null"],
+          "enum": ["onDemand", "host", "manual", null],
+          "default": null,
+          "description": "覆盖 app.json.startup；null 表示用清单默认"
+        },
         "layer": {
           "type": "string",
           "enum": ["floating", "desktop"]

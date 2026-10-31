@@ -19,6 +19,8 @@
 
 与 [widget.json](widget-contract.md) 分开：`app.json` 描述「怎么把进程跑起来」，`widget.json` 描述「窗口长什么样」。
 
+> Schema：[app.schema.json](../../contracts/schemas/app.schema.json)（含 `startup` 策略）。
+
 ```json
 {
   "schemaVersion": 1,
@@ -31,6 +33,7 @@
   "singleInstanceMutex": "SDemo.App.sdemo.planner",
   "startupTimeoutMs": 8000,
   "idleTimeoutMs": 300000,
+  "startup": "onDemand",
   "minHostApiVersion": "1.0",
   "mcp": {
     "transport": "http",
@@ -48,6 +51,7 @@
 | `sha256` | 首次安装时由用户确认并登记；之后每次启动前校验 |
 | `startupTimeoutMs` | 拉起后等待 `runtime.json` 出现 + 健康检查通过的上限 |
 | `idleTimeoutMs` | 无 MCP 调用、无组件可见时的退出延迟；`0` 表示常驻不退出 |
+| `startup` | `onDemand`（默认）/ `host`（壳启动后拉起）/ `manual`（只由用户或 Agent 拉起）；用户可用 `widgets.json.startupOverride` 覆盖（Q16） |
 | `mcp` | 仅供 MainAgent 发现，宿主只透传、不解析工具语义 |
 
 ## 3. 发现与启动状态机
@@ -66,6 +70,8 @@ Discovered → Validated → Launching → Handshaking → Ready ⇄ Idle → St
 | Handshaking | `GET /v1/health` + `POST /v1/handshake` | 401 / 版本不符 → Failed（不重试） |
 | Ready | 健康检查通过、组件可显示 | — |
 | Idle | 组件隐藏且超过 `idleTimeoutMs` 无调用 | 发 `POST /v1/shutdown`，超时后 `TerminateProcess` |
+
+> 应用可通过 `POST /v1/widgets/{id}/request { "kind": "idleHold", "value": true }` 声明「暂不空闲退出」；宿主只存内存标志，进程退出即清（见 [host-endpoints](host-endpoints.md) §6、DA-95）。
 
 启动顺序：宿主先显示**骨架态**（组件外框 + 图标 + 「正在启动」），进程就绪后再切换到真实窗口。绝不允许白窗或无提示的 1 秒空白。
 

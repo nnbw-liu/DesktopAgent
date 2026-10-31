@@ -136,7 +136,7 @@ S0 的目的很明确：**两天内验证「native 组件 + 宿主管控 + 穿�
 | # | 风险 | 影响 | 缓解 |
 | --- | --- | --- | --- |
 | R1 | 宿主膨胀成「小程序操作系统」 | 范围失控、维护成本爆炸 | 文档层锁死「宿主只管窗口与布局」，v1 不承诺第三方组件 SDK |
-| R2 | 常驻进程数增加 | 内存占用 250–400MB | 应用内核默认 idle 退出；组件数量上限（建议 4 个） |
+| R2 | 常驻进程数增加 | 内存占用 250–400MB | 应用内核默认 idle 退出；组件数量上限默认 8（`settings.json` 可调） |
 | R3 | native 窗口跨进程管控的边界不清 | 置顶/穿透/焦点互相打架 | [宿主控制协议](host-protocol.md) §7 明确列出宿主**只允许**做的 6 个 Win32 操作 |
 | R4 | WebView2 不支持分层窗口 | 半透明写的 wasm 组件失败 | 半透明只对 native 组件承诺；wasm 走不透明或 Win11 亚克力后备 |
 | R5 | 多端同步为时过早污染主流程 | 合并冲突出现在每条 CRUD 里 | v1 只在 outbox 层写，不实现合并 UI |
@@ -149,6 +149,6 @@ S0 的目的很明确：**两天内验证「native 组件 + 宿主管控 + 穿�
 | [widget-contract.md](widget-contract.md) | `widget.json` 字段、两种 renderer 的差异、尺寸/锚点/层级声明、校验与降级 |
 | [host-protocol.md](host-protocol.md) | 发现与启动状态机、`runtime.json`、握手鉴权、端点表、窗口管控白名单、错误码 |
 | [todo-mcp-surface.md](todo-mcp-surface.md) | MCP 传输与鉴权、工具清单、风险分级与审批、写入约束、草稿流程 |
-| [desktop-assembly-requirements.md](desktop-assembly-requirements.md) | 需求基线：DA-01–94、跨应用约束、非目标、待拍板缺口、P1 验收 |
+| [desktop-assembly-requirements.md](desktop-assembly-requirements.md) | 需求基线：DA-01–99、跨应用约束、非目标、待拍板缺口、P1 验收 |
 | [host-endpoints.md](host-endpoints.md) | 宿主回环端点：监听器、`host.json`、双 token、`GET /v1/apps`、`ensure` |
 | [shell-storage.md](shell-storage.md) | 壳存储：`settings.json` / `widgets.json`、Schema、原子写、迁移 |

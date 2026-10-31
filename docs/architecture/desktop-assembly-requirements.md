@@ -40,8 +40,9 @@
 | L 工程与非功能 | DA-82–89 | 8 | 四工程 + slnf、依赖规则、内存、冷启动、打包、契约同改、指令下发、MCP 透传 |
 | M 发现与接入 | DA-90–92 | 3 | 只读 MCP 注册表、注册表鉴权、按需拉起 ensure（不做代理） |
 | N 端点与存储 | DA-93–94 | 2 | 宿主回环监听器 / `host.json` / client-token、两份状态文件的 Schema 与原子写 |
+| O 决策补充 | DA-95–99 | 5 | `idleHold`、启动策略、壳单实例、空态安装入口、平台矩阵 |
 
-合计 **94 条**。优先级沿用蓝图口径：**P0 必须 / P1 应该 / P2 可选**。
+合计 **99 条**。优先级沿用蓝图口径：**P0 必须 / P1 应该 / P2 可选**。
 
 ---
 
@@ -61,7 +62,7 @@
 | DA-08 | 组件设置表单按 Schema 子集渲染，不改应用代码 | P1 | 支持 boolean / integer / string(enum) | 蓝图 §A |
 | DA-09 | 托盘菜单：显示主窗口、组件诊断、退出 | P1 | 诊断含 pid / 端口 / 最后错误 | 蓝图 §A |
 | DA-10 | 快捷键唤起组件（如 `Ctrl+Alt+T`），可改 | P2 | 冲突时提示 | 蓝图 §A |
-| DA-11 | 开机自启开关 | P2 | 注册表 Run 项，可关闭 | 蓝图 §A |
+| DA-11 | 开机自启开关 | P1 | 注册表 Run 项，可关闭；默认开（Q6） | 蓝图 §A |
 
 **非功能（蓝图原文）**：常驻内存 ≤ 120MB（不含 WebView2 渲染进程）；自身零磁盘业务数据。
 
@@ -88,7 +89,7 @@
 | DA-23 | 应用启动后绑 `127.0.0.1:0` 随机端口，写 `%LOCALAPPDATA%\...\runtime\<appId>.json`（pid / port / token / 时间 / 版本），ACL 仅当前用户 | P0 | 不写死端口；重启即换 token | host-protocol §4 |
 | DA-24 | 启动等待 `runtime.json` + 健康检查，上限 `startupTimeoutMs`；超时杀掉并退避 1s / 2s / 5s，最多 3 次 | P0 | 超时可见、可诊断 | host-protocol §3 |
 | DA-25 | 崩溃恢复：显示占位卡片，按退避重启，成功后回原位；连续 3 次失败转错误态 | P0 | 错误态提供「重启 / 查看日志」 | host-protocol §9 |
-| DA-26 | 空闲退出：组件不可见且超过 `idleTimeoutMs` 无调用 → `POST /v1/shutdown`，超时后终止 | P0 | `0` 表示常驻不退出 | host-protocol §3 · app.json |
+| DA-26 | 空闲退出：组件不可见且超过 `idleTimeoutMs` 无调用 → `POST /v1/shutdown`，超时后终止；收到 `idleHold=true` 期间不退出 | P0 | `0` 表示常驻不退出；`idleHold` 只存内存，进程退出即清 | host-protocol §3 · app.json · DA-95 |
 | DA-27 | 退出顺序：对每个应用 `shutdown`（等 2s）→ 超时终止 → 保存 `widgets.json` → 退出 | P0 | 布局不丢 | host-protocol §9 |
 | DA-28 | 安装 / 卸载 / 升级：升级 = 替换 `apps\<appId>\` + 重登记哈希；卸载清程序、保留 `%APPDATA%\SDemo\Apps\<appId>\` 并在确认框明示 | P0 | 数据不随卸载消失 | host-protocol §10 |
 | DA-29 | 窗口句柄失效（`IsWindow` 假）→ 通知应用重建窗口，保留布局 | P1 | 错误码 `WIDGET_WINDOW_LOST` | host-protocol §11 |
@@ -104,7 +105,7 @@
 | DA-34 | 拉起时通过 `SDEMO_APP_TOKEN` 下发 token；应用读 `SDEMO_HOST_URL` 回调宿主 | P0 | 用户自行双击启动时由应用自生成 token | host-protocol §4 §6.2 |
 | DA-35 | 握手交换 `capabilities`，做双向降级（宿主认识、应用不支持的能力自动关闭） | P0 | 版本不符 → Failed，不重试 | host-protocol §5 |
 | DA-36 | `request` 是「请求」不是「设置」；非法策略返回 `403 HOST_POLICY_DENIED` 并记日志 | P1 | 宿主是唯一策略执行者 | host-protocol §6.2 |
-| DA-37 | 通知通道：应用 `POST /v1/notify {title, body, level}`，宿主弹通知 | P1 | 供 planner 提醒复用（PL-08） | host-protocol §6.2 |
+| DA-37 | 通知通道：应用 `POST /v1/notify {title, body, level}`，宿主弹通知；宿主**不做通知队列**，应用下次启动自行重试 | P1 | 应用未就绪时不丢业务状态；壳只保证「应用活着时能弹」 | host-protocol §6.2 · Q10 |
 
 ### 3.5 E. 窗口管控（仅 native 跨进程）
 
@@ -162,10 +163,10 @@
 | # | 需求 | 优先级 | 验收要点 | 依据 |
 | --- | --- | --- | --- | --- |
 | DA-67 | 常驻托盘：开机自启或手动启动，用户显式退出才结束 | P0 | 关闭面板不退进程 | desktop-shell §4 |
-| DA-68 | 托盘菜单：打开面板 / 显示主窗口、组件诊断、退出 | P1 | 退出前走 DA-27 顺序 | 蓝图 DA-09 |
+| DA-68 | 托盘菜单：打开面板 / 显示主窗口、组件诊断、打开助理（可选入口）、退出 | P1 | 不管理 Agent 生命周期；退出前走 DA-27 顺序 | 蓝图 DA-09 · Q7 |
 | DA-69 | 组件诊断：状态、最后错误、端口、pid、日志路径、一键复制诊断信息 | P1 | 能直接贴给开发者排障 | host-protocol §12 |
 | DA-70 | 全局热键唤起组件，可配置 | P2 | 注册失败/冲突给出提示，不静默失效 | 蓝图 DA-10 · widget-contract §4 |
-| DA-71 | 开机自启开关（注册表 Run 项） | P2 | 可关闭，默认值见 Q6 | 蓝图 DA-11 |
+| DA-71 | 开机自启开关（注册表 Run 项） | P1 | 可关闭；默认开（Q6） | 蓝图 DA-11 |
 | DA-72 | 托盘入口显示/隐藏（`activation.showInTray`） | P2 | 组件级可控 | widget-contract §4 |
 
 ### 3.10 J. 日志与错误
@@ -193,7 +194,7 @@
 | --- | --- | --- | --- | --- |
 | DA-82 | 四个工程：`Shell.Contracts` / `Shell` / `Shell.Wpf` / `Shell.Host`（exe `SDemo.Shell.exe`）+ `SDemo.Shell.slnf` + `tests/Shell` | P0 | slnf 自包含可构建 | repo-layout §4 §7 |
 | DA-83 | 依赖规则：Shell 只依赖 `Shell.Contracts`，不认识任何具体应用；不依赖 Agent / Apps | P0 | `check-repo-guards.ps1` 的 dependency-edges 生效 | repo-layout §5 |
-| DA-84 | 内存 ≤ 120MB（不含 WebView2 渲染进程）；组件数量上限建议 4 | P0 | 常驻不失控；上限值见 Q5 | 蓝图 §A · desktop-shell R2 |
+| DA-84 | 内存 ≤ 120MB（不含 WebView2 渲染进程）；组件数量上限默认 8，`settings.json.components.limit` 可调（1–8） | P0 | 常驻不失控；超限组件标记 `blocked`，不静默丢弃 | 蓝图 §A · desktop-shell R2 · Q5 |
 | DA-85 | 应用冷启动量级 0.3–1.5s，壳负责骨架态 | P1 | 超时走 DA-24 的退避重启 | desktop-shell §4 |
 | DA-86 | 打包：`dist/SDemo-Shell-<ver>.zip`（含 apps 目录模板）；`dotnet publish` + 清单校验 + **脚本回填 sha256** + 压缩 | P1 | sha256 不许手写 | repo-layout §8 |
 | DA-87 | 契约同改：改 `widget.json` / 宿主协议 / URI 规范必须同 PR 改 `docs/architecture` 与 JSON Schema | P0 | AGENTS 铁律 1 | AGENTS.md |
@@ -216,6 +217,16 @@
 | --- | --- | --- | --- | --- |
 | DA-93 | 宿主回环监听器：`SDemo.Shell.Host` 唯一监听 `127.0.0.1:0`；启动顺序 bind → `client-token` → `host.json` → 扫描/拉起；`host.json` 含 pid / port / startedAt / 版本 / `clientTokenPath` / `registryRevision`；client token 每壳启动轮换、ACL 当前用户；app token 按 `appId` 配对，两类 token 不复用 | P0 | 应用拉起前 `host.json` 已落盘；壳重启后旧 client token 失效；带 `Origin` / 非法 `Host` 头被拒 | Q2 · host-endpoints §2–§4 |
 | DA-94 | 壳存储：`settings.json`（壳级）+ `widgets.json`（按 `widgetId`）两份 Schema；原子写 + `.bak` + 损坏隔离 + `schemaVersion` 迁移；只存 UI 状态，不存 token / 业务数据 / 清单字段 | P0 | 写入中断不产生半截 JSON；坏文件走 `.bak` 或默认；未知字段读→写后保留 | Q14 · shell-storage §6–§7 |
+
+### 3.15 O. 决策补充（Q4 / Q12 / Q13 / Q16 / Q9）
+
+| # | 需求 | 优先级 | 验收要点 | 依据 |
+| --- | --- | --- | --- | --- |
+| DA-95 | 空闲豁免：应用可 `POST /v1/widgets/{id}/request { kind: "idleHold", value: true }` 声明「暂不空闲退出」；宿主只改内存计时，不落盘；`false` 或进程退出即恢复默认 | P1 | planner 有未触发提醒时保持常驻；宿主不存提醒时间（业务数据） | Q4 · host-endpoints §6 |
+| DA-96 | 启动策略：`app.json.startup: onDemand / host / manual`（缺省 `onDemand`）+ `widgets.json.startupOverride`；壳只注册**一个** Run 项，启动后按策略错峰拉起；面板「全部启动」并发 ≤2、逐个骨架态、失败隔离 | P1 | 默认仍按需；`host` 策略的应用开机后可用；不出现 N 个 Run 项 | Q16 · host-protocol §2 · shell-storage §4 |
+| DA-97 | 壳单实例与升级：互斥量 `SDemo.Shell`，重复启动 = 激活面板；v1 无自动更新，升级 = 退出后替换 zip | P1 | 第二次启动不产生第二个托盘进程 | Q12 |
+| DA-98 | 首启动空态：`apps\` 为空时面板显示「安装应用」入口（选 zip / 打开安装目录）+ 数据保留位置提示 | P1 | 空目录不是错误页，也不阻塞托盘 | Q13 |
+| DA-99 | 平台矩阵：Win10 19041+ / Win11，x64；arm64 不承诺（Win+D / WorkerW / WebView2 需单独验） | P1 | 安装包与文档写明最低版本；非目标平台不静默降级 | Q9 |
 
 ---
 
@@ -260,6 +271,9 @@
 | 全局钩子、DLL 注入、接管应用消息循环 | 安全与稳定性红线 |
 | 多用户 / 账号 / 云同步 / 团队共享 | 本机回环 + 进程级 token 已足够 |
 | 应用数据备份、迁移、清理策略 | 宿主不碰应用数据目录 |
+| 壳管理 DesktopAgent 的生命周期 | Agent 自己托盘/自启；壳最多提供「打开助理」入口（Q7） |
+| 后端 / UI 多进程编排 | 应用是单 exe 三角色；多进程由应用自带 supervisor，宿主只拉起一个 `executable`（Q17） |
+| 自动更新（壳与应用） | v1 便携包 + 手动替换；自动更新是另一套签名/回滚工程（Q12） |
 
 ---
 
@@ -272,20 +286,20 @@
 | **Q1** | v1 是否实现 wasm 渲染器与桌面层 | 契约写了两种 renderer；S1 验收只有 native；当前 planner / meeting 都是 native，桌面层无真实需求 | **v1 只做 native**，wasm（DA-57–61）与桌面层（DA-07/59）降为 P2，契约解析保留但「实现未就绪」时禁用组件。R4 的亚克力问题一并推迟 |
 | **Q2** | 宿主自身回环端点未定义 | `SDEMO_HOST_URL` 只说应用回调宿主，但宿主的端口、启动时序、应用→宿主请求的鉴权方式、监听器归属都没写；native 组件的 `register` 在 S1 就依赖它 | **已确认（2026-10-31）**：见 [host-endpoints](host-endpoints.md)——唯一监听者 `Shell.Host`、`host.json` 发现、app token / client token 两类身份、`ensure` 语义；对应 DA-93 |
 | **Q3** | 壳的「主窗口 / 面板」范围 | DA-09 写「显示主窗口」，但壳没有聊天；产品地图只写「托盘、面板、组件设置表单」 | 建议只做一个**组件管理 + 设置 + 诊断**面板；不承载聊天、不承载业务视图。面板关闭 = 回托盘 |
-| **Q4** | 提醒 vs 空闲退出（真实冲突） | planner 要定时提醒，但应用空闲 5 分钟退出；宿主不能存提醒时间（那是业务数据） | 需要一条**应用可声明「暂不 idle 退出」**的协议（`/v1/widgets/{id}/request` 增 `idleHold` 或 `state` 增 `keepAlive`）。宿主只认标志、不存业务；planner 在有未触发提醒时保持常驻。P1 先把挂点留出来 |
-| **Q5** | 组件数量上限 | 文档只写「建议 4」 | 建议 **默认 4、可在 `settings.json` 调到 8**；超限时新组件加载失败并提示，不静默丢弃 |
-| **Q6** | 开机自启默认值 | 文档未定 | 建议**默认开**（它是常驻外壳），首次运行在托盘菜单里明示，可一键关 |
-| **Q7** | 壳是否拉起 DesktopAgent | D3 写「MainAgent 按需打开」，但没说是谁打开 | 建议**壳不管理 Agent**：Agent 自己托盘/自启，壳只在面板里提供「打开助理」入口（路径可配）。否则壳就要认识一个非受管应用，破坏「只认清单」 |
-| **Q8** | 权限与组件开关存哪 | `permissions` 授权、组件显示/隐藏都没说落哪个文件 | 建议都进 `widgets.json`（按组件 id 分组）：权限授权、`visible`、`enabled`、config 值。`settings.json` 只放壳级设置（自启、热键、上限、语言） |
-| **Q9** | 平台矩阵 | 文档默认 Windows，未写最低版本与架构 | 建议 **Win10 19041+ / Win11，x64 only**；arm64 不承诺（Win+D、WorkerW、WebView2 都要单独验） |
-| **Q10** | 应用未就绪时通知怎么办 | `notify` 是应用→宿主，应用挂了就发不出 | 建议**宿主不做通知队列**（暂存即业务数据），由应用在下次启动时重试；壳只保证「应用活着时能弹」 |
+| **Q4** | 提醒 vs 空闲退出（真实冲突） | planner 要定时提醒，但应用空闲 5 分钟退出；宿主不能存提醒时间（那是业务数据） | **已确认（2026-10-31）**：应用通过 `request.kind=idleHold` 声明暂不退出（DA-95）；宿主只存内存标志，不存提醒时间；planner 有未触发提醒时保持常驻 |
+| **Q5** | 组件数量上限 | 文档只写「建议 4」 | **已确认（2026-10-31）**：默认 **8**，`settings.json.components.limit` 可调（1–8）；后续要 >8 再改契约与 Schema |
+| **Q6** | 开机自启默认值 | 文档未定 | **已确认（2026-10-31）**：默认**开**（常驻外壳），首次运行在托盘菜单明示，可一键关 |
+| **Q7** | 壳是否拉起 DesktopAgent | D3 写「MainAgent 按需打开」，但没说是谁打开 | **已确认（2026-10-31）**：壳**不管理 Agent**；Agent 自己托盘/自启，壳只在面板/托盘提供「打开助理」入口（路径可配）。见 DA-68 |
+| **Q8** | 权限与组件开关存哪 | `permissions` 授权、组件显示/隐藏都没说落哪个文件 | **已由 Q14 落定**：都进 `widgets.json`（按组件 id），`settings.json` 只放壳级设置 |
+| **Q9** | 平台矩阵 | 文档默认 Windows，未写最低版本与架构 | **已确认（2026-10-31）**：Win10 19041+ / Win11，x64；arm64 不承诺。见 DA-99 |
+| **Q10** | 应用未就绪时通知怎么办 | `notify` 是应用→宿主，应用挂了就发不出 | **已确认（2026-10-31）**：宿主**不做通知队列**（暂存即业务数据），应用下次启动自行重试；见 DA-37 |
 | **Q11** | Win+D / `SC_MINIMIZE` 实测结论 | 文档明确要求 P1 首日验证，且警告不要提前承诺「永远可见」；`SC_MINIMIZE` 只拦最小化按钮，拦不住 Explorer 的「显示桌面」 | **已确认（2026-10-31）**：P1 实测矩阵判定 A（组件活过 Win+D，无需处理）/ B（被收起）；B 用**前台轮询状态机**恢复，禁止键盘钩子与操作非本组件窗口；DA-40 验收同步改写。见 §7.2 场景 15 |
-| **Q12** | 壳自身单实例 / 升级 / 自更新 | 只写了应用单实例与升级，没写壳自己 | 建议：壳也走 `SDemo.Shell` 互斥量，重复启动 = 激活面板；v1 无自动更新，升级 = 退出后替换 zip |
-| **Q13** | 首启动 `apps\` 为空 | 没有安装向导，也没有空态文案 | 建议面板空态给「安装应用」入口（选 zip / 打开安装目录），并提示数据保留位置 |
+| **Q12** | 壳自身单实例 / 升级 / 自更新 | 只写了应用单实例与升级，没写壳自己 | **已确认（2026-10-31）**：壳走 `SDemo.Shell` 互斥量，重复启动 = 激活面板；v1 无自动更新，升级 = 退出后替换 zip。见 DA-97 |
+| **Q13** | 首启动 `apps\` 为空 | 没有安装向导，也没有空态文案 | **已确认（2026-10-31）**：面板空态给「安装应用」入口（选 zip / 打开安装目录），提示数据保留位置。见 DA-98 |
 | **Q14** | `widgets.json` / `settings.json` 没有 Schema | 两份文件被多处引用（布局、权限、config、显示状态），字段只在正文散写 | **已确认（2026-10-31）**：见 [shell-storage](shell-storage.md) + `contracts/schemas/*.schema.json`；对应 DA-94 |
 | **Q15** | 宿主是否做 MCP 聚合 / 网关 | 协议只允许宿主「透传」`app.json.mcp`，不解析工具语义；MCP client 是 Agent，当前靠 `runtime.json` + Agent `settings.json` 发现，没有动态目录 | **已确认（2026-10-31）：做只读发现（DA-90–91），不做调用代理**。要动态发现就加 `GET /v1/apps` 注册表，Agent 拉取后**仍直连**各应用；代理的五条反对理由见 §6.1 |
-| **Q16** | 批量启动与每应用开机自启 | 现有只有「壳自启 + 应用按需拉起 + `idleTimeoutMs`」；`launchOnStartup` 只是组件清单字段，没有宿主侧策略 | 在 `app.json` 增 `startup: onDemand / host / manual`；壳只注册**一个** Run 项，启动后按策略错峰拉起；面板提供显式「全部启动」，并发 ≤2、逐个走骨架态。默认仍 `onDemand` |
-| **Q17** | 后端 + 双 UI 的进程形态 | D8 是「一个 exe：无窗口内核 + Blazor 主窗口 + native 组件」；`app.json` 只有一个 `executable` 与一个互斥量 | **保持单 exe 三角色**（角色由启动参数/模式切换）。宿主不做多进程编排；确需分离时由应用自带 supervisor，并另立 `processes[]` 契约（v1 不做） |
+| **Q16** | 批量启动与每应用开机自启 | 现有只有「壳自启 + 应用按需拉起 + `idleTimeoutMs`」；`launchOnStartup` 只是组件清单字段，没有宿主侧策略 | **已确认（2026-10-31）**：`app.json.startup: onDemand / host / manual` + `widgets.json.startupOverride`；壳只注册一个 Run 项，按策略错峰拉起；面板「全部启动」并发 ≤2。见 DA-96 |
+| **Q17** | 后端 + 双 UI 的进程形态 | D8 是「一个 exe：无窗口内核 + Blazor 主窗口 + native 组件」；`app.json` 只有一个 `executable` 与一个互斥量 | **已确认（2026-10-31）**：保持单 exe 三角色（角色由启动参数/模式切换）；宿主不做多进程编排。见 §5 非目标 |
 | **Q18** | 应用能否反向调 Agent | 设计里只有 meeting 的深链 `sdemo.agent://arrange?...`；应用不直连 Agent，Agent 只做 MCP client | **沿用深链**（应用用 `ShellExecute` 打开 URI），不经宿主；Agent 回写走 `meeting_mark_action` / `todo_accept_draft`。可选再加宿主通用 `POST /v1/open-uri`，但不建议为单个场景引入 |
 | **Q19** | Agent 调 MCP 时应用没启动，谁拉起 | 文档只写「宿主按需拉起应用」，但 Agent 不是受管应用、不经过宿主；`idleTimeoutMs` 又会让应用 5 分钟后退出，中间没有桥 | **已确认（2026-10-31）：选 A**。壳加 `POST /v1/apps/{appId}/ensure`（DA-92），给 Agent 独立 client token，返回 `runtime.json` 指针并负责哈希校验 / 单实例 / 骨架超时；不采用 B（MCP 应用常驻） |
 
@@ -311,9 +325,9 @@
 
 ### 7.1 本期包含
 
-- **产品能力**：DA-01 ~ DA-06（+ Q11 实测）
-- **契约/进程/IPC/窗口/布局**：DA-12 ~ DA-16、DA-19 ~ DA-28、DA-31 ~ DA-35、DA-38 ~ DA-43、DA-46 ~ DA-47、DA-49 ~ DA-55、DA-56、DA-67、DA-73 ~ DA-79、DA-82 ~ DA-84、DA-87、DA-89、DA-93 ~ DA-94
-- **明确排除**：wasm / 桌面层（DA-07、DA-57 ~ DA-61）、config 表单（DA-08、62、63）、主题强调色（DA-64）、权限 UI（DA-66）、热键/自启（DA-10、11、70 ~ 72）、通知（DA-37）、诊断面板完整版（DA-09、69 先做最小版）
+- **产品能力**：DA-01 ~ DA-06、DA-11（+ Q11 实测）
+- **契约/进程/IPC/窗口/布局**：DA-12 ~ DA-16、DA-19 ~ DA-28、DA-31 ~ DA-35、DA-37、DA-38 ~ DA-43、DA-46 ~ DA-47、DA-49 ~ DA-55、DA-56、DA-67、DA-71、DA-73 ~ DA-79、DA-82 ~ DA-84、DA-87、DA-89、DA-93 ~ DA-99
+- **明确排除**：wasm / 桌面层（DA-07、DA-57 ~ DA-61）、config 表单（DA-08、62、63）、主题强调色（DA-64）、权限 UI（DA-66）、热键/托盘入口（DA-10、70、72）、诊断面板完整版（DA-09、69 先做最小版）
 - **P3 前置（不在 P1）**：DA-90–92 只读注册表与 ensure。P1 可先留端点与 DTO 骨架，等 Agent MCP client 落地时再接通
 
 ### 7.2 验收场景（S1 口径）
@@ -350,6 +364,7 @@
 | 四工程模板、依赖规则、slnf、打包、测试分层 | [repository-layout.md](repository-layout.md) |
 | 宿主回环端点、`host.json`、client token、`ensure` | [host-endpoints.md](host-endpoints.md) |
 | `settings.json` / `widgets.json`、原子写、迁移 | [shell-storage.md](shell-storage.md) · [settings.schema.json](../../contracts/schemas/settings.schema.json) · [widgets.schema.json](../../contracts/schemas/widgets.schema.json) |
+| `app.json` Schema（含 `startup`） | [app.schema.json](../../contracts/schemas/app.schema.json) · [host-protocol.md](host-protocol.md) §2 |
 | 工作区入口（状态 / 命令） | [workspaces/shell.md](../../workspaces/shell.md) |
 
 ---
@@ -363,6 +378,9 @@
 | 2026-10-31 | 宿主回环端点与身份 | 新增 [host-endpoints](host-endpoints.md)：单监听器 + `host.json` + client/app 两类 token + `ensure` | Q2 · DA-93 |
 | 2026-10-31 | 壳状态文件 | 新增 [shell-storage](shell-storage.md)：两份 Schema + 原子写 + `.bak` + 迁移 + 损坏隔离 | Q14 · DA-94 · `contracts/schemas/` |
 | 2026-10-31 | Win+D | P1 实测 A/B；B 用前台轮询状态机，不装键盘钩子、不操作非本组件窗口 | Q11 · DA-40 · §7.2 |
+| 2026-10-31 | 生命周期与交互（Q4/Q6/Q7/Q12/Q13/Q16/Q17） | 按建议拍板：`idleHold`、自启默认开、壳不管理 Agent、壳单实例无自更新、空态安装入口、`startup` 策略 + 单一 Run 项、单 exe 三角色 | DA-95–98 · §5 |
+| 2026-10-31 | 环境、通知与上限（Q9/Q10/Q5） | Win10 19041+/Win11 x64；通知不做宿主队列；组件上限默认 8（可配置 1–8） | DA-99 · DA-37 · DA-84 |
+| 2026-10-31 | 权限与组件开关落盘 | 随 Q14 落定：全部进 `widgets.json` | Q8 |
 
 这些决策都不改变宿主的三条硬约束：无业务数据、无模型凭证、只做窗口与进程策略。
 </content>
