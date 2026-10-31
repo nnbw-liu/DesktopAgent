@@ -149,4 +149,6 @@ S0 的目的很明确：**两天内验证「native 组件 + 宿主管控 + 穿�
 | [widget-contract.md](widget-contract.md) | `widget.json` 字段、两种 renderer 的差异、尺寸/锚点/层级声明、校验与降级 |
 | [host-protocol.md](host-protocol.md) | 发现与启动状态机、`runtime.json`、握手鉴权、端点表、窗口管控白名单、错误码 |
 | [todo-mcp-surface.md](todo-mcp-surface.md) | MCP 传输与鉴权、工具清单、风险分级与审批、写入约束、草稿流程 |
-| [desktop-assembly-requirements.md](desktop-assembly-requirements.md) | 需求基线：DA-01–92、跨应用约束、非目标、待拍板缺口、P1 验收 |
+| [desktop-assembly-requirements.md](desktop-assembly-requirements.md) | 需求基线：DA-01–94、跨应用约束、非目标、待拍板缺口、P1 验收 |
+| [host-endpoints.md](host-endpoints.md) | 宿主回环端点：监听器、`host.json`、双 token、`GET /v1/apps`、`ensure` |
+| [shell-storage.md](shell-storage.md) | 壳存储：`settings.json` / `widgets.json`、Schema、原子写、迁移 |

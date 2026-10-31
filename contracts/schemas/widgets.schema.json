@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdemo.local/contracts/schemas/widgets.schema.json",
+  "title": "DesktopAssembly widgets.json",
+  "description": "按 widgetId 存放的组件 UI 状态。不含 token、业务数据、清单字段或工具清单。",
+  "type": "object",
+  "required": ["schemaVersion", "widgets"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "widgets": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z0-9]+(\\.[a-z0-9-]+)+$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/widgetState"
+      }
+    }
+  },
+  "$defs": {
+    "rect": {
+      "type": "object",
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false,
+      "description": "虚拟桌面绝对坐标，单位 DIP"
+    },
+    "anchor": {
+      "type": "object",
+      "required": ["corner", "offsetX", "offsetY"],
+      "properties": {
+        "corner": {
+          "type": "string",
+          "enum": ["top-left", "top-right", "bottom-left", "bottom-right"]
+        },
+        "offsetX": { "type": "integer", "minimum": -10000, "maximum": 10000 },
+        "offsetY": { "type": "integer", "minimum": -10000, "maximum": 10000 }
+      },
+      "additionalProperties": false
+    },
+    "widgetState": {
+      "type": "object",
+      "required": ["enabled", "visible"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "允许加载；false 时 ensure 返回 APP_DISABLED"
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "当前是否显示；与 enabled 独立"
+        },
+        "layer": {
+          "type": "string",
+          "enum": ["floating", "desktop"]
+        },
+        "alwaysOnTop": { "type": "boolean" },
+        "clickThrough": { "type": "boolean" },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "multipleOf": 0.01
+        },
+        "anchor": { "$ref": "#/$defs/anchor" },
+        "lastMonitorKey": {
+          "type": ["string", "null"]
+        },
+        "positions": {
+          "type": "object",
+          "maxProperties": 16,
+          "additionalProperties": { "$ref": "#/$defs/rect" }
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["boolean", "number", "string", "null"]
+          }
+        },
+        "permissions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["granted", "denied", "ask"]
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

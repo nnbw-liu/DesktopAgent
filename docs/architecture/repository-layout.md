@@ -87,6 +87,7 @@ SDemo.DesktopAgent/                 ← 仓库名暂不改（见 §12 Q1）
 ├─ .editorconfig                    ← 新增：与 Nullable/分析器配套
 ├─ SDemo.DesktopAgent.sln           ← 全量入口（改名与否见 Q1）
 ├─ docs/architecture/               ← 契约与设计（本目录）
+├─ contracts/schemas/               ← JSON Schema（settings / widgets 等，供 contract-lint 校验）
 ├─ src/
 │  ├─ (现有 Agent 工程，物理路径不动)   ← Contracts / Agents / Plugins / Context /
 │  │                                    Editing / Execution / Storage / Sandbox /

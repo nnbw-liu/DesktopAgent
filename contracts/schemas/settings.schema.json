@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdemo.local/contracts/schemas/settings.schema.json",
+  "title": "DesktopAssembly settings.json",
+  "description": "壳级设置。只允许开关与标量，不存放组件位置、config 值、权限或任何 token。",
+  "type": "object",
+  "required": ["schemaVersion"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "startup": {
+      "type": "object",
+      "properties": {
+        "launchAtLogin": {
+          "type": "boolean",
+          "default": true,
+          "description": "壳自身注册 Run 项；应用由壳按清单拉起，不各自注册"
+        },
+        "startHidden": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "components": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "default": 4
+        }
+      },
+      "additionalProperties": true
+    },
+    "hotkeys": {
+      "type": "object",
+      "properties": {
+        "toggleClickThrough": {
+          "type": ["string", "null"],
+          "default": null
+        },
+        "toggleWidgets": {
+          "type": ["string", "null"],
+          "default": null
+        }
+      },
+      "additionalProperties": true
+    },
+    "language": {
+      "type": "string",
+      "enum": ["zh-CN"],
+      "default": "zh-CN"
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["error", "warn", "info", "debug"],
+          "default": "info"
+        },
+        "keepDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90,
+          "default": 14
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

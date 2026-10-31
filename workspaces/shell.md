@@ -1,7 +1,7 @@
 # 工作区：DesktopAssembly（桌面外壳）（规划中）
 
 > 状态：🚧 未开工，目录尚未创建。
-> 规划：`docs/architecture/desktop-shell.md` · `docs/architecture/widget-contract.md` · `docs/architecture/host-protocol.md` · [需求基线](../docs/architecture/desktop-assembly-requirements.md)
+> 规划：`docs/architecture/desktop-shell.md` · `docs/architecture/widget-contract.md` · `docs/architecture/host-protocol.md` · [需求基线](../docs/architecture/desktop-assembly-requirements.md) · [宿主端点](../docs/architecture/host-endpoints.md) · [壳存储](../docs/architecture/shell-storage.md)
 > 工程结构见 `docs/architecture/repository-layout.md` §4（每个应用五件套：Contracts / Storage / Core / Mcp / Host）。
 
 ## 职责

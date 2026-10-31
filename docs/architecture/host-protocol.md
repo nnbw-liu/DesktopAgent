@@ -92,6 +92,8 @@ Discovered → Validated → Launching → Handshaking → Ready ⇄ Idle → St
 - **token 来源**：宿主拉起时通过环境变量 `SDEMO_APP_TOKEN` 传入（32 字节 base64url），应用写进 `runtime.json` 供宿主读回；用户自行双击启动时由应用生成。两种路径下 token 都**只在本机、只在本次进程存活期间有效**，重启即换。
 - 端口与 token 必须写在 `%LOCALAPPDATA%`：它们绑定本机进程，**不可随 `%APPDATA%` 漫游**。
 
+> 宿主自身的监听器、`host.json`、`client-token` 与 Agent 使用的 client 面端点，见 [host-endpoints.md](host-endpoints.md)；本节只定义每个应用的 `runtime.json`。
+
 ## 5. 握手与鉴权
 
 - 所有请求带 `Authorization: Bearer <token>`；除 `/v1/health` 外全部校验。
@@ -131,6 +133,8 @@ POST /v1/handshake
 | GET | `/v1/host/info` | 宿主版本、主题、强调色、语言、当前显示器集合 |
 
 **注意**：`request` 是「请求」不是「设置」。宿主是唯一的策略执行者，收到非法请求（例如 native 组件请求 `layer=desktop`）返回 `403 HOST_POLICY_DENIED`，并在日志里记一条。
+
+> 以上是 **app 面**（应用 token）。**client 面**（Agent 的 `GET /v1/host`、`GET /v1/apps`、`POST ensure`）与两类 token 的配对规则见 [host-endpoints.md](host-endpoints.md) §5–§7。
 
 ## 7. 窗口管控白名单（仅 `native`）
 

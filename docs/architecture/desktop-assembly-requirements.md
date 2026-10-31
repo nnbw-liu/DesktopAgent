@@ -39,8 +39,9 @@
 | K 安全 | DA-76–81 | 6 | 哈希、路径、回环传输、数据隔离、零凭证、升级回滚 |
 | L 工程与非功能 | DA-82–89 | 8 | 四工程 + slnf、依赖规则、内存、冷启动、打包、契约同改、指令下发、MCP 透传 |
 | M 发现与接入 | DA-90–92 | 3 | 只读 MCP 注册表、注册表鉴权、按需拉起 ensure（不做代理） |
+| N 端点与存储 | DA-93–94 | 2 | 宿主回环监听器 / `host.json` / client-token、两份状态文件的 Schema 与原子写 |
 
-合计 **92 条**。优先级沿用蓝图口径：**P0 必须 / P1 应该 / P2 可选**。
+合计 **94 条**。优先级沿用蓝图口径：**P0 必须 / P1 应该 / P2 可选**。
 
 ---
 
@@ -111,7 +112,7 @@
 | --- | --- | --- | --- | --- |
 | DA-38 | 白名单 6 个 Win32 操作：`SetWindowPos`、`GetWindowRect`、`SetWindowLongPtr(GWL_EXSTYLE)`（仅 `WS_EX_TOOLWINDOW` / `WS_EX_TRANSPARENT`）、`ShowWindow`、`PostMessage(WM_CLOSE)`、`SetWindowDisplayAffinity` | P0 | 超出白名单即违规 | host-protocol §7 |
 | DA-39 | 明令禁止：跨进程 `SetParent` / 改 `GWLP_HWNDPARENT`、改 `WS_CHILD`、`SetWindowsHookEx`、跨进程 `SendMessage` 阻塞、接管消息循环或替应用处理 `WM_DPICHANGED` | P0 | 代码审查 + 单测拦截 | host-protocol §7 |
-| DA-40 | 组件窗口不进任务栏、不进 Alt+Tab：`ShowInTaskbar=false` + `WS_EX_TOOLWINDOW`；无最小化按钮；拦截 `WM_SYSCOMMAND / SC_MINIMIZE` | P0 | Win+D 行为需实测（见 Q11） | widget-contract §7 |
+| DA-40 | 组件窗口不进任务栏、不进 Alt+Tab：`ShowInTaskbar=false` + `WS_EX_TOOLWINDOW`；无最小化按钮；拦截 `WM_SYSCOMMAND / SC_MINIMIZE` | P0 | Win+D 按 Q11 矩阵实测；`SC_MINIMIZE` 只覆盖最小化按钮，**不覆盖 Win+D** | widget-contract §7 · Q11 |
 | DA-41 | 显示不抢焦点：`SWP_NOACTIVATE` / `SW_SHOWNOACTIVATE`；用户点击时正常激活（**不要**加 `WS_EX_NOACTIVATE`） | P0 | 组件输入框可打字 | widget-contract §7 |
 | DA-42 | 点击穿透开关：`WS_EX_TRANSPARENT` 位切换，可由热键/菜单触发 | P0 | 穿透时点击落到下层窗口 | widget-contract §4 §6 |
 | DA-43 | 透明度：native 由应用自绘、宿主只传值；wasm 由宿主设窗口不透明度；范围 `opacity.default` / `min` | P0 | 半透明只对 native 承诺 | widget-contract §6 · 风险 R4 |
@@ -209,6 +210,13 @@
 
 **配套约束（不属于壳，但要同批定）**：注册表 DTO（`McpServerDescriptor` 等）放 `Shared.Contracts`，壳与 Agent 都只依赖它；**Agent 不得引用 `Shell.Contracts`**（依赖守卫禁止 Agent → `src/Shell/`）。Agent 侧动态注册（按 `appId` 做 add/update/remove、保留用户启停与审批策略、端口变化重连）属于 P3 的 `agent-mcp-client.md`，不重复算作壳需求。
 
+### 3.14 N. 端点与存储
+
+| # | 需求 | 优先级 | 验收要点 | 依据 |
+| --- | --- | --- | --- | --- |
+| DA-93 | 宿主回环监听器：`SDemo.Shell.Host` 唯一监听 `127.0.0.1:0`；启动顺序 bind → `client-token` → `host.json` → 扫描/拉起；`host.json` 含 pid / port / startedAt / 版本 / `clientTokenPath` / `registryRevision`；client token 每壳启动轮换、ACL 当前用户；app token 按 `appId` 配对，两类 token 不复用 | P0 | 应用拉起前 `host.json` 已落盘；壳重启后旧 client token 失效；带 `Origin` / 非法 `Host` 头被拒 | Q2 · host-endpoints §2–§4 |
+| DA-94 | 壳存储：`settings.json`（壳级）+ `widgets.json`（按 `widgetId`）两份 Schema；原子写 + `.bak` + 损坏隔离 + `schemaVersion` 迁移；只存 UI 状态，不存 token / 业务数据 / 清单字段 | P0 | 写入中断不产生半截 JSON；坏文件走 `.bak` 或默认；未知字段读→写后保留 | Q14 · shell-storage §6–§7 |
+
 ---
 
 ## 4. 跨应用倒逼出来的需求
@@ -220,7 +228,7 @@
 | planner | PL-07 桌面组件：≤8 条待办、快速新增、勾选；半透明、不抢焦点、输入框可打字 | native + floating；`focus.stealOnShow=false` + `activateOnClick=true`；透明度由应用自绘 | DA-05 / 38–43 / 47 ✓ |
 | planner | PL-08 提醒：到期前 N 分钟通知，「走宿主通知通道」 | `POST /v1/notify`；但应用必须存活才能触发 → 与空闲退出冲突，见 Q4 | DA-37 部分 ✓ |
 | meeting | MT-13 桌面录音组件：计时 + 结束按钮；半透明、置顶、不抢焦点 | 同一套 native 机制，无新增宿主需求 | DA-38–43 ✓ |
-| kb | v1 无桌面组件 | 只要求 `apps\` 为空时宿主能正常启动并给出空态 | DA-16 + Q14 |
+| kb | v1 无桌面组件 | 只要求 `apps\` 为空时宿主能正常启动并给出空态 | DA-16 + DA-94 |
 | meeting | 深链 `sdemo.agent://arrange?...` | **不进宿主**：协议注册与解析归 DesktopAgent | 非宿主需求 |
 | 全部应用 | 跨应用引用 URI `sdemo.<app>/<entity>/<id>` | 宿主不解析、不转发、不校验（只存字符串的应用自己负责） | DA-89 ✓ |
 | 全部应用 | 工具面 50+ 个，靠 Agent 路由与审批 | 宿主不参与工具暴露与审批 | DA-80 / 89 ✓ |
@@ -262,7 +270,7 @@
 | # | 议题 | 现状 | 建议 |
 | --- | --- | --- | --- |
 | **Q1** | v1 是否实现 wasm 渲染器与桌面层 | 契约写了两种 renderer；S1 验收只有 native；当前 planner / meeting 都是 native，桌面层无真实需求 | **v1 只做 native**，wasm（DA-57–61）与桌面层（DA-07/59）降为 P2，契约解析保留但「实现未就绪」时禁用组件。R4 的亚克力问题一并推迟 |
-| **Q2** | 宿主自身回环端点未定义 | `SDEMO_HOST_URL` 只说应用回调宿主，但宿主的端口、启动时序、应用→宿主请求的鉴权方式、监听器归属都没写；native 组件的 `register` 在 S1 就依赖它 | **P0 契约缺口**：补一节「宿主 HTTP 端点」——端口由宿主随机绑定、写进 `runtime.json`、app→host 复用 Bearer、401 语义与 host→app 一致 |
+| **Q2** | 宿主自身回环端点未定义 | `SDEMO_HOST_URL` 只说应用回调宿主，但宿主的端口、启动时序、应用→宿主请求的鉴权方式、监听器归属都没写；native 组件的 `register` 在 S1 就依赖它 | **已确认（2026-10-31）**：见 [host-endpoints](host-endpoints.md)——唯一监听者 `Shell.Host`、`host.json` 发现、app token / client token 两类身份、`ensure` 语义；对应 DA-93 |
 | **Q3** | 壳的「主窗口 / 面板」范围 | DA-09 写「显示主窗口」，但壳没有聊天；产品地图只写「托盘、面板、组件设置表单」 | 建议只做一个**组件管理 + 设置 + 诊断**面板；不承载聊天、不承载业务视图。面板关闭 = 回托盘 |
 | **Q4** | 提醒 vs 空闲退出（真实冲突） | planner 要定时提醒，但应用空闲 5 分钟退出；宿主不能存提醒时间（那是业务数据） | 需要一条**应用可声明「暂不 idle 退出」**的协议（`/v1/widgets/{id}/request` 增 `idleHold` 或 `state` 增 `keepAlive`）。宿主只认标志、不存业务；planner 在有未触发提醒时保持常驻。P1 先把挂点留出来 |
 | **Q5** | 组件数量上限 | 文档只写「建议 4」 | 建议 **默认 4、可在 `settings.json` 调到 8**；超限时新组件加载失败并提示，不静默丢弃 |
@@ -271,10 +279,10 @@
 | **Q8** | 权限与组件开关存哪 | `permissions` 授权、组件显示/隐藏都没说落哪个文件 | 建议都进 `widgets.json`（按组件 id 分组）：权限授权、`visible`、`enabled`、config 值。`settings.json` 只放壳级设置（自启、热键、上限、语言） |
 | **Q9** | 平台矩阵 | 文档默认 Windows，未写最低版本与架构 | 建议 **Win10 19041+ / Win11，x64 only**；arm64 不承诺（Win+D、WorkerW、WebView2 都要单独验） |
 | **Q10** | 应用未就绪时通知怎么办 | `notify` 是应用→宿主，应用挂了就发不出 | 建议**宿主不做通知队列**（暂存即业务数据），由应用在下次启动时重试；壳只保证「应用活着时能弹」 |
-| **Q11** | Win+D / `SC_MINIMIZE` 实测结论 | 文档明确要求 P1 首日验证，且警告不要提前承诺「永远可见」 | **P1 门禁项**：实测通过才保留 DA-40 的承诺；否则降级为「普通置顶窗口」，并在文档里写明 |
+| **Q11** | Win+D / `SC_MINIMIZE` 实测结论 | 文档明确要求 P1 首日验证，且警告不要提前承诺「永远可见」；`SC_MINIMIZE` 只拦最小化按钮，拦不住 Explorer 的「显示桌面」 | **已确认（2026-10-31）**：P1 实测矩阵判定 A（组件活过 Win+D，无需处理）/ B（被收起）；B 用**前台轮询状态机**恢复，禁止键盘钩子与操作非本组件窗口；DA-40 验收同步改写。见 §7.2 场景 15 |
 | **Q12** | 壳自身单实例 / 升级 / 自更新 | 只写了应用单实例与升级，没写壳自己 | 建议：壳也走 `SDemo.Shell` 互斥量，重复启动 = 激活面板；v1 无自动更新，升级 = 退出后替换 zip |
 | **Q13** | 首启动 `apps\` 为空 | 没有安装向导，也没有空态文案 | 建议面板空态给「安装应用」入口（选 zip / 打开安装目录），并提示数据保留位置 |
-| **Q14** | `widgets.json` / `settings.json` 没有 Schema | 两份文件被多处引用（布局、权限、config、显示状态），字段只在正文散写 | **P0 缺口**：先定 Schema（含 per-monitor 键、可见性、config 值、权限授权、版本号），再写实现；放 `docs/architecture/` 或 `contracts/` |
+| **Q14** | `widgets.json` / `settings.json` 没有 Schema | 两份文件被多处引用（布局、权限、config、显示状态），字段只在正文散写 | **已确认（2026-10-31）**：见 [shell-storage](shell-storage.md) + `contracts/schemas/*.schema.json`；对应 DA-94 |
 | **Q15** | 宿主是否做 MCP 聚合 / 网关 | 协议只允许宿主「透传」`app.json.mcp`，不解析工具语义；MCP client 是 Agent，当前靠 `runtime.json` + Agent `settings.json` 发现，没有动态目录 | **已确认（2026-10-31）：做只读发现（DA-90–91），不做调用代理**。要动态发现就加 `GET /v1/apps` 注册表，Agent 拉取后**仍直连**各应用；代理的五条反对理由见 §6.1 |
 | **Q16** | 批量启动与每应用开机自启 | 现有只有「壳自启 + 应用按需拉起 + `idleTimeoutMs`」；`launchOnStartup` 只是组件清单字段，没有宿主侧策略 | 在 `app.json` 增 `startup: onDemand / host / manual`；壳只注册**一个** Run 项，启动后按策略错峰拉起；面板提供显式「全部启动」，并发 ≤2、逐个走骨架态。默认仍 `onDemand` |
 | **Q17** | 后端 + 双 UI 的进程形态 | D8 是「一个 exe：无窗口内核 + Blazor 主窗口 + native 组件」；`app.json` 只有一个 `executable` 与一个互斥量 | **保持单 exe 三角色**（角色由启动参数/模式切换）。宿主不做多进程编排；确需分离时由应用自带 supervisor，并另立 `processes[]` 契约（v1 不做） |
@@ -285,7 +293,7 @@
 
 ## 6.1 为什么宿主不做 MCP 代理
 
-「Agent 通过 DesktopAssembly 拿到所有应用的 MCP」听起来像一个网关，但落到这套架构上会同时破坏四件事：
+「Agent 通过 DesktopAssembly 拿到所有应用的 MCP」听起来像一个网关，但落到这套架构上会同时破坏五件事：
 
 | # | 问题 | 具体后果 |
 | --- | --- | --- |
@@ -304,7 +312,7 @@
 ### 7.1 本期包含
 
 - **产品能力**：DA-01 ~ DA-06（+ Q11 实测）
-- **契约/进程/IPC/窗口/布局**：DA-12 ~ DA-16、DA-19 ~ DA-28、DA-31 ~ DA-35、DA-38 ~ DA-43、DA-46 ~ DA-47、DA-49 ~ DA-55、DA-56、DA-67、DA-73 ~ DA-79、DA-82 ~ DA-84、DA-87、DA-89
+- **契约/进程/IPC/窗口/布局**：DA-12 ~ DA-16、DA-19 ~ DA-28、DA-31 ~ DA-35、DA-38 ~ DA-43、DA-46 ~ DA-47、DA-49 ~ DA-55、DA-56、DA-67、DA-73 ~ DA-79、DA-82 ~ DA-84、DA-87、DA-89、DA-93 ~ DA-94
 - **明确排除**：wasm / 桌面层（DA-07、DA-57 ~ DA-61）、config 表单（DA-08、62、63）、主题强调色（DA-64）、权限 UI（DA-66）、热键/自启（DA-10、11、70 ~ 72）、通知（DA-37）、诊断面板完整版（DA-09、69 先做最小版）
 - **P3 前置（不在 P1）**：DA-90–92 只读注册表与 ensure。P1 可先留端点与 DTO 骨架，等 Agent MCP client 落地时再接通
 
@@ -326,7 +334,7 @@
 | 12 | 退出顺序 | 壳退出 2s 内发出 shutdown；未退的被终止；`widgets.json` 已保存 |
 | 13 | 协议 | fake app server 验 401 / 版本不符 / 启动超时 / `HOST_POLICY_DENIED` |
 | 14 | 资源 | 空载 + 1 个 native 组件 ≤ 120MB（不含渲染进程） |
-| 15 | Win+D | 实测记录结论；未通过则明确降级文案 |
+| 15 | Win+D | A：Win+D 后组件仍可见 → 记录结论并关闭 Q11；B：被收起 → 前台状态机恢复，第二下 Win+D 或离开桌面后可见且不抢焦点 |
 
 ---
 
@@ -340,6 +348,8 @@
 | DA-01–11 原始条目与非功能指标 | [sdemo-brand-blueprint.md](sdemo-brand-blueprint.md) §A |
 | 分期、准入规则、跨应用引用、工具面膨胀 | [workbench-roadmap.md](workbench-roadmap.md) |
 | 四工程模板、依赖规则、slnf、打包、测试分层 | [repository-layout.md](repository-layout.md) |
+| 宿主回环端点、`host.json`、client token、`ensure` | [host-endpoints.md](host-endpoints.md) |
+| `settings.json` / `widgets.json`、原子写、迁移 | [shell-storage.md](shell-storage.md) · [settings.schema.json](../../contracts/schemas/settings.schema.json) · [widgets.schema.json](../../contracts/schemas/widgets.schema.json) |
 | 工作区入口（状态 / 命令） | [workspaces/shell.md](../../workspaces/shell.md) |
 
 ---
@@ -350,6 +360,9 @@
 | --- | --- | --- | --- |
 | 2026-10-31 | 宿主是否做 MCP 总控 | **只做发现，不做代理**；Agent 仍是唯一 MCP client，直连各应用 | Q15 · DA-90–91 · §6.1 |
 | 2026-10-31 | Agent 调 MCP 时应用未启动 | **方案 A**：壳提供 `POST /v1/apps/{appId}/ensure`，独立 client token | Q19 · DA-92 · §4.1 |
+| 2026-10-31 | 宿主回环端点与身份 | 新增 [host-endpoints](host-endpoints.md)：单监听器 + `host.json` + client/app 两类 token + `ensure` | Q2 · DA-93 |
+| 2026-10-31 | 壳状态文件 | 新增 [shell-storage](shell-storage.md)：两份 Schema + 原子写 + `.bak` + 迁移 + 损坏隔离 | Q14 · DA-94 · `contracts/schemas/` |
+| 2026-10-31 | Win+D | P1 实测 A/B；B 用前台轮询状态机，不装键盘钩子、不操作非本组件窗口 | Q11 · DA-40 · §7.2 |
 
-两条决策都不改变宿主的三条硬约束：无业务数据、无模型凭证、只做窗口与进程策略。
+这些决策都不改变宿主的三条硬约束：无业务数据、无模型凭证、只做窗口与进程策略。
 </content>
