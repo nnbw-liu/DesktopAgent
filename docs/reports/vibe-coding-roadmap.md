@@ -1,7 +1,7 @@
 # Vibe Coding 路线图（2026-10-22 确认版）
 
 > 本文件是总纲。每期任务单独成文（P1–P7），执行时先改本文件的状态表，再动代码。
-> 关联：[README](../../README.md) · [插件系统](../architecture/plugin-system.md) · [沙箱开发手册](../architecture/sandbox-development-manual.md)
+> 关联：[README](../../README.md) · [插件系统](../architecture/detail/plugin-system.md) · [沙箱开发手册](../architecture/detail/sandbox-development-manual.md)
 
 ## 1. 目标
 

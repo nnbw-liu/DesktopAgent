@@ -166,7 +166,7 @@ escape hatch：search_capabilities(query) → 返回可用工具名 + 技能名 
 
 ### M4 路由升级与评测（3–4 天）✅ 已实施
 
-> 实施细节与偏差见 [§11](#11-m4-实施记录)；报告见 [../reports/m4-report.md](../reports/m4-report.md)；评测数据见 [../reports/m4-routing-eval.json](../reports/m4-routing-eval.json)。
+> 实施细节与偏差见 [§11](#11-m4-实施记录)；报告见 [../reports/m4-report.md](../reports/m4-report.md)；评测数据见 [../reports/data/m4-routing-eval.json](../reports/data/m4-routing-eval.json)。
 
 范围：
 
@@ -357,7 +357,7 @@ M1–M4 解决的是「从很多工具里挑哪些」，但从未回答「这一
 
 ## 13. P1b：曝光面按任务档稳定 + 工具描述带决策规则（2026-10-24）
 
-配套记录见 [dsh-reasoning-migration.md §11](dsh-reasoning-migration.md#11-p1b-实施记录工具描述--曝光面--同轮补齐--删-plan)。
+配套记录见 [dsh-reasoning-migration.md §11](detail/dsh-reasoning-migration.md#11-p1b-实施记录工具描述--曝光面--同轮补齐--删-plan)。
 
 ### 问题
 

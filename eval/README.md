@@ -33,17 +33,17 @@ eval/
 ```powershell
 # 离线规则（无网络、无模型）
 dotnet run --project tools/routing-eval -c Release -- --mode rules `
-  --out docs/reports/m4-routing-eval.json
+  --out docs/reports/data/m4-routing-eval.json
 
 # 在线小模型（从 %APPDATA%\SDemo\DesktopAgent\settings.json 读取并解密 Key）
 dotnet run --project tools/routing-eval -c Release -- --mode live `
   --provider ds --model deepseek-flash `
-  --out docs/reports/m4-routing-eval-live.json
+  --out docs/reports/data/m4-routing-eval-live.json
 
 # 对所有 case 施压，检查建议是否挤掉必要工具
 dotnet run --project tools/routing-eval -c Release -- --mode live `
   --provider ds --model deepseek-flash --always-advise `
-  --out docs/reports/m4-routing-eval-live-always.json
+  --out docs/reports/data/m4-routing-eval-live-always.json
 ```
 
 每个 case 输出 `expectedTools / exposedTools / missing / forbiddenExposed`；命中 = 期望工具全部暴露且禁用工具未暴露。默认阈值 90%，低于阈值返回退出码 2。`--only R08,R19` 可只跑指定用例，`--timeout` 控制单次分类超时。
@@ -95,7 +95,7 @@ dotnet run --project tools/AgentEval -c Release -- `
 
 `--only T01,T02` 可只跑指定任务。`--keep-work` 保留 worktree 便于手工复核。
 
-Round 1 / Round 2 的实际数字与结论见 [p7-report.md](../docs/plans/p7-report.md)；结果目录说明见 [results/README.md](results/README.md)。
+Round 1 / Round 2 的实际数字与结论见 [p7-report.md](../docs/reports/p7-report.md)；结果目录说明见 [results/README.md](results/README.md)。
 
 修复后的运行器在回灌判定前会临时注入隐藏测试，验收完立即清掉，避免“没改文件但既有测试绿”被误判为通过；不要再用 `round1/full-32k-invalid-repair` 的数据做基线。
 

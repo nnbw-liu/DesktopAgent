@@ -2,7 +2,7 @@
 
 > 状态：已确认，待实施（S0 契约先行，未动代码）
 > 决定日期：2026-10-28
-> 关联：[组件契约](widget-contract.md) · [宿主控制协议](host-protocol.md) · [待办 MCP 工具面](todo-mcp-surface.md) · [插件系统](plugin-system.md) · [README](../../README.md)
+> 关联：[组件契约](widget-contract.md) · [宿主控制协议](host-protocol.md) · [待办 MCP 工具面](todo-mcp-surface.md) · [插件系统](detail/plugin-system.md) · [README](../../README.md)
 
 ---
 

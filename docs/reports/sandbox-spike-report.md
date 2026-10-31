@@ -1,6 +1,6 @@
 # S1 AppContainer 可行性验证记录
 
-> 阶段：S1（对应 `docs/architecture/sandbox-development-manual.md` §5）
+> 阶段：S1（对应 `docs/architecture/detail/sandbox-development-manual.md` §5）
 > 日期：2026-10-21
 > 结论：**cmd 与 PowerShell 5.1 均能在 AppContainer 内运行，隔离能力符合预期，进入 S2，默认 AppContainer 路线。**
 

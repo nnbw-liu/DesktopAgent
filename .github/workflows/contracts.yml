@@ -1,0 +1,51 @@
+name: Repo guards
+
+# 文档与仓库布局门禁：体量、死链、脏文件、工作区清单、依赖边、契约同改。
+# 不需要 .NET，单作业几十秒；与 ci.yml（构建 + 测试）分开，失败原因更清楚。
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: guards-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  guards:
+    name: Docs / layout guards
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # 契约同改检查要用 merge-base，需要完整历史。
+          fetch-depth: 0
+
+      - name: Run guards
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq 'pull_request') {
+              git fetch --no-tags origin $env:GITHUB_BASE_REF
+              $base = "origin/$env:GITHUB_BASE_REF"
+          }
+          else {
+              $base = "${{ github.event.before }}"
+          }
+
+          if ([string]::IsNullOrWhiteSpace($base) -or $base -eq '0000000000000000000000000000000000000000') {
+              Write-Host "没有可用的 base（$base），跳过契约同改检查"
+              ./tools/check-repo-guards.ps1
+          }
+          else {
+              ./tools/check-repo-guards.ps1 -Base $base
+          }

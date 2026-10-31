@@ -56,7 +56,7 @@
 
 环境：LM Studio `http://localhost:1234/v1`，模型 `qwen3.5-4b`（`Q4_K_M`，VLM，capabilities 只有 `tool_use`），8K 档，Compact，`max_tokens=2048`，`CompactMaxToolCalls=8`，宿主每任务 `git reset --hard` 后单独跑，避免任务间污染；`P5_REPAIR=1` 允许验证失败后续跑 1 次。
 
-原始结果（含每次工具轨迹与输出）：[p6-bench-results-2026-10-23.json](p6-bench-results-2026-10-23.json)。
+原始结果（含每次工具轨迹与输出）：[p6-bench-results-2026-10-23.json](data/p6-bench-results-2026-10-23.json)。
 
 ### 5.1 代表结果（每个任务取最近一次通过/失败）
 

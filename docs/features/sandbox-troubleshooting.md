@@ -1,7 +1,7 @@
 # 沙箱故障排查
 
 本文对应 S1–S6 的 Windows 沙箱实现。开发细节见
-[sandbox-development-manual.md](../architecture/sandbox-development-manual.md)，S6 验收见
+[sandbox-development-manual.md](../architecture/detail/sandbox-development-manual.md)，S6 验收见
 [sandbox-s6-report.md](../reports/sandbox-s6-report.md)。
 
 ## 先看这三处

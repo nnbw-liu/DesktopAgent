@@ -2,7 +2,7 @@
 
 > 期次：P5（第 5 期）　分支：`feature/vibe-p5-task-loop`　状态：✅ 完成（5 任务基准 4/5）
 > 配套文档：[task-loop.md](../architecture/task-loop.md)　原始计划：[p5-task-loop.md](p5-task-loop.md)
-> 真机工具：[tools/p5-bench](../../tools/p5-bench) · 数据：[p5-bench-data.json](p5-bench-data.json)
+> 真机工具：[tools/p5-bench](../../tools/p5-bench) · 数据：[p5-bench-data.json](data/p5-bench-data.json)
 
 ## 1. 交付物
 

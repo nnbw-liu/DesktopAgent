@@ -1,7 +1,7 @@
 # P2 golden：压缩后 10 问
 
 > 目的：验证「压缩后模型仍能回答只有早期历史才知道的约束」。
-> 工具：[tools/p2-golden](../../tools/p2-golden/Program.cs) · 原始数据：[8K](p2-golden-data.json)、[8K 强制兜底](p2-golden-fallback-data.json)、[32K](p2-golden-32k-data.json)
+> 工具：[tools/p2-golden](../../tools/p2-golden/Program.cs) · 原始数据：[8K](data/p2-golden-data.json)、[8K 强制兜底](data/p2-golden-fallback-data.json)、[32K](data/p2-golden-32k-data.json)
 > 运行：`dotnet run --project tools/p2-golden -c Release`（可选 `P2_PROFILE=32K`、`P2_TURNS=300`、`P2_FORCE_FALLBACK=1`）
 
 ## 1. 方法
