@@ -1,7 +1,7 @@
 # Agent 工作区规划（让 agent 只读该读的）
 
 > 状态：规划稿，2026-10-31
-> 关联：[仓库规划](repository-layout.md) · [品牌蓝图](sdemo-brand-blueprint.md)
+> 关联：[仓库规划](../../../docs/repository-layout.md) · [品牌蓝图](../../../docs/sdemo-brand-blueprint.md)
 > 前提：仓库不拆（单仓多产品），但**喂给 agent 的上下文必须按工作区物理收窄**。
 
 ---
