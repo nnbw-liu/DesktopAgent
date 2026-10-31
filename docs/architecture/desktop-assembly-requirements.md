@@ -40,9 +40,9 @@
 | L 工程与非功能 | DA-82–89 | 8 | 四工程 + slnf、依赖规则、内存、冷启动、打包、契约同改、指令下发、MCP 透传 |
 | M 发现与接入 | DA-90–92 | 3 | 只读 MCP 注册表、注册表鉴权、按需拉起 ensure（不做代理） |
 | N 端点与存储 | DA-93–94 | 2 | 宿主回环监听器 / `host.json` / client-token、两份状态文件的 Schema 与原子写 |
-| O 决策补充 | DA-95–99 | 5 | `idleHold`、启动策略、壳单实例、空态安装入口、平台矩阵 |
+| O 决策补充 | DA-95–100 | 6 | `idleHold`、启动策略、壳单实例、空态安装入口、平台矩阵、面板范围 |
 
-合计 **99 条**。优先级沿用蓝图口径：**P0 必须 / P1 应该 / P2 可选**。
+合计 **100 条**。优先级沿用蓝图口径：**P0 必须 / P1 应该 / P2 可选**。
 
 ---
 
@@ -58,7 +58,7 @@
 | DA-04 | 崩溃退避重启 3 次后转错误态，组件保留占位卡片 | P0 | 重启后回原位 | 蓝图 §A |
 | DA-05 | 跨进程管控 native 窗口：位置、层级、显隐、穿透位 | P0 | 白名单 6 个 Win32 操作，禁止 `SetParent` | 蓝图 §A |
 | DA-06 | 位置与布局持久化（DIP + 显示器标识），多屏拔插后回落 | P0 | 换分辨率不丢布局 | 蓝图 §A |
-| DA-07 | 桌面层（`layer=desktop`）仅对 wasm 组件开放 | P1 | native 请求时返回 `HOST_POLICY_DENIED` | 蓝图 §A |
+| DA-07 | 桌面层（`layer=desktop`）仅对 wasm 组件开放 | P2 | native 请求时返回 `HOST_POLICY_DENIED` | 蓝图 §A · Q1 |
 | DA-08 | 组件设置表单按 Schema 子集渲染，不改应用代码 | P1 | 支持 boolean / integer / string(enum) | 蓝图 §A |
 | DA-09 | 托盘菜单：显示主窗口、组件诊断、退出 | P1 | 诊断含 pid / 端口 / 最后错误 | 蓝图 §A |
 | DA-10 | 快捷键唤起组件（如 `Ctrl+Alt+T`），可改 | P2 | 冲突时提示 | 蓝图 §A |
@@ -140,13 +140,13 @@
 | # | 需求 | 优先级 | 验收要点 | 依据 |
 | --- | --- | --- | --- | --- |
 | DA-56 | `native`：应用自建窗口，宿主不加载任何程序集，只做跨进程管控 | P0 | 避免 `AssemblyLoadContext` 版本矩阵 | widget-contract §5 |
-| DA-57 | `wasm`：宿主建窗 + 挂 WebView2 + 加载 `payload\index.html`，布局全部由宿主执行 | P1 | 应用无需程序集 | widget-contract §5 |
-| DA-58 | 桌面端所有 WebView2 复用同一个 `CoreWebView2Environment`（条件：实现 wasm） | P0* | 不出现 N 套 browser 进程与缓存目录 | desktop-shell §3 #6 |
-| DA-59 | 桌面层：`layer=desktop` 仅 wasm，`SetParent` 到 `WorkerW`，与置顶互斥 | P1 | native 请求返回 `HOST_POLICY_DENIED` | widget-contract §5 §6 |
-| DA-60 | wasm 限制：不支持半透明/点击穿透；Win11 走亚克力后备，其余不透明 | P1 | 不承诺做不到的效果 | widget-contract §5 · R4 |
-| DA-61 | wasm 首屏骨架：Blazor WASM 首次 ~1s+，之后走缓存 | P1 | 首屏不白窗 | widget-contract §5 |
+| DA-57 | `wasm`：宿主建窗 + 挂 WebView2 + 加载 `payload\index.html`，布局全部由宿主执行 | P2 | 应用无需程序集 | widget-contract §5 · Q1 |
+| DA-58 | 桌面端所有 WebView2 复用同一个 `CoreWebView2Environment`（条件：实现 wasm） | P2 | 不出现 N 套 browser 进程与缓存目录 | desktop-shell §3 #6 |
+| DA-59 | 桌面层：`layer=desktop` 仅 wasm，`SetParent` 到 `WorkerW`，与置顶互斥 | P2 | native 请求返回 `HOST_POLICY_DENIED` | widget-contract §5 §6 |
+| DA-60 | wasm 限制：不支持半透明/点击穿透；Win11 走亚克力后备，其余不透明 | P2 | 不承诺做不到的效果 | widget-contract §5 · R4 |
+| DA-61 | wasm 首屏骨架：Blazor WASM 首次 ~1s+，之后走缓存 | P2 | 首屏不白窗 | widget-contract §5 |
 
-`P0*` = 条件性 P0：只有落地 wasm 渲染器时才必须。
+> wasm 相关条目当前为 P2（Q1：v1 只做 native）。解析器仍保留契约校验，遇到 wasm 组件时禁用并提示。
 
 ### 3.8 H. 设置、主题与语言
 
@@ -218,7 +218,7 @@
 | DA-93 | 宿主回环监听器：`SDemo.Shell.Host` 唯一监听 `127.0.0.1:0`；启动顺序 bind → `client-token` → `host.json` → 扫描/拉起；`host.json` 含 pid / port / startedAt / 版本 / `clientTokenPath` / `registryRevision`；client token 每壳启动轮换、ACL 当前用户；app token 按 `appId` 配对，两类 token 不复用 | P0 | 应用拉起前 `host.json` 已落盘；壳重启后旧 client token 失效；带 `Origin` / 非法 `Host` 头被拒 | Q2 · host-endpoints §2–§4 |
 | DA-94 | 壳存储：`settings.json`（壳级）+ `widgets.json`（按 `widgetId`）两份 Schema；原子写 + `.bak` + 损坏隔离 + `schemaVersion` 迁移；只存 UI 状态，不存 token / 业务数据 / 清单字段 | P0 | 写入中断不产生半截 JSON；坏文件走 `.bak` 或默认；未知字段读→写后保留 | Q14 · shell-storage §6–§7 |
 
-### 3.15 O. 决策补充（Q4 / Q12 / Q13 / Q16 / Q9）
+### 3.15 O. 决策补充（Q1 / Q3 / Q4 / Q9 / Q12 / Q13 / Q16）
 
 | # | 需求 | 优先级 | 验收要点 | 依据 |
 | --- | --- | --- | --- | --- |
@@ -227,6 +227,7 @@
 | DA-97 | 壳单实例与升级：互斥量 `SDemo.Shell`，重复启动 = 激活面板；v1 无自动更新，升级 = 退出后替换 zip | P1 | 第二次启动不产生第二个托盘进程 | Q12 |
 | DA-98 | 首启动空态：`apps\` 为空时面板显示「安装应用」入口（选 zip / 打开安装目录）+ 数据保留位置提示 | P1 | 空目录不是错误页，也不阻塞托盘 | Q13 |
 | DA-99 | 平台矩阵：Win10 19041+ / Win11，x64；arm64 不承诺（Win+D / WorkerW / WebView2 需单独验） | P1 | 安装包与文档写明最低版本；非目标平台不静默降级 | Q9 |
+| DA-100 | 壳面板范围：组件管理 + 设置 + 诊断；不承载聊天、业务视图，不加载应用业务代码；关闭面板回托盘 | P1 | 与托盘可逆；面板不成为第二个 Agent | Q3 |
 
 ---
 
@@ -274,6 +275,7 @@
 | 壳管理 DesktopAgent 的生命周期 | Agent 自己托盘/自启；壳最多提供「打开助理」入口（Q7） |
 | 后端 / UI 多进程编排 | 应用是单 exe 三角色；多进程由应用自带 supervisor，宿主只拉起一个 `executable`（Q17） |
 | 自动更新（壳与应用） | v1 便携包 + 手动替换；自动更新是另一套签名/回滚工程（Q12） |
+| 壳代应用转发 URI / 反向调用 Agent | 应用直接 `ShellExecute` 深链；壳不认识 Agent（Q18） |
 
 ---
 
@@ -283,9 +285,9 @@
 
 | # | 议题 | 现状 | 建议 |
 | --- | --- | --- | --- |
-| **Q1** | v1 是否实现 wasm 渲染器与桌面层 | 契约写了两种 renderer；S1 验收只有 native；当前 planner / meeting 都是 native，桌面层无真实需求 | **v1 只做 native**，wasm（DA-57–61）与桌面层（DA-07/59）降为 P2，契约解析保留但「实现未就绪」时禁用组件。R4 的亚克力问题一并推迟 |
+| **Q1** | v1 是否实现 wasm 渲染器与桌面层 | 契约写了两种 renderer；S1 验收只有 native；当前 planner / meeting 都是 native，桌面层无真实需求 | **已确认（2026-10-31）**：v1 只做 native；wasm（DA-57–61）与桌面层（DA-07/59）降为 P2；解析器保留，遇到 wasm 组件时禁用并提示「宿主未支持该渲染器」 |
 | **Q2** | 宿主自身回环端点未定义 | `SDEMO_HOST_URL` 只说应用回调宿主，但宿主的端口、启动时序、应用→宿主请求的鉴权方式、监听器归属都没写；native 组件的 `register` 在 S1 就依赖它 | **已确认（2026-10-31）**：见 [host-endpoints](host-endpoints.md)——唯一监听者 `Shell.Host`、`host.json` 发现、app token / client token 两类身份、`ensure` 语义；对应 DA-93 |
-| **Q3** | 壳的「主窗口 / 面板」范围 | DA-09 写「显示主窗口」，但壳没有聊天；产品地图只写「托盘、面板、组件设置表单」 | 建议只做一个**组件管理 + 设置 + 诊断**面板；不承载聊天、不承载业务视图。面板关闭 = 回托盘 |
+| **Q3** | 壳的「主窗口 / 面板」范围 | DA-09 写「显示主窗口」，但壳没有聊天；产品地图只写「托盘、面板、组件设置表单」 | **已确认（2026-10-31）**：面板只做**组件管理 + 设置 + 诊断**；不承载聊天/业务视图；关闭回托盘。见 DA-100 |
 | **Q4** | 提醒 vs 空闲退出（真实冲突） | planner 要定时提醒，但应用空闲 5 分钟退出；宿主不能存提醒时间（那是业务数据） | **已确认（2026-10-31）**：应用通过 `request.kind=idleHold` 声明暂不退出（DA-95）；宿主只存内存标志，不存提醒时间；planner 有未触发提醒时保持常驻 |
 | **Q5** | 组件数量上限 | 文档只写「建议 4」 | **已确认（2026-10-31）**：默认 **8**，`settings.json.components.limit` 可调（1–8）；后续要 >8 再改契约与 Schema |
 | **Q6** | 开机自启默认值 | 文档未定 | **已确认（2026-10-31）**：默认**开**（常驻外壳），首次运行在托盘菜单明示，可一键关 |
@@ -300,7 +302,7 @@
 | **Q15** | 宿主是否做 MCP 聚合 / 网关 | 协议只允许宿主「透传」`app.json.mcp`，不解析工具语义；MCP client 是 Agent，当前靠 `runtime.json` + Agent `settings.json` 发现，没有动态目录 | **已确认（2026-10-31）：做只读发现（DA-90–91），不做调用代理**。要动态发现就加 `GET /v1/apps` 注册表，Agent 拉取后**仍直连**各应用；代理的五条反对理由见 §6.1 |
 | **Q16** | 批量启动与每应用开机自启 | 现有只有「壳自启 + 应用按需拉起 + `idleTimeoutMs`」；`launchOnStartup` 只是组件清单字段，没有宿主侧策略 | **已确认（2026-10-31）**：`app.json.startup: onDemand / host / manual` + `widgets.json.startupOverride`；壳只注册一个 Run 项，按策略错峰拉起；面板「全部启动」并发 ≤2。见 DA-96 |
 | **Q17** | 后端 + 双 UI 的进程形态 | D8 是「一个 exe：无窗口内核 + Blazor 主窗口 + native 组件」；`app.json` 只有一个 `executable` 与一个互斥量 | **已确认（2026-10-31）**：保持单 exe 三角色（角色由启动参数/模式切换）；宿主不做多进程编排。见 §5 非目标 |
-| **Q18** | 应用能否反向调 Agent | 设计里只有 meeting 的深链 `sdemo.agent://arrange?...`；应用不直连 Agent，Agent 只做 MCP client | **沿用深链**（应用用 `ShellExecute` 打开 URI），不经宿主；Agent 回写走 `meeting_mark_action` / `todo_accept_draft`。可选再加宿主通用 `POST /v1/open-uri`，但不建议为单个场景引入 |
+| **Q18** | 应用能否反向调 Agent | 设计里只有 meeting 的深链 `sdemo.agent://arrange?...`；应用不直连 Agent，Agent 只做 MCP client | **已确认（2026-10-31）**：沿用深链（应用 `ShellExecute` 打开 URI），不经宿主；Agent 回写走 MCP。**不新增宿主 `open-uri` 转发**，见 §5 非目标 |
 | **Q19** | Agent 调 MCP 时应用没启动，谁拉起 | 文档只写「宿主按需拉起应用」，但 Agent 不是受管应用、不经过宿主；`idleTimeoutMs` 又会让应用 5 分钟后退出，中间没有桥 | **已确认（2026-10-31）：选 A**。壳加 `POST /v1/apps/{appId}/ensure`（DA-92），给 Agent 独立 client token，返回 `runtime.json` 指针并负责哈希校验 / 单实例 / 骨架超时；不采用 B（MCP 应用常驻） |
 
 ---
@@ -326,8 +328,8 @@
 ### 7.1 本期包含
 
 - **产品能力**：DA-01 ~ DA-06、DA-11（+ Q11 实测）
-- **契约/进程/IPC/窗口/布局**：DA-12 ~ DA-16、DA-19 ~ DA-28、DA-31 ~ DA-35、DA-37、DA-38 ~ DA-43、DA-46 ~ DA-47、DA-49 ~ DA-55、DA-56、DA-67、DA-71、DA-73 ~ DA-79、DA-82 ~ DA-84、DA-87、DA-89、DA-93 ~ DA-99
-- **明确排除**：wasm / 桌面层（DA-07、DA-57 ~ DA-61）、config 表单（DA-08、62、63）、主题强调色（DA-64）、权限 UI（DA-66）、热键/托盘入口（DA-10、70、72）、诊断面板完整版（DA-09、69 先做最小版）
+- **契约/进程/IPC/窗口/布局**：DA-12 ~ DA-16、DA-19 ~ DA-28、DA-31 ~ DA-35、DA-37、DA-38 ~ DA-43、DA-46 ~ DA-47、DA-49 ~ DA-55、DA-56、DA-67、DA-71、DA-73 ~ DA-79、DA-82 ~ DA-84、DA-87、DA-89、DA-93 ~ DA-100
+- **明确排除**：wasm / 桌面层（DA-07、DA-57 ~ DA-61，Q1 定 P2）、config 表单（DA-08、62、63）、主题强调色（DA-64）、权限 UI（DA-66）、热键/托盘入口（DA-10、70、72）、诊断面板完整版（DA-09、69 先做最小版）
 - **P3 前置（不在 P1）**：DA-90–92 只读注册表与 ensure。P1 可先留端点与 DTO 骨架，等 Agent MCP client 落地时再接通
 
 ### 7.2 验收场景（S1 口径）
@@ -381,6 +383,8 @@
 | 2026-10-31 | 生命周期与交互（Q4/Q6/Q7/Q12/Q13/Q16/Q17） | 按建议拍板：`idleHold`、自启默认开、壳不管理 Agent、壳单实例无自更新、空态安装入口、`startup` 策略 + 单一 Run 项、单 exe 三角色 | DA-95–98 · §5 |
 | 2026-10-31 | 环境、通知与上限（Q9/Q10/Q5） | Win10 19041+/Win11 x64；通知不做宿主队列；组件上限默认 8（可配置 1–8） | DA-99 · DA-37 · DA-84 |
 | 2026-10-31 | 权限与组件开关落盘 | 随 Q14 落定：全部进 `widgets.json` | Q8 |
+| 2026-10-31 | 渲染器范围与面板（Q1/Q3） | v1 只做 native，wasm/桌面层 P2；面板只做组件管理 + 设置 + 诊断 | DA-57–61 · DA-100 |
+| 2026-10-31 | 应用反向调 Agent | 深链 `sdemo.agent://` 由应用 `ShellExecute`，壳不转发、不代理 | Q18 · §5 |
 
 这些决策都不改变宿主的三条硬约束：无业务数据、无模型凭证、只做窗口与进程策略。
 </content>
