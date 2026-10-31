@@ -70,16 +70,16 @@
 │  └─ chats\
 ├─ DesktopAssembly\
 │  ├─ apps\                           ← 已安装应用（用户级，D13）
-│  │  └─ sdemo.todo\
+│  │  └─ sdemo.planner\
 │  │     ├─ app.json                  ← 应用清单（exe 路径 + 版本 + 哈希）
 │  │     ├─ widget.json               ← 组件清单（见 widget-contract.md）
 │  │     └─ payload\                  ← wasm 组件的 web 产物（native 组件可空）
 │  ├─ widgets.json                    ← 组件布局状态：位置 / 层级 / 显隐 / 锚点
 │  └─ settings.json
 └─ Apps\
-   └─ sdemo.todo\                     ← 应用自有数据，与安装目录分离
-      ├─ todos.db
-      ├─ todos.db-wal
+   └─ sdemo.planner\                     ← 应用自有数据，与安装目录分离
+      ├─ planner.db
+      ├─ planner.db-wal
       └─ outbox\                      ← 同步用的操作日志（见 §6）
 
 %LOCALAPPDATA%\SDemo\
@@ -89,7 +89,7 @@
 
 - 安装目录（`apps\`）与数据目录（`Apps\`）分离：卸载应用不能带走用户数据。
 - `runtime.json` 与 token 放 `%LOCALAPPDATA%`，因为它们**不可漫游**（端口与进程绑定本机）。
-- `todos.db` 放漫游目录，与现有 `chats\` 的约定一致；但**绝不允许**把 `.db` 文件本身放进 OneDrive / 坚果云同步盘（文件锁 + 部分写会导致库损坏）。同步只走 `outbox\` 里的 op-log，见下。
+- `planner.db` 放漫游目录，与现有 `chats\` 的约定一致；但**绝不允许**把 `.db` 文件本身放进 OneDrive / 坚果云同步盘（文件锁 + 部分写会导致库损坏）。同步只走 `outbox\` 里的 op-log，见下。
 
 ## 6. 数据与同步基调（D9 / D10）
 

@@ -65,6 +65,7 @@ DesktopAgent/
 
 | 想知道 | 读这个 |
 | --- | --- |
+| **四个产品的规划 / 代码 / 数据分别在哪** | [product-map.md](docs/architecture/product-map.md) |
 | 三块分工、已确认决策、硬约束 | [desktop-shell.md](docs/architecture/desktop-shell.md) |
 | 组件清单 `widget.json` / 宿主控制协议 | [widget-contract.md](docs/architecture/widget-contract.md) · [host-protocol.md](docs/architecture/host-protocol.md) |
 | 仓库怎么摆、怎么发版、怎么分工作区 | [repository-layout.md](docs/architecture/repository-layout.md) · [agent-workspace.md](docs/architecture/agent-workspace.md) |

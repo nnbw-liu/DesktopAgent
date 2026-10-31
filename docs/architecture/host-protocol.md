@@ -22,13 +22,13 @@
 ```json
 {
   "schemaVersion": 1,
-  "id": "sdemo.todo",
+  "id": "sdemo.planner",
   "name": "待办",
   "version": "0.1.0",
   "executable": "payload\\Todo.exe",
   "arguments": ["--ipc"],
   "sha256": "9f2c…",
-  "singleInstanceMutex": "SDemo.App.sdemo.todo",
+  "singleInstanceMutex": "SDemo.App.sdemo.planner",
   "startupTimeoutMs": 8000,
   "idleTimeoutMs": 300000,
   "minHostApiVersion": "1.0",
@@ -100,7 +100,7 @@ Discovered → Validated → Launching → Handshaking → Ready ⇄ Idle → St
 
 ```
 POST /v1/handshake
-{ "hostVersion": "0.1.0", "hostApiVersion": "1.0", "widgetId": "sdemo.todo.widget" }
+{ "hostVersion": "0.1.0", "hostApiVersion": "1.0", "widgetId": "sdemo.planner.widget" }
 
 200 OK
 { "appVersion": "0.1.0", "hostApiVersion": "1.0", "capabilities": ["native-window", "notifications"] }

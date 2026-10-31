@@ -56,6 +56,7 @@ pwsh tools/ws.ps1 list                                    # 工作区清单
 
 | 想知道 | 读这个 |
 | --- | --- |
+| 四个产品的规划 / 代码 / 数据分别在哪 | `docs/architecture/product-map.md` |
 | 三块分工、硬约束 | `docs/architecture/desktop-shell.md` |
 | 组件清单、宿主协议 | `widget-contract.md` / `host-protocol.md` |
 | 仓库怎么摆、怎么发版 | `repository-layout.md` |

@@ -2,7 +2,7 @@
 
 > 状态：S0 草案，已确认方向，未实现
 > 关联：[总体架构](desktop-shell.md) · [宿主控制协议](host-protocol.md)
-> 适用范围：`sdemo.todo` 及后续所有要挂到桌面上的应用
+> 适用范围：`sdemo.planner` 及后续所有要挂到桌面上的应用
 
 ---
 
@@ -35,8 +35,8 @@
 ```json
 {
   "schemaVersion": 1,
-  "id": "sdemo.todo.widget",
-  "appId": "sdemo.todo",
+  "id": "sdemo.planner.widget",
+  "appId": "sdemo.planner",
   "name": "待办",
   "description": "桌面待办清单：随时记一条，勾掉一条。",
   "version": "0.1.0",

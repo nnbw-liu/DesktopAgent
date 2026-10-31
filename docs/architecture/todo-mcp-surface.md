@@ -27,10 +27,10 @@ MainAgent 侧的 server 注册项存 `settings.json`：
 
 ```json
 {
-  "id": "sdemo.todo",
+  "id": "sdemo.planner",
   "displayName": "待办",
   "transport": "http",
-  "urlFrom": "runtime:sdemo.todo",
+  "urlFrom": "runtime:sdemo.planner",
   "enabled": true,
   "approval": { "mode": "risk", "alwaysAllow": ["todo_list", "todo_get", "todo_stats"] }
 }
